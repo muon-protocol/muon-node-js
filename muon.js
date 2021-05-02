@@ -8,7 +8,7 @@ const emoji = require('node-emoji')
 
 class Muon extends Events{
   configs = {}
-  pearId = null;
+  peerId = null;
   libp2p = null;
   _plugins = {};
 
@@ -57,7 +57,7 @@ class Muon extends Events{
     //   nodeListener.pubsub.publish(REQUEST_BROADCAST_CHANNEL, uint8ArrayFromString('Hello world.'))
     // }, 1000)
 
-    this.pearId = peerId;
+    this.peerId = peerId;
     this.libp2p = libp2p;
   }
 

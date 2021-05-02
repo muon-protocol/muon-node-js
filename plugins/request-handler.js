@@ -41,8 +41,8 @@ class RequestHandlerPlugin extends BasePlugin{
 
   getPeerInfo(data){
     // console.log('RequestHandler.getPeerInfo', data)
-    let pearId = PeerId.createFromCID(data.pearId)
-    this.muon.libp2p.peerRouting.findPeer(pearId)
+    let peerId = PeerId.createFromCID(data.peerId)
+    this.muon.libp2p.peerRouting.findPeer(peerId)
       .then(peer =>{
         return this.muon.getPlugin('remote-call').call(peer, 'get-request', {_id: '6087ff68d4255e6e7c76778a'})
       })

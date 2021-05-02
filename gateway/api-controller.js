@@ -120,17 +120,17 @@ module.exports.getNewRequest = async (req, res, next) => {
   }
 }
 
-module.exports.getPearInfo = async (req, res, next) => {
-  let {pearId} = req.params || {}
+module.exports.getPeerInfo = async (req, res, next) => {
+  let {peerId} = req.params || {}
 
-  if(!pearId){
+  if(!peerId){
     return res.json({
       success: false,
-      message: 'Unknown pearId'
+      message: 'Unknown peerId'
     })
   }
 
-  sendToGateway({type: 'peer_info', pearId})
+  sendToGateway({type: 'peer_info', peerId})
 
   res.json({
     success: true
