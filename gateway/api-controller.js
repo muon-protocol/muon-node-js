@@ -1,33 +1,17 @@
-const crypto = require('../utils/crypto')
 const Sources = require('./sources')
+const fs = require('fs')
+const CID = require('cids');
 const Request = require('./models/Request')
 const Signature = require('./models/Signature')
 const NodeUtils = require('../utils/node-utils');
+const NodeCaller = require('./node-caller')
 const {timeout, getTimestamp} = require('../utils/helpers')
-const Redis = require('redis');
-const redis = Redis.createClient({
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT || 6379
-});
-
-redis.on("error", function(error) {
-  console.error(error);
-});
-
 
 module.exports.index = function (req, res, next) {
   res.json({
     status: 'API Its Working',
-    message: 'Welcome to RESTHub crafted with love!'
+    message: 'Welcome to MUON protocol!'
   });
-}
-
-function sendToGateway(data){
-  let redisMessage = JSON.stringify(data)
-  redis.lpush(process.env.REDIS_QUEUE, redisMessage);
-}
-
-function callGateway(data, callback){
 }
 
 module.exports.getNewRequest = async (req, res, next) => {
@@ -65,7 +49,7 @@ module.exports.getNewRequest = async (req, res, next) => {
 
     await NodeUtils.signRequest(newRequest);
 
-    sendToGateway({
+    NodeCaller.broadcast({
       type: 'new_request',
       peerId:  process.env.PEER_ID,
       id: newRequest._id
@@ -97,9 +81,9 @@ module.exports.getNewRequest = async (req, res, next) => {
       secondsToCheck += 0.25
     }
 
-    res.json({
-      success: confirmed,
+    let requestData = {
       symbol,
+      id: newRequest._id,
       price: price['price'],
       creator: process.env.SIGN_WALLET_ADDRESS,
       signatures: allSignatures.filter(sig => Object.keys(signers).includes(sig['owner'])).map(sig => ({
@@ -110,6 +94,20 @@ module.exports.getNewRequest = async (req, res, next) => {
       })),
       startedAt: startedAt,
       confirmedAt: newRequest.confirmedAt,
+    }
+
+    let cid
+
+    if(confirmed){
+      let content = JSON.stringify(requestData);
+      cid = await NodeUtils.createCID(newRequest)
+      fs.writeFileSync(`${__dirname}/../data/${cid.toString()}.req`, content)
+    }
+
+    res.json({
+      success: confirmed,
+      cid,
+      ...requestData
     })
   } catch (e) {
     console.log(e)
@@ -130,9 +128,27 @@ module.exports.getPeerInfo = async (req, res, next) => {
     })
   }
 
-  sendToGateway({type: 'peer_info', peerId})
+  NodeCaller.call('peer_info', {peerId: 'QmcrQZ6RJdpYuGvZqD5QEHAv6qX4BrQLJLQPQUrTrzdcgm'})
+    .then(result => {
+      res.json({
+        success: true,
+        result
+      })
+    })
 
-  res.json({
-    success: true
-  })
+}
+
+module.exports.getRequestContent = (req, res, next) => {
+  let {cid} = req.params;
+
+  NodeCaller.call('request_data', {cid})
+    .then(result => {
+      res.json({
+        success: true,
+        ...result
+      })
+    })
+    .catch(error => {
+      res.json(error)
+    })
 }

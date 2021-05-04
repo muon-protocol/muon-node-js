@@ -13,6 +13,7 @@
     "@nodeutils/defaults-deep": "^1.1.0",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",
+    "chokidar": "^3.5.1",
     "dotenv": "^8.2.0",
     "ethers": "^5.1.4",
     "events": "^3.3.0",

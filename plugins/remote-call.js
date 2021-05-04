@@ -1,12 +1,9 @@
 const BasePlugin = require('./base-plugin')
 const PeerInfo = require('peer-info')
 const pipe = require('it-pipe')
+const {newCallId} = require('../utils/helpers')
 
 const PROTOCOL = '/muon/remote-call/1.0.0'
-
-function newCallId() {
-  return Date.now().toString(32) + Math.floor(Math.random()*999999).toString(32);
-}
 
 class RemoteCall extends BasePlugin {
   _calls = {}

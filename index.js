@@ -1,4 +1,4 @@
-const Muon = require('./muon');
+const Muon = require('./core/muon');
 const Gateway = require('./gateway/index')
 
 function getEnvBootstraps(){
@@ -26,6 +26,7 @@ var muon;
       'ping-pong': [require('./plugins/ping-pong'), {}],
       // 'gw-log': [require('./plugins/gateway-log'), {}],
       'request-handler': [require('./plugins/request-handler'), {}],
+      'content-provider': [require('./plugins/content-provider'), {}],
     }
   })
 

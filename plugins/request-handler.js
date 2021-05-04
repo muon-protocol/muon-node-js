@@ -58,11 +58,14 @@ class RequestHandlerPlugin extends BasePlugin{
     let gatewayPlugin = this.muon.getPlugin('gateway-interface')
     gatewayPlugin.on('data/new_request', this.broadcastNewRequest)
     gatewayPlugin.on('data/peer_info', this.getPeerInfo.bind(this))
+    /**
+     * Remote calls registration
+     */
     this.muon.getPlugin('remote-call').on('remote:get-request', this.responseToRemoteRequestData.bind(this))
     this.muon.getPlugin('remote-call').on('remote:request-sign', this.responseToRemoteRequestSign.bind(this))
 
     /**
-     * Listen to network to get new requests
+     * Listen to network broadcast to get new requests
      */
     await this.muon.libp2p.pubsub.subscribe(REQUEST_BROADCAST_CHANNEL)
     this.muon.libp2p.pubsub.on(REQUEST_BROADCAST_CHANNEL, this.onRemoteRequestSign.bind(this))
