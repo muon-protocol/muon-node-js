@@ -1,7 +1,7 @@
 let express = require('express')
 let bodyParser = require('body-parser');
 let mongoose = require('mongoose');
-let apiRoutes = require("./api-routes")
+let api = require("./api")
 
 let app = express();
 
@@ -22,7 +22,7 @@ function start(options) {
   else
     console.log("Db connected successfully")
 
-  app.use('/api/v1/', apiRoutes)
+  app.use('/v1/', api)
 
   app.listen(port, host, function () {
     console.log(`Running gateway on port ${port} at ${host}`);

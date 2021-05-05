@@ -1,11 +1,11 @@
-const Sources = require('./sources')
+const Sources = require('../../sources')
 const fs = require('fs')
 const CID = require('cids');
-const Request = require('./models/Request')
-const Signature = require('./models/Signature')
-const NodeUtils = require('../utils/node-utils');
-const NodeCaller = require('./node-caller')
-const {timeout, getTimestamp} = require('../utils/helpers')
+const Request = require('../../models/Request')
+const Signature = require('../../models/Signature')
+const NodeUtils = require('../../../utils/node-utils');
+const NodeCaller = require('../../node-caller')
+const {timeout, getTimestamp} = require('../../../utils/helpers')
 
 module.exports.index = function (req, res, next) {
   res.json({
@@ -101,7 +101,7 @@ module.exports.getNewRequest = async (req, res, next) => {
     if(confirmed){
       let content = JSON.stringify(requestData);
       cid = await NodeUtils.createCID(newRequest)
-      fs.writeFileSync(`${__dirname}/../data/${cid.toString()}.req`, content)
+      fs.writeFileSync(`./data/${cid.toString()}.req`, content)
     }
 
     res.json({

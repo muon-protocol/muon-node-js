@@ -1,5 +1,5 @@
 let router = require('express').Router();
-const Controller = require('./api-controller');
+const Controller = require('./controller');
 
 router.get('/', Controller.index);
 

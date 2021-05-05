@@ -30,7 +30,7 @@ class ContentProvider extends BasePlugin {
       ignoreInitial: false,
       persistent: true,
       depth: 2,
-      cwd: `${__dirname}/../data`
+      cwd: `./data`
     });
     this.watcher
       .on('add', this.onNewFileAdd.bind(this))
@@ -39,7 +39,7 @@ class ContentProvider extends BasePlugin {
   }
 
   async responseToGatewayRequestData(data){
-    let filePath = `${__dirname}/../data/${data.cid}.req`
+    let filePath = `./data/${data.cid}.req`
     if(fs.existsSync(filePath, 'utf8')){
       let content = fs.readFileSync(filePath)
       let requestData = JSON.parse(content)
@@ -62,7 +62,7 @@ class ContentProvider extends BasePlugin {
   }
 
   async responseToRemoteRequestData(data){
-    let filePath = `${__dirname}/../data/${data.cid}.req`
+    let filePath = `./data/${data.cid}.req`
     if(fs.existsSync(filePath, 'utf8')){
       let content = fs.readFileSync(filePath)
       return JSON.parse(content)
