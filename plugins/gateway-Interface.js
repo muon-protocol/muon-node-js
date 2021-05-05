@@ -26,17 +26,25 @@ responseRedis.on('error', function(error) {
 
 class GatewayInterface extends BasePlugin{
 
-  async _onData(data){
+  async __onData(data){
     // console.log('gateway interface: ', data)
     this.emit('data', data)
     this.emit(`data/${data.type}`, data)
   }
 
-  async onRedisMessage(channel, message){
+  async __onGatewayCall(channel, message){
+    let data
     if(channel === GATEWAY_CALL_REQUEST){
       try {
-        let {callId, method, params} = JSON.parse(message);
-        let response = await this.emit(`call/${method}`, params)
+        data = JSON.parse(message);
+        let {callId, app, method, params} = data
+        let response
+        if(app){
+          response = await this.emit(`call/${app}/${method}`, params)
+        }
+        else{
+          response = await this.emit(`call/muon/${method}`, params)
+        }
         responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
           responseId: callId,
           response,
@@ -44,20 +52,32 @@ class GatewayInterface extends BasePlugin{
       }
       catch (e) {
         console.error(e)
+        responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
+          responseId: data ? data.callId : undefined,
+          error: e,
+        }))
       }
     }
   }
 
+  registerAppCall(app, method, callback){
+    this.on(`call/${app}/${method}`, callback)
+  }
+
+  registerMuonCall(method, callback){
+    this.on(`call/muon/${method}`, callback)
+  }
+
   async onStart(){
     callRedis.subscribe(GATEWAY_CALL_REQUEST)
-    callRedis.on('message', this.onRedisMessage.bind(this))
+    callRedis.on('message', this.__onGatewayCall.bind(this))
 
     while (true) {
       try {
         let [queue, dataStr] = await blpopAsync(process.env.REDIS_QUEUE, 0)
         let data = JSON.parse(dataStr);
         if(data) {
-          this._onData(data)
+          this.__onData(data)
         }
       }catch (e) {
         console.error(e)

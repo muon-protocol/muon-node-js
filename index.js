@@ -25,8 +25,8 @@ var muon;
       'gateway-interface': [require('./plugins/gateway-Interface'), {}],
       'ping-pong': [require('./plugins/ping-pong'), {}],
       // 'gw-log': [require('./plugins/gateway-log'), {}],
-      'request-handler': [require('./plugins/request-handler'), {}],
-      'content-provider': [require('./plugins/content-provider'), {}],
+      'stock-plugin': [require('./plugins/stock-plugin'), {}],
+      'stock-content-provider': [require('./plugins/stock-content-provider'), {}],
     }
   })
 

@@ -26,9 +26,14 @@ responseRedis.subscribe(GATEWAY_CALL_RESPONSE)
 responseRedis.on('message', (channel, message) => {
   if(channel === GATEWAY_CALL_RESPONSE){
     try {
-      let {responseId, response} = JSON.parse(message);
+      let {responseId, response, error} = JSON.parse(message);
       let callResult = calls[responseId]
-      callResult && callResult.resolve(response)
+      if(callResult) {
+        if(error)
+          callResult.reject(error)
+        else
+          callResult.resolve(response)
+      }
     }
     catch (e) {
       console.error(e)
@@ -59,9 +64,18 @@ function broadcast(data){
   broadcastRedis.lpush(process.env.REDIS_QUEUE, redisMessage);
 }
 
+function appCall(app, method, params){
+  let callId = newCallId();
+  callRedis.publish(GATEWAY_CALL_REQUEST, JSON.stringify({callId, app, method, params}))
+  let callResult = new CallResult()
+  calls[callId] = callResult;
+  return callResult.promise
+}
+
 module.exports = {
   GATEWAY_CALL_REQUEST,
   GATEWAY_CALL_RESPONSE,
   call: makeCall,
+  appCall,
   broadcast
 }
