@@ -1,12 +1,12 @@
 let router = require('express').Router();
 let NodeCaller = require('../node-caller')
 
-router.use('/:app/:method', (req, res, next) => {
-  let {app, method} = req.params
-  let params = {
+router.use('/', (req, res, next) => {
+  let mixed = {
     ...req.query,
     ...req.body,
   }
+  let {app, method, ...params} = mixed
   NodeCaller.appCall(app, method, params)
     .then(result => {
       res.json({success: true, result})

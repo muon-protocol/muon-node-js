@@ -1,23 +1,25 @@
 mongoose = require('mongoose');
 const CID = require('cids')
 const multihashing = require('multihashing-async')
-const Request = require('../gateway/models/Request')
-const Signature = require('../gateway/models/Signature')
-const {getTimestamp} = require('./helpers')
-const crypto = require('./crypto')
+const Request = require('../../gateway/models/Request')
+const Signature = require('../../gateway/models/Signature')
+const {getTimestamp} = require('../helpers')
+const crypto = require('../crypto')
 
 function signRequest(request, save=true) {
   return Promise.resolve(true)
     .then(() => {
       let signTimestamp = getTimestamp()
-      let signature = crypto.signRequest(request._id, signTimestamp, request['price'])
+      let signature = crypto.signRequest(request._id, signTimestamp, request['data']['price'])
 
       let sign = {
-        'request': request._id,
-        "price": request['price'],
-        "timestamp": signTimestamp,
-        "owner": process.env.SIGN_WALLET_ADDRESS,
-        "signature": signature
+        request: request._id,
+        owner: process.env.SIGN_WALLET_ADDRESS,
+        timestamp: signTimestamp,
+        data: {
+          price: request['data']['price'],
+        },
+        signature: signature
       }
 
       if(save) {
@@ -34,7 +36,12 @@ function getRequestInfo(requestId) {
 }
 
 function recoverSignature(signature){
-  let signer = crypto.recoverRequestSignature(signature['request'], signature['timestamp'], signature['price'], signature['signature'])
+  let signer = crypto.recoverRequestSignature(
+    signature['request'],
+    signature['timestamp'],
+    signature['data']['price'],
+    signature['signature']
+  )
   return signer
 }
 

@@ -20,7 +20,7 @@ class StockContentProvider extends BasePlugin {
 
   async onRequestSigned(request){
     let content = JSON.stringify(request);
-    let cid = await NodeUtils.createCID(request)
+    let cid = await NodeUtils.Stock.createCID(request)
     fs.writeFileSync(`./data/${cid.toString()}.req`, content)
   }
 

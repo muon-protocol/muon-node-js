@@ -25,17 +25,20 @@ class StockPlugin extends BasePlugin {
 
     let startedAt = Date.now();
     let newRequest = new Request({
-      "symbol": symbol,
-      "price": price['price'],
-      "timestamp": price['timestamp'],
-      "peerId": process.env.PEER_ID,
-      "owner": process.env.SIGN_WALLET_ADDRESS,
-      "source": source,
-      "rawPrice": price,
+      app: 'stock',
+      owner: process.env.SIGN_WALLET_ADDRESS,
+      peerId: process.env.PEER_ID,
+      data: {
+        symbol: symbol,
+        price: price['price'],
+        timestamp: price['timestamp'],
+        source: source,
+        rawPrice: price,
+      },
       startedAt,
     })
-    let saveNewUser = await newRequest.save()
-    await NodeUtils.signRequest(newRequest);
+    await newRequest.save()
+    await NodeUtils.Stock.signRequest(newRequest);
     this.broadcastNewRequest({
       type: 'new_request',
       peerId:  process.env.PEER_ID,
@@ -51,7 +54,7 @@ class StockPlugin extends BasePlugin {
       allSignatures = await Signature.find({request: newRequest._id})
       signers = {};
       for(let sig of allSignatures){
-        let sigOwner = NodeUtils.recoverSignature(sig)
+        let sigOwner = NodeUtils.Stock.recoverSignature(sig)
         if(sigOwner !== sig['owner'])
           continue;
 
@@ -68,18 +71,14 @@ class StockPlugin extends BasePlugin {
     }
 
     let requestData = {
-      symbol,
-      _id: newRequest._id,
-      price: price['price'],
-      creator: process.env.SIGN_WALLET_ADDRESS,
+      confirmed,
+      ...newRequest._doc,
       signatures: allSignatures.filter(sig => Object.keys(signers).includes(sig['owner'])).map(sig => ({
         "owner": sig['owner'],
         "timestamp": sig['timestamp'],
-        "price": sig['price'],
+        "price": sig['data']['price'],
         "signature": sig['signature'],
       })),
-      startedAt: startedAt,
-      confirmedAt: newRequest.confirmedAt,
     }
 
     if(confirmed){
@@ -87,7 +86,7 @@ class StockPlugin extends BasePlugin {
     }
 
     return {
-      cid: await NodeUtils.createCID(requestData),
+      cid: await NodeUtils.Stock.createCID(requestData),
       ...requestData
     }
   }
@@ -108,7 +107,7 @@ class StockPlugin extends BasePlugin {
         // let request = await NodeUtils.getRequestInfo(data.id)
         if(request){
           // console.log(`request info found: `, request)
-          let sign = await NodeUtils.signRequest(request, false)
+          let sign = await NodeUtils.Stock.signRequest(request, false)
           await remoteCall.call(peer, 'stock-request-sign', sign)
         }
         else{
@@ -150,7 +149,7 @@ class StockPlugin extends BasePlugin {
 
   async responseToRemoteRequestSign(signature){
     // console.log('RemoteCall.getRequestData', signature)
-    let signer = NodeUtils.recoverSignature(signature);
+    let signer = NodeUtils.Stock.recoverSignature(signature);
     if(signer === signature.owner) {
       let newSignature = new Signature(signature)
       await newSignature.save();
