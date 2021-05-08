@@ -6,7 +6,7 @@ router.use('/', (req, res, next) => {
     ...req.query,
     ...req.body,
   }
-  let {app, method, ...params} = mixed
+  let {app, method, params} = mixed
   NodeCaller.appCall(app, method, params)
     .then(result => {
       res.json({success: true, result})
