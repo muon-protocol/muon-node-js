@@ -1,4 +1,4 @@
-const BasePlugin = require('./base-plugin')
+const BasePlugin = require('./base/base-plugin')
 const { promisify } = require("util");
 const Redis = require('redis');
 

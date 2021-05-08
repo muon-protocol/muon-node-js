@@ -1,4 +1,4 @@
-const BasePlugin = require('./base-plugin')
+const BasePlugin = require('./base/base-plugin.js')
 const PeerInfo = require('peer-info')
 const pipe = require('it-pipe')
 const {newCallId} = require('../utils/helpers')
@@ -55,7 +55,6 @@ class RemoteCall extends BasePlugin {
       )
       // console.log('await pipe([], stream)')
       // Replies are done on new streams, so let's close this stream so we don't leak it
-      // TODO: What is this for?
       // await pipe([], stream)
     } catch (err) {
       console.error(err)

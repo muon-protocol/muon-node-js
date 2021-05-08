@@ -1,4 +1,4 @@
-const BasePlugin = require('./base-plugin')
+const BasePlugin = require('./base/base-plugin')
 const {timeout} = require('../utils/helpers')
 
 class PingPong extends BasePlugin {

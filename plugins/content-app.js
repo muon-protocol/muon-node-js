@@ -1,11 +1,14 @@
-const BasePlugin = require('./base-plugin')
+const BaseApp = require('./base/base-app-plugin')
 const CID = require('cids')
 const NodeUtils = require('../utils/node-utils')
 const fs = require('fs')
 const chokidar = require('chokidar');
 const all = require('it-all')
+const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
-class StockContentProvider extends BasePlugin {
+@remoteApp
+class ContentApp extends BaseApp {
+  APP_NAME = 'content'
   watcher = null;
 
   async onNewFileAdd(path){
@@ -20,20 +23,12 @@ class StockContentProvider extends BasePlugin {
 
   async onRequestSigned(request){
     let content = JSON.stringify(request);
-    let cid = await NodeUtils.Stock.createCID(request)
+    let cid = await NodeUtils.stock.createCID(request)
     fs.writeFileSync(`./data/${cid.toString()}.req`, content)
   }
 
   async onStart() {
-    this.muon.getPlugin('stock-plugin')
-      .on('request-signed', this.onRequestSigned.bind(this))
-    /**
-     * Gateway calls registration
-     */
-    this.muon.getPlugin('gateway-interface')
-      .registerAppCall('stock', 'get_content', this.responseToGatewayRequestData.bind(this))
-    this.muon.getPlugin('remote-call')
-      .on('remote:stock_get_content', this.responseToRemoteRequestData.bind(this))
+    this.muon.getPlugin('stock-plugin').on('request-signed', this.onRequestSigned.bind(this))
 
     this.watcher = chokidar.watch('*.req', {
       // ignored: /^\./,
@@ -48,21 +43,23 @@ class StockContentProvider extends BasePlugin {
 
   }
 
+  @gatewayMethod('get_content')
   async responseToGatewayRequestData(data){
     let filePath = `./data/${data.cid}.req`
     if(fs.existsSync(filePath, 'utf8')){
+      console.log('file exist')
       let content = fs.readFileSync(filePath)
       let requestData = JSON.parse(content)
       return requestData
     }
     else{
-      let remoteCall = this.muon.getPlugin('remote-call');
+      console.log('file not exist')
       let cid = new CID(data.cid);
       let providers = await all(this.muon.libp2p.contentRouting.findProviders(cid, {timeout: 5000}))
       for(let provider of providers){
         if(provider.id.toB58String() !== process.env.PEER_ID){
           let peer = await this.muon.libp2p.peerRouting.findPeer(provider.id);
-          let request = await remoteCall.call(peer, 'stock_get_content', data)
+          let request = await this.remoteCall(peer, 'get_content', data)
           // let request = await NodeUtils.getRequestInfo(data.id)
           return request
         }
@@ -71,6 +68,7 @@ class StockContentProvider extends BasePlugin {
     }
   }
 
+  @remoteMethod('get_content')
   async responseToRemoteRequestData(data){
     let filePath = `./data/${data.cid}.req`
     if(fs.existsSync(filePath, 'utf8')){
@@ -83,4 +81,4 @@ class StockContentProvider extends BasePlugin {
   }
 }
 
-module.exports = StockContentProvider;
+module.exports = ContentApp;

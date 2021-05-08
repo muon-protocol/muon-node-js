@@ -45,7 +45,19 @@ function toFixedHex(bigNum){
   return ethers.utils.hexZeroPad('0x' + bigNum.toString(16), 32);
 }
 
+function signString(string){
+  let sig = web3.eth.accounts.sign(string, PRIVATE_KEY)
+  return sig.signature;
+}
+
+function recoverStringSignature(str, sig){
+  let signer = web3.eth.accounts.recover(str, sig)
+  return signer;
+}
+
 module.exports = {
   signRequest,
   recoverRequestSignature,
+  signString,
+  recoverStringSignature,
 }
