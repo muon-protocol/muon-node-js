@@ -6,16 +6,16 @@ const Signature = require('../../gateway/models/Signature')
 const {getTimestamp} = require('../helpers')
 const crypto = require('../crypto')
 
-function signRequest(request) {
+function signRequest(request, priceResult) {
   let signTimestamp = getTimestamp()
-  let signature = crypto.signRequest(request._id, signTimestamp, request['data']['price'])
+  let signature = crypto.signRequest(request._id, signTimestamp, priceResult['price'])
 
   let sign = {
     request: request._id,
     owner: process.env.SIGN_WALLET_ADDRESS,
     timestamp: signTimestamp,
     data: {
-      price: request['data']['price'],
+      price: priceResult['price']
     },
     signature: signature
   }

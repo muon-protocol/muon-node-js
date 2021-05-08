@@ -42,7 +42,7 @@ class StockPlugin extends BaseApp {
       startedAt,
     })
     await newRequest.save()
-    let sign = NodeUtils.stock.signRequest(newRequest);
+    let sign = NodeUtils.stock.signRequest(newRequest, price);
     (new Signature(sign)).save()
 
     this.broadcastNewRequest({
@@ -76,7 +76,17 @@ class StockPlugin extends BaseApp {
   }
 
   async processRemoteRequest(request) {
-    let sign = NodeUtils.stock.signRequest(request)
+    let {symbol, source} = request['data']
+    let priceResult = await Sources.getSymbolPrice(symbol, source)
+    if (!priceResult) {
+      throw {"message": "Price not found"}
+    }
+    let priceDiff = Math.abs(priceResult['price'] - request['data']['price'])
+    if(priceDiff/request['data']['price'] > parseFloat(process.env.PRICE_TOLERANCE)){
+      throw {message: "Price threshold exceeded"}
+    }
+
+    let sign = NodeUtils.stock.signRequest(request, priceResult)
     return sign
   }
 }
