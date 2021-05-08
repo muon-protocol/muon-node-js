@@ -26,7 +26,8 @@ var muon;
       'ping-pong': [require('./plugins/ping-pong'), {}],
       // 'gw-log': [require('./plugins/gateway-log'), {}],
       'stock-plugin': [require('./plugins/stock-plugin'), {}],
-      'stock-content-provider': [require('./plugins/stock-content-provider'), {}],
+      'eth': [require('./plugins/eth-app-plugin'), {}],
+      'content': [require('./plugins/content-app'), {}],
     }
   })
 
