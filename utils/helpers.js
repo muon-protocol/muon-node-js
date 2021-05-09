@@ -5,7 +5,8 @@ module.exports.newCallId = () => {
   return Date.now().toString(32) + Math.floor(Math.random()*999999).toString(32);
 }
 module.exports.sortObject = o => Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {})
-module.exports.flattenObject = (obj, prefix="") => {
+
+const flattenObject = (obj, prefix="") => {
   let result = {}
   if(Array.isArray(obj)){
     for(let i=0 ; i<obj.length ; i++){
@@ -30,3 +31,4 @@ module.exports.flattenObject = (obj, prefix="") => {
   }
   return result
 }
+module.exports.flattenObject = flattenObject

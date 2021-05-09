@@ -56,7 +56,7 @@ class BaseAppPlugin extends BasePlugin {
       allSignatures = await Signature.find({request: newRequest._id})
       signers = {};
       for(let sig of allSignatures){
-        let sigOwner = this.recoverSignature(sig)
+        let sigOwner = this.recoverSignature(newRequest, sig)
         if(!!sigOwner && sigOwner !== sig['owner'])
           continue;
 
@@ -135,10 +135,13 @@ class BaseAppPlugin extends BasePlugin {
 
   async __responseToRemoteRequestSign(sig){
     // console.log('RemoteCall.requestSignature', sig)
-    let signer = this.recoverSignature(sig);
-    if(signer && signer === sig.owner) {
-      let newSignature = new Signature(sig)
-      await newSignature.save();
+    let request = await Request.findOne({_id: sig.request})
+    if(request) {
+      let signer = this.recoverSignature(request, sig);
+      if (signer && signer === sig.owner) {
+        let newSignature = new Signature(sig)
+        await newSignature.save();
+      }
     }
   }
 }

@@ -2,6 +2,7 @@ const BaseApp = require('./base/base-app-plugin')
 const Request = require('../gateway/models/Request')
 const Signature = require('../gateway/models/Signature')
 const NodeUtils = require('../utils/node-utils')
+const crypto = require('../utils/crypto')
 const {omit} = require('lodash')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
@@ -14,10 +15,50 @@ class EthAppPlugin extends BaseApp {
     super(...args);
   }
 
+  @gatewayMethod('test')
+  async onTest(data){
+    let contractAbi = [{
+      "constant": true,
+      "inputs": [
+        {"name": "owner", "type": "address"},
+        {"name": "index", "type": "uint256"}
+      ],
+      "name": "getLand",
+      "outputs": [
+        {"name": "x1", "type": "int256"},
+        {"name": "y1", "type": "int256"},
+        {"name": "x2", "type": "int256"},
+        {"name": "y2", "type": "int256"},
+        {"name": "time", "type": "uint256"},
+        {"name": "hash", "type": "string"}
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    }]
+
+    const sampleResult = {
+      "0": "-240",
+      "1": "-130",
+      "2": "-80",
+      "3": "-40",
+      "4": "1603218941",
+      "5": "QmPUiCAVn5Qie3NmfMrppP6HDrAd5voKeVX8a7MYhqJa9a",
+      "x1": "-240",
+      "y1": "-130",
+      "x2": "-80",
+      "y2": "-40",
+      "time": "1603218941",
+      "hash": "QmPUiCAVn5Qie3NmfMrppP6HDrAd5voKeVX8a7MYhqJa9a"
+    }
+    return {
+      sign: crypto.signCallOutput(contractAbi, 'getLand', sampleResult)
+    };
+  }
 
   @gatewayMethod('call')
   async onCall(data) {
-    let {address, method, params = [], abi} = data;
+    let {address, method, params = [], abi, outputs=[]} = data;
 
     if (!address)
       throw {message: 'Invalid contract "address"'}
@@ -28,6 +69,9 @@ class EthAppPlugin extends BaseApp {
     if (!abi)
       throw {message: 'Invalid contract method abi'}
 
+    if(!Array.isArray(outputs))
+      throw {message: 'Outputs should be an array'}
+
     let result = await NodeUtils.eth.call(address, method, params, abi)
 
     let startedAt = Date.now();
@@ -37,15 +81,15 @@ class EthAppPlugin extends BaseApp {
       owner: process.env.SIGN_WALLET_ADDRESS,
       peerId: process.env.PEER_ID,
       data: {
-        callInfo: {address, method, params, abi},
+        callInfo: {address, method, params, abi, outputs},
         result
       },
       startedAt,
     })
     newRequest.save()
 
-    let sign = NodeUtils.eth.signRequest(newRequest);
-    (new Signature(sign)).save()
+    let sign = NodeUtils.eth.signRequest(newRequest, result);
+    (new Signature(sign)).save();
 
     this.broadcastNewRequest({
       type: 'new_request',
@@ -73,15 +117,16 @@ class EthAppPlugin extends BaseApp {
     }
   }
 
-  recoverSignature(signature) {
-    return NodeUtils.eth.recoverSignature(signature)
+  recoverSignature(request, signature) {
+    return NodeUtils.eth.recoverSignature(request, signature)
   }
 
   async processRemoteRequest(request) {
     let {address, method, params, abi} = request.data.callInfo;
     let callResult = await NodeUtils.eth.call(address, method, params, abi)
     if (NodeUtils.eth.isEqualObject(callResult, request.data.result)) {
-      return NodeUtils.eth.signRequest(request, callResult)
+      let sign = NodeUtils.eth.signRequest(request, callResult)
+      return sign
     } else {
       throw {message: "Request not confirmed"}
     }

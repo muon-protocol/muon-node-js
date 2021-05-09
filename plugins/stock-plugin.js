@@ -71,7 +71,7 @@ class StockPlugin extends BaseApp {
     }
   }
 
-  recoverSignature(sig) {
+  recoverSignature(request, sig) {
     return NodeUtils.stock.recoverSignature(sig)
   }
 

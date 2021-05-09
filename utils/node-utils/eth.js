@@ -36,12 +36,17 @@ function objectToStr(obj){
 }
 
 function signRequest(request, result){
-  if(result === undefined)
-    result = request.data.result
-
-  let str = objectToStr(result)
-  let signature = crypto.signString(str)
+  let signature = null
   let signTimestamp = getTimestamp()
+
+  switch (request.method) {
+    case 'call':
+      let {abi, method, outputs} = request.data.callInfo
+      signature = crypto.signCallOutput(abi, method, result, outputs)
+      break;
+    default:
+      throw {message: `Unknown eth app method: ${request.method}`}
+  }
 
   return {
     request: request._id,
@@ -52,9 +57,18 @@ function signRequest(request, result){
   }
 }
 
-function recoverSignature(sign){
-  let str = objectToStr(sign.data)
-  return crypto.recoverStringSignature(str, sign.signature)
+function recoverSignature(request, sign){
+  let signer = null
+  switch (request.method) {
+    case 'call':
+      let {abi, method, outputs} = request.data.callInfo
+      signer = crypto.recoverCallOutputSignature(abi, method, sign.data, outputs, sign.signature)
+      break;
+    default:
+      throw {message: `Unknown eth app method: ${request.method}`}
+  }
+
+  return signer;
 }
 
 async function createCID(request) {
