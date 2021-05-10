@@ -1,4 +1,5 @@
 let express = require('express')
+var cors = require('cors');
 let bodyParser = require('body-parser');
 let mongoose = require('mongoose');
 let api = require("./api")
@@ -8,6 +9,8 @@ let app = express();
 function start(options) {
   var port = options.port || 8080;
   var host = options.host || '127.0.0.1';
+
+  app.use(cors());
 
   app.use(bodyParser.urlencoded({
     extended: true
