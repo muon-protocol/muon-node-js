@@ -99,6 +99,10 @@ class EthAppPlugin extends BaseApp {
 
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
 
+    if(confirmed){
+      newRequest['confirmedAt'] = Date.now()
+    }
+
     let requestData = {
       confirmed,
       ...omit(newRequest._doc, ['__v']),
@@ -106,7 +110,6 @@ class EthAppPlugin extends BaseApp {
     }
 
     if (confirmed) {
-      newRequest['confirmedAt'] = Date.now()
       newRequest.save()
       await this.emit('request-signed', requestData)
     }
