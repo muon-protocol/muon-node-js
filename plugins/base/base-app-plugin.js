@@ -142,6 +142,9 @@ class BaseAppPlugin extends BasePlugin {
         let newSignature = new Signature(sig)
         await newSignature.save();
       }
+      else{
+        console.log('signature mismatch', {request: request._id, signer, sigOwner: sig.owner})
+      }
     }
   }
 }

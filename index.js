@@ -28,6 +28,7 @@ var muon;
       'stock-plugin': [require('./plugins/stock-plugin'), {}],
       'eth': [require('./plugins/eth-app-plugin'), {}],
       'content': [require('./plugins/content-app'), {}],
+      'test': [require('./plugins/test-plugin'), {}],
     }
   })
 
