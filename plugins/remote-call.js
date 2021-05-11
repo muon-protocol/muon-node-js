@@ -78,15 +78,18 @@ class RemoteCall extends BasePlugin {
   }
 
   call(peer, method, params){
-
-    let callId = newCallId();
     return this.muon.libp2p.dialProtocol(peer.id, [PROTOCOL])
       .then(({stream}) => {
-        this.send({callId, method, params}, stream)
-        let remoteResult = new RemoteResult()
-        this._calls[callId] = remoteResult;
-        return remoteResult.promise
+        return this.callStream(stream, method, params)
       })
+  }
+
+  callStream(stream, method, params){
+    let callId = newCallId();
+    this.send({callId, method, params}, stream)
+    let remoteResult = new RemoteResult()
+    this._calls[callId] = remoteResult;
+    return remoteResult.promise
   }
 }
 

@@ -35,8 +35,8 @@ module.exports.remoteApp = function (target) {
           let remoteCall = this.muon.getPlugin('remote-call')
           for (let i = 0; i < constructor.prototype.__remoteMethods.length; i++) {
             let item = constructor.prototype.__remoteMethods[i];
-            let logTitle = `remote:${this.APP_NAME}-${item.title}`
-            console.log(`registering remote method: ${logTitle} >> ${target.name}.${item.property}`)
+            // let logTitle = `remote:${this.APP_NAME}-${item.title}`
+            // console.log(`registering remote method: ${logTitle} >> ${target.name}.${item.property}`)
             remoteCall.on(`remote:app-${this.APP_NAME}-${item.title}`, this[item.property].bind(this))
           }
         }
@@ -45,8 +45,8 @@ module.exports.remoteApp = function (target) {
           let gateway = this.muon.getPlugin('gateway-interface')
           for (let i = 0; i < constructor.prototype.__gatewayMethods.length; i++) {
             let item = constructor.prototype.__gatewayMethods[i];
-            let logTitle = `${this.APP_NAME}.${item.title}`
-            console.log(`registering gateway method: ${logTitle} >> ${target.name}.${item.property}`)
+            // let logTitle = `${this.APP_NAME}.${item.title}`
+            // console.log(`registering gateway method: ${logTitle} >> ${target.name}.${item.property}`)
             gateway.registerAppCall(this.APP_NAME, item.title, this[item.property].bind(this))
           }
         }
