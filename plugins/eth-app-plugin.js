@@ -4,6 +4,7 @@ const Signature = require('../gateway/models/Signature')
 const NodeUtils = require('../utils/node-utils')
 const crypto = require('../utils/crypto')
 const {omit} = require('lodash')
+const {getTimestamp} = require('../utils/helpers')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
 @remoteApp
@@ -74,7 +75,7 @@ class EthAppPlugin extends BaseApp {
 
     let result = await NodeUtils.eth.call(address, method, params, abi)
 
-    let startedAt = Date.now();
+    let startedAt = getTimestamp();
     let newRequest = new Request({
       app: 'eth',
       method: 'call',
@@ -100,7 +101,7 @@ class EthAppPlugin extends BaseApp {
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
 
     if(confirmed){
-      newRequest['confirmedAt'] = Date.now()
+      newRequest['confirmedAt'] = getTimestamp()
     }
 
     let requestData = {
@@ -127,7 +128,7 @@ class EthAppPlugin extends BaseApp {
   async processRemoteRequest(request) {
     let {address, method, params, abi} = request.data.callInfo;
     let callResult = await NodeUtils.eth.call(address, method, params, abi)
-    if (NodeUtils.eth.isEqualObject(callResult, request.data.result)) {
+    if (NodeUtils.eth.isEqualCallResult(request, callResult)) {
       let sign = NodeUtils.eth.signRequest(request, callResult)
       return sign
     } else {

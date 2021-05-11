@@ -4,6 +4,7 @@ const Signature = require('../gateway/models/Signature')
 const NodeUtils = require('../utils/node-utils')
 const Sources = require('../gateway/sources')
 const {omit} = require('lodash')
+const {getTimestamp} = require('../utils/helpers')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
 @remoteApp
@@ -26,7 +27,7 @@ class StockPlugin extends BaseApp {
       throw {"message": "Price not found"}
     }
 
-    let startedAt = Date.now();
+    let startedAt = getTimestamp();
     let newRequest = new Request({
       app: 'stock',
       method: 'get_price',
@@ -54,7 +55,7 @@ class StockPlugin extends BaseApp {
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
 
     if(confirmed){
-      newRequest['confirmedAt'] = Date.now()
+      newRequest['confirmedAt'] = getTimestamp()
     }
 
     let requestData = {
@@ -75,7 +76,7 @@ class StockPlugin extends BaseApp {
   }
 
   recoverSignature(request, sig) {
-    return NodeUtils.stock.recoverSignature(sig)
+    return NodeUtils.stock.recoverSignature(request, sig)
   }
 
   async processRemoteRequest(request) {
