@@ -41,7 +41,7 @@ function getMessageHash(requestId, timestamp, price){
   );
 }
 
-function signCallOutput(abi, method, result, outputFilter=[]){
+function hashCallOutput(abi, method, result, outputFilter=[]){
   let methodAbi = abi.find(({name, type}) => (name===method && type === 'function'))
   if(!methodAbi) {
     throw {message: `Abi of method (${method}) not found`}
@@ -53,23 +53,17 @@ function signCallOutput(abi, method, result, outputFilter=[]){
   // console.log('signing:',abiOutputs)
   let params = abiOutputs.map(({name, type}) => ({type, value: !!name ? result[name] : result}))
   let hash = web3.utils.soliditySha3(...params)
+  return hash;
+}
+
+function signCallOutput(abi, method, result, outputFilter=[]){
+  let hash = hashCallOutput(abi, method, result, outputFilter);
   let sig = web3.eth.accounts.sign(hash, PRIVATE_KEY)
   return sig.signature;
 }
 
 function recoverCallOutputSignature(abi, method, result, outputFilter=[], signature){
-  let methodAbi = abi.find(({name, type}) => (name===method && type === 'function'))
-  if(!methodAbi) {
-    throw {message: `Abi of method (${method}) not found`}
-  }
-  let abiOutputs = methodAbi.outputs
-  if(outputFilter.length > 0){
-    abiOutputs = abiOutputs.filter(({name}) => outputFilter.includes(name))
-  }
-  // console.log('signing:',abiOutputs)
-  let params = abiOutputs.map(({name, type}) => ({type, value: !!name ? result[name] : result}))
-  let hash = web3.utils.soliditySha3(...params)
-
+  let hash = hashCallOutput(abi, method, result, outputFilter)
   let signer = web3.eth.accounts.recover(hash, signature)
   return signer;
 }
@@ -98,6 +92,7 @@ module.exports = {
   recoverRequestSignature,
   signString,
   signSoliditySha3,
+  hashCallOutput,
   signCallOutput,
   recoverCallOutputSignature,
   recoverStringSignature,
