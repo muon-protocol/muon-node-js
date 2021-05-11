@@ -9,8 +9,8 @@ const callRedis = Redis.createClient(redisCongig);
 const responseRedis = Redis.createClient(redisCongig);
 const broadcastRedis = Redis.createClient(redisCongig);
 
-const GATEWAY_CALL_REQUEST  = `/muon/${process.env.PEER_ID}/gateway/call/request`
-const GATEWAY_CALL_RESPONSE = `/muon/${process.env.PEER_ID}/gateway/call/response`
+const GATEWAY_CALL_REQUEST  = `/muon/${process.env.PEER_ID}/gateway/${process.env.REDIS_GATEWAY_CHANNEL}/call/request`
+const GATEWAY_CALL_RESPONSE = `/muon/${process.env.PEER_ID}/gateway/${process.env.REDIS_GATEWAY_CHANNEL}/call/response`
 
 callRedis.on("error", function(error) {
   console.error('callRedis', error.message);

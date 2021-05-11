@@ -2,8 +2,8 @@ const BasePlugin = require('./base/base-plugin')
 const { promisify } = require("util");
 const Redis = require('redis');
 
-const GATEWAY_CALL_REQUEST  = `/muon/${process.env.PEER_ID}/gateway/call/request`
-const GATEWAY_CALL_RESPONSE = `/muon/${process.env.PEER_ID}/gateway/call/response`
+const GATEWAY_CALL_REQUEST  = `/muon/${process.env.PEER_ID}/gateway/${process.env.REDIS_GATEWAY_CHANNEL}/call/request`
+const GATEWAY_CALL_RESPONSE = `/muon/${process.env.PEER_ID}/gateway/${process.env.REDIS_GATEWAY_CHANNEL}/call/response`
 
 const redisConfig = {
   host: process.env.REDIS_HOST || '127.0.0.1',
