@@ -29,6 +29,14 @@ function isEqualObject(obj1, obj2) {
   return objectToStr(obj1) === objectToStr(obj2);
 }
 
+function isEqualCallResult(request, callResult) {
+  let {method, abi, outputs} = request.data.callInfo;
+  let hash1 = crypto.hashCallOutput(abi, method, request.data.result, outputs)
+  let hash2 = crypto.hashCallOutput(abi, method, callResult, outputs)
+
+  return hash1 == hash2
+}
+
 function objectToStr(obj){
   let flatData = flattenObject(obj)
   flatData = sortObject(flatData)
@@ -42,7 +50,7 @@ function signRequest(request, result){
   switch (request.method) {
     case 'call':
       let {abi, method, outputs} = request.data.callInfo
-      signature = crypto.signCallOutput(abi, method, result, outputs)
+      signature = crypto.signCallOutput(abi, method,request.data.result, outputs)
       break;
     default:
       throw {message: `Unknown eth app method: ${request.method}`}
@@ -62,7 +70,7 @@ function recoverSignature(request, sign){
   switch (request.method) {
     case 'call':
       let {abi, method, outputs} = request.data.callInfo
-      signer = crypto.recoverCallOutputSignature(abi, method, sign.data, outputs, sign.signature)
+      signer = crypto.recoverCallOutputSignature(abi, method, request.data.result, outputs, sign.signature)
       break;
     default:
       throw {message: `Unknown eth app method: ${request.method}`}
@@ -84,6 +92,7 @@ module.exports = {
   getTransactionReceipt,
   call,
   isEqualObject,
+  isEqualCallResult,
   signRequest,
   recoverSignature,
   createCID,

@@ -8,14 +8,14 @@ const crypto = require('../crypto')
 
 function signRequest(request, priceResult) {
   let signTimestamp = getTimestamp()
-  let signature = crypto.signRequest(request._id, signTimestamp, priceResult['price'])
+  let signature = crypto.signRequest(request._id, signTimestamp, request.data.price)
 
   let sign = {
     request: request._id,
     owner: process.env.SIGN_WALLET_ADDRESS,
     timestamp: signTimestamp,
     data: {
-      price: priceResult['price']
+      price: request.data.price
     },
     signature: signature
   }
@@ -26,11 +26,11 @@ function getRequestInfo(requestId) {
   return Request.findOne({_id: mongoose.Types.ObjectId(requestId)})
 }
 
-function recoverSignature(signature){
+function recoverSignature(request, signature){
   let signer = crypto.recoverRequestSignature(
     signature['request'],
     signature['timestamp'],
-    signature['data']['price'],
+    request['data']['price'],
     signature['signature']
   )
   return signer
