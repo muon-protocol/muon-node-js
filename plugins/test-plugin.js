@@ -29,7 +29,7 @@ class TestPlugin extends BaseApp {
     let providers = await all(this.muon.libp2p.contentRouting.findProviders(this.serviceId, {timeout: 5000}))
     let otherProviders = providers.filter(({id}) => (id._idB58String !== process.env.PEER_ID) )
 
-    console.log(`providers :`,otherProviders)
+    // console.log(`providers :`,otherProviders)
     for(let provider of otherProviders){
 
       let strPeerId = provider.id.toB58String();
@@ -91,10 +91,6 @@ class TestPlugin extends BaseApp {
     (new Signature(sign)).save()
 
     // this.broadcastNewRequest(newRequest)
-
-    for(let provider of this.serviceProviders){
-    }
-
     this.serviceProviders.map(async provider => {
       this.remoteCall(provider, 'wantSign', newRequest)
         .then(sign => {
@@ -102,7 +98,7 @@ class TestPlugin extends BaseApp {
           (new Signature(sign)).save();
         })
     })
-    console.log('wait for confirm ....')
+
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
 
     if(confirmed){

@@ -4,6 +4,7 @@ const Signature = require('../gateway/models/Signature')
 const NodeUtils = require('../utils/node-utils')
 const Sources = require('../gateway/sources')
 const {omit} = require('lodash')
+const all = require('it-all')
 const {getTimestamp} = require('../utils/helpers')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
@@ -11,9 +12,45 @@ const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators'
 class StockPlugin extends BaseApp {
   APP_BROADCAST_CHANNEL = 'muon/stock/request/broadcast'
   APP_NAME = 'stock'
+  serviceId=null
+  serviceProviders = []
 
   constructor(...args) {
     super(...args);
+  }
+
+  async onStart(){
+    super.onStart();
+    this.initializeService()
+  }
+
+  async initializeService(){
+    let serviceCID = await NodeUtils.common.strToCID(this.APP_BROADCAST_CHANNEL)
+    await this.muon.libp2p.contentRouting.provide(serviceCID)
+    this.serviceId = serviceCID
+    // console.log({serviceCID: serviceCID.toString()})
+    setTimeout(this.updatePeerList.bind(this), 9000);
+  }
+
+  async updatePeerList(){
+    // console.log('TestPlugin updating peer list ...')
+    let providers = await all(this.muon.libp2p.contentRouting.findProviders(this.serviceId, {timeout: 5000}))
+    let otherProviders = providers.filter(({id}) => (id._idB58String !== process.env.PEER_ID) )
+
+    // console.log(`providers :`,otherProviders)
+    for(let provider of otherProviders){
+
+      let strPeerId = provider.id.toB58String();
+      if(strPeerId === process.env.PEER_ID)
+        continue;
+
+      // console.log('pinging ', strPeerId)
+      const latency = await this.muon.libp2p.ping(provider.id)
+      // console.log({latency})
+    }
+    this.serviceProviders = otherProviders;
+
+    setTimeout(this.updatePeerList.bind(this), 30000)
   }
 
   @gatewayMethod('get_price')
@@ -46,10 +83,17 @@ class StockPlugin extends BaseApp {
     let sign = NodeUtils.stock.signRequest(newRequest, price);
     (new Signature(sign)).save()
 
-    this.broadcastNewRequest({
-      type: 'new_request',
-      peerId:  process.env.PEER_ID,
-      _id: newRequest._id
+    // this.broadcastNewRequest({
+    //   type: 'new_request',
+    //   peerId:  process.env.PEER_ID,
+    //   _id: newRequest._id
+    // })
+    this.serviceProviders.map(async provider => {
+      this.remoteCall(provider, 'wantSign', newRequest)
+        .then(sign => {
+          // console.log('wantSign response', sign);
+          (new Signature(sign)).save();
+        })
     })
 
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
@@ -92,6 +136,14 @@ class StockPlugin extends BaseApp {
 
     let sign = NodeUtils.stock.signRequest(request, priceResult)
     return sign
+  }
+
+
+  @remoteMethod('wantSign')
+  async remoteWantSign(request){
+    let sign = await this.processRemoteRequest(request)
+    // console.log('wantSign', request._id, sign)
+    return sign;
   }
 }
 
