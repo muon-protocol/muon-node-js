@@ -1,5 +1,4 @@
 const BasePlugin = require('./base/base-plugin.js')
-const PeerInfo = require('peer-info')
 const pipe = require('it-pipe')
 const {newCallId} = require('../utils/helpers')
 
@@ -75,6 +74,10 @@ class RemoteCall extends BasePlugin {
     } catch (err) {
       console.error(err)
     }
+  }
+
+  getPeerCallStream(peer){
+    return this.muon.libp2p.dialProtocol(peer.id, [PROTOCOL])
   }
 
   call(peer, method, params){

@@ -2,10 +2,12 @@ const Events = require('events-async')
 
 module.exports = class BasePlugin extends Events{
   muon = null;
+  configs = {}
 
-  constructor(muon, config){
+  constructor(muon, configs){
     super()
     this.muon = muon
+    this.configs = {...configs}
   }
 
   /**

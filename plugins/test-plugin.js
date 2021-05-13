@@ -13,6 +13,7 @@ class TestPlugin extends BaseApp {
   APP_BROADCAST_CHANNEL = 'muon/test_app/request/broadcast'
   APP_NAME = 'test'
   serviceId=null
+  serviceProviders = []
 
   constructor(...args) {
     super(...args);
@@ -20,7 +21,28 @@ class TestPlugin extends BaseApp {
 
   async onStart(){
     super.onStart();
-    // this.initializeService()
+    this.initializeService()
+  }
+
+  async updatePeerList(){
+    console.log('TestPlugin updating peer list ...')
+    let providers = await all(this.muon.libp2p.contentRouting.findProviders(this.serviceId, {timeout: 5000}))
+    let otherProviders = providers.filter(({id}) => (id._idB58String !== process.env.PEER_ID) )
+
+    console.log(`providers :`,otherProviders)
+    for(let provider of otherProviders){
+
+      let strPeerId = provider.id.toB58String();
+      if(strPeerId === process.env.PEER_ID)
+        continue;
+
+      console.log('pinging ', strPeerId)
+      const latency = await this.muon.libp2p.ping(provider.id)
+      console.log({latency})
+    }
+    this.serviceProviders = otherProviders;
+
+    setTimeout(this.updatePeerList.bind(this), 30000)
   }
 
   async initializeService(){
@@ -28,6 +50,7 @@ class TestPlugin extends BaseApp {
     await this.muon.libp2p.contentRouting.provide(serviceCID)
     this.serviceId = serviceCID
     console.log({serviceCID: serviceCID.toString()})
+    setTimeout(this.updatePeerList.bind(this), 9000);
   }
 
   @gatewayMethod('status')
@@ -35,7 +58,7 @@ class TestPlugin extends BaseApp {
     let providers = await all(this.muon.libp2p.contentRouting.findProviders(this.serviceId, {timeout: 5000}))
     return {
       serviceId: this.serviceId.toString(),
-      providers: providers.map(p => p.id.toB58String()),
+      providers//: providers.map(p => p.id.toB58String()),
     }
   }
 
@@ -67,7 +90,12 @@ class TestPlugin extends BaseApp {
     };
     (new Signature(sign)).save()
 
-    this.broadcastNewRequest(newRequest)
+    // this.broadcastNewRequest(newRequest)
+    for(let provider of this.serviceProviders){
+      let sign = await this.remoteCall(provider, 'wantSign', newRequest)
+      console.log('wantSign response', sign);
+      (new Signature(sign)).save();
+    }
 
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
 
@@ -107,7 +135,6 @@ class TestPlugin extends BaseApp {
   }
 
   async processRemoteRequest(request) {
-    console.log({request})
     let {number: reqNumber} = request['data']
     if (reqNumber<1 || reqNumber>2) {
       throw {"message": "Invalid number"}
@@ -123,6 +150,14 @@ class TestPlugin extends BaseApp {
       signature: crypto.signString(`${request.data.number}`)
     }
     return sign
+  }
+
+
+  @remoteMethod('wantSign')
+  async remoteWantSign(request){
+    let sign = await this.processRemoteRequest(request)
+    console.log('wantSign', request._id, sign)
+    return sign;
   }
 }
 

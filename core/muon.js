@@ -82,6 +82,15 @@ class Muon extends Events{
       chalk.blue(` Listening on: ${this.configs.libp2p.port}`)
     );
 
+    if (this.libp2p.isStarted()) {
+      this._onceStarted()
+    } else {
+      this.libp2p.once('start', this._onceStarted.bind(this))
+    }
+  }
+
+  _onceStarted(){
+    console.log('muon started');
     for(let pluginName in this._plugins){
       this._plugins[pluginName].onStart()
     }
