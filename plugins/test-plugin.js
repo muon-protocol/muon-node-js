@@ -91,12 +91,18 @@ class TestPlugin extends BaseApp {
     (new Signature(sign)).save()
 
     // this.broadcastNewRequest(newRequest)
+
     for(let provider of this.serviceProviders){
-      let sign = await this.remoteCall(provider, 'wantSign', newRequest)
-      console.log('wantSign response', sign);
-      (new Signature(sign)).save();
     }
 
+    this.serviceProviders.map(async provider => {
+      this.remoteCall(provider, 'wantSign', newRequest)
+        .then(sign => {
+          console.log('wantSign response', sign);
+          (new Signature(sign)).save();
+        })
+    })
+    console.log('wait for confirm ....')
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
 
     if(confirmed){
