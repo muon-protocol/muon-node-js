@@ -4,7 +4,6 @@ const {timeout} = require('../utils/helpers')
 class PingPong extends BasePlugin {
 
   async ping(data){
-    // console.log('DataExchange.onRemotePing', data)
     // await timeout(2000 + Math.floor(Math.random() * 3000));
     return 'Pong'
   }

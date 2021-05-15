@@ -30,9 +30,9 @@ function isEqualObject(obj1, obj2) {
 }
 
 function isEqualCallResult(request, callResult) {
-  let {method, abi, outputs} = request.data.callInfo;
-  let hash1 = crypto.hashCallOutput(abi, method, request.data.result, outputs)
-  let hash2 = crypto.hashCallOutput(abi, method, callResult, outputs)
+  let {address, method, abi, outputs} = request.data.callInfo;
+  let hash1 = crypto.hashCallOutput(address, method, abi, request.data.result, outputs)
+  let hash2 = crypto.hashCallOutput(address, method, abi, callResult, outputs)
 
   return hash1 == hash2
 }
@@ -49,8 +49,8 @@ function signRequest(request, result){
 
   switch (request.method) {
     case 'call':
-      let {abi, method, outputs} = request.data.callInfo
-      signature = crypto.signCallOutput(abi, method,request.data.result, outputs)
+      let {abi, address, method, outputs} = request.data.callInfo
+      signature = crypto.signCallOutput(address, method, abi,request.data.result, outputs)
       break;
     default:
       throw {message: `Unknown eth app method: ${request.method}`}
@@ -69,8 +69,8 @@ function recoverSignature(request, sign){
   let signer = null
   switch (request.method) {
     case 'call':
-      let {abi, method, outputs} = request.data.callInfo
-      signer = crypto.recoverCallOutputSignature(abi, method, request.data.result, outputs, sign.signature)
+      let {address, method, abi, outputs} = request.data.callInfo
+      signer = crypto.recoverCallOutputSignature(address, method, abi, request.data.result, outputs, sign.signature)
       break;
     default:
       throw {message: `Unknown eth app method: ${request.method}`}

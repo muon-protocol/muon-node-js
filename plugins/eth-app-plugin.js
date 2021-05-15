@@ -18,6 +18,7 @@ class EthAppPlugin extends BaseApp {
 
   @gatewayMethod('test')
   async onTest(data){
+    let address = '0x56040d44f407fa6f33056d4f352d2e919a0d99fb'
     let contractAbi = [{
       "constant": true,
       "inputs": [
@@ -53,7 +54,7 @@ class EthAppPlugin extends BaseApp {
       "hash": "QmPUiCAVn5Qie3NmfMrppP6HDrAd5voKeVX8a7MYhqJa9a"
     }
     return {
-      sign: crypto.signCallOutput(contractAbi, 'getLand', sampleResult)
+      sign: crypto.signCallOutput(address, 'getLand', contractAbi, sampleResult)
     };
   }
 
@@ -92,11 +93,7 @@ class EthAppPlugin extends BaseApp {
     let sign = NodeUtils.eth.signRequest(newRequest, result);
     (new Signature(sign)).save();
 
-    this.broadcastNewRequest({
-      type: 'new_request',
-      peerId: process.env.PEER_ID,
-      _id: newRequest._id
-    });
+    this.broadcastNewRequest(newRequest);
 
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
 
