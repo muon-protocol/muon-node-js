@@ -48,7 +48,9 @@ function hashCallOutput(address, method, abi, result, outputFilter=[]){
   }
   let abiOutputs = methodAbi.outputs
   if(outputFilter.length > 0){
-    abiOutputs = abiOutputs.filter(({name}) => outputFilter.includes(name))
+    abiOutputs = outputFilter.map(key => {
+      return methodAbi.outputs.find(({name}) => (name===key))
+    })
   }
   // console.log('signing:',abiOutputs)
   let params = abiOutputs.map(({name, type}) => ({type, value: !!name ? result[name] : result}))

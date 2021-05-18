@@ -36,9 +36,9 @@ class TestPlugin extends BaseApp {
       if(strPeerId === process.env.PEER_ID)
         continue;
 
-      console.log('pinging ', strPeerId)
+      // console.log('pinging ', strPeerId)
       const latency = await this.muon.libp2p.ping(provider.id)
-      console.log({latency})
+      // console.log({latency})
     }
     this.serviceProviders = otherProviders;
 

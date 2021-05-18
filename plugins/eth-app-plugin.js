@@ -60,7 +60,7 @@ class EthAppPlugin extends BaseApp {
 
   @gatewayMethod('call')
   async onCall(data) {
-    let {address, method, params = [], abi, outputs=[]} = data;
+    let {address, method, params = [], abi, outputs=[], network="eth"} = data;
 
     if (!address)
       throw {message: 'Invalid contract "address"'}
@@ -74,7 +74,7 @@ class EthAppPlugin extends BaseApp {
     if(!Array.isArray(outputs))
       throw {message: 'Outputs should be an array'}
 
-    let result = await NodeUtils.eth.call(address, method, params, abi)
+    let result = await NodeUtils.eth.call(address, method, params, abi, network)
 
     let startedAt = getTimestamp();
     let newRequest = new Request({
@@ -83,7 +83,7 @@ class EthAppPlugin extends BaseApp {
       owner: process.env.SIGN_WALLET_ADDRESS,
       peerId: process.env.PEER_ID,
       data: {
-        callInfo: {address, method, params, abi, outputs},
+        callInfo: {address, method, params, abi, outputs, network},
         result
       },
       startedAt,
@@ -123,8 +123,8 @@ class EthAppPlugin extends BaseApp {
   }
 
   async processRemoteRequest(request) {
-    let {address, method, params, abi} = request.data.callInfo;
-    let callResult = await NodeUtils.eth.call(address, method, params, abi)
+    let {address, method, params, abi, network} = request.data.callInfo;
+    let callResult = await NodeUtils.eth.call(address, method, params, abi, network)
     if (NodeUtils.eth.isEqualCallResult(request, callResult)) {
       let sign = NodeUtils.eth.signRequest(request, callResult)
       return sign

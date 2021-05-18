@@ -1,28 +1,42 @@
 const Web3 = require('web3')
+const HttpProvider = Web3.providers.HttpProvider;
 const CID = require('cids')
 const multihashing = require('multihashing-async')
 const {flattenObject, sortObject, getTimestamp} = require('../helpers')
 const crypto = require('../crypto')
 
-const provider = new Web3.providers.HttpProvider(`https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`)
-const web3 = new Web3(provider);
-
-function getTransaction(txHash){
-  return web3.eth.getTransaction(txHash)
+const _networksWeb3 = {
+  ganache: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_GANACHE)),
+  eth: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ETH)),
+  ropsten: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ROPSTEN)),
+  rinkeby: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_RINKEBY)),
+  bsc: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSC)),
+  bsctest: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSCTEST)),
+  ftm: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTM)),
+  ftmtest: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTMTEST)),
 }
 
-function getTransactionReceipt(txHash){
-  return web3.eth.getTransactionReceipt(txHash)
+function getWeb3(network) {
+  if(_networksWeb3[network])
+    return Promise.resolve(_networksWeb3[network])
+  else
+    return Promise.reject({message: `invalid network "${network}"`})
 }
 
-function call(contractAddress, methodName, params, abi){
-  let contract = new web3.eth.Contract(abi, contractAddress);
-  return contract.methods[methodName](...params).call();
+function getTransaction(txHash, network){
+  return getWeb3(network).then(web3 => web3.eth.getTransaction(txHash))
 }
 
-function getCallData(contractAddress, method, params, abi) {
-  let contract = new web3.eth.Contract(abi, contractAddress);
-  return contract.methods[method](...params).encodeABI();
+function getTransactionReceipt(txHash, network){
+  return getWeb3(network).then(web3 => web3.eth.getTransactionReceipt(txHash))
+}
+
+function call(contractAddress, methodName, params, abi, network){
+  return getWeb3(network)
+    .then(web3 => {
+      let contract = new web3.eth.Contract(abi, contractAddress);
+      return contract.methods[methodName](...params).call();
+    })
 }
 
 function isEqualObject(obj1, obj2) {
