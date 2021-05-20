@@ -34,21 +34,26 @@ class StockPlugin extends BaseApp {
 
   async updatePeerList(){
     // console.log('TestPlugin updating peer list ...')
-    let providers = await all(this.muon.libp2p.contentRouting.findProviders(this.serviceId, {timeout: 5000}))
-    let otherProviders = providers.filter(({id}) => (id._idB58String !== process.env.PEER_ID) )
+    try {
+      let providers = await all(this.muon.libp2p.contentRouting.findProviders(this.serviceId, {timeout: 5000}))
+      let otherProviders = providers.filter(({id}) => (id._idB58String !== process.env.PEER_ID))
 
-    // console.log(`providers :`,otherProviders)
-    for(let provider of otherProviders){
+      // console.log(`providers :`,otherProviders)
+      for (let provider of otherProviders) {
 
-      let strPeerId = provider.id.toB58String();
-      if(strPeerId === process.env.PEER_ID)
-        continue;
+        let strPeerId = provider.id.toB58String();
+        if (strPeerId === process.env.PEER_ID)
+          continue;
 
-      // console.log('pinging ', strPeerId)
-      const latency = await this.muon.libp2p.ping(provider.id)
-      // console.log({latency})
+        // console.log('pinging ', strPeerId)
+        const latency = await this.muon.libp2p.ping(provider.id)
+        // console.log({latency})
+      }
+      this.serviceProviders = otherProviders;
     }
-    this.serviceProviders = otherProviders;
+    catch (e) {
+      console.log('stock-plugin updatePeerList error', e)
+    }
 
     setTimeout(this.updatePeerList.bind(this), 30000)
   }
