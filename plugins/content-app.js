@@ -47,13 +47,11 @@ class ContentApp extends BaseApp {
   async responseToGatewayRequestData(data){
     let filePath = `./data/${data.cid}.req`
     if(fs.existsSync(filePath, 'utf8')){
-      console.log('file exist')
       let content = fs.readFileSync(filePath)
       let requestData = JSON.parse(content)
       return requestData
     }
     else{
-      console.log('file not exist')
       let cid = new CID(data.cid);
       let providers = await all(this.muon.libp2p.contentRouting.findProviders(cid, {timeout: 5000}))
       for(let provider of providers){
