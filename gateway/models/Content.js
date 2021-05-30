@@ -6,8 +6,8 @@ var modelSchema = mongoose.Schema({
   cid: {type: String, required: true},
   content: {type: String, required: true},
   data: {type: Object},
-  createdAt: { type: Date, expires: '60m', default: Date.now }
-});
+}, {timestamps: true});
+modelSchema.index({createdAt: 1},{expireAfterSeconds: 60 * 60});
 
 const Model = module.exports = mongoose.model(MODEL_CONTENT, modelSchema);
 
