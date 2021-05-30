@@ -6,7 +6,7 @@ var modelSchema = mongoose.Schema({
   cid: {type: String, required: true},
   content: {type: String, required: true},
   data: {type: Object},
-  createdAt: { type: Date, expires: '5m', default: Date.now }
+  createdAt: { type: Date, expires: '60m', default: Date.now }
 });
 
 const Model = module.exports = mongoose.model(MODEL_CONTENT, modelSchema);
