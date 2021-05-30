@@ -1,6 +1,7 @@
 const BaseApp = require('./base/base-app-plugin')
 const Request = require('../gateway/models/Request')
 const Signature = require('../gateway/models/Signature')
+const Content = require('../gateway/models/Content')
 const NodeUtils = require('../utils/node-utils')
 const crypto = require('../utils/crypto')
 const {omit} = require('lodash')
@@ -112,8 +113,11 @@ class EthAppPlugin extends BaseApp {
       await this.emit('request-signed', requestData)
     }
 
+    let content = await Content.create(requestData)
+    await content.save();
+
     return {
-      cid: await NodeUtils.eth.createCID(requestData),
+      cid: content.cid,
       ...requestData
     }
   }
