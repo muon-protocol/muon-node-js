@@ -73,6 +73,17 @@ class Muon extends Events{
     return this._plugins[pluginName];
   }
 
+  getAppByName(appName){
+    if(!appName)
+      return null;
+    let keys = Object.keys(this._plugins);
+    for(let i=0 ; i<keys.length ; i++){
+      if(this._plugins[keys[i]].APP_NAME === appName)
+        return this._plugins[keys[i]]
+    }
+    return null
+  }
+
   async start(){
     await this.libp2p.start()
 
