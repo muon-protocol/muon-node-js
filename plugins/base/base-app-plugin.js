@@ -5,6 +5,7 @@ const PeerId = require('peer-id')
 const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
 const {getTimestamp, timeout} = require('../../utils/helpers')
+const crypto = require('../../utils/crypto')
 
 class BaseAppPlugin extends BasePlugin {
   APP_BROADCAST_CHANNEL = null
@@ -100,6 +101,16 @@ class BaseAppPlugin extends BasePlugin {
     }
   }
 
+  /**
+   *
+   * @param request
+   * @returns {Promise<*[isVerified, expectedResult, actualResult]>}
+   */
+  async isVerifiedRequest(request){
+    // returns [isVerified, expectedResult, actualResult]
+    return [true, null, null];
+  }
+
   recoverSignature(request, signature){}
 
   broadcastNewRequest(request){
@@ -120,6 +131,18 @@ class BaseAppPlugin extends BasePlugin {
     let remoteCall = this.muon.getPlugin('remote-call');
     let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
     return remoteCall.call(peer, remoteMethodEndpoint, data)
+  }
+
+  makeSignature(request, result, resultHash){
+    let signTimestamp = getTimestamp()
+    let signature = crypto.sign(resultHash)
+    return {
+      request: request._id,
+      owner: process.env.SIGN_WALLET_ADDRESS,
+      timestamp: signTimestamp,
+      data: result,
+      signature,
+    }
   }
 
   /**
