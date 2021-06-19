@@ -7,6 +7,16 @@ function getEnvBootstraps(){
     .map(key => process.env[key]);
 }
 
+function getEnvPlugins(){
+  let pluginsStr = process.env['MUON_PLUGINS'] || ''
+  return pluginsStr.split('|').reduce((res, key) => {
+    return {
+      ...res,
+      [`__${key}__`]: [require(`./plugins/${key}`), {}]
+    }
+  }, {})
+}
+
 var muon;
 
 (async () => {
@@ -27,8 +37,9 @@ var muon;
       // 'gw-log': [require('./plugins/gateway-log'), {}],
       'stock-plugin': [require('./plugins/stock-plugin'), {}],
       'eth': [require('./plugins/eth-app-plugin'), {}],
+      'content-verify': [require('./plugins/content-verify-plugin'), {}],
       'content': [require('./plugins/content-app'), {}],
-      // 'test': [require('./plugins/test-plugin'), {}],
+      ... getEnvPlugins(),
     }
   })
 
@@ -41,3 +52,4 @@ var muon;
     port: process.env.GATEWAY_PORT,
   })
 })()
+
