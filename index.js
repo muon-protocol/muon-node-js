@@ -8,7 +8,9 @@ function getEnvBootstraps(){
 }
 
 function getEnvPlugins(){
-  let pluginsStr = process.env['MUON_PLUGINS'] || ''
+  let pluginsStr = process.env['MUON_PLUGINS']
+  if(!pluginsStr)
+    return {}
   return pluginsStr.split('|').reduce((res, key) => {
     return {
       ...res,
