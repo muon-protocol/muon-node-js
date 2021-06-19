@@ -32,6 +32,19 @@ class GatewayInterface extends BasePlugin{
     this.emit(`data/${data.type}`, data)
   }
 
+  async __handleCallResponse(callData, response){
+    let {callId, app, method, params} = callData;
+
+    if(response.confirmed){
+      await this.emit('confirmed', response)
+    }
+
+    responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
+      responseId: callId,
+      response,
+    }))
+  }
+
   async __onGatewayCall(channel, message){
     let data
     if(channel === GATEWAY_CALL_REQUEST){
@@ -45,16 +58,13 @@ class GatewayInterface extends BasePlugin{
         else{
           response = await this.emit(`call/muon/${method}`, params)
         }
-        responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
-          responseId: callId,
-          response,
-        }))
+        await this.__handleCallResponse(data, response)
       }
       catch (e) {
-        console.error('gateway-interface error', e)
+        // console.error('gateway-interface error', e)
         responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
           responseId: data ? data.callId : undefined,
-          error: e,
+          error: e.message,
         }))
       }
     }
