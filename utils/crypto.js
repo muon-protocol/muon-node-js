@@ -71,17 +71,26 @@ function recoverCallOutputSignature(address, method, abi, result, outputFilter=[
   return signer;
 }
 
+function soliditySha3(params){
+  return web3.utils.soliditySha3(...params);
+}
+
+function sign(hash) {
+  let sig = web3.eth.accounts.sign(hash, PRIVATE_KEY)
+  return sig.signature;
+}
+
+function recover(hash, signature){
+  let signer = web3.eth.accounts.recover(hash, signature)
+  return signer;
+}
+
 function toFixedHex(bigNum){
   return ethers.utils.hexZeroPad('0x' + bigNum.toString(16), 32);
 }
 
 function signString(string){
   let sig = web3.eth.accounts.sign(string, PRIVATE_KEY)
-  return sig.signature;
-}
-
-function signSoliditySha3(sha3){
-  let sig = web3.eth.accounts.sign(sha3, PRIVATE_KEY)
   return sig.signature;
 }
 
@@ -94,9 +103,11 @@ module.exports = {
   signRequest,
   recoverRequestSignature,
   signString,
-  signSoliditySha3,
   hashCallOutput,
   signCallOutput,
+  soliditySha3,
+  sign,
+  recover,
   recoverCallOutputSignature,
   recoverStringSignature,
 }
