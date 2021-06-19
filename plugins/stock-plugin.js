@@ -109,7 +109,7 @@ class StockPlugin extends BaseApp {
 
     let requestData = {
       confirmed,
-      ...omit(newRequest._doc, ['__v', 'data.source', 'data.rawPrice']),
+      ...omit(newRequest._doc, ['__v', 'data.rawPrice']),
       signatures,
     }
 
@@ -118,14 +118,26 @@ class StockPlugin extends BaseApp {
       await this.emit('request-signed', requestData)
     }
 
-    return {
-      cid: await NodeUtils.stock.createCID(requestData),
-      ...requestData
-    }
+    return requestData
+  }
+
+  async isVerifiedRequest(request){
+    let {symbol, price, source, timestamp} = request.data;
+    let actualPrice = await Sources.getSymbolPrice(symbol, source, timestamp)
+    let verified = this.isPriceToleranceOk(actualPrice, price);
+    return [verified, price, actualPrice];
   }
 
   recoverSignature(request, sig) {
     return NodeUtils.stock.recoverSignature(request, sig)
+  }
+
+  isPriceToleranceOk(price, expectedPrice){
+    let priceDiff = Math.abs(price - expectedPrice)
+    if(priceDiff/expectedPrice > parseFloat(process.env.PRICE_TOLERANCE)){
+      return false
+    }
+    return true;
   }
 
   async processRemoteRequest(request) {
@@ -134,8 +146,7 @@ class StockPlugin extends BaseApp {
     if (!priceResult) {
       throw {"message": "Price not found"}
     }
-    let priceDiff = Math.abs(priceResult['price'] - request['data']['price'])
-    if(priceDiff/request['data']['price'] > parseFloat(process.env.PRICE_TOLERANCE)){
+    if(!this.isPriceToleranceOk(priceResult['price'], request['data']['price'])){
       throw {message: "Price threshold exceeded"}
     }
 
