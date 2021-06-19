@@ -1,7 +1,6 @@
 const BaseApp = require('./base/base-app-plugin')
 const Request = require('../gateway/models/Request')
 const Signature = require('../gateway/models/Signature')
-const Content = require('../gateway/models/Content')
 const NodeUtils = require('../utils/node-utils')
 const crypto = require('../utils/crypto')
 const {omit} = require('lodash')
@@ -91,7 +90,7 @@ class EthAppPlugin extends BaseApp {
     })
     newRequest.save()
 
-    let sign = NodeUtils.eth.signRequest(newRequest, result);
+    let sign = await NodeUtils.eth.signRequest(newRequest, result);
     (new Signature(sign)).save();
 
     this.broadcastNewRequest(newRequest);
@@ -113,25 +112,150 @@ class EthAppPlugin extends BaseApp {
       await this.emit('request-signed', requestData)
     }
 
-    let content = await Content.create(requestData)
-    await content.save();
+    return requestData
+  }
 
-    return {
-      cid: content.cid,
-      ...requestData
+  @gatewayMethod('addBridgeToken')
+  async onAddToken(data) {
+    let {mainTokenAddress, mainNetwork, targetNetwork} = data;
+
+    let result = {
+      token: await NodeUtils.eth.getTokenInfo(mainTokenAddress, mainNetwork),
+      tokenId: mainTokenAddress,
+    }
+
+    let startedAt = getTimestamp();
+    let newRequest = new Request({
+      app: 'eth',
+      method: 'addBridgeToken',
+      owner: process.env.SIGN_WALLET_ADDRESS,
+      peerId: process.env.PEER_ID,
+      data: {
+        input: {mainTokenAddress, mainNetwork, targetNetwork},
+        result
+      },
+      startedAt,
+    })
+    newRequest.save()
+
+    let sign = await NodeUtils.eth.signRequest(newRequest, result);
+    (new Signature(sign)).save();
+
+    this.broadcastNewRequest(newRequest);
+
+    let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest, parseInt(process.env.NUM_SIGN_TO_CONFIRM))
+
+    if(confirmed){
+      newRequest['confirmedAt'] = getTimestamp()
+    }
+
+    let requestData = {
+      confirmed,
+      ...omit(newRequest._doc, ['__v']),
+      signatures,
+    }
+
+    if (confirmed) {
+      newRequest.save()
+      await this.emit('request-signed', requestData)
+    }
+
+    return requestData
+  }
+
+  async isVerifiedRequest(request){
+    let actualResult=null, verified=true;
+    switch (request.method) {
+      case 'call': {
+        let {callInfo: {address, method, params, abi, network, outputs}, result} = request.data;
+        actualResult = await NodeUtils.eth.call(address, method, params, abi, network)
+        break;
+        // let hash1 = crypto.hashCallOutput(address, method, abi, actualResult, outputs);
+        // let hash2 = crypto.hashCallOutput(address, method, abi, result, outputs);
+        // // console.log({result, actualResult, hash1, hash2})
+        // return [hash1 === hash2, result, actualResult];
+      }
+      case 'addBridgeToken': {
+        let {input: {mainTokenAddress, mainNetwork, targetNetwork}, result} = request.data;
+        actualResult = {
+          token: await NodeUtils.eth.getTokenInfo(mainTokenAddress, mainNetwork),
+          tokenId: mainTokenAddress,
+        }
+        break;
+        // let hash1 = crypto.soliditySha3([
+        //   {type: 'uint256', value: actualResult.tokenId},
+        //   {type: 'string', value: actualResult.token.name},
+        //   {type: 'string', value: actualResult.token.symbol},
+        //   {type: 'uint8', value: actualResult.token.decimals},
+        // ]);
+        // let hash2 = crypto.soliditySha3([
+        //   {type: 'uint256', value: result.tokenId},
+        //   {type: 'string', value: result.token.name},
+        //   {type: 'string', value: result.token.symbol},
+        //   {type: 'uint8', value: result.token.decimals},
+        // ]);
+        // // console.log({result, actualResult, hash1, hash2})
+        // return [hash1 === hash2, result, actualResult];
+      }
+    }
+    if(actualResult){
+      let hash1 = this.hashRequestResult(request, request.data.result);
+      let hash2 = this.hashRequestResult(request, actualResult);
+      verified = hash1 === hash2
+    }
+    return [verified, request.data.result, actualResult]
+  }
+
+  hashRequestResult(request, result) {
+    switch (request.method) {
+      case 'call': {
+        let {address, method, abi, outputs} = request.data.callInfo;
+        return crypto.hashCallOutput(address, method, abi, result, outputs)
+      }
+      case 'addBridgeToken': {
+        let {token, tokenId} = result;
+        return crypto.soliditySha3([
+          {type: 'uint256', value: tokenId},
+          {type: 'string', value: token.name},
+          {type: 'string', value: token.symbol},
+          {type: 'uint8', value: token.decimals},
+        ]);
+      }
+      default:
+        return null;
     }
   }
 
-  recoverSignature(request, signature) {
-    return NodeUtils.eth.recoverSignature(request, signature)
+  recoverSignature(request, sign) {
+    let {data:result, signature} = sign
+    let hash = this.hashRequestResult(request, result);
+    return crypto.recover(hash, signature);
+    // return NodeUtils.eth.recoverSignature(request, signature)
   }
 
   async processRemoteRequest(request) {
-    let {address, method, params, abi, network} = request.data.callInfo;
-    let callResult = await NodeUtils.eth.call(address, method, params, abi, network)
-    if (NodeUtils.eth.isEqualCallResult(request, callResult)) {
-      let sign = NodeUtils.eth.signRequest(request, callResult)
-      return sign
+    let result = null;
+    switch (request.method) {
+      case 'call': {
+        let {address, method, params, abi, network} = request.data.callInfo;
+        result = await NodeUtils.eth.call(address, method, params, abi, network)
+        break;
+      }
+      case 'addBridgeToken':{
+        let {mainTokenAddress, mainNetwork, targetNetwork} = request.data.input;
+        result = {
+          token: await NodeUtils.eth.getTokenInfo(mainTokenAddress, mainNetwork),
+          tokenId: mainTokenAddress,
+        }
+        break;
+      }
+    }
+    let hash1 = this.hashRequestResult(request, request.data.result);
+    let hash2 = this.hashRequestResult(request, result);
+    if (hash1 === hash2) {
+      // let sign = await NodeUtils.eth.signRequest(request, result)
+      // return sign
+      return this.makeSignature(request, result, hash2);
     } else {
       throw {message: "Request not confirmed"}
     }
