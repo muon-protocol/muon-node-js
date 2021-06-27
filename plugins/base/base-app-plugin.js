@@ -6,9 +6,9 @@ const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
 const {getTimestamp, timeout} = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
+const {omit} = require('lodash')
 
 class BaseAppPlugin extends BasePlugin {
-  APP_BROADCAST_CHANNEL = null
   APP_NAME = null;
 
   constructor(...args) {
@@ -26,16 +26,65 @@ class BaseAppPlugin extends BasePlugin {
     /**
      * Subscribe to app broadcast channel
      */
-
-    if(!!this.APP_BROADCAST_CHANNEL) {
-      await this.muon.libp2p.pubsub.subscribe(this.APP_BROADCAST_CHANNEL)
-      this.muon.libp2p.pubsub.on(this.APP_BROADCAST_CHANNEL, this.__onBroadcastReceived.bind(this))
+    let broadcastChannel = this.getBroadcastChannel()
+    if(broadcastChannel) {
+      await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
+      this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
     }
     /**
      * Remote call handlers
      */
-    this.muon.getPlugin('remote-call').on(`remote:app-${this.APP_NAME}-get-request`, this.__responseToRemoteRequestData.bind(this))
-    this.muon.getPlugin('remote-call').on(`remote:app-${this.APP_NAME}-request-sign`, this.__responseToRemoteRequestSign.bind(this))
+    this.muon.getPlugin('remote-call').on(`remote:app-${this.APP_NAME}-get-request`, this.__onRemoteWantRequest.bind(this))
+    this.muon.getPlugin('remote-call').on(`remote:app-${this.APP_NAME}-request-sign`, this.__onRemoteSignRequest.bind(this))
+    this.muon.getPlugin('gateway-interface').registerAppCall(this.APP_NAME, 'request', this.__onRequestArrived.bind(this))
+  }
+
+  getBroadcastChannel(){
+    return this.APP_NAME ? `muon/${this.APP_NAME}/request/broadcast` : null;
+  }
+
+  async __onRequestArrived(method, params, nSign){
+    let startedAt = getTimestamp();
+    let result = await this.onRequest(method, params)
+    nSign = !!nSign ? parseInt(nSign) : parseInt(process.env.NUM_SIGN_TO_CONFIRM);
+    let newRequest = new Request({
+      app: this.APP_NAME,
+      method: method,
+      nSign,
+      owner: process.env.SIGN_WALLET_ADDRESS,
+      peerId: process.env.PEER_ID,
+      data: {
+        params,
+        result,
+      },
+      startedAt,
+    })
+
+    await newRequest.save()
+
+    let resultHash = this.hashRequestResult(newRequest, result);
+    let sign = this.makeSignature(newRequest, result, resultHash);
+    (new Signature(sign)).save()
+
+    this.broadcastNewRequest(newRequest);
+
+    let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
+
+    if(confirmed){
+      newRequest['confirmedAt'] = getTimestamp()
+    }
+
+    let requestData = {
+      confirmed,
+      ...omit(newRequest._doc, ['__v']),
+      signatures,
+    }
+
+    if (confirmed) {
+      newRequest.save()
+    }
+
+    return requestData
   }
 
   /**
@@ -44,9 +93,19 @@ class BaseAppPlugin extends BasePlugin {
    * @returns {Promise<void>} >> Response object
    */
   async processRemoteRequest(request){
+    let result = await this.onRequest(request.method, request.data.params)
+
+    let hash1 = await this.hashRequestResult(request, request.data.result);
+    let hash2 = await this.hashRequestResult(request, result);
+
+    if(hash1 === hash2) {
+      return this.makeSignature(request, result, hash2)
+    } else {
+      throw {message: "Request not confirmed"}
+    }
   }
 
-  async isOtherNodesConfirmed(newRequest, numNodesToConfirm){
+  async isOtherNodesConfirmed(newRequest){
     let secondsToCheck = 0
     let confirmed = false
     let allSignatures = []
@@ -64,7 +123,7 @@ class BaseAppPlugin extends BasePlugin {
         signers[sigOwner] = true;
       }
 
-      if(Object.keys(signers).length >= numNodesToConfirm){
+      if(Object.keys(signers).length >= newRequest.nSign){
         confirmed = true;
       }
       secondsToCheck += 0.25
@@ -107,20 +166,33 @@ class BaseAppPlugin extends BasePlugin {
    * @returns {Promise<*[isVerified, expectedResult, actualResult]>}
    */
   async isVerifiedRequest(request){
-    // returns [isVerified, expectedResult, actualResult]
-    return [true, null, null];
+    let {method, data: {params, result}} = request
+    let actualResult= await this.onRequest(method, params);
+    let verified=false;
+    if(actualResult){
+      let hash1 = this.hashRequestResult(request, result);
+      let hash2 = this.hashRequestResult(request, actualResult);
+      verified = hash1 === hash2
+    }
+    return [verified, request.data.result, actualResult]
   }
 
-  recoverSignature(request, signature){}
+  recoverSignature(request, sign){
+    let hash = this.hashRequestResult(request, sign.data)
+    return crypto.recover(hash, sign.signature);
+  }
 
   broadcastNewRequest(request){
+    let broadcastChannel = this.getBroadcastChannel()
+    if(!broadcastChannel)
+      return;
     let data = {
       type: 'new_request',
       peerId:  process.env.PEER_ID,
       _id: request._id
     }
     let dataStr = JSON.stringify(data)
-    this.muon.libp2p.pubsub.publish(this.APP_BROADCAST_CHANNEL, uint8ArrayFromString(dataStr))
+    this.muon.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(dataStr))
   }
 
   remoteMethodEndpoint(title){
@@ -131,6 +203,17 @@ class BaseAppPlugin extends BasePlugin {
     let remoteCall = this.muon.getPlugin('remote-call');
     let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
     return remoteCall.call(peer, remoteMethodEndpoint, data)
+  }
+
+  /**
+   * hash parameters that smart contract need it.
+   *
+   * @param request
+   * @param result
+   * @returns {sha3 hash of parameters}
+   */
+  hashRequestResult(request, result) {
+    return null;
   }
 
   makeSignature(request, result, resultHash){
@@ -150,16 +233,17 @@ class BaseAppPlugin extends BasePlugin {
    * This methods will call from remote peer
    */
 
-  async __responseToRemoteRequestData(data){
+  async __onRemoteWantRequest(data){
     // console.log('RemoteCall.getRequestData', data)
     let req = await Request.findOne({_id: data._id})
     return req
   }
 
-  async __responseToRemoteRequestSign(sig){
+  async __onRemoteSignRequest(sig){
     // console.log('RemoteCall.requestSignature', sig)
     let request = await Request.findOne({_id: sig.request})
     if(request) {
+      // TODO: check response similarity
       let signer = this.recoverSignature(request, sig);
       if (signer && signer === sig.owner) {
         let newSignature = new Signature(sig)
