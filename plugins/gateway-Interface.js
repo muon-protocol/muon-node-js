@@ -50,18 +50,23 @@ class GatewayInterface extends BasePlugin{
     if(channel === GATEWAY_CALL_REQUEST){
       try {
         data = JSON.parse(message);
-        let {callId, app, method, params} = data
+        let {callId, app, method, params, nSign} = data
         let response
         if(app){
-          response = await this.emit(`call/${app}/${method}`, params)
+          if(this.listenerCount(`call/${app}/${method}`) > 0){
+            response = await this.emit(`call/${app}/${method}`, params, nSign)
+          }
+          else{
+            response = await this.emit(`call/${app}/request`, method, params, nSign)
+          }
         }
         else{
-          response = await this.emit(`call/muon/${method}`, params)
+          response = await this.emit(`call/muon/${method}`, params, nSign)
         }
         await this.__handleCallResponse(data, response)
       }
       catch (e) {
-        // console.error('gateway-interface error', e)
+        console.error('gateway-interface error', e)
         responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
           responseId: data ? data.callId : undefined,
           error: e.message,

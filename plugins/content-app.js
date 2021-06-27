@@ -1,11 +1,11 @@
-const BaseApp = require('./base/base-app-plugin')
+const SimpleApp = require('./base/base-simple-app-plugin')
 const Content = require('../gateway/models/Content')
 const CID = require('cids')
 const all = require('it-all')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
 @remoteApp
-class ContentApp extends BaseApp {
+class ContentApp extends SimpleApp {
   APP_NAME = 'content'
 
   async onGatewayConfirmed(response){
