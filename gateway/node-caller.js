@@ -43,9 +43,9 @@ responseRedis.on('message', (channel, message) => {
 
 let calls = {}
 
-function makeCall(method, params){
+function makeCall(method, params, nSign){
   let callId = newCallId();
-  callRedis.publish(GATEWAY_CALL_REQUEST, JSON.stringify({callId, method, params}))
+  callRedis.publish(GATEWAY_CALL_REQUEST, JSON.stringify({callId, method, params, nSign}))
   let callResult = new CallResult()
   calls[callId] = callResult;
   return callResult.promise
@@ -64,9 +64,9 @@ function broadcast(data){
   broadcastRedis.lpush(process.env.REDIS_QUEUE, redisMessage);
 }
 
-function appCall(app, method, params){
+function appCall(app, method, params, nSign){
   let callId = newCallId();
-  callRedis.publish(GATEWAY_CALL_REQUEST, JSON.stringify({callId, app, method, params}))
+  callRedis.publish(GATEWAY_CALL_REQUEST, JSON.stringify({callId, app, method, params, nSign}))
   let callResult = new CallResult()
   calls[callId] = callResult;
   return callResult.promise
