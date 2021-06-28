@@ -62,6 +62,14 @@ function call(contractAddress, methodName, params, abi, network) {
     })
 }
 
+function read(contractAddress, property, params, abi, network) {
+  return getWeb3(network)
+    .then(web3 => {
+      let contract = new web3.eth.Contract(abi, contractAddress);
+      return contract.methods[property].call(...params);
+    })
+}
+
 function isEqualObject(obj1, obj2) {
   return objectToStr(obj1) === objectToStr(obj2);
 }
@@ -227,6 +235,7 @@ module.exports = {
   getTransaction,
   getTransactionReceipt,
   call,
+  read,
   isEqualObject,
   isEqualResult,
   signRequest,

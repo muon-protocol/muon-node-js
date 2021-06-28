@@ -41,6 +41,7 @@ var muon;
       'eth': [require('./plugins/eth-app-plugin'), {}],
       'content-verify': [require('./plugins/content-verify-plugin'), {}],
       'content': [require('./plugins/content-app'), {}],
+      'presale': [require('./plugins/muon-presale-plugin'), {}],
       ... getEnvPlugins(),
     }
   })
