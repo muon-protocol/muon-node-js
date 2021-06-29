@@ -1,5 +1,8 @@
 const Muon = require('./core/muon');
+const {dynamicExtend} = require('./core/utils')
+const BaseApp = require('./plugins/base/base-app-plugin')
 const Gateway = require('./gateway/index')
+require('./core/global')
 
 function getEnvBootstraps(){
   return Object.keys(process.env)
@@ -15,6 +18,18 @@ function getEnvPlugins(){
     return {
       ...res,
       [`__${key}__`]: [require(`./plugins/${key}`), {}]
+    }
+  }, {})
+}
+
+function getCustomApps(){
+  let pluginsStr = process.env['MUON_CUSTOM_APPS']
+  if(!pluginsStr)
+    return {}
+  return pluginsStr.split('|').reduce((res, key) => {
+    return {
+      ...res,
+      [`__${key}__`]: [dynamicExtend(BaseApp, require(`./custom-apps/${key}`)), {}]
     }
   }, {})
 }
@@ -41,8 +56,9 @@ var muon;
       'eth': [require('./plugins/eth-app-plugin'), {}],
       'content-verify': [require('./plugins/content-verify-plugin'), {}],
       'content': [require('./plugins/content-app'), {}],
-      'presale': [require('./plugins/muon-presale-plugin'), {}],
+      // 'presale': [require('./plugins/muon-presale-plugin'), {}],
       ... getEnvPlugins(),
+      ... getCustomApps(),
     }
   })
 

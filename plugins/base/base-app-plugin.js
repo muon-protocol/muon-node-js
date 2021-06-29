@@ -17,12 +17,14 @@ class BaseAppPlugin extends BasePlugin {
     /**
      * This is abstract class, so "new BaseAppPlugin()" is not allowed
      */
-    if (new.target === BaseAppPlugin) {
-      throw new TypeError("Cannot construct abstract BaseAppPlugin instances directly");
-    }
+    // if (new.target === BaseAppPlugin) {
+    //   throw new TypeError("Cannot construct abstract BaseAppPlugin instances directly");
+    // }
   }
 
   async onStart(){
+
+    console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
     /**
      * Subscribe to app broadcast channel
      */
