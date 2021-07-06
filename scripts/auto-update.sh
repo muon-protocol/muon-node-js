@@ -32,9 +32,9 @@ check_for_update (){
         # restart services
         log "========== updating detected ===========";
         log "Installing dependencies ...";
-        log `npm install`
+        log `/usr/bin/env npm install`
         log "Restarting PM2 ...";
-        log `pm2 restart all`
+        log `/usr/bin/env pm2 restart all`
         log "============ updating done =============";
     fi
 }
