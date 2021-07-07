@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 project_dir="`dirname "$0"`/.."
 cd "$project_dir"
@@ -32,9 +33,9 @@ check_for_update (){
         # restart services
         log "========== updating detected ===========";
         log "Installing dependencies ...";
-        log `/usr/bin/env npm install`
+        log `npm install`
         log "Restarting PM2 ...";
-        log `/usr/bin/env pm2 restart all`
+        log `pm2 restart all`
         log "============ updating done =============";
     fi
 }
