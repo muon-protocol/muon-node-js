@@ -23,6 +23,7 @@
     "chokidar": "^3.5.1",
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
+    "elliptic": "^6.5.4",
     "ethers": "^5.1.4",
     "events": "^3.3.0",
     "events-async": "^1.2.1",
