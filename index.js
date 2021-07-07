@@ -1,4 +1,6 @@
 const Muon = require('./core/muon');
+const path = require('path');
+const fs = require('fs');
 const {dynamicExtend} = require('./core/utils')
 const BaseApp = require('./plugins/base/base-app-plugin')
 const Gateway = require('./gateway/index')
@@ -23,15 +25,25 @@ function getEnvPlugins(){
 }
 
 function getCustomApps(){
-  let pluginsStr = process.env['MUON_CUSTOM_APPS']
-  if(!pluginsStr)
-    return {}
-  return pluginsStr.split('|').reduce((res, key) => {
-    return {
-      ...res,
-      [`__${key}__`]: [dynamicExtend(BaseApp, require(`./custom-apps/${key}`)), {}]
-    }
-  }, {})
+  const appDir = path.join(__dirname, 'custom-apps');
+  return new Promise(function (resolve, reject) {
+    let result = {};
+    fs.readdir(appDir, function (err, files) {
+      if (err) {
+        reject(err)
+      }
+      files.forEach(function (file) {
+        let ext = file.split('.').pop();
+        if(ext.toLowerCase() === 'js'){
+          let app = require(`./custom-apps/${file}`)
+          if(!!app.APP_NAME) {
+            result[app.APP_NAME] = [dynamicExtend(BaseApp, app), {}]
+          }
+        }
+      });
+      resolve(result)
+    });
+  })
 }
 
 var muon;
@@ -58,7 +70,7 @@ var muon;
       'content': [require('./plugins/content-app'), {}],
       // 'presale': [require('./plugins/muon-presale-plugin'), {}],
       ... getEnvPlugins(),
-      ... getCustomApps(),
+      ... await getCustomApps(),
     }
   })
 

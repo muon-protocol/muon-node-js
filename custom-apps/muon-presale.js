@@ -25,7 +25,7 @@ module.exports = {
           throw {message: 'Invalid token'}
         if (!amount)
           throw {message: 'Invalid deposit amount'}
-        if (!amount)
+        if (!forAddress)
           throw {message: 'Invalid sender address'}
 
         let [tokenList, allowance] = await Promise.all([getTokens(), getAllowance()])
@@ -40,7 +40,7 @@ module.exports = {
 
         return {
           token: token.address,
-          tokenPrice: token.price,
+          tokenPrice: toBaseUnit(token.price.toString(), 18).toString(),
           amount,
           time,
           forAddress,
