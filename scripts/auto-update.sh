@@ -1,8 +1,7 @@
 #!/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+. "./pre-run.sh"
 
-project_dir="`dirname "$0"`/.."
-cd "$project_dir"
+project_dir=`pwd`
 absolute_path="`pwd`/scripts/`basename $0`"
 
 log (){
