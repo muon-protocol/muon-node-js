@@ -22,14 +22,14 @@ class BaseAppPlugin extends BasePlugin {
     // }
   }
 
-  async onStart(){
+  async onStart() {
 
     console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
     /**
      * Subscribe to app broadcast channel
      */
     let broadcastChannel = this.getBroadcastChannel()
-    if(broadcastChannel) {
+    if (broadcastChannel) {
       await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
       this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
     }
@@ -41,11 +41,11 @@ class BaseAppPlugin extends BasePlugin {
     this.muon.getPlugin('gateway-interface').registerAppCall(this.APP_NAME, 'request', this.__onRequestArrived.bind(this))
   }
 
-  getBroadcastChannel(){
+  getBroadcastChannel() {
     return this.APP_NAME ? `muon/${this.APP_NAME}/request/broadcast` : null;
   }
 
-  async __onRequestArrived(method, params, nSign){
+  async __onRequestArrived(method, params, nSign) {
     let startedAt = getTimestamp();
     let result = await this.onRequest(method, params)
     nSign = !!nSign ? parseInt(nSign) : parseInt(process.env.NUM_SIGN_TO_CONFIRM);
@@ -64,9 +64,9 @@ class BaseAppPlugin extends BasePlugin {
 
     let resultHash = this.hashRequestResult(newRequest, result);
     let memWrite;
-    if(this.hasOwnProperty('memWrite')){
+    if (this.hasOwnProperty('memWrite')) {
       memWrite = this.memWrite(newRequest, result)
-      if(!!memWrite)
+      if (!!memWrite)
         newRequest.data.memWrite = memWrite;
     }
 
@@ -79,7 +79,7 @@ class BaseAppPlugin extends BasePlugin {
 
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
 
-    if(confirmed){
+    if (confirmed) {
       newRequest['confirmedAt'] = getTimestamp()
     }
 
@@ -101,15 +101,15 @@ class BaseAppPlugin extends BasePlugin {
    * @param request
    * @returns {Promise<void>} >> Response object
    */
-  async processRemoteRequest(request){
+  async processRemoteRequest(request) {
     let result = await this.onRequest(request.method, request.data.params)
 
     let hash1 = await this.hashRequestResult(request, request.data.result);
     let hash2 = await this.hashRequestResult(request, result);
 
-    if(hash1 === hash2) {
+    if (hash1 === hash2) {
       let memWrite;
-      if(this.hasOwnProperty('memWrite')){
+      if (this.hasOwnProperty('memWrite')) {
         memWrite = this.memWrite(request, result)
       }
       return [this.makeSignature(request, result, hash2), memWrite]
@@ -118,25 +118,25 @@ class BaseAppPlugin extends BasePlugin {
     }
   }
 
-  async isOtherNodesConfirmed(newRequest){
+  async isOtherNodesConfirmed(newRequest) {
     let secondsToCheck = 0
     let confirmed = false
     let allSignatures = []
     let signers = {}
 
-    while(!confirmed && secondsToCheck < 5) {
+    while (!confirmed && secondsToCheck < 5) {
       await timeout(250);
       allSignatures = await Signature.find({request: newRequest._id})
       signers = {};
-      for(let sig of allSignatures){
+      for (let sig of allSignatures) {
         let sigOwner = this.recoverSignature(newRequest, sig)
-        if(!!sigOwner && sigOwner !== sig['owner'])
+        if (!!sigOwner && sigOwner !== sig['owner'])
           continue;
 
         signers[sigOwner] = true;
       }
 
-      if(Object.keys(signers).length >= newRequest.nSign){
+      if (Object.keys(signers).length >= newRequest.nSign) {
         confirmed = true;
       }
       secondsToCheck += 0.25
@@ -150,26 +150,24 @@ class BaseAppPlugin extends BasePlugin {
     }))]
   }
 
-  async __onBroadcastReceived(msg){
+  async __onBroadcastReceived(msg) {
     let remoteCall = this.muon.getPlugin('remote-call');
     try {
       let data = JSON.parse(uint8ArrayToString(msg.data));
-      if(data && data.type === 'new_request'){
+      if (data && data.type === 'new_request') {
         let peerId = PeerId.createFromCID(data.peerId)
         let peer = await this.muon.libp2p.peerRouting.findPeer(peerId);
         let request = await remoteCall.call(peer, `app-${this.APP_NAME}-get-request`, {_id: data._id})
-        if(request){
+        if (request) {
           // console.log(`request info found: `, request)
           let [sign, memWrite] = await this.processRemoteRequest(request)
           console.log({sign, memWrite})
           await remoteCall.call(peer, `app-${this.APP_NAME}-request-sign`, sign)
-        }
-        else{
+        } else {
           // console.log(`request info not found "${data.id}"`)
         }
       }
-    }
-    catch (e) {
+    } catch (e) {
       console.error(e)
     }
   }
@@ -179,46 +177,46 @@ class BaseAppPlugin extends BasePlugin {
    * @param request
    * @returns {Promise<*[isVerified, expectedResult, actualResult]>}
    */
-  async isVerifiedRequest(request){
-    let {method, data: {params, result}} = request
-    let actualResult= await this.onRequest(method, params);
-    let verified=false;
-    if(actualResult){
-      try {
+  async isVerifiedRequest(request) {
+    let actualResult;
+    try {
+      let {method, data: {params, result}} = request
+      actualResult = await this.onRequest(method, params);
+      let verified = false;
+      if (actualResult) {
         let hash1 = this.hashRequestResult(request, result);
         let hash2 = this.hashRequestResult(request, actualResult);
         verified = hash1 === hash2
       }
-      catch (e) {
-        // TODO: handle this error
-      }
+      return [verified, request.data.result, actualResult]
+    } catch (e) {
+      return [false, request.data.result, actualResult]
     }
-    return [verified, request.data.result, actualResult]
   }
 
-  recoverSignature(request, sign){
+  recoverSignature(request, sign) {
     let hash = this.hashRequestResult(request, sign.data)
     return crypto.recover(hash, sign.signature);
   }
 
-  broadcastNewRequest(request){
+  broadcastNewRequest(request) {
     let broadcastChannel = this.getBroadcastChannel()
-    if(!broadcastChannel)
+    if (!broadcastChannel)
       return;
     let data = {
       type: 'new_request',
-      peerId:  process.env.PEER_ID,
+      peerId: process.env.PEER_ID,
       _id: request._id
     }
     let dataStr = JSON.stringify(data)
     this.muon.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(dataStr))
   }
 
-  remoteMethodEndpoint(title){
+  remoteMethodEndpoint(title) {
     return `app-${this.APP_NAME}-${title}`
   }
 
-  remoteCall(peer, methodName, data){
+  remoteCall(peer, methodName, data) {
     let remoteCall = this.muon.getPlugin('remote-call');
     let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
     return remoteCall.call(peer, remoteMethodEndpoint, data)
@@ -235,7 +233,7 @@ class BaseAppPlugin extends BasePlugin {
     return null;
   }
 
-  makeSignature(request, result, resultHash){
+  makeSignature(request, result, resultHash) {
     let signTimestamp = getTimestamp()
     let signature = crypto.sign(resultHash)
     return {
@@ -252,23 +250,22 @@ class BaseAppPlugin extends BasePlugin {
    * This methods will call from remote peer
    */
 
-  async __onRemoteWantRequest(data){
+  async __onRemoteWantRequest(data) {
     // console.log('RemoteCall.getRequestData', data)
     let req = await Request.findOne({_id: data._id})
     return req
   }
 
-  async __onRemoteSignRequest(sig){
+  async __onRemoteSignRequest(sig) {
     // console.log('RemoteCall.requestSignature', sig)
     let request = await Request.findOne({_id: sig.request})
-    if(request) {
+    if (request) {
       // TODO: check response similarity
       let signer = this.recoverSignature(request, sig);
       if (signer && signer === sig.owner) {
         let newSignature = new Signature(sig)
         await newSignature.save();
-      }
-      else{
+      } else {
         console.log('signature mismatch', {request: request._id, signer, sigOwner: sig.owner})
       }
     }
