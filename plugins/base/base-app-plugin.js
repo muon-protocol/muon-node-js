@@ -62,9 +62,16 @@ class BaseAppPlugin extends BasePlugin {
       startedAt,
     })
 
+    let resultHash = this.hashRequestResult(newRequest, result);
+    let memWrite;
+    if(this.hasOwnProperty('memWrite')){
+      memWrite = this.memWrite(newRequest, result)
+      if(!!memWrite)
+        newRequest.data.memWrite = memWrite;
+    }
+
     await newRequest.save()
 
-    let resultHash = this.hashRequestResult(newRequest, result);
     let sign = this.makeSignature(newRequest, result, resultHash);
     (new Signature(sign)).save()
 
@@ -101,7 +108,11 @@ class BaseAppPlugin extends BasePlugin {
     let hash2 = await this.hashRequestResult(request, result);
 
     if(hash1 === hash2) {
-      return this.makeSignature(request, result, hash2)
+      let memWrite;
+      if(this.hasOwnProperty('memWrite')){
+        memWrite = this.memWrite(request, result)
+      }
+      return [this.makeSignature(request, result, hash2), memWrite]
     } else {
       throw {message: "Request not confirmed"}
     }
@@ -149,7 +160,8 @@ class BaseAppPlugin extends BasePlugin {
         let request = await remoteCall.call(peer, `app-${this.APP_NAME}-get-request`, {_id: data._id})
         if(request){
           // console.log(`request info found: `, request)
-          let sign = await this.processRemoteRequest(request)
+          let [sign, memWrite] = await this.processRemoteRequest(request)
+          console.log({sign, memWrite})
           await remoteCall.call(peer, `app-${this.APP_NAME}-request-sign`, sign)
         }
         else{
