@@ -184,9 +184,14 @@ class BaseAppPlugin extends BasePlugin {
     let actualResult= await this.onRequest(method, params);
     let verified=false;
     if(actualResult){
-      let hash1 = this.hashRequestResult(request, result);
-      let hash2 = this.hashRequestResult(request, actualResult);
-      verified = hash1 === hash2
+      try {
+        let hash1 = this.hashRequestResult(request, result);
+        let hash2 = this.hashRequestResult(request, actualResult);
+        verified = hash1 === hash2
+      }
+      catch (e) {
+        // TODO: handle this error
+      }
     }
     return [verified, request.data.result, actualResult]
   }
