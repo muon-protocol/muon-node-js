@@ -12,7 +12,7 @@ log (){
 
 setup (){
     backup=`crontab -l`
-    new_cron="*/5 * * * * export _PM2=`which pm2`; export _NPM=`which npm` $absolute_path"; # every 5 minutes
+    new_cron="*/5 * * * * export _PM2=`which pm2`; export _NPM=`which npm`; $absolute_path"; # every 5 minutes
     if [[ "$backup" == *"$new_cron"* ]]
     then
         echo "Already exist.";
