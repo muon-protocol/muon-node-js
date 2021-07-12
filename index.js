@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const {dynamicExtend} = require('./core/utils')
 const BaseApp = require('./plugins/base/base-app-plugin')
+const BaseService = require('./plugins/base/base-service-plugin')
 const Gateway = require('./gateway/index')
 require('./core/global')
 
@@ -37,7 +38,7 @@ function getCustomApps(){
         if(ext.toLowerCase() === 'js'){
           let app = require(`./custom-apps/${file}`)
           if(!!app.APP_NAME) {
-            result[app.APP_NAME] = [dynamicExtend(BaseApp, app), {}]
+            result[app.APP_NAME] = [dynamicExtend(app.isService ? BaseService : BaseApp, app), {}]
           }
         }
       });
