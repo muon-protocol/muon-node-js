@@ -12,9 +12,9 @@ class BaseServicePlugin extends BaseAppPlugin {
     /**
      * This is abstract class, so "new BaseServicePlugin()" is not allowed
      */
-    if (new.target === BaseServicePlugin) {
-      throw new TypeError("Cannot construct abstract BaseServicePlugin instances directly");
-    }
+    // if (new.target === BaseServicePlugin) {
+    //   throw new TypeError("Cannot construct abstract BaseServicePlugin instances directly");
+    // }
   }
 
   async onStart(){
@@ -67,8 +67,8 @@ class BaseServicePlugin extends BaseAppPlugin {
   }
 
   async __onRemoteWantSign(request){
-    let sign = await this.processRemoteRequest(request)
-    // console.log('wantSign', request._id, sign)
+    let [sign, memWrite] = await this.processRemoteRequest(request)
+    console.log('wantSign', request._id, sign)
     return sign;
   }
 }

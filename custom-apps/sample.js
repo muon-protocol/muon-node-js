@@ -9,10 +9,13 @@ const getTimestamp = () => Math.floor(Date.now() / 1000)
 
 module.exports = {
   APP_NAME: 'sample',
+  isService: true,
 
   onRequest: async function (method, params) {
     console.log({method, params})
     switch (method) {
+      case "test_speed":
+        return "speed test done"
       case "btc_price":
         let result = await getBtcPrice()
         let price = toBaseUnit(result.bpi.USD.rate_float.toString(), 18).toString()
@@ -30,6 +33,8 @@ module.exports = {
 
   hashRequestResult: (request, result) => {
     switch (request.method) {
+      case "test_speed":
+        return result;
       case "btc_price":
         let hash = soliditySha3([
           {type: 'uint256', value: request.data.result.time},

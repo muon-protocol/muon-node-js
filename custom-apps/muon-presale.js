@@ -68,5 +68,29 @@ module.exports = {
       default:
         return null;
     }
+  },
+  memWrite: (req, res) => {
+    let {
+      method,
+      data:{
+        params: {forAddress, amount},
+        result: {time}
+      }
+    } = req;
+    switch (method) {
+      case 'deposit': {
+        return {
+          timeout: 5 * 60,
+          data: {forAddress, amount, time},
+          hash: soliditySha3([
+            {type: 'address', value: forAddress},
+            {type: 'uint256', value: amount},
+            {type: 'uint256', value: time},
+          ])
+        }
+      }
+      default:
+        return null;
+    }
   }
 }
