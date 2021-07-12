@@ -9,6 +9,7 @@ async function getPrice() {
 
 module.exports = {
   APP_NAME: 'deus_oracle',
+  isService: true,
 
   onRequest: async function (method, params) {
     switch (method) {
