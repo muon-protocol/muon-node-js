@@ -15,7 +15,7 @@ module.exports = {
     console.log({method, params})
     switch (method) {
       case "test_speed":
-        return "speed test done"
+        return "speed test done successfully."
       case "btc_price":
         let result = await getBtcPrice()
         let price = toBaseUnit(result.bpi.USD.rate_float.toString(), 18).toString()
