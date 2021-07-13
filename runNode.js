@@ -21,12 +21,17 @@ async function runNodes() {
   let node_n = params['n'] ? Number(params['n']) : 2
   let port = params['p'] ? Number(params['p']) : 8080
   const dir = './dev-chain'
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, {
-      recursive: true
-    })
-  }
+
   if (params['setup']) {
+    // delete directory recursively
+    fs.rmdir(dir, { recursive: true }, (err) => {
+      if (err) {
+        throw err
+      }
+      fs.mkdirSync(dir, {
+        recursive: true
+      })
+    })
     console.log('setup envs')
     const result = spawn('node', [
       'generateEnvs.js',
@@ -43,6 +48,11 @@ async function runNodes() {
       runMuonNode(node_n)
     } else {
       console.log('Generating Envs...')
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, {
+          recursive: true
+        })
+      }
       const result = spawn('node', [
         'generateEnvs.js',
         `-n=${node_n}`,
