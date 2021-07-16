@@ -86,7 +86,7 @@ module.exports = {
     switch (method) {
       case 'deposit': {
         return {
-          ttl: 15,
+          ttl: 5 * 60,
           data: [
             {name: 'forAddress' ,type: 'address', value: forAddress}
           ],
