@@ -12,10 +12,17 @@ module.exports = {
   isService: true,
 
   onRequest: async function (method, params) {
-    console.log({method, params})
     switch (method) {
       case "test_speed":
         return "speed test done."
+      case "lock":
+        let {user} = params;
+        let lock = await this.memRead({"data.name": 'lock', 'data.value': user})
+        // console.log({lock})
+        if(lock)
+          throw {message: `user:[${user}] has been locked for 10 seconds`}
+        return "lock done."
+
       case "btc_price":
         let result = await getBtcPrice()
         let price = toBaseUnit(result.bpi.USD.rate_float.toString(), 18).toString()
@@ -34,6 +41,7 @@ module.exports = {
   hashRequestResult: (request, result) => {
     switch (request.method) {
       case "test_speed":
+      case "lock":
         return result;
       case "btc_price":
         let hash = soliditySha3([
@@ -43,6 +51,18 @@ module.exports = {
         return hash;
       default:
         throw {message: `Unknown method: ${request.method}`}
+    }
+  },
+
+  onMemWrite: (req, res) => {
+    if(req.method === 'lock') {
+      let {data: {params: {user}}} = req;
+      return {
+        ttl: 10,
+        data: [
+          {name: 'lock', type: 'string', value: user}
+        ],
+      }
     }
   }
 }
