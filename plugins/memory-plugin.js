@@ -94,6 +94,10 @@ class MemoryPlugin extends BasePlugin {
   async readAppMem(app, query) {
     return Memory.findOne({...query, app})
   }
+
+  async readAppMemMulti(app, query) {
+    return Memory.find({...query, app})
+  }
 }
 
 module.exports = MemoryPlugin;
