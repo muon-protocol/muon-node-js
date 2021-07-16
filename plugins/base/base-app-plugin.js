@@ -124,7 +124,10 @@ class BaseAppPlugin extends BasePlugin {
     if (this.hasOwnProperty('onMemWrite')) {
       let timestamp = request.startedAt;
       let nSign = request.nSign;
-      let {ttl, data} = this.onMemWrite(request, result);
+      let memWrite = this.onMemWrite(request, result);
+      if(!memWrite)
+        return;
+      let {ttl, data} = memWrite;
 
       let hash = crypto.soliditySha3([
         {type: 'string', value: this.APP_NAME},
@@ -140,6 +143,10 @@ class BaseAppPlugin extends BasePlugin {
 
   async memRead(query){
     return this.muon.getPlugin('memory').readAppMem(this.APP_NAME, query)
+  }
+
+  async memReadMulti(query){
+    return this.muon.getPlugin('memory').readAppMemMulti(this.APP_NAME, query)
   }
 
   async isOtherNodesConfirmed(newRequest) {
@@ -281,7 +288,7 @@ class BaseAppPlugin extends BasePlugin {
   }
 
   async __onRemoteSignRequest({sign, memWrite}) {
-    console.log('RemoteCall.requestSignature', {sign, memWrite})
+    // console.log('RemoteCall.requestSignature', {sign, memWrite})
     let request = await Request.findOne({_id: sign.request})
     if (request) {
       // TODO: check response similarity
