@@ -18,6 +18,7 @@ module.exports = {
   onRequest: async function (method, params={}) {
     switch (method) {
       case 'deposit':{
+
         let {token, amount, forAddress,} = params;
         let time = getTimestamp();
 
@@ -27,6 +28,11 @@ module.exports = {
           throw {message: 'Invalid deposit amount'}
         if (!forAddress)
           throw {message: 'Invalid sender address'}
+
+        let locked = await this.memRead({nSign: 2, "data.name": "forAddress" ,"data.value": forAddress});
+        if(!!locked){
+          throw {message: `deposit from address ${forAddress} has been locked for 5 minutes.`}
+        }
 
         let [tokenList, allowance] = await Promise.all([getTokens(), getAllowance()])
 
@@ -69,7 +75,7 @@ module.exports = {
         return null;
     }
   },
-  memWrite: (req, res) => {
+  onMemWrite: (req, res) => {
     let {
       method,
       data:{
@@ -80,13 +86,10 @@ module.exports = {
     switch (method) {
       case 'deposit': {
         return {
-          timeout: 5 * 60,
-          data: {forAddress, amount, time},
-          hash: soliditySha3([
-            {type: 'address', value: forAddress},
-            {type: 'uint256', value: amount},
-            {type: 'uint256', value: time},
-          ])
+          ttl: 15,
+          data: [
+            {name: 'forAddress' ,type: 'address', value: forAddress}
+          ],
         }
       }
       default:

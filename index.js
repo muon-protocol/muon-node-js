@@ -69,6 +69,7 @@ var muon;
       'eth': [require('./plugins/eth-app-plugin'), {}],
       'content-verify': [require('./plugins/content-verify-plugin'), {}],
       'content': [require('./plugins/content-app'), {}],
+      'memory': [require('./plugins/memory-plugin'), {}],
       // 'presale': [require('./plugins/muon-presale-plugin'), {}],
       ... getEnvPlugins(),
       ... await getCustomApps(),
