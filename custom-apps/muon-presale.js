@@ -1,4 +1,4 @@
-const {axios, toBaseUnit, soliditySha3} = MuonAppUtils;
+const {axios, toBaseUnit, soliditySha3, ecRecover} = MuonAppUtils;
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -19,15 +19,30 @@ module.exports = {
     switch (method) {
       case 'deposit':{
 
-        let {token, amount, forAddress,} = params;
-        let time = getTimestamp();
+        let {token, amount, forAddress, time, sign} = params;
+        let currentTime = getTimestamp();
 
+        if(!time)
+          throw {message: "invalid deposit time"}
+        if(currentTime - time > 20)
+          throw {message: 'time diff is grater than 20 seconds. check your system time.'}
         if (!token)
           throw {message: 'Invalid token'}
         if (!amount)
           throw {message: 'Invalid deposit amount'}
         if (!forAddress)
           throw {message: 'Invalid sender address'}
+        if(!sign)
+          throw {message: "Request signature undefined"}
+        else{
+          let hash = soliditySha3([
+            {type: 'uint256', value: time},
+            {type: 'address', value: forAddress},
+          ])
+          let signer = ecRecover(hash, sign)
+          if(signer !== forAddress)
+            throw {message: 'Request signature mismatch'}
+        }
 
         let locked = await this.memRead({nSign: 2, "data.name": "forAddress" ,"data.value": forAddress});
         if(!!locked){
