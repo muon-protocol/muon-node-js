@@ -16,7 +16,8 @@ function getAllowance() {
 class MuonPresalePlugin extends BaseApp {
   APP_NAME = 'presale'
 
-  async onRequest(method, params={}){
+  async onRequest(request){
+    let {method, data: {params}} = request;
     switch (method) {
       case 'deposit':{
         let {token, amount, forAddress,} = params;

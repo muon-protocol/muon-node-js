@@ -5,7 +5,8 @@ const crypto = require('../utils/crypto')
 class EthAppPlugin extends BaseApp {
   APP_NAME = 'eth'
 
-  async onRequest(method, params){
+  async onRequest(request){
+    let {method, data: {params}} = request;
     // console.dir({method, params}, {depth: null})
     switch (method) {
       case 'call':{

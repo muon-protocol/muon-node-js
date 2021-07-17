@@ -8,6 +8,8 @@ const {getTimestamp, timeout} = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
 const {omit} = require('lodash')
 
+const clone = obj => JSON.parse(JSON.stringify(obj));
+
 class BaseAppPlugin extends BasePlugin {
   APP_NAME = null;
 
@@ -47,7 +49,6 @@ class BaseAppPlugin extends BasePlugin {
 
   async __onRequestArrived(method, params, nSign) {
     let startedAt = getTimestamp();
-    let result = await this.onRequest(method, params)
     nSign = !!nSign ? parseInt(nSign) : parseInt(process.env.NUM_SIGN_TO_CONFIRM);
     let newRequest = new Request({
       app: this.APP_NAME,
@@ -57,10 +58,12 @@ class BaseAppPlugin extends BasePlugin {
       peerId: process.env.PEER_ID,
       data: {
         params,
-        result,
       },
       startedAt,
     })
+
+    let result = await this.onRequest(clone(newRequest))
+    newRequest.data.result = result;
 
     let resultHash = this.hashRequestResult(newRequest, result);
     let memWrite = this.getMemWrite(newRequest, result);
@@ -107,7 +110,7 @@ class BaseAppPlugin extends BasePlugin {
    * @returns {Promise<void>} >> Response object
    */
   async processRemoteRequest(request) {
-    let result = await this.onRequest(request.method, request.data.params)
+    let result = await this.onRequest(clone(request))
 
     let hash1 = await this.hashRequestResult(request, request.data.result);
     let hash2 = await this.hashRequestResult(request, result);
@@ -211,8 +214,8 @@ class BaseAppPlugin extends BasePlugin {
   async isVerifiedRequest(request) {
     let actualResult;
     try {
-      let {method, data: {params, result}} = request
-      actualResult = await this.onRequest(method, params);
+      let {data: {result}} = request
+      actualResult = await this.onRequest(clone(request));
       let verified = false;
       if (actualResult) {
         let hash1 = this.hashRequestResult(request, result);

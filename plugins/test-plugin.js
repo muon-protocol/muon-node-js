@@ -3,7 +3,8 @@ const BaseService = require('./base/base-service-plugin')
 class TestPlugin extends BaseService {
   APP_NAME = 'test'
 
-  async onRequest(method, params){
+  async onRequest(request){
+    let {method, data: {params}} = request;
     switch (method) {
       case "sign":
         return 1 + Math.random()

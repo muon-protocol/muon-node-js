@@ -6,7 +6,8 @@ const Sources = require('../gateway/sources')
 class StockPlugin extends BaseService {
   APP_NAME = 'stock';
 
-  async onRequest(method, params){
+  async onRequest(request){
+    let {method, data: {params}} = request;
     switch (method) {
       case 'get_price': {
         let {symbol, source = "finnhub", timestamp=null} = params || {}

@@ -15,7 +15,8 @@ function getAllowance() {
 module.exports = {
   APP_NAME: 'presale',
 
-  onRequest: async function (method, params={}) {
+  onRequest: async function (request) {
+    let {method, nSign, data: {params}} = request;
     switch (method) {
       case 'deposit':{
 
@@ -44,7 +45,7 @@ module.exports = {
             throw {message: 'Request signature mismatch'}
         }
 
-        let locked = await this.memRead({nSign: 2, "data.name": "forAddress" ,"data.value": forAddress});
+        let locked = await this.memRead({nSign, "data.name": "forAddress" ,"data.value": forAddress});
         if(!!locked){
           throw {message: `deposit from address ${forAddress} has been locked for 5 minutes.`}
         }
