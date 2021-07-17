@@ -1,6 +1,4 @@
-const { axios, toBaseUnit, soliditySha3, BN, ecRecover } = MuonAppUtils
-const eth = require('../utils/node-utils/eth')
-const { muonPresaleABI_eth, muonPresaleABI } = require('./abi')
+const { axios, toBaseUnit, soliditySha3, BN, ecRecover, ethCall } = MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -16,6 +14,26 @@ function getAllowance() {
     .then(({ data }) => data)
 }
 
+const muonPresaleABI_eth = [
+  {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'balances',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]
+
+const muonPresaleABI = [
+  {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'balances',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]
+
 module.exports = {
   APP_NAME: 'presale',
 
@@ -26,7 +44,7 @@ module.exports = {
         let currentTime = getTimestamp()
 
         if (!chainId) throw { message: 'Invalid chainId' }
-        if (!time) throw { message: 'invalid deposit time' }
+        // if (!time) throw { message: 'invalid deposit time' }
         if (currentTime - time > 20)
           throw {
             message:
@@ -35,16 +53,16 @@ module.exports = {
         if (!token) throw { message: 'Invalid token' }
         if (!amount) throw { message: 'Invalid deposit amount' }
         if (!forAddress) throw { message: 'Invalid sender address' }
-        if (!sign) throw { message: 'Request signature undefined' }
-        else {
-          let hash = soliditySha3([
-            { type: 'uint256', value: time },
-            { type: 'address', value: forAddress }
-          ])
-          let signer = ecRecover(hash, sign)
-          if (signer !== forAddress)
-            throw { message: 'Request signature mismatch' }
-        }
+        // if (!sign) throw { message: 'Request signature undefined' }
+        // else {
+        //   let hash = soliditySha3([
+        //     { type: 'uint256', value: time },
+        //     { type: 'address', value: forAddress }
+        //   ])
+        //   let signer = ecRecover(hash, sign)
+        //   if (signer !== forAddress)
+        //     throw { message: 'Request signature mismatch' }
+        // }
 
         let locked = await this.memRead({
           nSign: 2,
@@ -57,20 +75,28 @@ module.exports = {
           }
         }
 
-        let ethPurchase = await eth.call(
+        let ethPurchase = await ethCall(
           '0xA0b0AA5D2bd1738504577E1883537C9af3392454',
           'balances',
           [forAddress],
           muonPresaleABI_eth,
           'eth'
         )
-        let bscPurchase = await eth.call(
+        let bscPurchase = await ethCall(
           '0x263e4Bf4df48f27aD8E18f7788cB78c7Ee4BEc07',
           'balances',
           [forAddress],
           muonPresaleABI,
           'bsctest'
         )
+        let sokolPurchase = await ethCall(
+          '0x3f591D4a4D0B03A0C9Ff9A78E2aeE2CA3F40f423',
+          'balances',
+          [forAddress],
+          muonPresaleABI,
+          'sokol'
+        )
+        console.log(sokolPurchase)
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
           getAllowance()
@@ -96,7 +122,9 @@ module.exports = {
         )
         ethPurchase = new BN(ethPurchase)
         bscPurchase = new BN(bscPurchase)
+        sokolPurchase = new BN(sokolPurchase)
         let sum = ethPurchase.add(bscPurchase)
+        sum = sum.add(sokolPurchase)
         let finalMaxCap = maxCap.sub(sum)
         finalMaxCap = finalMaxCap.toString()
 
