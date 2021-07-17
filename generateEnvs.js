@@ -1,4 +1,5 @@
 const PeerId = require('peer-id')
+const emoji = require('node-emoji')
 const fs = require('fs')
 const Web3 = require('web3')
 const parseArgv = require('./utils/parseArgv')
@@ -7,7 +8,6 @@ const web3 = new Web3()
 const createEnv = async () => {
   let params = parseArgv()
   let node_n = params['n'] ? params['n'] : 2
-  console.log(params)
 
   /***** Create Env1 ******/
   let accountEnv1 = web3.eth.accounts.create()
@@ -21,12 +21,13 @@ const createEnv = async () => {
   GATEWAY_PORT = ${params['p'] ? params['p'] : 8080}\n
   MONGODB_CS = mongodb://localhost:27017/muon_dev\n
   # ============ LibP2P Configs ==============
+  SIGN_WALLET_ADDRESS = ${accountEnv1.address}\n
+  SIGN_WALLET_PRIVATE_KEY = ${accountEnv1.privateKey.substr(2)}
   PEER_ID = "${libP2PConfigsEnv1.id}"\n
   PEER_PUBLIC_KEY = "${libP2PConfigsEnv1.pubKey}"\n
   PEER_PRIVATE_KEY = "${libP2PConfigsEnv1.privKey}"\n
   PEER_PORT = 4000\n
-  SIGN_WALLET_ADDRESS = ${accountEnv1.address}\n
-  SIGN_WALLET_PRIVATE_KEY = ${accountEnv1.privateKey.substr(2)}
+
   FINNHUB_API_KEY = c0v5f0v48v6pr2p75fmg\n
   INFURA_PROJECT_ID=ece9c4a96f684e49a17747b64dd54684\n
 
@@ -52,6 +53,7 @@ const createEnv = async () => {
   MUON_CUSTOM_APPS = "muon-presale|sample"
   `
   fs.writeFileSync('./dev-chain/dev-node-1.env', env1)
+  console.log(emoji.get('o'), 'Node-1 Ethereum Address: ', accountEnv1.address)
 
   /***** Create Other Envs ******/
 
@@ -67,13 +69,14 @@ const createEnv = async () => {
     GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8080 + index}\n
     MONGODB_CS = mongodb://localhost:27017/muon_dev\n
     # ============ LibP2P Configs ==============
+    SIGN_WALLET_ADDRESS = ${account.address}\n
+    SIGN_WALLET_PRIVATE_KEY = ${account.privateKey.substr(2)}
     PEER_ID = "${libP2PConfigs.id}"\n
     PEER_PUBLIC_KEY = "${libP2PConfigs.pubKey}"\n
     PEER_PRIVATE_KEY = "${libP2PConfigs.privKey}"\n
     PEER_PORT = ${index + 4000}\n
     PEER_BOOTSTRAP_0= "/ip4/127.0.0.1/tcp/4000/p2p/${libP2PConfigsEnv1.id}"
-    SIGN_WALLET_ADDRESS = ${account.address}\n
-    SIGN_WALLET_PRIVATE_KEY = ${account.privateKey.substr(2)}
+
     FINNHUB_API_KEY = c0v5f0v48v6pr2p75fmg\n
     INFURA_PROJECT_ID=ece9c4a96f684e49a17747b64dd54684\n
   
@@ -99,9 +102,14 @@ const createEnv = async () => {
     MUON_CUSTOM_APPS = "muon-presale|sample"
     `
     fs.writeFileSync(`./dev-chain/dev-node-${index + 1}.env`, env2)
+    console.log(
+      emoji.get('o'),
+      `Node-${index + 1} Ethereum Address: `,
+      account.address
+    )
   }
 
-  console.log('Environment is created successfully for run nodes')
+  // console.log('Environment is created successfully for run nodes')
 }
 
 createEnv()

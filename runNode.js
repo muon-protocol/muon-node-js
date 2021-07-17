@@ -1,5 +1,6 @@
 const fs = require('fs')
-const { exec, spawn } = require('child_process')
+const emoji = require('node-emoji')
+const { spawn } = require('child_process')
 const parseArgv = require('./utils/parseArgv')
 
 function runMuonNode(node_n) {
@@ -32,7 +33,7 @@ async function runNodes() {
         recursive: true
       })
     })
-    console.log('setup envs')
+    // console.log('Setting Up Envs ...')
     const result = spawn('node', [
       'generateEnvs.js',
       `-n=${node_n}`,
@@ -40,14 +41,25 @@ async function runNodes() {
     ])
     result.stdout.on('data', (data) => {
       runMuonNode(node_n)
+      console.log(data.toString())
     })
 
     // await exec(`node generateEnvs.js -n=${node_n} -p=${port}`)
   } else {
     if (fs.existsSync(`./dev-chain/dev-node-${node_n}.env`)) {
       runMuonNode(node_n)
+      for (let index = 1; index <= node_n; index++) {
+        let data = fs.readFileSync(`./dev-chain/dev-node-${index}.env`, 'utf8')
+        let lines = data.split('\n')
+        let address = lines[14].split('=')
+        console.log(
+          emoji.get('o'),
+          `Node-${index} Ethereum Address: `,
+          `${address[1]}\n`
+        )
+      }
     } else {
-      console.log('Generating Envs...')
+      // console.log('Generating Envs...')
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, {
           recursive: true
@@ -60,15 +72,10 @@ async function runNodes() {
       ])
       result.stdout.on('data', (data) => {
         runMuonNode(node_n)
+        console.log(data.toString())
       })
     }
   }
-
-  // exec(
-  //   `./node_modules/.bin/env-cmd -f ./dev-chain/dev-node-${i}.env babel-node index.js`
-  // )
-
-  console.log(`running ${node_n} nodes ...`)
 }
 
 runNodes()
