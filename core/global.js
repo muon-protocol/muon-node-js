@@ -13,4 +13,5 @@ global.MuonAppUtils = {
   BN: Web3.utils.BN,
   toBaseUnit,
   soliditySha3,
+  ecRecover: web3Instance.eth.personal.ecRecover,
 }

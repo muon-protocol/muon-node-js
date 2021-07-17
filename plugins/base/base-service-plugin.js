@@ -75,8 +75,8 @@ class BaseServicePlugin extends BaseAppPlugin {
 
   async __onRemoteWantSign(request) {
     let [sign, memWrite] = await this.processRemoteRequest(request)
-    // console.log('wantSign', request._id, sign)
-    return sign
+    console.log('wantSign', request._id, sign)
+    return { sign, memWrite }
   }
 }
 

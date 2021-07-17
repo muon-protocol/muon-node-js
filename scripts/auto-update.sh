@@ -1,5 +1,5 @@
 #!/bin/bash
-. "./pre-run.sh"
+. "`dirname "$0"`/pre-run.sh"
 
 project_dir=`pwd`
 absolute_path="`pwd`/scripts/`basename $0`"
@@ -12,7 +12,7 @@ log (){
 
 setup (){
     backup=`crontab -l`
-    new_cron="*/5 * * * * $absolute_path"; # every 5 minutes
+    new_cron="*/5 * * * * export _PM2=`which pm2`; export _NPM=`which npm`; $absolute_path"; # every 5 minutes
     if [[ "$backup" == *"$new_cron"* ]]
     then
         echo "Already exist.";
@@ -32,9 +32,9 @@ check_for_update (){
         # restart services
         log "========== updating detected ===========";
         log "Installing dependencies ...";
-        log `npm install`
+        log `$_NPM install`
         log "Restarting PM2 ...";
-        log `pm2 restart all`
+        log `$_PM2 restart all`
         log "============ updating done =============";
     fi
 }

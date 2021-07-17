@@ -1,4 +1,4 @@
-const { axios, toBaseUnit, soliditySha3, BN } = MuonAppUtils
+const { axios, toBaseUnit, soliditySha3, BN, ecRecover } = MuonAppUtils
 const eth = require('../utils/node-utils/eth')
 const { muonPresaleABI_eth, muonPresaleABI } = require('./abi')
 
@@ -22,13 +22,40 @@ module.exports = {
   onRequest: async function (method, params = {}) {
     switch (method) {
       case 'deposit': {
-        let { token, amount, forAddress, chainId } = params
-        let time = getTimestamp()
+        let { token, amount, forAddress, chainId, time, sign } = params
+        let currentTime = getTimestamp()
 
+        if (!chainId) throw { message: 'Invalid chainId' }
+        if (!time) throw { message: 'invalid deposit time' }
+        if (currentTime - time > 20)
+          throw {
+            message:
+              'time diff is grater than 20 seconds. check your system time.'
+          }
         if (!token) throw { message: 'Invalid token' }
         if (!amount) throw { message: 'Invalid deposit amount' }
         if (!forAddress) throw { message: 'Invalid sender address' }
-        if (!chainId) throw { message: 'Invalid chainId' }
+        if (!sign) throw { message: 'Request signature undefined' }
+        else {
+          let hash = soliditySha3([
+            { type: 'uint256', value: time },
+            { type: 'address', value: forAddress }
+          ])
+          let signer = ecRecover(hash, sign)
+          if (signer !== forAddress)
+            throw { message: 'Request signature mismatch' }
+        }
+
+        let locked = await this.memRead({
+          nSign: 2,
+          'data.name': 'forAddress',
+          'data.value': forAddress
+        })
+        if (!!locked) {
+          throw {
+            message: `deposit from address ${forAddress} has been locked for 5 minutes.`
+          }
+        }
 
         let ethPurchase = await eth.call(
           '0xA0b0AA5D2bd1738504577E1883537C9af3392454',
@@ -48,7 +75,6 @@ module.exports = {
           getTokens(),
           getAllowance()
         ])
-
         // if (!Object.keys(tokenList).includes(token))
         //   throw { message: 'Token not allowed for deposit' }
 
@@ -129,7 +155,7 @@ module.exports = {
         return null
     }
   },
-  memWrite: (req, res) => {
+  onMemWrite: (req, res) => {
     let {
       method,
       data: {
@@ -140,13 +166,8 @@ module.exports = {
     switch (method) {
       case 'deposit': {
         return {
-          timeout: 5 * 60,
-          data: { forAddress, amount, time },
-          hash: soliditySha3([
-            { type: 'address', value: forAddress },
-            { type: 'uint256', value: amount },
-            { type: 'uint256', value: time }
-          ])
+          ttl: 5 * 60,
+          data: [{ name: 'forAddress', type: 'address', value: forAddress }]
         }
       }
       default:
