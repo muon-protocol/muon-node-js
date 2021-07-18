@@ -1,4 +1,4 @@
-const { axios, toBaseUnit, soliditySha3, BN, ecRecover, ethCall } = MuonAppUtils
+const { axios, toBaseUnit, soliditySha3, BN, recoverTypedSignature, ethCall } = MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -48,7 +48,6 @@ module.exports = {
     } = request
     switch (method) {
       case 'deposit': {
-        try {
           let { token, amount, forAddress, chainId, time, sign } = params
           console.log({ token, amount, forAddress, chainId, time, sign })
           let currentTime = getTimestamp()
@@ -69,12 +68,12 @@ module.exports = {
           if ((token === 'busd' || token === 'bnb') && chainId != bscChainId)
             throw { message: 'Token and chain is not matched' }
           else {
-            let hash = soliditySha3([
-              { type: 'uint256', value: time },
-              { type: 'address', value: forAddress }
-            ])
-            let signer = ecRecover(hash, sign)
-            if (signer !== forAddress)
+            let typedData = [
+              {type: 'uint256', name: 'time', value: time},
+              {type: 'address', name: 'forAddress', value: forAddress},
+            ]
+            let signer = recoverTypedSignature({data: typedData, sig: sign})
+            if (signer.toLowerCase() !== forAddress.toLowerCase())
               throw { message: 'Request signature mismatch' }
           }
 
@@ -160,9 +159,6 @@ module.exports = {
                   addressMaxCap: [finalMaxCap, chainId]
                 }
           return data
-        } catch (error) {
-          console.log(error)
-        }
       }
       default:
         throw { message: `Unknown method ${params}` }
