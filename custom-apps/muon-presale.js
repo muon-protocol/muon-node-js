@@ -34,6 +34,9 @@ const muonPresaleABI = [
   }
 ]
 
+const xDaiChainId = 77
+const bscChainId = 97
+
 module.exports = {
   APP_NAME: 'presale',
 
@@ -45,114 +48,125 @@ module.exports = {
     } = request
     switch (method) {
       case 'deposit': {
-        let { token, amount, forAddress, chainId, time, sign } = params
-        let currentTime = getTimestamp()
+        try {
+          let { token, amount, forAddress, chainId, time, sign } = params
+          console.log({ token, amount, forAddress, chainId, time, sign })
+          let currentTime = getTimestamp()
 
-        if (!chainId) throw { message: 'Invalid chainId' }
-        if (!time) throw { message: 'invalid deposit time' }
-        if (currentTime - time > 20)
-          throw {
-            message:
-              'time diff is grater than 20 seconds. check your system time.'
+          if (!chainId) throw { message: 'Invalid chainId' }
+          if (!time) throw { message: 'invalid deposit time' }
+          if (currentTime - time > 20)
+            throw {
+              message:
+                'time diff is grater than 20 seconds. check your system time.'
+            }
+          if (!token) throw { message: 'Invalid token' }
+          if (!amount) throw { message: 'Invalid deposit amount' }
+          if (!forAddress) throw { message: 'Invalid sender address' }
+          if (!sign) throw { message: 'Request signature undefined' }
+          if (token === 'xdai' && chainId != xDaiChainId)
+            throw { message: 'Token and chain is not matched' }
+          if ((token === 'busd' || token === 'bnb') && chainId != bscChainId)
+            throw { message: 'Token and chain is not matched' }
+          else {
+            console.log('check hash')
+            let hash = soliditySha3([
+              { type: 'uint256', value: time },
+              { type: 'address', value: forAddress }
+            ])
+            let signer = ecRecover(hash, sign)
+            if (signer !== forAddress)
+              throw { message: 'Request signature mismatch' }
           }
-        if (!token) throw { message: 'Invalid token' }
-        if (!amount) throw { message: 'Invalid deposit amount' }
-        if (!forAddress) throw { message: 'Invalid sender address' }
-        if (!sign) throw { message: 'Request signature undefined' }
-        else {
-          let hash = soliditySha3([
-            { type: 'uint256', value: time },
-            { type: 'address', value: forAddress }
+
+          let locked = await this.memRead({
+            nSign,
+            'data.name': 'forAddress',
+            'data.value': forAddress
+          })
+          console.log('locked', locked)
+          if (!!locked) {
+            throw {
+              message: `deposit from address ${forAddress} has been locked for 5 minutes.`
+            }
+          }
+          console.log('object')
+          let ethPurchase = await ethCall(
+            '0xA0b0AA5D2bd1738504577E1883537C9af3392454',
+            'balances',
+            [forAddress],
+            muonPresaleABI_eth,
+            'eth'
+          )
+          let bscPurchase = await ethCall(
+            '0x263e4Bf4df48f27aD8E18f7788cB78c7Ee4BEc07',
+            'balances',
+            [forAddress],
+            muonPresaleABI,
+            'bsctest'
+          )
+          let sokolPurchase = await ethCall(
+            '0x3f591D4a4D0B03A0C9Ff9A78E2aeE2CA3F40f423',
+            'balances',
+            [forAddress],
+            muonPresaleABI,
+            'sokol'
+          )
+          console.log(sokolPurchase)
+          let [tokenList, allowance] = await Promise.all([
+            getTokens(),
+            getAllowance()
           ])
-          let signer = ecRecover(hash, sign)
-          if (signer !== forAddress)
-            throw { message: 'Request signature mismatch' }
-        }
+          // if (!Object.keys(tokenList).includes(token))
+          //   throw { message: 'Token not allowed for deposit' }
 
-        let locked = await this.memRead({
-          nSign,
-          'data.name': 'forAddress',
-          'data.value': forAddress
-        })
-        if (!!locked) {
-          throw {
-            message: `deposit from address ${forAddress} has been locked for 5 minutes.`
+          // token = tokenList[token]
+          token = {
+            decimals: 18,
+            address: '0x4Ef4E0b448AC75b7285c334e215d384E7227A2E6',
+            price: 1
           }
+          allowance = {
+            ...allowance,
+            '0x5629227C1E2542DbC5ACA0cECb7Cd3E02C82AD0a': 20000
+          }
+          if (allowance[forAddress] === undefined)
+            throw { message: 'address not allowed for deposit' }
+
+          let maxCap = new BN(
+            toBaseUnit(allowance[forAddress].toString(), '18').toString()
+          )
+          ethPurchase = new BN(ethPurchase)
+          bscPurchase = new BN(bscPurchase)
+          sokolPurchase = new BN(sokolPurchase)
+          let sum = ethPurchase.add(bscPurchase)
+          sum = sum.add(sokolPurchase)
+          let finalMaxCap = maxCap.sub(sum)
+          finalMaxCap = finalMaxCap.toString()
+
+          const data =
+            chainId == 1
+              ? {
+                  token: token.address,
+                  tokenPrice: toBaseUnit(token.price.toString(), 18).toString(),
+                  amount,
+                  time,
+                  forAddress,
+                  addressMaxCap: finalMaxCap
+                }
+              : {
+                  token: token.address,
+                  tokenPrice: toBaseUnit(token.price.toString(), 18).toString(),
+                  amount,
+                  time,
+                  forAddress,
+                  addressMaxCap: [finalMaxCap, chainId]
+                }
+
+          return data
+        } catch (error) {
+          console.log(error)
         }
-
-        let ethPurchase = await ethCall(
-          '0xA0b0AA5D2bd1738504577E1883537C9af3392454',
-          'balances',
-          [forAddress],
-          muonPresaleABI_eth,
-          'eth'
-        )
-        let bscPurchase = await ethCall(
-          '0x263e4Bf4df48f27aD8E18f7788cB78c7Ee4BEc07',
-          'balances',
-          [forAddress],
-          muonPresaleABI,
-          'bsctest'
-        )
-        let sokolPurchase = await ethCall(
-          '0x3f591D4a4D0B03A0C9Ff9A78E2aeE2CA3F40f423',
-          'balances',
-          [forAddress],
-          muonPresaleABI,
-          'sokol'
-        )
-        console.log(sokolPurchase)
-        let [tokenList, allowance] = await Promise.all([
-          getTokens(),
-          getAllowance()
-        ])
-        // if (!Object.keys(tokenList).includes(token))
-        //   throw { message: 'Token not allowed for deposit' }
-
-        // token = tokenList[token]
-        token = {
-          decimals: 18,
-          address: '0x4Ef4E0b448AC75b7285c334e215d384E7227A2E6',
-          price: 1
-        }
-        allowance = {
-          ...allowance,
-          '0x5629227C1E2542DbC5ACA0cECb7Cd3E02C82AD0a': 20000
-        }
-        if (allowance[forAddress] === undefined)
-          throw { message: 'address not allowed for deposit' }
-
-        let maxCap = new BN(
-          toBaseUnit(allowance[forAddress].toString(), '18').toString()
-        )
-        ethPurchase = new BN(ethPurchase)
-        bscPurchase = new BN(bscPurchase)
-        sokolPurchase = new BN(sokolPurchase)
-        let sum = ethPurchase.add(bscPurchase)
-        sum = sum.add(sokolPurchase)
-        let finalMaxCap = maxCap.sub(sum)
-        finalMaxCap = finalMaxCap.toString()
-
-        const data =
-          chainId == 1
-            ? {
-                token: token.address,
-                tokenPrice: toBaseUnit(token.price.toString(), 18).toString(),
-                amount,
-                time,
-                forAddress,
-                addressMaxCap: finalMaxCap
-              }
-            : {
-                token: token.address,
-                tokenPrice: toBaseUnit(token.price.toString(), 18).toString(),
-                amount,
-                time,
-                forAddress,
-                addressMaxCap: [finalMaxCap, chainId]
-              }
-
-        return data
       }
       default:
         throw { message: `Unknown method ${params}` }
