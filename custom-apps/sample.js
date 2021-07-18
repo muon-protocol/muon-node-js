@@ -11,7 +11,8 @@ module.exports = {
   APP_NAME: 'sample',
   isService: true,
 
-  onRequest: async function (method, params) {
+  onRequest: async function (request) {
+    let {method, data: {params}} = request;
     switch (method) {
       case 'test_speed':
         return 'speed test done.'

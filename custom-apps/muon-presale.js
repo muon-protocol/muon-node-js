@@ -37,7 +37,12 @@ const muonPresaleABI = [
 module.exports = {
   APP_NAME: 'presale',
 
-  onRequest: async function (method, params = {}) {
+  onRequest: async function (request) {
+    let {
+      method,
+      nSign,
+      data: { params }
+    } = request
     switch (method) {
       case 'deposit': {
         let { token, amount, forAddress, chainId, time, sign } = params
@@ -65,7 +70,7 @@ module.exports = {
         }
 
         let locked = await this.memRead({
-          nSign: 2,
+          nSign,
           'data.name': 'forAddress',
           'data.value': forAddress
         })
