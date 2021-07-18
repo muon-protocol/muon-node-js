@@ -20,6 +20,10 @@ module.exports = {
 
         if (!name) throw { message: 'Invalid name' }
         let info = await getPrice()
+        name = name.toUpperCase();
+        if(!info[name])
+          throw {message: `price not found for symbol ${name}`}
+
         let price = info[name]['Long']['price']
         return { time, price }
 
