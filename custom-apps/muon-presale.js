@@ -80,16 +80,16 @@ module.exports = {
             throw { message: 'Request signature mismatch' }
         }
 
-        // let locked = await this.memRead({
-        //   nSign,
-        //   'data.name': 'forAddress',
-        //   'data.value': forAddress
-        // })
-        // if (!!locked) {
-        //   throw {
-        //     message: `deposit from address ${forAddress} has been locked for 5 minutes.`
-        //   }
-        // }
+        let locked = await this.memRead({
+          nSign,
+          'data.name': 'forAddress',
+          'data.value': forAddress
+        })
+        if (!!locked) {
+          throw {
+            message: `deposit from address ${forAddress} has been locked for 5 minutes.`
+          }
+        }
         let ethPurchase = await ethCall(
           ethContractAddress,
           'balances',
