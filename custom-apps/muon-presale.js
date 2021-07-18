@@ -37,7 +37,11 @@ const muonPresaleABI = [
 const ethContractAddress = '0xA0b0AA5D2bd1738504577E1883537C9af3392454'
 const bscContractAddress = '0x263e4Bf4df48f27aD8E18f7788cB78c7Ee4BEc07'
 const xdaiContractAddress = '0x3f591D4a4D0B03A0C9Ff9A78E2aeE2CA3F40f423'
-
+const ethNetwork = 'eth'
+// for mainNet bsc
+const bscNetWork = 'bsctest'
+// for mainNet xdai
+const xdaiNetwork = 'sokol'
 const xDaiChainId = 77
 const bscChainId = 97
 
@@ -87,7 +91,11 @@ module.exports = {
         })
         if (!!locked) {
           throw {
-            message: `deposit from address ${forAddress} has been locked for 5 minutes.`
+            message: {
+              message: `deposit from address ${forAddress} has been locked for 6 minutes.`,
+              lockTime: 6 * 60,
+              expireAt: locked.expireAt
+            }
           }
         }
         let ethPurchase = await ethCall(
@@ -95,21 +103,21 @@ module.exports = {
           'balances',
           [forAddress],
           muonPresaleABI_eth,
-          'eth'
+          ethNetwork
         )
         let bscPurchase = await ethCall(
           bscContractAddress,
           'balances',
           [forAddress],
           muonPresaleABI,
-          'bsctest'
+          bscNetWork
         )
         let sokolPurchase = await ethCall(
           xdaiContractAddress,
           'balances',
           [forAddress],
           muonPresaleABI,
-          'sokol'
+          xdaiNetwork
         )
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
@@ -207,7 +215,7 @@ module.exports = {
     switch (method) {
       case 'deposit': {
         return {
-          ttl: 5 * 60,
+          ttl: 6 * 60,
           data: [{ name: 'forAddress', type: 'address', value: forAddress }]
         }
       }
