@@ -11,7 +11,8 @@ module.exports = {
   APP_NAME: 'deus_oracle',
   isService: true,
 
-  onRequest: async function (method, params) {
+  onRequest: async function (request) {
+    let {method, data: {params}} = request;
     switch (method) {
       case 'getPrice':
         let { name } = params
