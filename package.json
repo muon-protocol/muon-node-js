@@ -4,11 +4,11 @@
   "description": "Muon protocol javascript implementation",
   "main": "index.js",
   "scripts": {
-    "help":"node help.js",
+    "help": "node help.js",
     "start": "env-cmd babel-node ./index.js",
     "dev": "env-cmd nodemon --exec babel-node ./index.js",
     "dev-chain": "node generateEnvs.js",
-    "node":"node runNode.js",
+    "node": "node runNode.js",
     "test": "jest"
   },
   "jest": {
