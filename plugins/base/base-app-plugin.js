@@ -324,8 +324,13 @@ class BaseAppPlugin extends BasePlugin {
     return req
   }
 
-  async __onRemoteSignRequest({ sign, memWrite }) {
+  async __onRemoteSignRequest(data = {}) {
     // console.log('RemoteCall.requestSignature', {sign, memWrite})
+    let {sign, memWrite} = data
+    if(!sign) {
+      console.log("undefined sign", data);
+      return;
+    }
     let request = await Request.findOne({ _id: sign.request })
     if (request) {
       // TODO: check response similarity
