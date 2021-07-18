@@ -69,7 +69,6 @@ module.exports = {
           if ((token === 'busd' || token === 'bnb') && chainId != bscChainId)
             throw { message: 'Token and chain is not matched' }
           else {
-            console.log('check hash')
             let hash = soliditySha3([
               { type: 'uint256', value: time },
               { type: 'address', value: forAddress }
@@ -84,13 +83,11 @@ module.exports = {
             'data.name': 'forAddress',
             'data.value': forAddress
           })
-          console.log('locked', locked)
           if (!!locked) {
             throw {
               message: `deposit from address ${forAddress} has been locked for 5 minutes.`
             }
           }
-          console.log('object')
           let ethPurchase = await ethCall(
             '0xA0b0AA5D2bd1738504577E1883537C9af3392454',
             'balances',
@@ -162,7 +159,6 @@ module.exports = {
                   forAddress,
                   addressMaxCap: [finalMaxCap, chainId]
                 }
-
           return data
         } catch (error) {
           console.log(error)
