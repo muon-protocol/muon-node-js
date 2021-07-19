@@ -112,13 +112,14 @@ module.exports = {
           muonPresaleABI,
           bscNetWork
         )
-        let sokolPurchase = await ethCall(
-          xdaiContractAddress,
-          'balances',
-          [forAddress],
-          muonPresaleABI,
-          xdaiNetwork
-        )
+        let sokolPurchase = 0
+        // let sokolPurchase = await ethCall(
+        //   xdaiContractAddress,
+        //   'balances',
+        //   [forAddress],
+        //   muonPresaleABI,
+        //   xdaiNetwork
+        // )
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
           getAllowance()
