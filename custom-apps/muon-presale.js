@@ -1,12 +1,5 @@
-const {
-  axios,
-  toBaseUnit,
-  soliditySha3,
-  BN,
-  recoverTypedSignature,
-  ethCall,
-  ethRead
-} = MuonAppUtils
+const { axios, toBaseUnit, soliditySha3, BN, recoverTypedSignature, ethCall } =
+  MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -101,7 +94,7 @@ module.exports = {
             message: {
               message: `deposit from address ${forAddress} has been locked for 6 minutes.`,
               lockTime: 6 * 60,
-              expireAt: new Date(locked.expireAt).getTime()
+              expireAt: locked.expireAt
             }
           }
         }
@@ -119,9 +112,7 @@ module.exports = {
           muonPresaleABI,
           bscNetWork
         )
-        // TODO change sokolPyrchase
         let sokolPurchase = 0
-
         // let sokolPurchase = await ethCall(
         //   xdaiContractAddress,
         //   'balances',
@@ -129,24 +120,23 @@ module.exports = {
         //   muonPresaleABI,
         //   xdaiNetwork
         // )
-
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
           getAllowance()
         ])
-        if (!Object.keys(tokenList).includes(token))
-          throw { message: 'Token not allowed for deposit' }
+        // if (!Object.keys(tokenList).includes(token))
+        //   throw { message: 'Token not allowed for deposit' }
 
-        token = tokenList[token]
-        // token = {
-        //   decimals: 18,
-        //   address: '0x4Ef4E0b448AC75b7285c334e215d384E7227A2E6',
-        //   price: 1
-        // }
-        // allowance = {
-        //   ...allowance,
-        //   '0x5629227C1E2542DbC5ACA0cECb7Cd3E02C82AD0a': 20000
-        // }
+        // token = tokenList[token]
+        token = {
+          decimals: 18,
+          address: '0x4Ef4E0b448AC75b7285c334e215d384E7227A2E6',
+          price: 1
+        }
+        allowance = {
+          ...allowance,
+          '0x5629227C1E2542DbC5ACA0cECb7Cd3E02C82AD0a': 20000
+        }
         if (allowance[forAddress] === undefined)
           throw { message: 'address not allowed for deposit' }
 
@@ -187,11 +177,17 @@ module.exports = {
   },
 
   hashRequestResult: (request, result) => {
-    switch (request.method) {
+    let {
+      method,
+      data: { params }
+    } = request
+    switch (method) {
       case 'deposit': {
+        let { chainId } = params
+        console.log(chainId)
         let { token, tokenPrice, amount, forAddress, addressMaxCap } = result
         const data =
-          addressMaxCap[1] == 1
+          chainId == 1
             ? soliditySha3([
                 { type: 'address', value: token },
                 { type: 'uint256', value: tokenPrice },
