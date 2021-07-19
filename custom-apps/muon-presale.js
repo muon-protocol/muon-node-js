@@ -1,5 +1,12 @@
-const { axios, toBaseUnit, soliditySha3, BN, recoverTypedSignature, ethCall } =
-  MuonAppUtils
+const {
+  axios,
+  toBaseUnit,
+  soliditySha3,
+  BN,
+  recoverTypedSignature,
+  ethCall,
+  ethRead
+} = MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -94,7 +101,7 @@ module.exports = {
             message: {
               message: `deposit from address ${forAddress} has been locked for 6 minutes.`,
               lockTime: 6 * 60,
-              expireAt: locked.expireAt
+              expireAt: new Date(locked.expireAt).getTime()
             }
           }
         }
@@ -112,13 +119,17 @@ module.exports = {
           muonPresaleABI,
           bscNetWork
         )
-        let sokolPurchase = await ethCall(
-          xdaiContractAddress,
-          'balances',
-          [forAddress],
-          muonPresaleABI,
-          xdaiNetwork
-        )
+        // TODO change sokolPyrchase
+        let sokolPurchase = 0
+
+        // let sokolPurchase = await ethCall(
+        //   xdaiContractAddress,
+        //   'balances',
+        //   [forAddress],
+        //   muonPresaleABI,
+        //   xdaiNetwork
+        // )
+
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
           getAllowance()
