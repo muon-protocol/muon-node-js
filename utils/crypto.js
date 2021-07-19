@@ -54,7 +54,7 @@ function hashCallOutput(address, method, abi, result, outputFilter=[]){
     })
   }
   // console.log('signing:',abiOutputs)
-  let params = abiOutputs.map(({name, type}) => ({type, value: !!name ? result[name] : result}))
+  let params = abiOutputs.map(({name, type}) => ({type, value: (!name || typeof result === "string") ?  result : result[name]}))
   params = [{type: 'address', value: address}, ...params]
   let hash = web3.utils.soliditySha3(...params)
   return hash;

@@ -4,11 +4,11 @@
   "description": "Muon protocol javascript implementation",
   "main": "index.js",
   "scripts": {
+    "help": "node help.js",
     "start": "env-cmd babel-node ./index.js",
     "dev": "env-cmd nodemon --exec babel-node ./index.js",
-    "dev-node-1": "env-cmd -f ./dev-chain/dev-node-1.env babel-node index.js",
-    "dev-node-2": "env-cmd -f ./dev-chain/dev-node-2.env babel-node index.js",
-    "dev-chain": "concurrently --kill-others \"npm run dev-node-1\" \"npm run dev-node-2\"",
+    "dev-chain": "node generateEnvs.js",
+    "node": "node runNode.js",
     "test": "jest"
   },
   "jest": {
@@ -23,6 +23,7 @@
     "chokidar": "^3.5.1",
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
+    "eth-sig-util": "1.4.2",
     "ethers": "^5.1.4",
     "events": "^3.3.0",
     "events-async": "^1.2.1",

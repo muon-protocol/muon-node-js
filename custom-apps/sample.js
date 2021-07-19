@@ -1,4 +1,3 @@
-const { soliditySha3 } = MuonAppUtils
 const { axios, toBaseUnit, soliditySha3 } = MuonAppUtils
 
 const COINDESK_API = 'https://api.coindesk.com/v1/bpi/currentprice/BTC.json'
@@ -10,14 +9,27 @@ const getTimestamp = () => Math.floor(Date.now() / 1000)
 
 module.exports = {
   APP_NAME: 'sample',
+  isService: true,
 
-  onRequest: async function (method, params) {
-    console.log({ method, params })
+  onRequest: async function (request) {
+    let {
+      method,
+      data: { params }
+    } = request
     switch (method) {
-      case 'test':
-        return 1 + Math.random()
-      case 'currentDate':
-        return new Date().toDateString()
+      case 'test_speed':
+        return 'speed test done.'
+      case 'lock':
+        let { user } = params
+        let lock = await this.memRead({
+          'data.name': 'lock',
+          'data.value': user
+        })
+        // console.log({lock})
+        if (lock)
+          throw { message: `user:[${user}] has been locked for 10 seconds` }
+        return 'lock done.'
+
       case 'btc_price':
         let result = await getBtcPrice()
         let price = toBaseUnit(
@@ -39,12 +51,9 @@ module.exports = {
   hashRequestResult: (request, result) => {
     console.log(result)
     switch (request.method) {
-      case 'test':
-        return Math.floor(result).toString()
-
-      case 'currentDate':
-        return soliditySha3([{ type: 'string', value: result }])
-
+      case 'test_speed':
+      case 'lock':
+        return result
       case 'btc_price':
         let hash = soliditySha3([
           { type: 'uint256', value: request.data.result.time },
@@ -52,7 +61,21 @@ module.exports = {
         ])
         return hash
       default:
-        return null
+        throw { message: `Unknown method: ${request.method}` }
+    }
+  },
+
+  onMemWrite: (req, res) => {
+    if (req.method === 'lock') {
+      let {
+        data: {
+          params: { user }
+        }
+      } = req
+      return {
+        ttl: 10,
+        data: [{ name: 'lock', type: 'string', value: user }]
+      }
     }
   }
 }

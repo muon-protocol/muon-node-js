@@ -12,6 +12,6 @@ var modelSchema = mongoose.Schema({
   data: {type: Object},
   startedAt: {type: Number, required: true},
   confirmedAt: {type: Number},
-});
+}, {minimize: false});
 
 var Model = module.exports = mongoose.model(MODEL_REQUEST, modelSchema);
