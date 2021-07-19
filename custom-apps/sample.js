@@ -12,7 +12,10 @@ module.exports = {
   isService: true,
 
   onRequest: async function (request) {
-    let {method, data: {params}} = request;
+    let {
+      method,
+      data: { params }
+    } = request
     switch (method) {
       case 'test_speed':
         return 'speed test done.'
@@ -46,6 +49,7 @@ module.exports = {
   },
 
   hashRequestResult: (request, result) => {
+    console.log(result)
     switch (request.method) {
       case 'test_speed':
       case 'lock':
