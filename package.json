@@ -9,10 +9,13 @@
     "dev": "env-cmd nodemon --exec babel-node ./index.js",
     "dev-chain": "node generateEnvs.js",
     "node": "node runNode.js",
-    "test": "jest"
+    "test": "jest --verbose"
   },
   "jest": {
-    "collectCoverage": true
+    "collectCoverage": false,
+    "setupFilesAfterEnv": [
+      "./__test__/jest.init.js"
+    ]
   },
   "author": "",
   "license": "ISC",
@@ -58,7 +61,10 @@
     "chalk": "^4.1.0",
     "concurrently": "^6.2.0",
     "env-cmd": "^10.1.0",
+    "enzyme": "^3.11.0",
+    "enzyme-adapter-react-16": "^1.15.6",
     "jest": "^27.0.6",
-    "node-emoji": "^1.10.0"
+    "node-emoji": "^1.10.0",
+    "regenerator-runtime": "^0.13.7"
   }
 }

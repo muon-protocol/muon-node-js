@@ -1,0 +1,8 @@
+{
+  "verbose": true,
+  "ignore": [
+    "*.test.js",
+    "__test__/*",
+    "fixtures/*"
+  ]
+}
