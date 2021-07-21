@@ -319,36 +319,41 @@ class BaseAppPlugin extends BasePlugin {
    */
 
   async __onRemoteWantRequest(data) {
-    // console.log('RemoteCall.getRequestData', data)
-    let req = await Request.findOne({ _id: data._id })
-    return req
+    try {
+      // console.log('RemoteCall.getRequestData', data)
+      let req = await Request.findOne({_id: data._id})
+      return req
+    }catch (e) {
+      console.error(e);
+    }
   }
 
   async __onRemoteSignRequest(data = {}) {
     // console.log('RemoteCall.requestSignature', {sign, memWrite})
-    let {sign, memWrite} = data
-    if(!sign) {
-      console.log("undefined sign", data);
-      return;
-    }
-    let request = await Request.findOne({ _id: sign.request })
-    if (request) {
-      // TODO: check response similarity
-      let signer = this.recoverSignature(request, sign)
-      if (signer && signer === sign.owner) {
-        if (!!memWrite) {
-          // TODO: validate memWright signature
-          sign.memWriteSignature = memWrite.signature
+    try {
+      let {sign, memWrite} = data;
+      let request = await Request.findOne({_id: sign.request})
+      if (request) {
+        // TODO: check response similarity
+        let signer = this.recoverSignature(request, sign)
+        if (signer && signer === sign.owner) {
+          if (!!memWrite) {
+            // TODO: validate memWright signature
+            sign.memWriteSignature = memWrite.signature
+          }
+          let newSignature = new Signature(sign)
+          await newSignature.save()
+        } else {
+          console.log('signature mismatch', {
+            request: request._id,
+            signer,
+            sigOwner: sign.owner
+          })
         }
-        let newSignature = new Signature(sign)
-        await newSignature.save()
-      } else {
-        console.log('signature mismatch', {
-          request: request._id,
-          signer,
-          sigOwner: sign.owner
-        })
       }
+    }
+    catch (e) {
+      console.error(e);
     }
   }
 }
