@@ -41,7 +41,7 @@ class EthAppPlugin extends BaseApp {
         return result
       }
       default:
-        throw {message: `Unknown method ${params}`}
+        throw {message: `Unknown method ${method}`}
     }
   }
 

@@ -56,8 +56,11 @@ class GatewayInterface extends BasePlugin{
           if(this.listenerCount(`call/${app}/${method}`) > 0){
             response = await this.emit(`call/${app}/${method}`, params, nSign)
           }
-          else{
+          else if(this.listenerCount(`call/${app}/request`) > 0){
             response = await this.emit(`call/${app}/request`, method, params, nSign)
+          }
+          else{
+            throw {message: 'app method handler not defined'}
           }
         }
         else{
