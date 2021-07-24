@@ -25,7 +25,7 @@ async function runNodes() {
 
   if (params['setup']) {
     // delete directory recursively
-    fs.rmdir(dir, { recursive: true }, (err) => {
+    fs.rm(dir, { recursive: true, force: true }, (err) => {
       if (err) {
         throw err
       }
