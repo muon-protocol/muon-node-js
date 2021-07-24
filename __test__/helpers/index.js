@@ -1,7 +1,11 @@
 const axios = require('axios')
 
-function callMuon(req) {
-  return axios.post("http://localhost:8000/v1", req)
+function callMuon(req, options={}) {
+  let {
+    endpoint="http://localhost:8000/v1",
+  } = options;
+
+  return axios.post(endpoint, req)
     .then(({data}) => data)
 }
 
