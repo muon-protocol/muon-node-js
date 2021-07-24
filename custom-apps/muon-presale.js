@@ -35,15 +35,13 @@ const muonPresaleABI = [
   }
 ]
 const ethContractAddress = '0xA0b0AA5D2bd1738504577E1883537C9af3392454'
-const bscContractAddress = '0x263e4Bf4df48f27aD8E18f7788cB78c7Ee4BEc07'
-const xdaiContractAddress = '0x3f591D4a4D0B03A0C9Ff9A78E2aeE2CA3F40f423'
+const bscContractAddress = '0x059ce16319da782e2909c9e15f3232233649a321'
+const xdaiContractAddress = '0x059ce16319Da782E2909c9e15f3232233649a321'
 const ethNetwork = 'eth'
-// for mainNet bsc
-const bscNetWork = 'bsctest'
-// for mainNet xdai
-const xdaiNetwork = 'sokol'
-const xDaiChainId = 77
-const bscChainId = 97
+const bscNetWork = 'bsc'
+const xdaiNetwork = 'xdai'
+const xDaiChainId = 100
+const bscChainId = 56
 
 module.exports = {
   APP_NAME: 'presale',
@@ -113,13 +111,13 @@ module.exports = {
           bscNetWork
         )
         let sokolPurchase = 0
-        // let sokolPurchase = await ethCall(
-        //   xdaiContractAddress,
-        //   'balances',
-        //   [forAddress],
-        //   muonPresaleABI,
-        //   xdaiNetwork
-        // )
+        let sokolPurchase = await ethCall(
+          xdaiContractAddress,
+          'balances',
+          [forAddress],
+          muonPresaleABI,
+          xdaiNetwork
+        )
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
           getAllowance()
