@@ -1,8 +1,14 @@
 var mongoose = require('mongoose');
 const {MODEL_MEMORY} = require('./constants')
 
+const types = {
+  App: 'app',
+  Node: 'node',
+}
+
 var modelSchema = mongoose.Schema({
-  app: {type: String},
+  type: {type: String, enum: Object.values(types)},
+  owner: {type: String},
   timestamp: {type: Number},
   ttl: {type: Number, default: 0},
   nSign: {type: Number},
@@ -14,4 +20,6 @@ var modelSchema = mongoose.Schema({
 
 modelSchema.index({expireAt: 1},{expireAfterSeconds: 0});
 
-const Model = module.exports = mongoose.model(MODEL_MEMORY, modelSchema);
+const Model = mongoose.model(MODEL_MEMORY, modelSchema);
+module.exports = Model;
+module.exports.types = types;
