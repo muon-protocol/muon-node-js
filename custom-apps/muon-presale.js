@@ -110,14 +110,14 @@ module.exports = {
           muonPresaleABI,
           bscNetWork
         )
-        let sokolPurchase = 0
-        let sokolPurchase = await ethCall(
+        let xdaiPurchase = await ethCall(
           xdaiContractAddress,
           'balances',
           [forAddress],
           muonPresaleABI,
           xdaiNetwork
         )
+
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
           getAllowance()
@@ -143,9 +143,9 @@ module.exports = {
         )
         ethPurchase = new BN(ethPurchase)
         bscPurchase = new BN(bscPurchase)
-        sokolPurchase = new BN(sokolPurchase)
+        xdaiPurchase = new BN(xdaiPurchase)
         let sum = ethPurchase.add(bscPurchase)
-        sum = sum.add(sokolPurchase)
+        sum = sum.add(xdaiPurchase)
         let finalMaxCap = maxCap.sub(sum)
         finalMaxCap = finalMaxCap.toString()
 
