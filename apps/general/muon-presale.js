@@ -43,8 +43,26 @@ const xdaiNetwork = 'xdai'
 const xDaiChainId = 100
 const bscChainId = 56
 
+const DEPOSIT_LOCK = 'muon-deposit-lock'
+
 module.exports = {
   APP_NAME: 'presale',
+
+  onArrive: async function (request) {
+    let {method, data: {params}} = request
+    switch (method) {
+      case 'deposit':
+        let {forAddress} = params;
+        let memory = [
+          {type: 'uint256', name: DEPOSIT_LOCK, value: forAddress}
+        ]
+        let lock = await this.readNodeMem({"data.name": DEPOSIT_LOCK, "data.value": forAddress})
+        if(lock)
+          throw {message: `Address [${forAddress}] locked for a moment`}
+        await this.writeNodeMem(memory, 5 * 60);
+        return ;
+    }
+  },
 
   onRequest: async function (request) {
     let {
@@ -82,20 +100,20 @@ module.exports = {
             throw { message: 'Request signature mismatch' }
         }
 
-        let locked = await this.memRead({
-          nSign,
-          'data.name': 'forAddress',
-          'data.value': forAddress
-        })
-        if (!!locked) {
-          throw {
-            message: {
-              message: `deposit from address ${forAddress} has been locked for 6 minutes.`,
-              lockTime: 6 * 60,
-              expireAt: locked.expireAt
-            }
-          }
-        }
+        // let locked = await this.memRead({
+        //   nSign,
+        //   'data.name': 'forAddress',
+        //   'data.value': forAddress
+        // })
+        // if (!!locked) {
+        //   throw {
+        //     message: {
+        //       message: `deposit from address ${forAddress} has been locked for 6 minutes.`,
+        //       lockTime: 6 * 60,
+        //       expireAt: locked.expireAt
+        //     }
+        //   }
+        // }
         let ethPurchase = await ethCall(
           ethContractAddress,
           'balances',
@@ -167,6 +185,9 @@ module.exports = {
                 forAddress,
                 addressMaxCap: [finalMaxCap, chainId]
               }
+        let lock = await this.readNodeMem({"data.name": DEPOSIT_LOCK, "data.value": forAddress}, {distinct: "owner"})
+        if(lock.length !== 1)
+          throw {message: 'Atomic run failed.'}
         return data
       }
       default:
@@ -208,23 +229,24 @@ module.exports = {
         return null
     }
   },
-  onMemWrite: (req, res) => {
-    let {
-      method,
-      data: {
-        params: { forAddress, amount },
-        result: { time }
-      }
-    } = req
-    switch (method) {
-      case 'deposit': {
-        return {
-          ttl: 6 * 60,
-          data: [{ name: 'forAddress', type: 'address', value: forAddress }]
-        }
-      }
-      default:
-        return null
-    }
-  }
+
+  // onMemWrite: (req, res) => {
+  //   let {
+  //     method,
+  //     data: {
+  //       params: { forAddress, amount },
+  //       result: { time }
+  //     }
+  //   } = req
+  //   switch (method) {
+  //     case 'deposit': {
+  //       return {
+  //         ttl: 6 * 60,
+  //         data: [{ name: 'forAddress', type: 'address', value: forAddress }]
+  //       }
+  //     }
+  //     default:
+  //       return null
+  //   }
+  // }
 }
