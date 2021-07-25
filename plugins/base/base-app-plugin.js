@@ -82,6 +82,10 @@ class BaseAppPlugin extends BasePlugin {
       startedAt
     })
 
+    if(this.onArrive){
+      await this.onArrive(clone(newRequest));
+    }
+
     let result = await this.onRequest(clone(newRequest))
     newRequest.data.result = result
 
@@ -118,7 +122,7 @@ class BaseAppPlugin extends BasePlugin {
 
     if (confirmed) {
       newRequest.save()
-      this.muon.getPlugin('memory').writeRequestMem(requestData)
+      this.muon.getPlugin('memory').writeAppMem(requestData)
     }
 
     return requestData
@@ -145,30 +149,38 @@ class BaseAppPlugin extends BasePlugin {
 
   getMemWrite(request, result) {
     if (this.hasOwnProperty('onMemWrite')) {
+      let memPlugin = this.muon.getPlugin('memory');
       let timestamp = request.startedAt
       let nSign = request.nSign
-      let memWrite = this.onMemWrite(request, result)
-      if (!memWrite) return
-      let { ttl, data } = memWrite
+      let appMem = this.onMemWrite(request, result)
+      if (!appMem) return
+      let { ttl, data } = appMem
 
-      let hash = crypto.soliditySha3([
-        { type: 'string', value: this.APP_NAME },
-        { type: 'uint256', value: timestamp },
-        { type: 'uint256', value: ttl },
-        { type: 'uint256', value: nSign },
-        ...data.map(({ type, value }) => ({ type, value }))
-      ])
+      let memWrite = {
+        type: 'app',
+        owner: this.APP_NAME,
+        timestamp,
+        ttl,
+        nSign,
+        data,
+      }
+
+      let hash = memPlugin.hashMemWrite(memWrite);
       let signature = crypto.sign(hash)
-      return { timestamp, ttl, nSign, data, hash, signature }
+      return { ...memWrite, hash, signature }
     }
   }
 
-  async memRead(query) {
-    return this.muon.getPlugin('memory').readAppMem(this.APP_NAME, query)
+  async memRead(query, options) {
+    return this.muon.getPlugin('memory').readAppMem(this.APP_NAME, query, options)
   }
 
-  async memReadMulti(query) {
-    return this.muon.getPlugin('memory').readAppMemMulti(this.APP_NAME, query)
+  async writeNodeMem(data, ttl=0) {
+    this.muon.getPlugin('memory').writeNodeMem({ttl, data})
+  }
+
+  async readNodeMem(query, options) {
+    return this.muon.getPlugin('memory').readNodeMem(query, options)
   }
 
   async isOtherNodesConfirmed(newRequest) {
@@ -319,36 +331,41 @@ class BaseAppPlugin extends BasePlugin {
    */
 
   async __onRemoteWantRequest(data) {
-    // console.log('RemoteCall.getRequestData', data)
-    let req = await Request.findOne({ _id: data._id })
-    return req
+    try {
+      // console.log('RemoteCall.getRequestData', data)
+      let req = await Request.findOne({_id: data._id})
+      return req
+    }catch (e) {
+      console.error(e);
+    }
   }
 
   async __onRemoteSignRequest(data = {}) {
     // console.log('RemoteCall.requestSignature', {sign, memWrite})
-    let {sign, memWrite} = data
-    if(!sign) {
-      console.log("undefined sign", data);
-      return;
-    }
-    let request = await Request.findOne({ _id: sign.request })
-    if (request) {
-      // TODO: check response similarity
-      let signer = this.recoverSignature(request, sign)
-      if (signer && signer === sign.owner) {
-        if (!!memWrite) {
-          // TODO: validate memWright signature
-          sign.memWriteSignature = memWrite.signature
+    try {
+      let {sign, memWrite} = data;
+      let request = await Request.findOne({_id: sign.request})
+      if (request) {
+        // TODO: check response similarity
+        let signer = this.recoverSignature(request, sign)
+        if (signer && signer === sign.owner) {
+          if (!!memWrite) {
+            // TODO: validate memWright signature
+            sign.memWriteSignature = memWrite.signature
+          }
+          let newSignature = new Signature(sign)
+          await newSignature.save()
+        } else {
+          console.log('signature mismatch', {
+            request: request._id,
+            signer,
+            sigOwner: sign.owner
+          })
         }
-        let newSignature = new Signature(sign)
-        await newSignature.save()
-      } else {
-        console.log('signature mismatch', {
-          request: request._id,
-          signer,
-          sigOwner: sign.owner
-        })
       }
+    }
+    catch (e) {
+      console.error(e);
     }
   }
 }
