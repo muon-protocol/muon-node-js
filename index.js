@@ -25,8 +25,26 @@ function getEnvPlugins(){
   }, {})
 }
 
-function getCustomApps(){
-  const appDir = path.join(__dirname, 'custom-apps');
+function getCustomApps() {
+  let pluginsStr = process.env['MUON_CUSTOM_APPS']
+  if (!pluginsStr)
+    return {}
+  return pluginsStr.split('|').reduce((res, key) => {
+    let app = require(`./apps/custom/${key}`)
+    if (!!app.APP_NAME) {
+      return {
+        ...res,
+        [key]: [dynamicExtend(app.isService ? BaseService : BaseApp, app), {}]
+      }
+    }
+    else {
+      return res;
+    }
+  }, {})
+}
+
+function getGeneralApps(){
+  const appDir = path.join(__dirname, 'apps/general');
   return new Promise(function (resolve, reject) {
     let result = {};
     fs.readdir(appDir, function (err, files) {
@@ -36,7 +54,7 @@ function getCustomApps(){
       files.forEach(function (file) {
         let ext = file.split('.').pop();
         if(ext.toLowerCase() === 'js'){
-          let app = require(`./custom-apps/${file}`)
+          let app = require(`./apps/general/${file}`)
           if(!!app.APP_NAME) {
             result[app.APP_NAME] = [dynamicExtend(app.isService ? BaseService : BaseApp, app), {}]
           }
@@ -72,7 +90,8 @@ var muon;
       'memory': [require('./plugins/memory-plugin'), {}],
       // 'presale': [require('./plugins/muon-presale-plugin'), {}],
       ... getEnvPlugins(),
-      ... await getCustomApps(),
+      ... getCustomApps(),
+      ... await getGeneralApps(),
     }
   })
 
