@@ -67,9 +67,10 @@ class MemoryPlugin extends BasePlugin {
 
   hashMemWrite(memWrite) {
     let {type, owner, timestamp, ttl, nSign, data} = memWrite;
+    let ownerIsWallet = type === Memory.types.Node;
     return crypto.soliditySha3([
       {type: 'string', value: type},
-      {type: 'string', value: owner},
+      {type: ownerIsWallet ? 'address' : 'string', value: owner},
       {type: 'uint256', value: timestamp},
       {type: 'uint256', value: ttl},
       {type: 'uint256', value: nSign},
