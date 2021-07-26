@@ -59,8 +59,12 @@ module.exports = {
 
         // You can check for atomic run of the lock method
         let lock = await this.readNodeMem({"data.name": LOCK_NAME, "data.value": user}, {distinct: "owner"})
-        if(lock.length !== 1)
+        if(lock.length === 0) {
+          throw {message: 'Memory write not confirmed.'}
+        }
+        else if(lock.length > 1) {
           throw {message: 'Atomic run failed.'}
+        }
 
         return 'lock done.'
 
