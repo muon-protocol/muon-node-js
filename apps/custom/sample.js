@@ -1,4 +1,4 @@
-const { axios, toBaseUnit, soliditySha3 } = MuonAppUtils
+const { axios, toBaseUnit, soliditySha3, timeout } = MuonAppUtils
 
 const COINDESK_API = 'https://api.coindesk.com/v1/bpi/currentprice/BTC.json'
 
@@ -7,9 +7,43 @@ function getBtcPrice() {
 }
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
+const LOCK_NAME = "sample-app-lock-user"
+
 module.exports = {
   APP_NAME: 'sample',
   isService: true,
+
+  /**
+   * Request arrival hook
+   * Runs only on the first node
+   *
+   * @param request
+   * @returns {Promise<void>}
+   */
+  onArrive: async function (request) {
+    let {method, data: {params}} = request;
+    switch (method) {
+      case 'lock':
+        let {user} = params;
+
+        // looking for data in memory
+        let lock = await this.readNodeMem({"data.name": LOCK_NAME, "data.value": user})
+        if (lock) {
+          throw {message: `User [${user}] locked for a moment`}
+        }
+
+        // Write to memory
+        let memory = [
+          {type: 'uint256', name: LOCK_NAME, value: user}
+        ]
+        await this.writeNodeMem(memory, 120);
+
+        // wait for memory write confirmation
+        await timeout(200);
+
+        break;
+    }
+  },
 
   onRequest: async function (request) {
     let {
@@ -17,17 +51,17 @@ module.exports = {
       data: { params }
     } = request
     switch (method) {
-      case 'test_speed':
+      case 'test_speed': {
         return 'speed test done.'
+      }
       case 'lock':
         let { user } = params
-        let lock = await this.memRead({
-          'data.name': 'lock',
-          'data.value': user
-        })
-        // console.log({lock})
-        if (lock)
-          throw { message: `user:[${user}] has been locked for 10 seconds` }
+
+        // You can check for atomic run of the lock method
+        let lock = await this.readNodeMem({"data.name": LOCK_NAME, "data.value": user}, {distinct: "owner"})
+        if(lock.length !== 1)
+          throw {message: 'Atomic run failed.'}
+
         return 'lock done.'
 
       case 'btc_price':
@@ -65,6 +99,9 @@ module.exports = {
     }
   },
 
+  /**
+   * store data on request confirm
+   */
   onMemWrite: (req, res) => {
     if (req.method === 'lock') {
       let {
