@@ -39,7 +39,7 @@ module.exports = {
         await this.writeNodeMem(memory, 120);
 
         // wait for memory write confirmation
-        await timeout(200);
+        await timeout(1000);
 
         break;
     }
