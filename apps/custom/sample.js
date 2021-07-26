@@ -87,7 +87,7 @@ module.exports = {
   },
 
   hashRequestResult: (request, result) => {
-    console.log(result)
+    // console.log(result)
     switch (request.method) {
       case 'test_speed':
       case 'lock':

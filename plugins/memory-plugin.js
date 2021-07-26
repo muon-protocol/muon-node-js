@@ -57,8 +57,9 @@ class MemoryPlugin extends BasePlugin {
     }
     let allowedList = this.muon.getNodesWalletList();
     let sigOwners = signatures.map(sig => crypto.recover(hash, sig));
-    for(let i=0 ; i<sigOwners.length ; i++){
-      if(allowedList.indexOf(addr => (addr.toLowerCase()===sigOwners[i].toLowerCase())) < 0) {
+    for(const address of sigOwners){
+      let index = allowedList.findIndex(addr => (addr.toLowerCase()===address.toLowerCase()))
+      if(index < 0) {
         return false
       }
     }
