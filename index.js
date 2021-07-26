@@ -30,6 +30,15 @@ function getCustomApps() {
   if (!pluginsStr)
     return {}
   return pluginsStr.split('|').reduce((res, key) => {
+    // check if app exist.
+    try{
+      require.resolve(`./apps/custom/${key}`);
+    }
+    catch (e) {
+      console.error(e);
+      return res;
+    }
+    // load app
     let app = require(`./apps/custom/${key}`)
     if (!!app.APP_NAME) {
       return {
