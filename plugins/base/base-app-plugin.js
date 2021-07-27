@@ -3,6 +3,7 @@ const Request = require('../../gateway/models/Request')
 const Signature = require('../../gateway/models/Signature')
 const PeerId = require('peer-id')
 const uint8ArrayFromString = require('uint8arrays/from-string')
+const {makeAppDependency} = require('./app-dependencies')
 const uint8ArrayToString = require('uint8arrays/to-string')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
@@ -22,10 +23,25 @@ class BaseAppPlugin extends BasePlugin {
     // if (new.target === BaseAppPlugin) {
     //   throw new TypeError("Cannot construct abstract BaseAppPlugin instances directly");
     // }
+
+  }
+
+  async onInit() {
+    if(this.dependencies){
+      this.initializeDependencies();
+    }
+    if(this.onAppInit)
+      this.onAppInit();
+  }
+
+  initializeDependencies() {
+    this.dependencies.map(key => {
+      this[key] = makeAppDependency(this, key);
+    })
   }
 
   async onStart() {
-    console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
+    // console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
     /**
      * Subscribe to app broadcast channel
      */
