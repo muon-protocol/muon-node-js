@@ -1,7 +1,7 @@
 const PriceCache = require('./price-cache')
-const WebSocket = require('ws')
+const {ws: WebSocket} = MuonAppUtils
 const API_KEY = process.env.FINNHUB_API_KEY
-const SYMBOLS = 'TSLA'; //process.env.FINNHUB_SUBSCRIBE_SYMBOLS || 'TSLA'
+const SYMBOLS = process.env.FINNHUB_SUBSCRIBE_SYMBOLS || 'TSLA'
 const VERBOSE = false;
 
 let waitBeforeReconnect = 1000;
@@ -15,7 +15,10 @@ function onTradeData(data){
         "price": trade['p'],
         "timestamp": Math.floor(trade['t'] / 1000)
       }
-      PriceCache.setSymbolPrice(trade['s'], price)
+      try {
+        PriceCache.setSymbolPrice(trade['s'], price)
+      }
+      catch (e) {}
   }
 }
 
@@ -63,10 +66,13 @@ function connect(){
   });
 
   ws.on('error', function onError(e) {
-    // console.log('finnhub websocket error', e.message)
+    if(VERBOSE)
+      console.log('finnhub websocket error', e.message)
     ws.close()
   });
 }
 
-connect()
+module.exports = {
+  start: connect,
+}
 

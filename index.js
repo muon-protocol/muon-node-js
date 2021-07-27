@@ -92,7 +92,7 @@ var muon;
       'gateway-interface': [require('./plugins/gateway-Interface'), {}],
       'ping-pong': [require('./plugins/ping-pong'), {}],
       // 'gw-log': [require('./plugins/gateway-log'), {}],
-      'stock-plugin': [require('./plugins/stock-plugin'), {}],
+      // 'stock-plugin': [require('./plugins/stock-plugin'), {}],
       'eth': [require('./plugins/eth-app-plugin'), {}],
       'content-verify': [require('./plugins/content-verify-plugin'), {}],
       'content': [require('./plugins/content-app'), {}],

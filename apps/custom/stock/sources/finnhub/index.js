@@ -1,6 +1,11 @@
 const Api = require('./api');
-require('./websocket')
+const wsService = require('./websocket')
 const PriceCache = require('./price-cache')
+
+function init(redisClient){
+  PriceCache.setRedisClient(redisClient)
+  wsService.start();
+}
 
 async function getSymbolPrice(symbol, timestamp) {
   let result = await PriceCache.getSymbolPrice(symbol)
@@ -13,5 +18,6 @@ async function getSymbolPrice(symbol, timestamp) {
 }
 
 module.exports = {
+  init,
   getSymbolPrice,
 }

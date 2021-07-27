@@ -1,4 +1,4 @@
-const axios = require('axios');
+const {axios} = MuonAppUtils;
 
 const API_KEY = process.env.FINNHUB_API_KEY
 
