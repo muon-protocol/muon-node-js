@@ -11,6 +11,13 @@ module.exports = class BasePlugin extends Events{
   }
 
   /**
+   * This method will call immediately after plugin create.
+   * @returns {Promise<void>}
+   */
+  async onInit(){
+  }
+
+  /**
    * This method will call immediately after Muon start.
    * @returns {Promise<void>}
    */

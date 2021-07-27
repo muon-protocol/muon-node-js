@@ -66,6 +66,7 @@ class Muon extends Events {
     for (let pluginName in plugins) {
       let [plugin, configs] = plugins[pluginName]
       this._plugins[pluginName] = new plugin(this, configs)
+      this._plugins[pluginName].onInit();
     }
     // console.log('plugins initialized.')
   }
