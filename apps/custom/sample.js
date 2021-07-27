@@ -11,7 +11,15 @@ const LOCK_NAME = "sample-app-lock-user"
 
 module.exports = {
   APP_NAME: 'sample',
+  dependencies: ['redis'],
   isService: true,
+
+  /**
+   * App initialization hook
+   * @returns {Promise<void>}
+   */
+  onAppInit: async function (){
+  },
 
   /**
    * Request arrival hook
@@ -54,6 +62,12 @@ module.exports = {
       case 'test_speed': {
         return 'speed test done.'
       }
+      case 'test_redis':{
+        let previews = await this.redis.get('last-exec-time');
+        let current = `${Math.floor(Date.now()/1000)}`
+        this.redis.set("last-exec-time", current);
+        return "done";
+      }
       case 'lock':
         let { user } = params
 
@@ -90,6 +104,7 @@ module.exports = {
     // console.log(result)
     switch (request.method) {
       case 'test_speed':
+      case 'test_redis':
       case 'lock':
         return result
       case 'btc_price':
