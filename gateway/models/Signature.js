@@ -7,6 +7,7 @@ var modelSchema = mongoose.Schema({
   owner: {type: String, required: true},
   data: {type: Object},
   signature: {type: String, required: true},
+  memWriteSignature: {type: String},
 });
 
 var Model = module.exports = mongoose.model(MODEL_SIGNATURE, modelSchema);

@@ -4,15 +4,18 @@
   "description": "Muon protocol javascript implementation",
   "main": "index.js",
   "scripts": {
+    "help": "node help.js",
     "start": "env-cmd babel-node ./index.js",
     "dev": "env-cmd nodemon --exec babel-node ./index.js",
-    "dev-node-1": "env-cmd -f ./dev-chain/dev-node-1.env babel-node index.js",
-    "dev-node-2": "env-cmd -f ./dev-chain/dev-node-2.env babel-node index.js",
-    "dev-chain": "concurrently --kill-others \"npm run dev-node-1\" \"npm run dev-node-2\"",
-    "test": "jest"
+    "dev-chain": "node generateEnvs.js",
+    "node": "node runNode.js",
+    "test": "jest --verbose"
   },
   "jest": {
-    "collectCoverage": true
+    "collectCoverage": false,
+    "setupFilesAfterEnv": [
+      "./__test__/jest.init.js"
+    ]
   },
   "author": "",
   "license": "ISC",
@@ -24,6 +27,7 @@
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
     "elliptic": "^6.5.4",
+    "eth-sig-util": "1.4.2",
     "ethers": "^5.1.4",
     "events": "^3.3.0",
     "events-async": "^1.2.1",
@@ -58,7 +62,10 @@
     "chalk": "^4.1.0",
     "concurrently": "^6.2.0",
     "env-cmd": "^10.1.0",
+    "enzyme": "^3.11.0",
+    "enzyme-adapter-react-16": "^1.15.6",
     "jest": "^27.0.6",
-    "node-emoji": "^1.10.0"
+    "node-emoji": "^1.10.0",
+    "regenerator-runtime": "^0.13.7"
   }
 }

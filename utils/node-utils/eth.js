@@ -17,6 +17,8 @@ const _networksWeb3 = {
   bsctest: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSCTEST)),
   ftm: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTM)),
   ftmtest: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTMTEST)),
+  xdai: new Web3(new HttpProvider('https://rpc.xdaichain.com/')),
+  sokol: new Web3(new HttpProvider('https://sokol.poa.network'))
 }
 
 function getWeb3(network) {

@@ -1,28 +1,28 @@
 'use strict'
 /* eslint-disable no-console */
-const Events = require('events');
+const Events = require('events')
 const PeerId = require('peer-id')
 const Node = require('./libp2p_bundle')
-const chalk = require('chalk');
+const chalk = require('chalk')
 const emoji = require('node-emoji')
 
-class Muon extends Events{
+class Muon extends Events {
   configs = {}
-  peerId = null;
-  libp2p = null;
-  _plugins = {};
+  peerId = null
+  libp2p = null
+  _plugins = {}
 
-  constructor(configs){
-    super();
+  constructor(configs) {
+    super()
     this.configs = configs
   }
 
-  async initialize(){
+  async initialize() {
     await this._initializeNetwork(this.configs.libp2p)
     await this._initializePlugin(this.configs.plugins)
   }
 
-  async _initializeNetwork(configs){
+  async _initializeNetwork(configs) {
     let peerId = await PeerId.createFromJSON(configs.nodeId)
 
     let libp2p = await Node.create({
@@ -32,21 +32,22 @@ class Muon extends Events{
       },
       config: {
         peerDiscovery: {
-          [Node.Bootstrap.tag]:{
-            list: [
-              ...configs.bootstrap,
-            ],
+          [Node.Bootstrap.tag]: {
+            list: [...configs.bootstrap],
             interval: 5000, // default is 10 ms,
-            enabled: configs.bootstrap.length > 0,
+            enabled: configs.bootstrap.length > 0
           }
         }
       }
     })
 
     libp2p.connectionManager.on('peer:connect', (connection) => {
-      console.log(emoji.get('moon'), chalk.blue(' Node connected to '),
+      console.log(
+        emoji.get('moon'),
+        chalk.blue(' Node connected to '),
         emoji.get('large_blue_circle'),
-        chalk.blue(` ${connection.remotePeer.toB58String()}`));
+        chalk.blue(` ${connection.remotePeer.toB58String()}`)
+      )
     })
 
     libp2p.on('peer:discovery', function (peerId) {
@@ -57,41 +58,42 @@ class Muon extends Events{
     //   nodeListener.pubsub.publish(REQUEST_BROADCAST_CHANNEL, uint8ArrayFromString('Hello world.'))
     // }, 1000)
 
-    this.peerId = peerId;
-    this.libp2p = libp2p;
+    this.peerId = peerId
+    this.libp2p = libp2p
   }
 
-  _initializePlugin(plugins){
-    for(let pluginName in plugins){
+  _initializePlugin(plugins) {
+    for (let pluginName in plugins) {
       let [plugin, configs] = plugins[pluginName]
       this._plugins[pluginName] = new plugin(this, configs)
+      this._plugins[pluginName].onInit();
     }
-    console.log('plugins initialized.')
+    // console.log('plugins initialized.')
   }
 
-  getPlugin(pluginName){
-    return this._plugins[pluginName];
+  getPlugin(pluginName) {
+    return this._plugins[pluginName]
   }
 
-  getAppByName(appName){
-    if(!appName)
-      return null;
-    let keys = Object.keys(this._plugins);
-    for(let i=0 ; i<keys.length ; i++){
-      if(this._plugins[keys[i]].APP_NAME === appName)
+  getAppByName(appName) {
+    if (!appName) return null
+    let keys = Object.keys(this._plugins)
+    for (let i = 0; i < keys.length; i++) {
+      if (this._plugins[keys[i]].APP_NAME === appName)
         return this._plugins[keys[i]]
     }
     return null
   }
 
-  async start(){
+  async start() {
     await this.libp2p.start()
 
-    console.log(emoji.get('moon'),
+    console.log(
+      emoji.get('moon'),
       chalk.blue(' Node ready '),
       emoji.get('headphones'),
       chalk.blue(` Listening on: ${this.configs.libp2p.port}`)
-    );
+    )
 
     if (this.libp2p.isStarted()) {
       this._onceStarted()
@@ -100,13 +102,27 @@ class Muon extends Events{
     }
   }
 
-  _onceStarted(){
-    console.log('muon started');
-    for(let pluginName in this._plugins){
+  _onceStarted() {
+    console.log('muon started')
+    for (let pluginName in this._plugins) {
       this._plugins[pluginName].onStart()
     }
   }
+
+  getNodesWalletList() {
+    return [
+      '0x06A85356DCb5b307096726FB86A78c59D38e08ee',
+      '0x4513218Ce2e31004348Fd374856152e1a026283C',
+      '0xe4f507b6D5492491f4B57f0f235B158C4C862fea',
+      '0x2236ED697Dab495e1FA17b079B05F3aa0F94E1Ef',
+      '0xCA40791F962AC789Fdc1cE589989444F851715A8',
+      '0x7AA04BfC706095b748979FE3E3dB156C3dFb9451',
+      '0x60AA825FffaF4AC68392D886Cc2EcBCBa3Df4BD9',
+      '0x031e6efe16bCFB88e6bfB068cfd39Ca02669Ae7C',
+      '0x27a58c0e7688F90B415afA8a1BfA64D48A835DF7',
+      '0x11C57ECa88e4A40b7B041EF48a66B9a0EF36b830'
+    ]
+  }
 }
 
-module.exports = Muon;
-
+module.exports = Muon

@@ -5,7 +5,8 @@ const crypto = require('../utils/crypto')
 class EthAppPlugin extends BaseApp {
   APP_NAME = 'eth'
 
-  async onRequest(method, params){
+  async onRequest(request){
+    let {method, data: {params}} = request;
     // console.dir({method, params}, {depth: null})
     switch (method) {
       case 'call':{
@@ -40,7 +41,7 @@ class EthAppPlugin extends BaseApp {
         return result
       }
       default:
-        throw {message: `Unknown method ${params}`}
+        throw {message: `Unknown method ${method}`}
     }
   }
 

@@ -10,3 +10,10 @@ module.exports.getSymbolPrice = (symbol, source, timestamp=null) => {
 
   return Sources[source].getSymbolPrice(symbol, timestamp)
 }
+
+module.exports.init = redisClient => {
+  for(const src in Sources){
+    if(Sources[src].init)
+      Sources[src].init(redisClient);
+  }
+}
