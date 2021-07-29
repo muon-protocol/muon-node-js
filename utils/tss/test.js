@@ -3,7 +3,7 @@ const tss = require('./index')
 
 const t = 3, n=5;
 
-privateKey = tss.makeRandomNum();
+privateKey = tss.random();
 pubKey = tss.key2pub(privateKey)
 address = tss.pub2addr(pubKey)
 
@@ -16,7 +16,7 @@ let shares = tss.shareKey(privateKey, t, n)
 let reconstructed = tss.reconstructKey(shares, t);
 console.log(`RK: ${reconstructed.toString(16)}`);
 
-let k = tss.makeRandomNum();
+let k = tss.random();
 let kPub = tss.key2pub(k);
 let k_shares = tss.shareKey(k, t, n);
 

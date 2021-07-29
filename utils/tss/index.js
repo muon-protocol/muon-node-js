@@ -165,14 +165,14 @@ function calcPoly(x, polynomial){
   return result.umod(curve.n)
 }
 
-function makeRandomNum() {
+function random() {
   let byteSize = curve.n.bitLength() / 8
   let rand = randomHex(byteSize)
   return toBN(rand).umod(curve.n);
 }
 
 function shareKey(privateKey, t, n){
-  let poly = [privateKey , ...(range(1, t).map(makeRandomNum))]
+  let poly = [privateKey , ...(range(1, t).map(random))]
   return range(1, n+1).map(i => {
     let key = calcPoly(i, poly)
     let pub = key2pub(key);
@@ -220,7 +220,7 @@ function pub2addr(publicKey) {
 }
 
 function makeKeyPair(){
-  let privateKey = makeRandomNum();
+  let privateKey = random();
   return {
     privateKey,
     publicKey: key2pub(privateKey)
@@ -263,7 +263,7 @@ function schnorrVerify(pubKey, msg, sig){
 
 module.exports = {
   curve,
-  makeRandomNum,
+  random,
   shareKey,
   lagrangeCoef,
   reconstructKey,
