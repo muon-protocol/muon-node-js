@@ -175,7 +175,7 @@ function shareKey(privateKey, t, n){
   let poly = [privateKey , ...(range(1, t).map(makeRandomNum))]
   return range(1, n+1).map(i => {
     let key = calcPoly(i, poly)
-    let pub = getPublicKey(key);
+    let pub = key2pub(key);
     return{i, key, pub}
   })
 }
@@ -208,7 +208,7 @@ function reconstructPubKey(shares, t){
   return pub;
 }
 
-function getPublicKey(privateKey) {
+function key2pub(privateKey) {
   return scalarMult(privateKey, curve.g);
 }
 
@@ -223,7 +223,7 @@ function makeKeyPair(){
   let privateKey = makeRandomNum();
   return {
     privateKey,
-    publicKey: getPublicKey(privateKey)
+    publicKey: key2pub(privateKey)
   }
 }
 
@@ -269,7 +269,7 @@ module.exports = {
   reconstructKey,
   reconstructPubKey,
   toBN,
-  getPublicKey,
+  key2pub,
   pub2addr,
   schnorrHash,
   schnorrSign,
