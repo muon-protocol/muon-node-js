@@ -1,9 +1,10 @@
-const {BN, toBN, randomHex} = require('./utils')
+const {BN, toBN, randomHex, sha3, range} = require('./utils')
+const assert = require('assert')
 const elliptic = require('elliptic');
 const Point = require('./point');
 const Curve = require('./curve');
-const ZERO = new BN(0)
-const ONE = new BN(1)
+const ZERO = toBN(0)
+const ONE = toBN(1)
 const TWO = toBN(2)
 const THREE = toBN(3)
 
@@ -33,10 +34,9 @@ function inverseMod(k, p) {
 
   let quotient;
   while(!r.isZero()) {
-    quotient = old_r.divRound(r);
+    quotient = old_r.divmod(r).div;
     [old_r, r] = [r, old_r.sub(quotient.mul(r))];
     [old_s, s] = [s, old_s.sub(quotient.mul(s))];
-    [old_t, t] = [t, old_t.sub(quotient.mul(t))];
   }
 
   let [gcd, x, y] = [old_r, old_s, old_t];
@@ -82,9 +82,12 @@ function pointNeg(point) {
 
 function pointAdd(point1, point2){
   assert(isOnCurve(point1))
-  if(point2 === null)
-    return this;
   assert(isOnCurve(point2))
+
+  if(point1 === null)
+    return point2;
+  if(point2 === null)
+    return point1;
 
   let {x:x1, y:y1} = point1;
   let {x:x2, y:y2} = point2;
@@ -123,7 +126,8 @@ function pointAdd(point1, point2){
 function scalarMult(k, point){
   assert(isOnCurve(point))
 
-  if(k.umod(curve.n).isZero() || point === null)
+  if(k.umod(curve.n).isZero() || point === null) //TODO
+  // if(k.umod(curve.p).isZero() || point === null)
     return null
 
   // k * point = -k * (-point)
@@ -152,6 +156,8 @@ function scalarMult(k, point){
 }
 
 function calcPoly(x, polynomial){
+  if(!BN.isBN(x))
+    x = toBN(x);
   let result = toBN(0);
   for(let i=0 ; i<polynomial.length ; i++){
     result = result.add(polynomial[i].mul(x.pow(toBN(i))));
@@ -163,4 +169,97 @@ function makeRandomNum() {
   let byteSize = curve.n.bitLength() / 8
   let rand = randomHex(byteSize)
   return toBN(rand).umod(curve.n);
+}
+
+function shareKey(privateKey, t, n){
+  let poly = [privateKey , ...(range(1, t).map(makeRandomNum))]
+  return range(1, n+1).map(i => ({
+    i,
+    key: calcPoly(i, poly)
+  }))
+}
+
+function lagrangeCoef(j, t, shares) {
+  let prod = arr => arr.reduce((acc, current) => (current*acc) ,1);
+  let arr = range(0, t).map(k => {
+    return j===k ? 1 : (-shares[k].i/(shares[j].i - shares[k].i))
+  });
+  return parseInt(prod(arr));
+}
+
+function reconstructKey(shares, t){
+  assert(shares.length >= t);
+  let sum = toBN(0);
+  for(let j=0 ; j<t ; j++){
+    let coef = lagrangeCoef(j, t, shares)
+    sum.iadd(shares[j].key.mul(toBN(coef)))
+  }
+  return sum.umod(curve.n);
+}
+
+function getPublicKey(privateKey) {
+  return scalarMult(privateKey, curve.g);
+}
+
+function pub2addr(publicKey) {
+  let {x, y} = publicKey
+  let mix = '0x' + x.shln(y.byteLength()*8).or(y).toString(16);
+  let pub_hash = sha3(mix)
+  return toChecksumAddress('0x' + pub_hash.substr(-40));
+}
+
+function makeKeyPair(){
+  let privateKey = makeRandomNum();
+  return {
+    privateKey,
+    publicKey: getPublicKey(privateKey)
+  }
+}
+
+function toChecksumAddress (address) {
+  address = address.toLowerCase().replace(/^0x/i, '')
+  let hash = sha3(address).replace(/^0x/i, '');
+  let ret = '0x'
+  for (let i = 0; i < address.length; i++) {
+    if (parseInt(hash[i], 16) >= 8) {
+      ret += address[i].toUpperCase()
+    } else {
+      ret += address[i]
+    }
+  }
+  return ret
+}
+
+function schnorrHash(publicKey, msg){
+  let {x, y} = publicKey
+  let pubKeyBuff = x.shln(y.byteLength() * 8).or(y).toBuffer();
+  let msgBuff = Buffer.from(msg)
+  let buffToHash = Buffer.concat([pubKeyBuff, msgBuff])
+  return sha3(buffToHash)
+}
+
+function schnorrSign(sharedPrivateKey, sharedK, kPub, msg){
+  let e = toBN(schnorrHash(kPub, msg))
+  let s = sharedK.sub(sharedPrivateKey.mul(e)).umod(curve.n);
+  return {s, e}
+}
+
+function schnorrVerify(pubKey, msg, sig){
+  let r_v = pointAdd(scalarMult(sig.s, curve.g), scalarMult(sig.e, pubKey))
+  let e_v = schnorrHash(r_v, msg)
+  return e_v === '0x'+sig.e.toString(16)
+}
+
+module.exports = {
+  curve,
+  makeRandomNum,
+  shareKey,
+  lagrangeCoef,
+  reconstructKey,
+  toBN,
+  getPublicKey,
+  pub2addr,
+  schnorrHash,
+  schnorrSign,
+  schnorrVerify,
 }

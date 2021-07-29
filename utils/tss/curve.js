@@ -1,4 +1,5 @@
 const {BN, toBN} = require('./utils');
+const Point = require('./point')
 
 class Curve {
   constructor(name, p, a, b, g, n, h) {
