@@ -71,7 +71,7 @@ function isOnCurve(point) {
 function pointNeg(point) {
   assert(isOnCurve(point))
 
-  let {x, y} = this
+  let {x, y} = point
   // (x, -y % curve.p)
   let result = new Point(x, y.neg().umod(curve.p))
 
@@ -173,10 +173,11 @@ function makeRandomNum() {
 
 function shareKey(privateKey, t, n){
   let poly = [privateKey , ...(range(1, t).map(makeRandomNum))]
-  return range(1, n+1).map(i => ({
-    i,
-    key: calcPoly(i, poly)
-  }))
+  return range(1, n+1).map(i => {
+    let key = calcPoly(i, poly)
+    let pub = getPublicKey(key);
+    return{i, key, pub}
+  })
 }
 
 function lagrangeCoef(j, t, shares) {
@@ -195,6 +196,16 @@ function reconstructKey(shares, t){
     sum.iadd(shares[j].key.mul(toBN(coef)))
   }
   return sum.umod(curve.n);
+}
+
+function reconstructPubKey(shares, t){
+  assert(shares.length >= t);
+  let pub = null
+  range(0, t).map(j => {
+    let coef = toBN(lagrangeCoef(j, t, shares));
+    pub = pointAdd(pub, scalarMult(coef, shares[j].pub))
+  })
+  return pub;
 }
 
 function getPublicKey(privateKey) {
@@ -256,6 +267,7 @@ module.exports = {
   shareKey,
   lagrangeCoef,
   reconstructKey,
+  reconstructPubKey,
   toBN,
   getPublicKey,
   pub2addr,
