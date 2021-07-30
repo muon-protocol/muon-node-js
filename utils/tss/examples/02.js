@@ -1,28 +1,46 @@
-const {toBN, range} = require('./utils')
-const tss = require('./index')
+/**
+ * Sign message using schnorr signature and verify signature.
+ */
 
+const {toBN, range} = require('../utils')
+const tss = require('../index')
+
+
+/**
+ * Share privateKey between 5 individuals
+ * Needs to at least 3 individual's signature to recover global signature
+ */
 const t = 3, n=5;
 
+/**
+ * 1) Generate random privateKey
+ */
 privateKey = tss.random();
 pubKey = tss.key2pub(privateKey)
 address = tss.pub2addr(pubKey)
 
-
-console.log(`PK: ${privateKey.toString(16)}`)
+/**
+ * Share private key
+ */
 let shares = tss.shareKey(privateKey, t, n)
-// console.log(shares.map(s => ({...s, key: s.key.toString(16)})))
-// console.log(shares.map(s => s.key.toString(16)))
 
-let reconstructed = tss.reconstructKey(shares, t);
-console.log(`RK: ${reconstructed.toString(16)}`);
-
+/**
+ * Generate random nonce
+ */
 let k = tss.random();
 let kPub = tss.key2pub(k);
 let k_shares = tss.shareKey(k, t, n);
 
 let msg = 'hello tss'
+
+/**
+ * Sign message
+ */
 let sigs = range(0, t).map(i => tss.schnorrSign(shares[i].key, k_shares[i].key, kPub, msg))
 
+/**
+ * Aggregate signatures
+ */
 let ts = toBN(0)
 range(0, sigs.length).map(j => {
   let coef = tss.lagrangeCoef(j, t, k_shares);
@@ -31,6 +49,9 @@ range(0, sigs.length).map(j => {
 ts = ts.umod(tss.curve.n)
 let sig = {s:ts, e:sigs[0].e}
 
-console.log({verified: tss.schnorrVerify(pubKey, msg, sig)})
+/**
+ * Verify signatures
+ */
+console.log(`verified: ${tss.schnorrVerify(pubKey, msg, sig)}`)
 
 
