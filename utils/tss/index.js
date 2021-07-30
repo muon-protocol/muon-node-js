@@ -20,11 +20,11 @@ const curve = Curve.secp256k1;
  * @param p
  */
 function inverseMod(k, p) {
-  if(k.isZero())
+  if (k.isZero())
     throw {message: 'division by zero'}
 
   // k ** -1 = p - (-k) ** -1  (mod p)
-  if(k.isNeg())
+  if (k.isNeg())
     return p.sub(inverseMod(k.neg(), p))
 
   // Extended Euclidean algorithm.
@@ -33,7 +33,7 @@ function inverseMod(k, p) {
   let [r, old_r] = [p, k]
 
   let quotient;
-  while(!r.isZero()) {
+  while (!r.isZero()) {
     quotient = old_r.divmod(r).div;
     [old_r, r] = [r, old_r.sub(quotient.mul(r))];
     [old_s, s] = [s, old_s.sub(quotient.mul(s))];
@@ -80,25 +80,25 @@ function pointNeg(point) {
   return result
 }
 
-function pointAdd(point1, point2){
+function pointAdd(point1, point2) {
   assert(isOnCurve(point1))
   assert(isOnCurve(point2))
 
-  if(point1 === null)
+  if (point1 === null)
     return point2;
-  if(point2 === null)
+  if (point2 === null)
     return point1;
 
-  let {x:x1, y:y1} = point1;
-  let {x:x2, y:y2} = point2;
+  let {x: x1, y: y1} = point1;
+  let {x: x2, y: y2} = point2;
 
   // point1 + (-point1) = 0
-  if(x1.eq(x2) && !y1.eq(y2))
+  if (x1.eq(x2) && !y1.eq(y2))
     return null
 
   let m;
   // This is the case point1 == point2.
-  if(x1.eq(x2)) {
+  if (x1.eq(x2)) {
     // m = (3 * x1 * x1 + curve.a) * inverse_mod(2 * y1, curve.p)
     m = (THREE.mul(x1).mul(x1).add(curve.a)).mul(inverseMod(TWO.mul(y1), curve.p))
   }
@@ -123,23 +123,23 @@ function pointAdd(point1, point2){
  * @param point
  * @returns {*}
  */
-function scalarMult(k, point){
+function scalarMult(k, point) {
   assert(isOnCurve(point))
 
-  if(k.umod(curve.n).isZero() || point === null) //TODO
+  if (k.umod(curve.n).isZero() || point === null) //TODO
   // if(k.umod(curve.p).isZero() || point === null)
     return null
 
   // k * point = -k * (-point)
-  if(k.lt(ZERO))
+  if (k.lt(ZERO))
     return scalarMult(k.neg(), pointNeg(point))
 
   let result = null
   let addend = point
 
-  while(!k.isZero()) {
+  while (!k.isZero()) {
     // k & 1 != 0
-    if(!k.and(ONE).isZero()) {
+    if (!k.and(ONE).isZero()) {
       // Add.
       result = pointAdd(result, addend);
     }
@@ -155,11 +155,11 @@ function scalarMult(k, point){
   return result
 }
 
-function calcPoly(x, polynomial){
-  if(!BN.isBN(x))
+function calcPoly(x, polynomial) {
+  if (!BN.isBN(x))
     x = toBN(x);
   let result = toBN(0);
-  for(let i=0 ; i<polynomial.length ; i++){
+  for (let i = 0; i < polynomial.length; i++) {
     result = result.add(polynomial[i].mul(x.pow(toBN(i))));
   }
   return result.umod(curve.n)
@@ -171,34 +171,34 @@ function random() {
   return toBN(rand).umod(curve.n);
 }
 
-function shareKey(privateKey, t, n){
-  let poly = [privateKey , ...(range(1, t).map(random))]
-  return range(1, n+1).map(i => {
+function shareKey(privateKey, t, n) {
+  let poly = [privateKey, ...(range(1, t).map(random))]
+  return range(1, n + 1).map(i => {
     let key = calcPoly(i, poly)
     let pub = key2pub(key);
-    return{i, key, pub}
+    return {i, key, pub}
   })
 }
 
 function lagrangeCoef(j, t, shares) {
-  let prod = arr => arr.reduce((acc, current) => (current*acc) ,1);
+  let prod = arr => arr.reduce((acc, current) => (current * acc), 1);
   let arr = range(0, t).map(k => {
-    return j===k ? 1 : (-shares[k].i/(shares[j].i - shares[k].i))
+    return j === k ? 1 : (-shares[k].i / (shares[j].i - shares[k].i))
   });
   return parseInt(prod(arr));
 }
 
-function reconstructKey(shares, t){
+function reconstructKey(shares, t) {
   assert(shares.length >= t);
   let sum = toBN(0);
-  for(let j=0 ; j<t ; j++){
+  for (let j = 0; j < t; j++) {
     let coef = lagrangeCoef(j, t, shares)
     sum.iadd(shares[j].key.mul(toBN(coef)))
   }
   return sum.umod(curve.n);
 }
 
-function reconstructPubKey(shares, t){
+function reconstructPubKey(shares, t) {
   assert(shares.length >= t);
   let pub = null
   range(0, t).map(j => {
@@ -214,12 +214,12 @@ function key2pub(privateKey) {
 
 function pub2addr(publicKey) {
   let {x, y} = publicKey
-  let mix = '0x' + x.shln(y.byteLength()*8).or(y).toString(16);
+  let mix = '0x' + x.shln(y.byteLength() * 8).or(y).toString(16);
   let pub_hash = sha3(mix)
   return toChecksumAddress('0x' + pub_hash.substr(-40));
 }
 
-function makeKeyPair(){
+function makeKeyPair() {
   let privateKey = random();
   return {
     privateKey,
@@ -227,7 +227,7 @@ function makeKeyPair(){
   }
 }
 
-function toChecksumAddress (address) {
+function toChecksumAddress(address) {
   address = address.toLowerCase().replace(/^0x/i, '')
   let hash = sha3(address).replace(/^0x/i, '');
   let ret = '0x'
@@ -241,7 +241,7 @@ function toChecksumAddress (address) {
   return ret
 }
 
-function schnorrHash(publicKey, msg){
+function schnorrHash(publicKey, msg) {
   let {x, y} = publicKey
   let pubKeyBuff = x.shln(y.byteLength() * 8).or(y).toBuffer();
   let msgBuff = Buffer.from(msg)
@@ -249,16 +249,16 @@ function schnorrHash(publicKey, msg){
   return sha3(buffToHash)
 }
 
-function schnorrSign(sharedPrivateKey, sharedK, kPub, msg){
+function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
   let e = toBN(schnorrHash(kPub, msg))
   let s = sharedK.sub(sharedPrivateKey.mul(e)).umod(curve.n);
   return {s, e}
 }
 
-function schnorrVerify(pubKey, msg, sig){
+function schnorrVerify(pubKey, msg, sig) {
   let r_v = pointAdd(scalarMult(sig.s, curve.g), scalarMult(sig.e, pubKey))
   let e_v = schnorrHash(r_v, msg)
-  return e_v === '0x'+sig.e.toString(16)
+  return toBN(e_v).eq(sig.e);
 }
 
 module.exports = {
