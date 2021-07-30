@@ -73,7 +73,7 @@ function pointNeg(point) {
 
   let {x, y} = point
   // (x, -y % curve.p)
-  let result = new Point(x, y.neg().umod(curve.p))
+  let result = new Point(x.clone(), y.neg().umod(curve.p))
 
   assert(isOnCurve(result))
 
@@ -125,6 +125,7 @@ function pointAdd(point1, point2) {
  */
 function scalarMult(k, point) {
   assert(isOnCurve(point))
+  k = k.clone();
 
   if (k.umod(curve.n).isZero() || point === null) //TODO
   // if(k.umod(curve.p).isZero() || point === null)
