@@ -1,5 +1,6 @@
 const { axios, toBaseUnit, soliditySha3, BN, recoverTypedSignature, ethCall } =
   MuonAppUtils
+let ethSignUtils = require('eth-sig-util')
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -103,27 +104,24 @@ module.exports = {
         if ((token === 'busd' || token === 'bnb') && chainId != bscChainId)
           throw { message: 'Token and chain is not matched' }
         else {
-          // let typedData = [
-          //   { type: 'uint256', name: 'time', value: time },
-          //   { type: 'address', name: 'forAddress', value: forAddress }
-          // ]
-          let typedData = [
-            {
-              types: {
-                EIP712Domain: [{ name: 'name', type: 'string' }],
-                Message: [
-                  { type: 'uint256', name: 'time' },
-                  { type: 'address', name: 'forAddress' }
-                ]
-              },
-              domain: { name: 'MUON Presale' },
-              primaryType: 'Message',
-              message: { time: time, forAddress: forAddress }
-            }
-          ]
-          // typedData = JSON.stringify(typedData)
+          let typedData = {
+            types: {
+              EIP712Domain: [{ name: 'name', type: 'string' }],
+              Message: [
+                { type: 'uint256', name: 'time' },
+                { type: 'address', name: 'forAddress' }
+              ]
+            },
+            domain: { name: 'MUON Presale' },
+            primaryType: 'Message',
+            message: { time: time, forAddress: forAddress }
+          }
 
-          let signer = recoverTypedSignature({ data: typedData, sig: sign })
+          let signer = ethSignUtils.recoverTypedMessage(
+            { data: typedData, sig: sign },
+            'v4'
+          )
+
           if (signer.toLowerCase() !== forAddress.toLowerCase())
             throw { message: 'Request signature mismatch' }
         }
@@ -133,15 +131,7 @@ module.exports = {
         //   'data.name': 'forAddress',
         //   'data.value': forAddress
         // })
-        // if (!!locked) {
-        //   throw {
-        //     message: {
-        //       message: `deposit from address ${forAddress} has been locked for 6 minutes.`,
-        //       lockTime: 6 * 60,
-        //       expireAt: locked.expireAt
-        //     }
-        //   }
-        // }
+
         let ethPurchase = await ethCall(
           ethContractAddress,
           'balances',
@@ -156,6 +146,7 @@ module.exports = {
           muonPresaleABI,
           bscNetWork
         )
+
         let xdaiPurchase = await ethCall(
           xdaiContractAddress,
           'balances',
@@ -194,7 +185,6 @@ module.exports = {
         sum = sum.add(xdaiPurchase)
         let finalMaxCap = maxCap.sub(sum)
         finalMaxCap = finalMaxCap.toString()
-
         const data =
           chainId == 1
             ? {
