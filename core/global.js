@@ -21,5 +21,6 @@ global.MuonAppUtils = {
   toBaseUnit,
   soliditySha3,
   ecRecover: util.ecrecover,
-  recoverTypedSignature: ethSigUtil.recoverTypedSignature
+  recoverTypedSignature: ethSigUtil.recoverTypedSignature,
+  recoverTypedMessage: ethSigUtil.recoverTypedMessage
 }
