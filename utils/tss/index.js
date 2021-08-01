@@ -265,6 +265,7 @@ function schnorrVerify(pubKey, msg, sig) {
 module.exports = {
   curve,
   random,
+  calcPoly,
   shareKey,
   lagrangeCoef,
   reconstructKey,
