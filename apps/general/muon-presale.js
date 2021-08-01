@@ -1,4 +1,4 @@
-const { axios, toBaseUnit, soliditySha3, BN, recoverTypedSignature, ethCall } =
+const { axios, toBaseUnit, soliditySha3, BN, recoverTypedMessage, ethCall } =
   MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
@@ -49,18 +49,30 @@ module.exports = {
   APP_NAME: 'presale',
 
   onArrive: async function (request) {
-    let {method, data: {params}} = request
+    let {
+      method,
+      data: { params }
+    } = request
     switch (method) {
       case 'deposit':
-        let {forAddress} = params;
+        let { forAddress } = params
         let memory = [
-          {type: 'uint256', name: DEPOSIT_LOCK, value: forAddress}
+          { type: 'uint256', name: DEPOSIT_LOCK, value: forAddress }
         ]
-        let lock = await this.readNodeMem({"data.name": DEPOSIT_LOCK, "data.value": forAddress})
-        if(lock)
-          throw {message: `Address [${forAddress}] locked for a moment`}
-        await this.writeNodeMem(memory, 5 * 60);
-        return ;
+        let lock = await this.readNodeMem({
+          'data.name': DEPOSIT_LOCK,
+          'data.value': forAddress
+        })
+        if (lock)
+          throw {
+            message: {
+              message: `Address [${forAddress}] locked for for 6 minutes.`,
+              lockTime: 6 * 60,
+              expireAt: lock.expireAt
+            }
+          }
+        await this.writeNodeMem(memory, 6 * 60)
+        return
     }
   },
 
@@ -91,11 +103,21 @@ module.exports = {
         if ((token === 'busd' || token === 'bnb') && chainId != bscChainId)
           throw { message: 'Token and chain is not matched' }
         else {
-          let typedData = [
-            { type: 'uint256', name: 'time', value: time },
-            { type: 'address', name: 'forAddress', value: forAddress }
-          ]
-          let signer = recoverTypedSignature({ data: typedData, sig: sign })
+          let typedData = {
+            types: {
+              EIP712Domain: [{ name: 'name', type: 'string' }],
+              Message: [
+                { type: 'uint256', name: 'time' },
+                { type: 'address', name: 'forAddress' }
+              ]
+            },
+            domain: { name: 'MUON Presale' },
+            primaryType: 'Message',
+            message: { time: time, forAddress: forAddress }
+          }
+
+          let signer = recoverTypedMessage({ data: typedData, sig: sign }, 'v4')
+
           if (signer.toLowerCase() !== forAddress.toLowerCase())
             throw { message: 'Request signature mismatch' }
         }
@@ -105,15 +127,7 @@ module.exports = {
         //   'data.name': 'forAddress',
         //   'data.value': forAddress
         // })
-        // if (!!locked) {
-        //   throw {
-        //     message: {
-        //       message: `deposit from address ${forAddress} has been locked for 6 minutes.`,
-        //       lockTime: 6 * 60,
-        //       expireAt: locked.expireAt
-        //     }
-        //   }
-        // }
+
         let ethPurchase = await ethCall(
           ethContractAddress,
           'balances',
@@ -128,6 +142,7 @@ module.exports = {
           muonPresaleABI,
           bscNetWork
         )
+
         let xdaiPurchase = await ethCall(
           xdaiContractAddress,
           'balances',
@@ -166,7 +181,6 @@ module.exports = {
         sum = sum.add(xdaiPurchase)
         let finalMaxCap = maxCap.sub(sum)
         finalMaxCap = finalMaxCap.toString()
-
         const data =
           chainId == 1
             ? {
@@ -185,9 +199,11 @@ module.exports = {
                 forAddress,
                 addressMaxCap: [finalMaxCap, chainId]
               }
-        let lock = await this.readNodeMem({"data.name": DEPOSIT_LOCK, "data.value": forAddress}, {distinct: "owner"})
-        if(lock.length !== 1)
-          throw {message: 'Atomic run failed.'}
+        let lock = await this.readNodeMem(
+          { 'data.name': DEPOSIT_LOCK, 'data.value': forAddress },
+          { distinct: 'owner' }
+        )
+        if (lock.length !== 1) throw { message: 'Atomic run failed.' }
         return data
       }
       default:
@@ -228,7 +244,7 @@ module.exports = {
       default:
         return null
     }
-  },
+  }
 
   // onMemWrite: (req, res) => {
   //   let {
