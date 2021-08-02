@@ -27,7 +27,7 @@
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
     "elliptic": "^6.5.4",
-    "eth-sig-util": "1.4.2",
+    "eth-sig-util": "3.0.1",
     "ethers": "^5.1.4",
     "events": "^3.3.0",
     "events-async": "^1.2.1",
