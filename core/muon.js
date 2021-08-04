@@ -6,6 +6,22 @@ const Node = require('./libp2p_bundle')
 const chalk = require('chalk')
 const emoji = require('node-emoji')
 
+/**
+ * Each wallet has a unique known index and will never change.
+ */
+const MUON_WALLETS_INDEX = {
+  '0x06A85356DCb5b307096726FB86A78c59D38e08ee': 1,
+  '0x4513218Ce2e31004348Fd374856152e1a026283C': 2,
+  '0xe4f507b6D5492491f4B57f0f235B158C4C862fea': 3,
+  '0x2236ED697Dab495e1FA17b079B05F3aa0F94E1Ef': 4,
+  '0xCA40791F962AC789Fdc1cE589989444F851715A8': 5,
+  '0x7AA04BfC706095b748979FE3E3dB156C3dFb9451': 6,
+  '0x60AA825FffaF4AC68392D886Cc2EcBCBa3Df4BD9': 7,
+  '0x031e6efe16bCFB88e6bfB068cfd39Ca02669Ae7C': 8,
+  '0x27a58c0e7688F90B415afA8a1BfA64D48A835DF7': 9,
+  '0x11C57ECa88e4A40b7B041EF48a66B9a0EF36b830': 10
+}
+
 class Muon extends Events {
   configs = {}
   peerId = null
@@ -110,18 +126,11 @@ class Muon extends Events {
   }
 
   getNodesWalletList() {
-    return [
-      '0x06A85356DCb5b307096726FB86A78c59D38e08ee',
-      '0x4513218Ce2e31004348Fd374856152e1a026283C',
-      '0xe4f507b6D5492491f4B57f0f235B158C4C862fea',
-      '0x2236ED697Dab495e1FA17b079B05F3aa0F94E1Ef',
-      '0xCA40791F962AC789Fdc1cE589989444F851715A8',
-      '0x7AA04BfC706095b748979FE3E3dB156C3dFb9451',
-      '0x60AA825FffaF4AC68392D886Cc2EcBCBa3Df4BD9',
-      '0x031e6efe16bCFB88e6bfB068cfd39Ca02669Ae7C',
-      '0x27a58c0e7688F90B415afA8a1BfA64D48A835DF7',
-      '0x11C57ECa88e4A40b7B041EF48a66B9a0EF36b830'
-    ]
+    return Object.keys(MUON_WALLETS_INDEX)
+  }
+
+  getNodesWalletIndex() {
+    return MUON_WALLETS_INDEX
   }
 }
 
