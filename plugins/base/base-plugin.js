@@ -1,4 +1,5 @@
 const Events = require('events-async')
+const PeerId = require('peer-id')
 
 module.exports = class BasePlugin extends Events{
   muon = null;
@@ -22,5 +23,13 @@ module.exports = class BasePlugin extends Events{
    * @returns {Promise<void>}
    */
   async onStart(){
+  }
+
+  async findPeer(peerId){
+    if(!PeerId.isPeerId(peerId))
+      peerId = PeerId.createFromCID(peerId)
+
+    let peer = await this.muon.libp2p.peerRouting.findPeer(peerId)
+    return  peer;
   }
 }
