@@ -20,6 +20,16 @@ class RemoteCall extends BasePlugin {
         };
         return this.send(response, responseStream)
       })
+      .catch(error => {
+        console.error(error)
+        let response = {
+          responseId: callId,
+          error: {
+            message: error.message || 'Somethings went wrong'
+          }
+        };
+        return this.send(response, responseStream)
+      })
   }
 
   async handleIncomingMessage(message, stream){
@@ -29,11 +39,14 @@ class RemoteCall extends BasePlugin {
         let {callId, method, params={}} = data;
         await this.handleCall(callId, method, params, stream);
       }
-      else if('response' in data){
-        if('response' in data && 'responseId' in data){
-          let {responseId, response} = data;
-          let remoteResult = this._calls[responseId]
+      else if('responseId' in data){
+        let {responseId, response=undefined, error=undefined} = data;
+        let remoteResult = this._calls[responseId]
+        if(!error)
           remoteResult.resolve(response)
+        else {
+          console.log('remote side error', error)
+          remoteResult.reject(error)
         }
       }
     }catch (e) {

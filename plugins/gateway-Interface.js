@@ -72,7 +72,7 @@ class GatewayInterface extends BasePlugin{
         console.error('gateway-interface error', e)
         responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
           responseId: data ? data.callId : undefined,
-          error: e.message,
+          error: e.message || "Unknown error occurred",
         }))
       }
     }
