@@ -183,7 +183,8 @@ function random() {
 
 function shareKey(privateKey, t, n) {
   let poly = [privateKey, ...(range(1, t).map(random))]
-  return range(1, n + 1).map(i => {
+  return range(1, n + 1).map(idx => {
+    let i = idx * 10 + Math.floor(Math.random() * 9)
     let key = calcPoly(i, poly)
     let pub = key2pub(key);
     return {i, key, pub}
@@ -195,7 +196,7 @@ function lagrangeCoef(j, t, shares) {
   let arr = range(0, t).map(k => {
     return j === k ? 1 : (-shares[k].i / (shares[j].i - shares[k].i))
   });
-  return parseInt(prod(arr));
+  return prod(arr);
 }
 
 function reconstructKey(shares, t) {
@@ -203,7 +204,8 @@ function reconstructKey(shares, t) {
   let sum = toBN(0);
   for (let j = 0; j < t; j++) {
     let coef = lagrangeCoef(j, t, shares)
-    sum.iadd(shares[j].key.mul(toBN(coef)))
+    console.log({coef})
+    sum.iadd(shares[j].key.mul(toBN(parseInt(coef))))
   }
   return sum.umod(curve.n);
 }

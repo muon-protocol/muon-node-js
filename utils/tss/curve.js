@@ -1,4 +1,4 @@
-const {BN, toBN} = require('./utils');
+const {BN, toBN, randomHex} = require('./utils');
 const Point = require('./point')
 
 class Curve {
@@ -10,6 +10,12 @@ class Curve {
     this.g = g;
     this.n = BN.isBN(n) ? b : toBN(n);
     this.h = BN.isBN(h) ? b : toBN(h);
+  }
+
+  random(){
+    let byteSize = this.n.bitLength() / 8
+    let rand = randomHex(byteSize)
+    return toBN(rand).umod(this.n);
   }
 }
 
