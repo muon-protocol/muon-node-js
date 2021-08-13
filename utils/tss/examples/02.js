@@ -4,6 +4,7 @@
 
 const {toBN, range} = require('../utils')
 const tss = require('../index')
+const BigNumber = require('bignumber.js')
 
 
 /**
@@ -22,14 +23,15 @@ address = tss.pub2addr(pubKey)
 /**
  * Share private key
  */
-let shares = tss.shareKey(privateKey, t, n)
+let shares = tss.shareKey(privateKey, t, n, [1,6,7,12,20])
+// let shares = tss.shareKey(privateKey, t, n, [1,2,3,4,5])
 
 /**
  * Generate random nonce
  */
 let k = tss.random();
 let kPub = tss.key2pub(k);
-let k_shares = tss.shareKey(k, t, n);
+let k_shares = tss.shareKey(k, t, n, shares.map(s => s.i));
 
 let msg = 'hello tss'
 
@@ -38,20 +40,34 @@ let msg = 'hello tss'
  */
 let sigs = range(0, t).map(i => tss.schnorrSign(shares[i].key, k_shares[i].key, kPub, msg))
 
+console.log(`z share indices: `, shares.map(s => s.i))
+console.log(`k share indices: `, k_shares.map(s => s.i))
+
 /**
  * Aggregate signatures
  */
-let ts = toBN(0)
+let ts = new BigNumber(0)
 range(0, sigs.length).map(j => {
+  // verify step 1
+  // console.log('check verification for ' + tss.pub2addr(shares[j].pub))
+  let SiG = tss.scalarMult(sigs[j].s, tss.curve.g)
+  let Ki_Zie = tss.pointAdd(k_shares[j].pub, tss.scalarMult(sigs[j].e.neg(), shares[j].pub))
+  console.log(`sigs[${j}] verified: ${SiG.serialize() === Ki_Zie.serialize()}`)
+
   let coef = tss.lagrangeCoef(j, t, k_shares);
-  ts = ts.add(sigs[j].s.mul(toBN(coef)))
+  // console.log({coef: coef.toString()})
+  let s = new BigNumber(sigs[j].s.toString())
+  ts = ts.plus(s.multipliedBy(coef))
+  // console.log({coef: coef.toString(), s: sigs[j].s.toString(), ts: ts.toString()})
 })
-ts = ts.umod(tss.curve.n)
+// console.log(`ts: ${ts.integerValue()}`)
+ts = toBN(ts.integerValue().toString(16)).umod(tss.curve.n)
 let sig = {s:ts, e:sigs[0].e}
 
 /**
  * Verify signatures
  */
+console.log('  K: ' + kPub.serialize())
 console.log(`verified: ${tss.schnorrVerify(pubKey, msg, sig)}`)
 
 

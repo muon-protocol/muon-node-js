@@ -7,7 +7,7 @@ class Polynomial {
     if(key0 && !BN.isBN(key0))
       throw {message: "invalid key0 of polynomial"}
     this.curve = curve;
-
+    this.t = t;
     this.coefficients = [key0 ? key0 : curve.random(), ...range(1, t).map(() => curve.random())]
   }
 
@@ -17,7 +17,7 @@ class Polynomial {
     for (let i = 0; i < this.coefficients.length; i++) {
       result.iadd(this.coefficients[i].mul(_x.pow(toBN(i))));
     }
-    return result.umod(this.curve.n)
+    return result;//.umod(this.curve.n)
   }
 }
 
