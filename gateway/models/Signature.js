@@ -5,6 +5,7 @@ var modelSchema = mongoose.Schema({
   request: {type: mongoose.ObjectId, required: true},
   timestamp: {type: Number, required: true},
   owner: {type: String, required: true},
+  pubKey: {type: String},
   data: {type: Object},
   signature: {type: String, required: true},
   memWriteSignature: {type: String},
