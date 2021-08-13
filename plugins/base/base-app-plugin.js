@@ -99,7 +99,7 @@ class BaseAppPlugin extends BasePlugin {
     })
 
     if(this.onArrive){
-      await this.onArrive(clone(newRequest));
+      newRequest.data.init = await this.onArrive(clone(newRequest));
     }
 
     let result = await this.onRequest(clone(newRequest))
