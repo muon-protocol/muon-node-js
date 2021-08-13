@@ -4,6 +4,7 @@ const fs = require('fs');
 const {dynamicExtend} = require('./core/utils')
 const BaseApp = require('./plugins/base/base-app-plugin')
 const BaseService = require('./plugins/base/base-service-plugin')
+const BaseTssApp = require('./plugins/base/base-tss-app-plugin')
 const Gateway = require('./gateway/index')
 require('./core/global')
 
@@ -25,6 +26,13 @@ function getEnvPlugins(){
   }, {})
 }
 
+function getAppParent(app) {
+  if(app.useTss){
+    return BaseTssApp;
+  }
+  return app.isService ? BaseService : BaseApp
+}
+
 function getCustomApps() {
   let pluginsStr = process.env['MUON_CUSTOM_APPS']
   if (!pluginsStr)
@@ -43,7 +51,7 @@ function getCustomApps() {
     if (!!app.APP_NAME) {
       return {
         ...res,
-        [key]: [dynamicExtend(app.isService ? BaseService : BaseApp, app), {}]
+        [key]: [dynamicExtend(getAppParent(app), app), {}]
       }
     }
     else {
@@ -65,7 +73,7 @@ function getGeneralApps(){
         if(ext.toLowerCase() === 'js'){
           let app = require(`./apps/general/${file}`)
           if(!!app.APP_NAME) {
-            result[app.APP_NAME] = [dynamicExtend(app.isService ? BaseService : BaseApp, app), {}]
+            result[app.APP_NAME] = [dynamicExtend(getAppParent(app), app), {}]
           }
         }
       });
