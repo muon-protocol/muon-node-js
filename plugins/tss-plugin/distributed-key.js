@@ -1,6 +1,8 @@
 const Polynomial = require('../../utils/tss/polynomial')
-const {curve, lagrangeCoef} = require('../../utils/tss/index')
-const {toBN} = require('../../utils/tss/utils')
+const Point = require('../../utils/tss/point')
+const {curve, pointAdd, calcPolyPoint, shareKey} = require('../../utils/tss/index')
+const {toBN, range} = require('../../utils/tss/utils')
+const assert = require('assert')
 
 const random = () => Math.floor(Math.random()*9999999)
 
@@ -24,21 +26,14 @@ class DistributedKey {
   sharedKey = new WrappedPromise()
 
   constructor(party, id){
-    let knownKey = toBN(process.env.SIGN_WALLET_PRIVATE_KEY)
-
     this.id = id || `K${Date.now()}${random()}`
     this.party = party;
-    this.f_x = new Polynomial(party.t, curve, knownKey);
-    this.h_x = new Polynomial(party.t, curve, knownKey);
+    this.f_x = new Polynomial(party.t, curve);
+    this.h_x = new Polynomial(party.t, curve);
   }
 
   setFH(fromIndex, f, h){
     this.keyParts[fromIndex] = {f, h}
-    // if(this.isKeyDistributed()){
-    //   let fh = this.getTotalFH()
-    //   this.sharedKey.resolve(fh)
-    // }
-
   }
 
   getFH(toIndex){
@@ -48,8 +43,8 @@ class DistributedKey {
     }
   }
 
-  setPubKeyPortion(fromIndex, A0){
-    this.pubKeyParts[fromIndex] = A0
+  setParticipantPubKeys(fromIndex, A_ik){
+    this.pubKeyParts[fromIndex] = A_ik.map(A => Point.deserialize(A))
     if(this.isPubKeyDistributed()){
       let fh = this.getTotalFH()
       this.sharedKey.resolve(fh)
@@ -61,29 +56,34 @@ class DistributedKey {
     let f = toBN(0)
     let h = toBN(0)
     for(const [i, {f: _f, h: _h}] of Object.entries(this.keyParts)){
-      // console.log(`f from parties[${i}]: ${_f}`)
-      // console.log(`h from parties[${i}]: ${_h}`)
       f.iadd(toBN(_f))
       h.iadd(toBN(_h))
     }
-    // console.log(`==== count ${Object.keys(this.keyParts).length} ====`)
-    // console.log(`total f: ${f.toString(16)}`)
-    // console.log(`total h: ${h.toString(16)}`)
-    return {f, h}
+    return {f:f.umod(curve.n), h: h.umod(curve.n)}
+  }
+
+  /**
+   * Returns public key of participant with id of [idx]
+   * public key calculated from public key of shared polynomials coefficients.
+   * @param idx
+   * @returns {[string, any]}
+   */
+  getPubKey(idx){
+    return Object.entries(this.pubKeyParts)
+      // .filter(([i, A_ik]) => parseInt(i) !== idx)
+      .reduce((acc, [i, A_ik]) => {
+        return pointAdd(acc, calcPolyPoint(idx, A_ik))
+      }, null)
   }
 
   getTotalPubKey(){
+    assert(Object.keys(this.pubKeyParts).length >= this.party.t)
     // calculate shared key
-    let x = toBN(0)
-    let y = toBN(0)
-    let list = Object.keys(this.pubKeyParts).map(i => ({i: parseInt(i)}))
-    for(const [i, {x: _x, y: _y}] of Object.entries(this.pubKeyParts)){
-      // TODO
-      // let w = toBN(lagrangeCoef(parseInt(i), this.party.t, list))
-      // x.iadd(w.mul(toBN(_x)))
-      // y.iadd(w.mul(toBN(_y)))
+    let totalPubKey = null
+    for(const [i, A_ik] of Object.entries(this.pubKeyParts)){
+      totalPubKey = pointAdd(totalPubKey, A_ik[0])
     }
-    return {x, y}
+    return totalPubKey
   }
 
   isKeyDistributed(){
@@ -94,8 +94,8 @@ class DistributedKey {
 
   isPubKeyDistributed(){
     let {pubKeyParts, party: {t, partners}} = this
-    // All nodes (except current node) must share their part of shared key.
-    return Object.keys(pubKeyParts).length >= Object.keys(partners).length-1;
+    // All nodes must share their part of shared key.
+    return Object.keys(pubKeyParts).length >= Object.keys(partners).length;
   }
 
   getSharedKey(){

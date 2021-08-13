@@ -118,6 +118,12 @@ class TssPlugin extends BasePlugin {
   async broadcastKey(key){
     let walletIndexes = this.muon.getNodesWalletIndex();
     let {party} = key;
+
+    // set key self FH
+    let selfWalletIndex = walletIndexes[process.env.SIGN_WALLET_ADDRESS]
+    let selfFH = key.getFH(selfWalletIndex)
+    key.setFH(selfWalletIndex, selfFH.f, selfFH.h);
+
     await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
       if(wallet === process.env.SIGN_WALLET_ADDRESS)
         return Promise.resolve(true);
@@ -141,10 +147,14 @@ class TssPlugin extends BasePlugin {
     // check either already distributed or not
     if(key.pubKeyDistributed)
       return;
+
     key.pubKeyDistributed = true;
 
-    let a0 = key.getFH(0).f;
-    let A0 = tss.key2pub(a0);
+    // Public key of f polynomial coefficients.
+    let A_ik = key.f_x.coefficients.map(a_k => tss.key2pub(a_k).serialize())
+    // console.log({A_ik})
+    let fromIndex = this.muon.getNodesWalletIndex()[process.env.SIGN_WALLET_ADDRESS]
+    key.setParticipantPubKeys(fromIndex, A_ik)
 
     let {party} = key;
     await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
@@ -158,10 +168,7 @@ class TssPlugin extends BasePlugin {
           from: process.env.SIGN_WALLET_ADDRESS,
           party: party.id,
           key: key.id,
-          A0: {
-            x: `0x${A0.x.toString(16)}`,
-            y: `0x${A0.y.toString(16)}`
-          },
+          pubKeys: A_ik
         }
       )
     }))
@@ -173,11 +180,18 @@ class TssPlugin extends BasePlugin {
     return Promise.all(peerIds.map(peerId => this.findPeer(peerId)))
   }
 
+  getParty(id){
+    return this.parties[id];
+  }
+
+  getSharedKey(id){
+    return this.keys[id];
+  }
+
   async hash(msg, party){
   }
 
-  async sign(hash, party){
-    let nonce = await this.keyGen(party)
+  async sign(hash, party, nonce){
     console.log({
       ...nonce,
       keyPart: nonce.keyPart.toString(),
@@ -299,7 +313,7 @@ class TssPlugin extends BasePlugin {
   async __distributePubKey(data={}){
     // console.log('__distributePubKey', data)
     let {parties, keys} = this
-    let {from, party, key, A0} = data
+    let {from, party, key, pubKeys} = data
     if(!parties[party]) {
       throw {message: 'party not found'}
     }
@@ -307,7 +321,7 @@ class TssPlugin extends BasePlugin {
       throw {message: 'distributed key not found'}
     }
     let fromIndex = this.muon.getNodesWalletIndex()[from]
-    keys[key].setPubKeyPortion(fromIndex, A0)
+    keys[key].setParticipantPubKeys(fromIndex, pubKeys)
   }
 }
 
