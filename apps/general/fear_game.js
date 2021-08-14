@@ -1,6 +1,8 @@
 const { axios, soliditySha3 } = MuonAppUtils
 
-async function getMilestoneReached(signature, milestoneId, address, time) {
+const APP_ID = 10
+
+async function getMilestoneReached(signature, milestoneId, address, time, tag) {
   const result = await axios.get(
     'https://api.fearnft.games/api/MilestoneReached',
     {
@@ -8,7 +10,8 @@ async function getMilestoneReached(signature, milestoneId, address, time) {
         signature,
         milestoneId,
         address,
-        time
+        time,
+        tag
       }
     }
   )
@@ -27,28 +30,32 @@ module.exports = {
     } = request
     switch (method) {
       case 'claim':
-        let { address, milestoneId, signature, time } = params
-
+        let { address, milestoneId, signature, time, tag } = params
         if (!milestoneId) throw { message: 'Invalid milestone Id' }
         if (!time) throw { message: 'invalid claim time' }
         if (!address) throw { message: 'Invalid sender address' }
         if (!signature) throw { message: 'Request signature undefined' }
+        if (!tag) throw { message: 'Invalid tag' }
 
         let result = await getMilestoneReached(
           signature,
           milestoneId,
           address,
-          time
+          time,
+          tag
         )
+
         if (!result.reached) {
           throw { message: 'address not allowed for claim' }
         }
 
         return {
+          appId: APP_ID,
           signature,
           time,
           address,
-          milestoneId
+          milestoneId,
+          tag
         }
 
       default:
@@ -60,12 +67,14 @@ module.exports = {
     let { method } = request
     switch (method) {
       case 'claim':
-        let { address, milestoneId, signature } = result
+        let { address, milestoneId, signature, tag } = result
         return soliditySha3([
+          { type: 'uint256', value: APP_ID },
           { type: 'string', value: signature },
           { type: 'uint256', value: request.data.result.time },
           { type: 'address', value: address },
-          { type: 'uint256', value: milestoneId }
+          { type: 'uint256', value: milestoneId },
+          { type: 'string', value: tag }
         ])
 
       default:
