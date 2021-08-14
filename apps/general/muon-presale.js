@@ -42,6 +42,7 @@ const bscNetWork = 'bsc'
 const xdaiNetwork = 'xdai'
 const xDaiChainId = 100
 const bscChainId = 56
+const ethChainId = 1
 
 const DEPOSIT_LOCK = 'muon-deposit-lock'
 
@@ -177,8 +178,20 @@ module.exports = {
         ethPurchase = new BN(ethPurchase)
         bscPurchase = new BN(bscPurchase)
         xdaiPurchase = new BN(xdaiPurchase)
-        let sum = ethPurchase.add(bscPurchase)
-        sum = sum.add(xdaiPurchase)
+        let sum
+        switch (chainId) {
+          case ethChainId:
+            sum = bscPurchase.add(xdaiPurchase)
+            break
+          case bscChainId:
+            sum = ethPurchase.add(xdaiPurchase)
+            break
+          case xDaiChainId:
+            sum = bscPurchase.add(ethPurchase)
+            break
+          default:
+            break
+        }
         let finalMaxCap = maxCap.sub(sum)
         finalMaxCap = finalMaxCap.toString()
         const data =
