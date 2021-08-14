@@ -20,7 +20,7 @@ address = tss.pub2addr(pubKey)
 /**
  * Share private key
  */
-let shares = tss.shareKey(privateKey, t, n)
+let shares = tss.shareKey(privateKey, t, n, range(1, n+1))
 let msg = 'hello tss'
 
 for(let loop=0 ; loop<200 ; loop++) {
@@ -29,7 +29,7 @@ for(let loop=0 ; loop<200 ; loop++) {
    */
   let k = tss.random();
   let kPub = tss.key2pub(k);
-  let k_shares = tss.shareKey(k, t, n);
+  let k_shares = tss.shareKey(k, t, n, shares.map(s => s.i));
 
   /**
    * Sign message
@@ -38,13 +38,7 @@ for(let loop=0 ; loop<200 ; loop++) {
   /**
    * Aggregate signatures
    */
-  let ts = toBN(0)
-  range(0, sigs.length).map(j => {
-    let coef = tss.lagrangeCoef(j, t, k_shares);
-    ts = ts.add(sigs[j].s.mul(toBN(coef)))
-  })
-  ts = ts.umod(tss.curve.n)
-  let sig = {s:ts, e:sigs[0].e}
+  let sig = tss.schnorrAggregateSigs(t, sigs, k_shares.map(s => s.i))
   /**
    * Verify signatures
    */

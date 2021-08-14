@@ -18,6 +18,7 @@ global.MuonAppUtils = {
   ws,
   timeout,
   BN: Web3.utils.BN,
+  toBN: Web3.utils.toBN,
   ethRead,
   ethCall,
   toBaseUnit,
