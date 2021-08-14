@@ -93,7 +93,6 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let {nonce: nonceId} = newRequest.data.init;
     let nonce = this.getTssPlugin().getSharedKey(nonceId);
     let K = nonce.getTotalPubKey();
-    console.log({K: K.serialize()})
     let tssSign = null
 
     while (!confirmed && secondsToCheck < 5) {
