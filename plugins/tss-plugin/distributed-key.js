@@ -1,6 +1,6 @@
 const Polynomial = require('../../utils/tss/polynomial')
 const Point = require('../../utils/tss/point')
-const {curve, pointAdd, calcPolyPoint, shareKey} = require('../../utils/tss/index')
+const tss = require('../../utils/tss/index')
 const {toBN, range} = require('../../utils/tss/utils')
 const assert = require('assert')
 
@@ -19,21 +19,30 @@ class DistributedKey {
   party = null;
   f_x = null
   h_x = null;
+  // pedersen commitment
+  commitment = null
 
   keyParts = {};
   pubKeyParts = {};
+  commitmentParts = {};
   pubKeyDistributed = false;
   sharedKey = new WrappedPromise()
 
   constructor(party, id){
     this.id = id || `K${Date.now()}${random()}`
     this.party = party;
-    this.f_x = new Polynomial(party.t, curve);
-    this.h_x = new Polynomial(party.t, curve);
+    this.f_x = new Polynomial(party.t, tss.curve);
+    this.h_x = new Polynomial(party.t, tss.curve);
+    // pedersen commitment
+    this.commitment = this.f_x.coefficients.map((a, i) => {
+      let A = tss.scalarMult(a, tss.curve.g)
+      let H = tss.scalarMult(this.h_x.coefficients[i], tss.H)
+      return tss.pointAdd(A, H)
+    })
   }
 
   setFH(fromIndex, f, h){
-    this.keyParts[fromIndex] = {f, h}
+    this.keyParts[fromIndex] = {f:toBN(f), h: toBN(h)}
   }
 
   getFH(toIndex){
@@ -41,6 +50,10 @@ class DistributedKey {
       f: this.f_x.calc(toIndex),
       h: this.h_x.calc(toIndex),
     }
+  }
+
+  setParticipantCommitment(fromIndex, commitment){
+    this.commitmentParts[fromIndex] = commitment.map(c => Point.deserialize(c))
   }
 
   setParticipantPubKeys(fromIndex, A_ik){
@@ -51,6 +64,18 @@ class DistributedKey {
     }
   }
 
+  verifyCommitment(index){
+    let Cc = this.commitmentParts[index]
+    let p1 = tss.calcPolyPoint(index, Cc)
+    let {f, h} = this.keyParts[index]
+    const mul = tss.scalarMult, G=tss.curve.g, H=tss.H;
+    let p2 = tss.pointAdd(mul(f, G), mul(h,H));
+    console.log({
+      p1: p1.serialize(),
+      p2: p2.serialize(),
+    })
+  }
+
   getTotalFH(){
     // calculate shared key
     let f = toBN(0)
@@ -59,7 +84,7 @@ class DistributedKey {
       f.iadd(toBN(_f))
       h.iadd(toBN(_h))
     }
-    return {f:f.umod(curve.n), h: h.umod(curve.n)}
+    return {f:f.umod(tss.curve.n), h: h.umod(tss.curve.n)}
   }
 
   /**
@@ -72,7 +97,7 @@ class DistributedKey {
     return Object.entries(this.pubKeyParts)
       // .filter(([i, A_ik]) => parseInt(i) !== idx)
       .reduce((acc, [i, A_ik]) => {
-        return pointAdd(acc, calcPolyPoint(idx, A_ik))
+        return tss.pointAdd(acc, tss.calcPolyPoint(idx, A_ik))
       }, null)
   }
 
@@ -81,7 +106,7 @@ class DistributedKey {
     // calculate shared key
     let totalPubKey = null
     for(const [i, A_ik] of Object.entries(this.pubKeyParts)){
-      totalPubKey = pointAdd(totalPubKey, A_ik[0])
+      totalPubKey = tss.pointAdd(totalPubKey, A_ik[0])
     }
     return totalPubKey
   }

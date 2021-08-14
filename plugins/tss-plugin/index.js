@@ -106,6 +106,9 @@ class TssPlugin extends BasePlugin {
     await this.broadcastKey(key)
     // 4- calculate distributed key part
     let sharedKey = await key.getSharedKey()
+    // 5- verify commitment
+    key.verifyCommitment(2);
+
     return {
       id: key.id,
       keyPart: sharedKey.f,
@@ -136,6 +139,7 @@ class TssPlugin extends BasePlugin {
           from: process.env.SIGN_WALLET_ADDRESS,
           party: party.id,
           key: key.id,
+          commitment: key.commitment.map(c => c.serialize()),
           walletIndex,
           ... key.getFH(walletIndex),
         }
@@ -294,7 +298,7 @@ class TssPlugin extends BasePlugin {
   async __distributeKey(data={}){
     // console.log('__distributeKey', data)
     let {parties, keys} = this
-    let {from, party, key, f, h} = data
+    let {from, commitment, party, key, f, h} = data
     if(!parties[party]) {
       throw {message: 'party not found'}
     }
@@ -304,6 +308,7 @@ class TssPlugin extends BasePlugin {
     }
     let fromIndex = this.muon.getNodesWalletIndex()[from]
     keys[key].setFH(fromIndex, f, h)
+    keys[key].setParticipantCommitment(fromIndex, commitment)
 
     if(keys[key].isKeyDistributed()){
       this.broadcastPubKey(keys[key])
