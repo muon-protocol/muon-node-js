@@ -51,11 +51,8 @@ module.exports = {
 
         return {
           appId: APP_ID,
-          signature,
-          time,
           address,
-          milestoneId,
-          tag
+          milestoneId
         }
 
       default:
@@ -67,14 +64,11 @@ module.exports = {
     let { method } = request
     switch (method) {
       case 'claim':
-        let { address, milestoneId, signature, tag } = result
+        let { address, milestoneId } = result
         return soliditySha3([
           { type: 'uint256', value: APP_ID },
-          { type: 'string', value: signature },
-          { type: 'uint256', value: request.data.result.time },
           { type: 'address', value: address },
-          { type: 'uint256', value: milestoneId },
-          { type: 'string', value: tag }
+          { type: 'uint256', value: milestoneId }
         ])
 
       default:
