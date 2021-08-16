@@ -286,7 +286,6 @@ class TssPlugin extends BasePlugin {
   }
 
   async __setPartners(data={}){
-    // console.log('__setPartners', data)
     let {id, t, partners} = data;
     if(!this.parties[id])
       this.parties[id] = new Party(t, id)
@@ -295,10 +294,6 @@ class TssPlugin extends BasePlugin {
     })
     let peers = await this.getPartyPeers(this.parties[id])
     this.parties[id].setPeers(peers)
-    console.log('__setPartners: partner length is ', this.parties[id].size())
-    // return 1
-    // let {id} = data
-    // this.parties[id].addPartner(data)
   }
 
   async __distributeKey(data={}){

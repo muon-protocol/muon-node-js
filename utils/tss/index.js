@@ -189,10 +189,6 @@ function calcPolyPoint(x, polynomial) {
 }
 
 function random() {
-  // let byteSize = curve.n.byteLength()
-  // let rand = randomHex(byteSize)
-  // return toBN(rand).umod(curve.n).div(toBN(0xffff));
-  // return toBN(rand).umod(curve.n).div(toBN('0xfffffffffffffffffffffffffffffffffffffffffffff'));
   return curve.random();
 }
 
@@ -220,15 +216,6 @@ function shareKey(privateKey, t, n, indices, polynomial) {
     })
   }
 }
-
-// function lagrangeCoef(j, t, shares) {
-//   let prod = arr => arr.reduce((acc, current) => (current * acc), 1);
-//   let arr = range(0, t).map(k => {
-//     return j === k ? 1 : (-shares[k].i / (shares[j].i - shares[k].i))
-//   });
-//   return prod(arr);
-// }
-
 
 // function lagrangeCoef(j, t, shares) {
 //   // slower but less division rounding error propagation
@@ -265,16 +252,6 @@ function reconstructKey(shares, t) {
   }
   sum = toBN('0x'+sum.integerValue().toString(16))
   return sum.umod(curve.n);
-}
-
-function reconstructPubKey(shares, t) {
-  assert(shares.length >= t);
-  let pub = null<
-  range(0, t).map(j => {
-    let coef = toBN(lagrangeCoef(j, t, shares));
-    pub = pointAdd(pub, scalarMult(coef, shares[j].pub))
-  })
-  return pub;
 }
 
 function key2pub(privateKey) {
@@ -362,7 +339,6 @@ module.exports = {
   shareKey,
   lagrangeCoef,
   reconstructKey,
-  reconstructPubKey,
   toBN,
   key2pub,
   pub2addr,

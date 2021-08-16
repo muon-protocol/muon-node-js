@@ -12,10 +12,14 @@ class Curve {
     this.h = BN.isBN(h) ? b : toBN(h);
   }
 
-  random(){
-    let byteSize = this.n.byteLength()
-    let rand = randomHex(byteSize)
-    return toBN(rand).umod(this.n).div(toBN('0xffff'));
+  random(exact){
+    let byteSize = this.n.byteLength();
+    let rand = randomHex(byteSize);
+    let num = toBN(rand).umod(this.n);
+    if(exact)
+      return num;
+    else
+      return num.div(toBN('0xffff'));
   }
 }
 

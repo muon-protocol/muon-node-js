@@ -17,7 +17,7 @@ class Polynomial {
     for (let i = 0; i < this.coefficients.length; i++) {
       result.iadd(this.coefficients[i].mul(_x.pow(toBN(i))));
     }
-    return result;//.umod(this.curve.n)
+    return result.umod(this.curve.n)
   }
 }
 
