@@ -214,7 +214,7 @@ class TssPlugin extends BasePlugin {
   }
 
   async handleBroadcastMessage(msg){
-    // console.log(msg);
+    console.log('tss-plugin.handleBroadcastMessage', msg);
     switch (msg.type) {
       case MSG_TYPE_JOIN_PARTY_REQ: {
         let peer = await this.findPeer(msg.peerId)
