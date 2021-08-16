@@ -23,11 +23,21 @@ const ECPoint = require('../utils/tss/point')
 //   '0x11C57ECa88e4A40b7B041EF48a66B9a0EF36b830': 10
 // }
 const MUON_WALLETS_INDEX = {
-  '0x56306C726cDBE693edA670b22610E1a6222957F0': 1,
-  '0x3FB03F24456B01E2C71b991A090CCe9bF64AF2B1': 2,
-  '0x9e2faF5BF5A96A75e0b3A8A3AbbD3b9B5E12e800': 3,
-  '0x475Ff8a8E9D37441D2c32B9C66991599D063Af77': 4,
-  '0xC522a53131B8Bfd15F9F8A9bA25E00655671C592': 5,
+  '0xe555c91C8c95ff6e5738D40db8D2A6eA3031b36c': 1,
+  '0x2182d2A71e9A017FdcbC6a4cc02b4a1B7DDc3142': 2,
+  '0x6021E9CE15ecECbB39c8E67480Cc16e58Baa58fB': 3,
+  '0x173D314e660fbbd6CA667E3091e5c486293c9AEA': 4,
+  '0x9AFB3A216161cf64D5be15417f7D6175d63882c2': 5,
+  '0xAFD18A22bC17493c44e7DdD197284D8ff719E19e': 6,
+  '0x41ad356598211ce70903062213c1E28EA4B9FD6f': 7,
+  '0x7c3A084D74425305Ccb4296be35028F41DB1f738': 8,
+  '0xc2b9Fb60af2c3826152B258C6055a5DF32300c18': 9,
+  '0xb60AF009C6b71f73f4d3F324bd3D84689019F2E2': 10,
+  '0xB19c651ea5c4E4E1D7da798efA2Cc68B711daF56': 11,
+  '0xEBC2F3F4AF867E2d0bfB1893A7911FEccfbe599d': 12,
+  '0x37c098B92Cc6c4f2A636FAFA95c35D9D110cac3D': 13,
+  '0x5b1D8358Dd2C15A40A1Da0144fba0d8D1bef6354': 14,
+  '0xdc21D3BF547Fe6f2514e54Ae4cE4Bf6204339cE8': 15,
 }
 
 class Muon extends Events {
@@ -36,10 +46,10 @@ class Muon extends Events {
   libp2p = null
   _plugins = {}
   sharedWalletPubKey = new ECPoint(
-    '0x26da8d7976d5559e6a298962c325044c16a9a25a89bfa0032950fe4685ec48a8',
-    '0x69e142a7c4bdb5ebfcee08ad89ce4d8f5f69080e1e00067d3189d1c57ec49141'
+    '0xd2a77c9664a807945590d4c98fbefe89951b27fc620f9e3e0047f49c7bf1587d',
+    '0x212a3eca5d7145b30469d9ae24c2e9291e86f71962d08bcc823460506d988ce0'
   );
-  sharedWalletAddress = '0x8e8C5DfF0c4386b0d91320dfD8d446fD2Ba9b403'
+  sharedWalletAddress = '0x8f720928474f259FaB29c2D6d871cA0ae1A620eE'
 
   constructor(configs) {
     super()
@@ -115,6 +125,10 @@ class Muon extends Events {
   }
 
   async start() {
+    console.log(
+      emoji.get('moon'),
+      chalk.green(` peer [${process.env.PEER_ID}] starting ...`)
+    )
     await this.libp2p.start()
 
     console.log(
