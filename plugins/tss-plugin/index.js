@@ -76,7 +76,7 @@ class TssPlugin extends BasePlugin {
 
       await partyFullFilled;
       if(!party.isFullFilled()){
-        throw {message: 'Party not full filled after 5 seconds.'}
+        throw {message: `Need to ${party.t} partners, but ${Object.keys(party.partners).length} partner joined after 5 seconds.`}
       }
 
       // let partners = Object.values(party.partners).filter(({peerId}) => peerId != process.env.PEER_ID)
