@@ -96,6 +96,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let K = nonce.getTotalPubKey();
     let tssSign = null
     let masterWalletPubKey = this.muon.getSharedWalletPubKey()
+    let signersIndices;
 
     while (!confirmed && secondsToCheck < 5) {
       await timeout(250)
@@ -115,8 +116,8 @@ class BaseTssAppPlugin extends BaseAppPlugin {
           let [s, e] = signature.split(',').map(toBN)
           return {s, e};
         })
-        let indices = owners.map(w => this.muon.getNodesWalletIndex()[w])
-        tssSign = tss.schnorrAggregateSigs(2, schnorrSigns, indices)
+        signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
+        tssSign = tss.schnorrAggregateSigs(2, schnorrSigns, signersIndices)
         let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
 
         // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
@@ -130,6 +131,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
       confirmed,
       confirmed ? [{
           owner: tss.pub2addr(masterWalletPubKey),
+          signers: signersIndices,
           timestamp: getTimestamp(),
           result: newRequest.data.result,
           signature: `0x${tssSign.s.toString(16)},0x${tssSign.e.toString(16)}`,
