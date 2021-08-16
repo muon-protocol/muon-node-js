@@ -5,10 +5,6 @@ const tss = require('../../utils/tss');
 const {toBN} = require('../../utils/tss/utils')
 const Point = require('../../utils/tss/point')
 
-const MASTER_PUB_KEY = new Point(
-  '0x26da8d7976d5559e6a298962c325044c16a9a25a89bfa0032950fe4685ec48a8',
-  '0x69e142a7c4bdb5ebfcee08ad89ce4d8f5f69080e1e00067d3189d1c57ec49141'
-)
 
 class BaseTssAppPlugin extends BaseAppPlugin {
 
@@ -64,8 +60,13 @@ class BaseTssAppPlugin extends BaseAppPlugin {
 
     let {owner, pubKey} = sign;
     pubKey = Point.deserialize(pubKey);
-    if(owner !== tss.pub2addr(pubKey))
+    if(owner !== tss.pub2addr(pubKey)) {
+      console.log({
+        owner,
+        pubKey: pubKey.serialize(),
+      })
       throw {message: 'Sign recovery error: invalid pubKey address'}
+    }
 
     let [s, e] = sign.signature.split(',').map(toBN)
     // let sig = {s, e}
@@ -94,6 +95,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let nonce = this.getTssPlugin().getSharedKey(nonceId);
     let K = nonce.getTotalPubKey();
     let tssSign = null
+    let masterWalletPubKey = this.muon.getSharedWalletPubKey()
 
     while (!confirmed && secondsToCheck < 5) {
       await timeout(250)
@@ -105,7 +107,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
         signers[sig.owner] = sig
       }
 
-      if (Object.keys(signers).length >= newRequest.nSign) {
+      if (Object.keys(signers).length >= 2) {
         let owners = Object.keys(signers)
         allSignatures = owners.map(w => signers[w]);
 
@@ -117,7 +119,9 @@ class BaseTssAppPlugin extends BaseAppPlugin {
         tssSign = tss.schnorrAggregateSigs(2, schnorrSigns, indices)
         let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
 
-        confirmed = tss.schnorrVerify(MASTER_PUB_KEY, resultHash, tssSign)
+        // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
+        confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, tssSign)
+        break;
       }
       secondsToCheck += 0.25
     }
@@ -125,7 +129,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     return [
       confirmed,
       confirmed ? [{
-          owner: tss.pub2addr(MASTER_PUB_KEY),
+          owner: tss.pub2addr(masterWalletPubKey),
           timestamp: getTimestamp(),
           result: newRequest.data.result,
           signature: `0x${tssSign.s.toString(16)},0x${tssSign.e.toString(16)}`,
@@ -140,7 +144,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
 
   async __onRemoteWantSign(request) {
     let [sign, memWrite] = await this.processRemoteRequest(request)
-    console.log('wantSign', request._id, sign)
+    // console.log('wantSign', request._id, sign)
     return { sign, memWrite }
   }
 }

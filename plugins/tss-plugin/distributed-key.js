@@ -70,7 +70,7 @@ class DistributedKey {
     let {f, h} = this.keyParts[index]
     const mul = tss.scalarMult, G=tss.curve.g, H=tss.H;
     let p2 = tss.pointAdd(mul(f, G), mul(h,H));
-    console.log({
+    console.log('DistributedKey.verifyCommitment', {
       p1: p1.serialize(),
       p2: p2.serialize(),
     })

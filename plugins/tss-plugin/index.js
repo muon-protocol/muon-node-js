@@ -106,8 +106,8 @@ class TssPlugin extends BasePlugin {
     await this.broadcastKey(key)
     // 4- calculate distributed key part
     let sharedKey = await key.getSharedKey()
-    // 5- verify commitment
-    key.verifyCommitment(2);
+    // 5- TODO: verify commitment
+    // key.verifyCommitment(2);
 
     return {
       id: key.id,
@@ -276,7 +276,13 @@ class TssPlugin extends BasePlugin {
   async __joinToParty(data={}){
     // console.log('__joinToParty', data)
     let {id, peerId, wallet} = data
-    this.parties[id].addPartner({peerId, wallet})
+    let party = this.parties[id];
+    if(party && !party.isFullFilled()){
+      this.parties[id].addPartner({peerId, wallet})
+    }
+    // else{
+      // console.log(`party ${id} full filled ignoring peer join ${peerId}`)
+    // }
   }
 
   async __setPartners(data={}){
@@ -300,6 +306,7 @@ class TssPlugin extends BasePlugin {
     let {parties, keys} = this
     let {from, commitment, party, key, f, h} = data
     if(!parties[party]) {
+      console.log('TssPlugin.__distributeKey>> party not fount on this node id: '+ party);
       throw {message: 'party not found'}
     }
     if(!keys[key]){
@@ -320,6 +327,7 @@ class TssPlugin extends BasePlugin {
     let {parties, keys} = this
     let {from, party, key, pubKeys} = data
     if(!parties[party]) {
+      console.log('TssPlugin.__distributePubKey>> party not fount on this node id: '+ party);
       throw {message: 'party not found'}
     }
     if(!keys[key]){

@@ -34,6 +34,11 @@ class TssParty {
     })
   }
 
+  isFullFilled(){
+    let {partners, t} = this;
+    return Object.keys(partners).length >= t;
+  }
+
   getPeers(){
     let peersWallet = Object.keys(this.partners).filter(wallet => wallet !== process.env.SIGN_WALLET_ADDRESS)
     return peersWallet.map(w => this.partners[w].peer).filter(p => !!p)

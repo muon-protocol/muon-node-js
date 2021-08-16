@@ -1,8 +1,8 @@
-const {BN, toBN, randomHex, sha3, range} = require('./utils')
+const {BN, toBN, randomHex, sha3, soliditySha3, range} = require('./utils')
 const assert = require('assert')
 const elliptic = require('elliptic');
 const BigNumber = require('bignumber.js')
-BigNumber.set({DECIMAL_PLACES: 100})
+BigNumber.set({DECIMAL_PLACES: 300})
 const Point = require('./point');
 const Curve = require('./curve');
 const ZERO = toBN(0)
@@ -189,29 +189,36 @@ function calcPolyPoint(x, polynomial) {
 }
 
 function random() {
-  // TODO: replace with byteLength
-  let byteSize = curve.n.bitLength() / 8
-  let rand = randomHex(byteSize)
-  return toBN(rand).umod(curve.n);
+  // let byteSize = curve.n.byteLength()
+  // let rand = randomHex(byteSize)
+  // return toBN(rand).umod(curve.n).div(toBN(0xffff));
+  // return toBN(rand).umod(curve.n).div(toBN('0xfffffffffffffffffffffffffffffffffffffffffffff'));
+  return curve.random();
 }
 
-function shareKey(privateKey, t, n, indices) {
+function shareKey(privateKey, t, n, indices, polynomial) {
   if(indices){
     assert(indices.length === n)
   }
   else{
     // uniform distribution of indices
-    // indices = range(1, n + 1)
+    indices = range(1, n + 1)
     // non uniform distribution of indices
-    indices = range(1, n + 1).map(i => i * 10 + Math.floor(Math.random() * 9))
+    // indices = range(1, n + 1).map(i => i * 10 + Math.floor(Math.random() * 9))
   }
-  let poly = [privateKey, ...(range(1, t).map(random))]
-  return indices.map(i => {
-    // TODO: key % n will prevent reconstructing of main key
-    let key = calcPoly(i, poly)//.umod(curve.n)
-    let pub = key2pub(key);
-    return {i, key, pub}
-  })
+  if(polynomial)
+    assert(polynomial.length === t)
+  else
+    polynomial = [privateKey, ...(range(1, t).map(random))]
+  return {
+    polynomial: polynomial,
+    shares: indices.map(i => {
+      // TODO: key % n will prevent reconstructing of main key
+      let key = calcPoly(i, polynomial)//.umod(curve.n)
+      let pub = key2pub(key);
+      return {i, key, pub}
+    })
+  }
 }
 
 // function lagrangeCoef(j, t, shares) {
@@ -256,7 +263,7 @@ function reconstructKey(shares, t) {
     let key = new BigNumber(shares[j].key.toString())
     sum = sum.plus(key.multipliedBy(coef))
   }
-  sum = toBN(sum.integerValue().toString(16))
+  sum = toBN('0x'+sum.integerValue().toString(16))
   return sum.umod(curve.n);
 }
 
@@ -277,10 +284,11 @@ function key2pub(privateKey) {
 
 function pub2addr(publicKey) {
   let {x, y} = publicKey
-  let mix = '0x' + x.shln(y.byteLength() * 8).or(y).toString(16);
-  let pub_hash = sha3(mix)
+  let mix = x.shln(256).or(y)
+  let pub_hash = soliditySha3(mix.toBuffer())
   return toChecksumAddress('0x' + pub_hash.substr(-40));
 }
+
 
 function makeKeyPair() {
   let privateKey = random();
@@ -306,7 +314,7 @@ function toChecksumAddress(address) {
 
 function schnorrHash(publicKey, msg) {
   let {x, y} = publicKey
-  let pubKeyBuff = x.shln(y.byteLength() * 8).or(y).toBuffer();
+  let pubKeyBuff = x.shln(256).or(y).toBuffer();
   let msgBuff = Buffer.from(msg)
   let buffToHash = Buffer.concat([pubKeyBuff, msgBuff])
   return sha3(buffToHash)
@@ -315,28 +323,31 @@ function schnorrHash(publicKey, msg) {
 function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
   let _sharedPrivateKey = BN.isBN(sharedPrivateKey) ? sharedPrivateKey : toBN(sharedPrivateKey);
   let e = toBN(schnorrHash(kPub, msg))
-  let s = sharedK.sub(_sharedPrivateKey.mul(e)).umod(curve.n);
-  // console.log({msg, K: kPub.serialize(), e: `0x${e.toString(16)}`})
+  let s = sharedK.sub(_sharedPrivateKey.mul(e));
   return {s, e}
 }
 
 function schnorrVerify(pubKey, msg, sig) {
   let r_v = pointAdd(scalarMult(sig.s, curve.g), scalarMult(sig.e, pubKey))
   let e_v = schnorrHash(r_v, msg)
-  return toBN(e_v).eq(sig.e);
+  let verified = toBN(e_v).eq(sig.e)
+  // if(!verified){
+  //   console.log(`r_v`, r_v.serialize());
+  // }
+  return verified;
 }
 
 function schnorrAggregateSigs(t, sigs, indices){
   assert(sigs.length >= t);
 
   let ts = new BigNumber(0)
-  range(0, sigs.length).map(j => {
+  range(0, t).map(j => {
     let coef = lagrangeCoef(j, t, indices.map(i => ({i})));
     let s = new BigNumber(sigs[j].s.toString())
     ts = ts.plus(s.multipliedBy(coef))
   })
   // TODO: is "s % n" needed?
-  let s = toBN(ts.integerValue().toString(16)).umod(curve.n)
+  let s = toBN('0x' + ts.integerValue().toString(16)).umod(curve.n)
   let e = sigs[0].e.clone();
   return {s, e}
 }
