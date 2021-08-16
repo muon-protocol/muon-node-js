@@ -91,7 +91,8 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let allSignatures = []
     let signers = {}
 
-    let {nonce: nonceId} = newRequest.data.init;
+    let {party: partyId, nonce: nonceId} = newRequest.data.init;
+    let party = this.getTssPlugin().getParty(partyId);
     let nonce = this.getTssPlugin().getSharedKey(nonceId);
     let K = nonce.getTotalPubKey();
     let tssSign = null
@@ -108,7 +109,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
         signers[sig.owner] = sig
       }
 
-      if (Object.keys(signers).length >= 2) {
+      if (Object.keys(signers).length >= party.t) {
         let owners = Object.keys(signers)
         allSignatures = owners.map(w => signers[w]);
 
@@ -117,7 +118,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
           return {s, e};
         })
         signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
-        tssSign = tss.schnorrAggregateSigs(2, schnorrSigns, signersIndices)
+        tssSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, signersIndices)
         let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
 
         // TODO: check more combination of signatures. some time one combination not verified bot other combination does.

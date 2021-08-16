@@ -45,6 +45,7 @@ class TssPlugin extends BasePlugin {
    * @returns {Promise<TssParty|null>}
    */
   async makeParty(t=2){
+    // TODO: redesign this method
     // let party = await this._makeNewParty(2);
     // const peers = await this.getPartyPeers(party)
     // party.setPeers(peers)
@@ -74,6 +75,9 @@ class TssPlugin extends BasePlugin {
       })
 
       await partyFullFilled;
+      if(!party.isFullFilled()){
+        throw {message: 'Party not full filled after 5 seconds.'}
+      }
 
       // let partners = Object.values(party.partners).filter(({peerId}) => peerId != process.env.PEER_ID)
       // let peers = await Promise.all(partners.map(({peerId}) => this.findPeer(peerId)))

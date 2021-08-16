@@ -5,12 +5,13 @@ module.exports = {
   APP_NAME: 'tss',
   useTss: true,
 
+  // TODO: move this method into the base-tss-app-plugin
   onArrive: async function(request){
     let {method, data: {params}} = request;
     switch (method) {
       case 'test':
         let tssPlugin = this.muon.getPlugin(`__tss-plugin__`)
-        let party = await tssPlugin.makeParty()
+        let party = await tssPlugin.makeParty(8)
         // console.log('party generation done.', party)
         if(!party)
           throw {message: 'party not generated'}
