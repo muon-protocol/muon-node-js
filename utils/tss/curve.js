@@ -13,9 +13,9 @@ class Curve {
   }
 
   random(){
-    let byteSize = this.n.bitLength() / 8
+    let byteSize = this.n.byteLength()
     let rand = randomHex(byteSize)
-    return toBN(rand).umod(this.n);
+    return toBN(rand).umod(this.n).div(toBN('0xffff'));
   }
 }
 
