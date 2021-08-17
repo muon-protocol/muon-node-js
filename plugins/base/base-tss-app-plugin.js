@@ -34,6 +34,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
   }
 
   makeSignature(request, result, resultHash) {
+    let t0 = Date.now()
     let signTimestamp = getTimestamp()
     // let signature = crypto.sign(resultHash)
 
@@ -45,6 +46,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let k_i = nonce.getTotalFH().f
     let K = nonce.getTotalPubKey();
     let signature = tss.schnorrSign(process.env.SIGN_WALLET_PRIVATE_KEY, k_i, K, resultHash)
+    console.log('base-tss-app-plugin.makeSignature', {time: Date.now() - t0})
     return {
       request: request._id,
       owner: process.env.SIGN_WALLET_ADDRESS,
@@ -86,7 +88,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
   }
 
   async isOtherNodesConfirmed(newRequest) {
-    let secondsToCheck = 0
+    let startTime = Date.now()
     let confirmed = false
     let allSignatures = []
     let signers = {}
@@ -99,8 +101,9 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let masterWalletPubKey = this.muon.getSharedWalletPubKey()
     let signersIndices;
 
-    while (!confirmed && secondsToCheck < 5) {
+    while (!confirmed && (Date.now() - startTime) < 15000) {
       await timeout(250)
+      let t0 = Date.now()
       allSignatures = await Signature.find({ request: newRequest._id })
       signers = {}
 
@@ -125,7 +128,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
         confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, tssSign)
         break;
       }
-      secondsToCheck += 0.25
+      console.log('base-tss-app-plugin.isOtherNodeConfirmed iteration time', {time: Date.now()-t0})
     }
 
     return [
@@ -146,6 +149,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
   }
 
   async __onRemoteWantSign(request) {
+    console.log(`__onRemoteWantSign at ${parseInt(Date.now() / 1000)}`)
     let [sign, memWrite] = await this.processRemoteRequest(request)
     // console.log('wantSign', request._id, sign)
     return { sign, memWrite }

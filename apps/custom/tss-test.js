@@ -10,13 +10,22 @@ module.exports = {
     let {method, data: {params}} = request;
     switch (method) {
       case 'test':
+        let t1 = Date.now()
         let tssPlugin = this.muon.getPlugin(`__tss-plugin__`)
         let party = await tssPlugin.makeParty(8)
+        let t2 = Date.now()
         // console.log('party generation done.', party)
         if(!party)
           throw {message: 'party not generated'}
 
         let nonce = await tssPlugin.keyGen(party)
+
+        let now = Date.now();
+        console.log('nonce key generation', {
+          partyTime: t2-t1,
+          keyTime: now - t2,
+          total: now-t1
+        })
 
         // let sign = tssPlugin.sign(null, party);
         return {party: party.id, nonce: nonce.id}

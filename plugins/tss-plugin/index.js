@@ -103,15 +103,25 @@ class TssPlugin extends BasePlugin {
   }
 
   async keyGen(party){
+    let t0 = Date.now()
     // 1- create new key
     let key = new DKey(party)
     this.keys[key.id] = key;
+    let t1 = Date.now()
     // 2- distribute key initialization
     await this.broadcastKey(key)
+    let t2 = Date.now()
     // 4- calculate distributed key part
     let sharedKey = await key.getSharedKey()
+    let t3 = Date.now()
     // 5- TODO: verify commitment
     // key.verifyCommitment(2);
+    console.log('keyGen inner times', {
+      t1: t1 - t0,
+      t2: t2 - t1,
+      t3: t3 - t2,
+      total: t3 - t0,
+    })
 
     return {
       id: key.id,

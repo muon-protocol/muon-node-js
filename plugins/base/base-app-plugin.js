@@ -82,6 +82,7 @@ class BaseAppPlugin extends BasePlugin {
   }
 
   async __onRequestArrived(method, params, nSign) {
+    let t0 = Date.now()
     let startedAt = getTimestamp()
     nSign = !!nSign
       ? parseInt(nSign)
@@ -97,13 +98,16 @@ class BaseAppPlugin extends BasePlugin {
       },
       startedAt
     })
+    let t1= Date.now()
 
     if(this.onArrive){
       newRequest.data.init = await this.onArrive(clone(newRequest));
     }
+    let t2 = Date.now()
 
     let result = await this.onRequest(clone(newRequest))
     newRequest.data.result = result
+    let t3 = Date.now()
 
     let resultHash = this.hashRequestResult(newRequest, result)
     let memWrite = this.getMemWrite(newRequest, result)
@@ -120,8 +124,19 @@ class BaseAppPlugin extends BasePlugin {
     new Signature(sign).save()
 
     this.broadcastNewRequest(newRequest)
+    let t4 = Date.now()
 
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
+    let t5 = Date.now()
+
+    console.log('base-app-plugin.__onRequestArrived',{
+      t1: t1-t0,
+      t2: t2-t1,
+      t3: t3-t2,
+      t4: t4-t3,
+      t5: t5-t4,
+      '*': t5-t0
+    })
 
     if (confirmed) {
       newRequest['confirmedAt'] = getTimestamp()
