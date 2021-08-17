@@ -20,7 +20,7 @@ class DistributedKey {
   f_x = null
   h_x = null;
   // pedersen commitment
-  commitment = null
+  commitment = []
 
   keyParts = {};
   pubKeyParts = {};
@@ -34,11 +34,11 @@ class DistributedKey {
     this.f_x = new Polynomial(party.t, tss.curve);
     this.h_x = new Polynomial(party.t, tss.curve);
     // pedersen commitment
-    this.commitment = this.f_x.coefficients.map((a, i) => {
-      let A = tss.scalarMult(a, tss.curve.g)
-      let H = tss.scalarMult(this.h_x.coefficients[i], tss.H)
-      return tss.pointAdd(A, H)
-    })
+    // this.commitment = this.f_x.coefficients.map((a, i) => {
+    //   let A = tss.scalarMult(a, tss.curve.g)
+    //   let H = tss.scalarMult(this.h_x.coefficients[i], tss.H)
+    //   return tss.pointAdd(A, H)
+    // })
   }
 
   setFH(fromIndex, f, h){
