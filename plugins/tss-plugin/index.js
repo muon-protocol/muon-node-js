@@ -69,7 +69,7 @@ class TssPlugin extends BasePlugin {
             return resolve(party)
           if (Date.now() - partyStartTime > 5000)
             return resolve(null)
-          setTimeout(check, 500);
+          setTimeout(check, 50);
         }
         setTimeout(check, 50)
       })

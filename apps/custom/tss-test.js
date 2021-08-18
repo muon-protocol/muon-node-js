@@ -5,6 +5,8 @@ module.exports = {
   APP_NAME: 'tss',
   useTss: true,
 
+  getNSign: () => 8,
+
   // TODO: move this method into the base-tss-app-plugin
   onArrive: async function(request){
     let {method, data: {params}} = request;

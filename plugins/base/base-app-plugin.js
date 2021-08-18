@@ -11,8 +11,67 @@ const { omit } = require('lodash')
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
+function WrappedPromise() {
+  var self = this;
+  this.promise = new Promise(function(resolve, reject) {
+    self.reject = reject
+    self.resolve = resolve
+  })
+}
+
+class RequestManager{
+  requests = {}
+  signatures = {}
+  promises = {};
+
+  constructor(){
+  }
+
+  addRequest(req){
+    this.requests[req._id] = req;
+  }
+
+  getRequest(_id){
+    return this.requests[_id]
+  }
+
+  addSignature(reqId, owner, sign){
+    if(this.signatures[reqId] === undefined)
+      this.signatures[reqId] = {}
+    if(this.signatures[reqId][owner] === undefined){
+      this.signatures[reqId][owner] = sign
+      if(this.isRequestFullFilled(reqId)){
+        if(this.promises[reqId])
+          this.promises[reqId].resolve(this.signatures[reqId])
+      }
+    }
+  }
+
+  isRequestFullFilled(_id){
+    let req = this.requests[_id]
+    let sigs = this.signatures[_id]
+    return !!sigs && Object.keys(sigs).length >= req.nSign;
+  }
+
+  onRequestSignFullFilled(_id){
+    if(!this.requests[_id])
+      return Promise.reject({message: "RequestManager: request not added to RequestManager"})
+    let req = this.requests[_id]
+    let sigs = this.signatures[_id]
+    if(sigs && Object.keys(sigs).length >= req.nSign){
+      return Promise.resolve(sigs)
+    }
+    else{
+      if(this.promises[_id] === undefined)
+        this.promises[_id] = new WrappedPromise();
+      return this.promises[_id].promise;
+    }
+  }
+}
+
 class BaseAppPlugin extends BasePlugin {
   APP_NAME = null
+  reqquestManager = new RequestManager();
 
   constructor(...args) {
     super(...args)
@@ -87,6 +146,10 @@ class BaseAppPlugin extends BasePlugin {
     nSign = !!nSign
       ? parseInt(nSign)
       : parseInt(process.env.NUM_SIGN_TO_CONFIRM)
+
+    if(this.getNSign)
+      nSign = this.getNSign(nSign)
+
     let newRequest = new Request({
       app: this.APP_NAME,
       method: method,
@@ -115,13 +178,16 @@ class BaseAppPlugin extends BasePlugin {
       newRequest.data.memWrite = memWrite
     }
 
-    await newRequest.save()
+    this.reqquestManager.addRequest(newRequest);
+
+    // await newRequest.save()
 
     let sign = this.makeSignature(newRequest, result, resultHash)
     if (!!memWrite) {
       sign.memWriteSignature = memWrite.signature
     }
-    new Signature(sign).save()
+    this.reqquestManager.addSignature(newRequest._id, sign.owner, sign);
+    // new Signature(sign).save()
 
     this.broadcastNewRequest(newRequest)
     let t4 = Date.now()
@@ -364,7 +430,8 @@ class BaseAppPlugin extends BasePlugin {
   async __onRemoteWantRequest(data) {
     try {
       // console.log('RemoteCall.getRequestData', data)
-      let req = await Request.findOne({_id: data._id})
+      // let req = await Request.findOne({_id: data._id})
+      let req = this.reqquestManager.getRequest(data._id)
       return req
     }catch (e) {
       console.error(e);
@@ -375,7 +442,8 @@ class BaseAppPlugin extends BasePlugin {
     // console.log('RemoteCall.requestSignature', {sign, memWrite})
     try {
       let {sign, memWrite} = data;
-      let request = await Request.findOne({_id: sign.request})
+      // let request = await Request.findOne({_id: sign.request})
+      let request = this.reqquestManager.getRequest(sign.request)
       if (request) {
         // TODO: check response similarity
         let signer = this.recoverSignature(request, sign)
@@ -384,8 +452,9 @@ class BaseAppPlugin extends BasePlugin {
             // TODO: validate memWright signature
             sign.memWriteSignature = memWrite.signature
           }
-          let newSignature = new Signature(sign)
-          await newSignature.save()
+          this.reqquestManager.addSignature(request._id, sign.owner, sign)
+          // let newSignature = new Signature(sign)
+          // await newSignature.save()
         } else {
           console.log('signature mismatch', {
             request: request._id,

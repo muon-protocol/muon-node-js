@@ -2,7 +2,7 @@ var mongoose = require('mongoose');
 const {MODEL_SIGNATURE} = require('./constants')
 
 var modelSchema = mongoose.Schema({
-  request: {type: mongoose.ObjectId, required: true},
+  request: {type: mongoose.ObjectId, required: true, index: { background: false }},
   timestamp: {type: Number, required: true},
   owner: {type: String, required: true},
   pubKey: {type: String},

@@ -101,35 +101,49 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let masterWalletPubKey = this.muon.getSharedWalletPubKey()
     let signersIndices;
 
-    while (!confirmed && (Date.now() - startTime) < 15000) {
-      await timeout(250)
-      let t0 = Date.now()
-      allSignatures = await Signature.find({ request: newRequest._id })
-      signers = {}
+    signers = await this.reqquestManager.onRequestSignFullFilled(newRequest._id)
+    {
+      let owners = Object.keys(signers)
+      allSignatures = owners.map(w => signers[w]);
 
-      // make signatures unique
-      for (let sig of allSignatures) {
-        signers[sig.owner] = sig
-      }
+      let schnorrSigns = allSignatures.map(({signature}) => {
+        let [s, e] = signature.split(',').map(toBN)
+        return {s, e};
+      })
+      signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
+      tssSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, signersIndices)
+      let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
 
-      if (Object.keys(signers).length >= party.t) {
-        let owners = Object.keys(signers)
-        allSignatures = owners.map(w => signers[w]);
-
-        let schnorrSigns = allSignatures.map(({signature}) => {
-          let [s, e] = signature.split(',').map(toBN)
-          return {s, e};
-        })
-        signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
-        tssSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, signersIndices)
-        let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
-
-        // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
-        confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, tssSign)
-        break;
-      }
-      console.log('base-tss-app-plugin.isOtherNodeConfirmed iteration time', {time: Date.now()-t0})
+      // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
+      confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, tssSign)
     }
+
+    // while (!confirmed && (Date.now() - startTime) < 15000) {
+    //   await timeout(250)
+    //   allSignatures = await Signature.find({ request: newRequest._id })
+    //   signers = {}
+    //
+    //   // make signatures unique
+    //   for (let sig of allSignatures) {
+    //     signers[sig.owner] = sig
+    //   }
+    //
+    //   if (Object.keys(signers).length >= party.t) {
+    //     let owners = Object.keys(signers)
+    //     allSignatures = owners.map(w => signers[w]);
+    //
+    //     let schnorrSigns = allSignatures.map(({signature}) => {
+    //       let [s, e] = signature.split(',').map(toBN)
+    //       return {s, e};
+    //     })
+    //     signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
+    //     tssSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, signersIndices)
+    //     let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
+    //
+    //     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
+    //     confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, tssSign)
+    //   }
+    // }
 
     return [
       confirmed,
