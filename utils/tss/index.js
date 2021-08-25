@@ -10,8 +10,8 @@ const ONE = toBN(1)
 const TWO = toBN(2)
 const THREE = toBN(3)
 
-
-const curve = Curve.secp256k1;
+const EC = require('elliptic').ec;
+const curve = new EC('secp256k1');
 /**
  * Let H be elements of G, such that nobody knows log, h
  * used for pedersen commitment
@@ -91,41 +91,50 @@ function pointNeg(point) {
   return result
 }
 
+// function pointAdd(point1, point2) {
+//   if (point1 === null)
+//     return point2;
+//   if (point2 === null)
+//     return point1;
+//
+//   assert(isOnCurve(point1))
+//   assert(isOnCurve(point2))
+//
+//   let {x: x1, y: y1} = point1;
+//   let {x: x2, y: y2} = point2;
+//
+//   // point1 + (-point1) = 0
+//   if (x1.eq(x2) && !y1.eq(y2))
+//     return null
+//
+//   let m;
+//   // This is the case point1 == point2.
+//   if (x1.eq(x2)) {
+//     // m = (3 * x1 * x1 + curve.a) * inverse_mod(2 * y1, curve.p)
+//     m = (THREE.mul(x1).mul(x1).add(curve.a)).mul(inverseMod(TWO.mul(y1), curve.p))
+//   }
+//   // This is the case point1 != point2.
+//   else {
+//     // m = (y1 - y2) * inverseMod(x1 - x2, curve.p)
+//     m = (y1.sub(y2)).mul(inverseMod(x1.sub(x2), curve.p))
+//   }
+//
+//   let x3 = m.mul(m).sub(x1).sub(x2)
+//   let y3 = y1.add(m.mul(x3.sub(x1)))
+//   let result = new Point(x3.umod(curve.p), y3.neg().umod(curve.p))
+//
+//   assert(isOnCurve(result))
+//
+//   return result
+// }
+
 function pointAdd(point1, point2) {
   if (point1 === null)
     return point2;
   if (point2 === null)
     return point1;
 
-  assert(isOnCurve(point1))
-  assert(isOnCurve(point2))
-
-  let {x: x1, y: y1} = point1;
-  let {x: x2, y: y2} = point2;
-
-  // point1 + (-point1) = 0
-  if (x1.eq(x2) && !y1.eq(y2))
-    return null
-
-  let m;
-  // This is the case point1 == point2.
-  if (x1.eq(x2)) {
-    // m = (3 * x1 * x1 + curve.a) * inverse_mod(2 * y1, curve.p)
-    m = (THREE.mul(x1).mul(x1).add(curve.a)).mul(inverseMod(TWO.mul(y1), curve.p))
-  }
-  // This is the case point1 != point2.
-  else {
-    // m = (y1 - y2) * inverseMod(x1 - x2, curve.p)
-    m = (y1.sub(y2)).mul(inverseMod(x1.sub(x2), curve.p))
-  }
-
-  let x3 = m.mul(m).sub(x1).sub(x2)
-  let y3 = y1.add(m.mul(x3.sub(x1)))
-  let result = new Point(x3.umod(curve.p), y3.neg().umod(curve.p))
-
-  assert(isOnCurve(result))
-
-  return result
+  return point1.add(point2);
 }
 
 /**
@@ -183,13 +192,14 @@ function calcPolyPoint(x, polynomial) {
     x = toBN(x);
   let result = null;
   for (let i = 0; i < polynomial.length; i++) {
-    result = pointAdd(result, scalarMult(x.pow(toBN(i)), polynomial[i]));
+    // result = pointAdd(result, scalarMult(x.pow(toBN(i)), polynomial[i]));
+    result = pointAdd(result, polynomial[i].mul(x.pow(toBN(i))));
   }
   return result;
 }
 
 function random() {
-  return curve.random();
+  return curve.genKeyPair().getPrivate();
 }
 
 function shareKey(privateKey, t, n, indices, polynomial) {
@@ -205,14 +215,13 @@ function shareKey(privateKey, t, n, indices, polynomial) {
   if(polynomial)
     assert(polynomial.length === t)
   else
-    polynomial = [privateKey, ...(range(1, t).map(random))]
+    polynomial = [privateKey.getPrivate(), ...(range(1, t).map(random))]
   return {
     polynomial: polynomial,
     shares: indices.map(i => {
       // TODO: key % n will prevent reconstructing of main key
-      let key = calcPoly(i, polynomial)//.umod(curve.n)
-      let pub = key2pub(key);
-      return {i, key, pub}
+      let privateKey = calcPoly(i, polynomial)//.umod(curve.n)
+      return {i, key: curve.keyFromPrivate(privateKey)}
     })
   }
 }
@@ -231,15 +240,38 @@ function shareKey(privateKey, t, n, indices, polynomial) {
 //   return numerator.div(denominator);
 // }
 
+// function lagrangeCoef(j, t, shares) {
+//   // faster but more error propagation
+//   let prod = arr => arr.reduce((acc, current) => acc.multipliedBy(current), new BigNumber(1));
+//   let x_j = new BigNumber(shares[j].i)
+//   let arr = range(0, t).filter(k => k!==j).map(k => {
+//     let x_k = new BigNumber(shares[k].i)
+//     return x_k.negated().div(x_j.minus(x_k))
+//   });
+//   return prod(arr);
+// }
+
+// function lagrangeCoef(j, t, shares) {
+//   let prod = arr => arr.reduce((acc, current) => acc.multipliedBy(current), new BigNumber(1));
+//   let x_j = toBN(shares[j].i)
+//   let arr = range(0, t).filter(k => k!==j).map(k => {
+//     let x_k = toBN(shares[k].i)
+//     return x_k.neg().mul(x_j.sub(x_k).invm(curve.n))
+//   });
+//   return prod(arr);
+// }
+
 function lagrangeCoef(j, t, shares) {
-  // faster but more error propagation
-  let prod = arr => arr.reduce((acc, current) => acc.multipliedBy(current), new BigNumber(1));
-  let x_j = new BigNumber(shares[j].i)
+  let prod = arr => arr.reduce((acc, current) => acc.mul(current), toBN(1));
+  let x_j = toBN(shares[j].i)
   let arr = range(0, t).filter(k => k!==j).map(k => {
-    let x_k = new BigNumber(shares[k].i)
-    return x_k.negated().div(x_j.minus(x_k))
+    let x_k = toBN(shares[k].i)
+    // [numerator, denominator]
+    return [x_k.neg(), x_j.sub(x_k)]
   });
-  return prod(arr);
+  let numerator = prod(arr.map(a => a[0]))
+  let denominator = prod(arr.map(a => a[1]))
+  return numerator.mul(denominator.invm(curve.n));
 }
 
 function reconstructKey(shares, t) {
@@ -247,16 +279,27 @@ function reconstructKey(shares, t) {
   let sum = new BigNumber(0);
   for (let j = 0; j < t; j++) {
     let coef = lagrangeCoef(j, t, shares)
-    let key = new BigNumber(shares[j].key.toString())
+    let key = new BigNumber(shares[j].key.getPrivate().toString())
     sum = sum.plus(key.multipliedBy(coef))
   }
   sum = toBN('0x'+sum.integerValue().toString(16))
   return sum.umod(curve.n);
 }
 
+function keyFromPrivate(prv) {
+  if(typeof prv === 'string')
+    prv = prv.replace(/^0x/i, '')
+  return curve.keyFromPrivate(prv)
+}
+
+function keyFromPublic(pubKeyStr) {
+  return curve.keyFromPublic(pubKeyStr, 'hex').getPublic()
+}
+
 function key2pub(privateKey) {
   let _PK = BN.isBN(privateKey) ? privateKey : toBN(privateKey)
-  return scalarMult(_PK, curve.g);
+  let {x, y} = curve.g.mul(_PK);
+  return new Point(x, y);
 }
 
 function pub2addr(publicKey) {
@@ -264,15 +307,6 @@ function pub2addr(publicKey) {
   let mix = x.shln(256).or(y)
   let pub_hash = soliditySha3(mix.toBuffer())
   return toChecksumAddress('0x' + pub_hash.substr(-40));
-}
-
-
-function makeKeyPair() {
-  let privateKey = random();
-  return {
-    privateKey,
-    publicKey: key2pub(privateKey)
-  }
 }
 
 function toChecksumAddress(address) {
@@ -305,26 +339,19 @@ function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
 }
 
 function schnorrVerify(pubKey, msg, sig) {
-  let r_v = pointAdd(scalarMult(sig.s, curve.g), scalarMult(sig.e, pubKey))
+  let r_v = pointAdd(curve.g.mul(sig.s), pubKey.mul(sig.e))
   let e_v = schnorrHash(r_v, msg)
-  let verified = toBN(e_v).eq(sig.e)
-  // if(!verified){
-  //   console.log(`r_v`, r_v.serialize());
-  // }
-  return verified;
+  return toBN(e_v).eq(sig.e);
 }
 
 function schnorrAggregateSigs(t, sigs, indices){
   assert(sigs.length >= t);
-
-  let ts = new BigNumber(0)
+  let ts = toBN(0)
   range(0, t).map(j => {
     let coef = lagrangeCoef(j, t, indices.map(i => ({i})));
-    let s = new BigNumber(sigs[j].s.toString())
-    ts = ts.plus(s.multipliedBy(coef))
+    ts.iadd(sigs[j].s.mul(coef))
   })
-  // TODO: is "s % n" needed?
-  let s = toBN('0x' + ts.integerValue().toString(16)).umod(curve.n)
+  let s = ts.umod(curve.n)
   let e = sigs[0].e.clone();
   return {s, e}
 }
@@ -340,6 +367,8 @@ module.exports = {
   lagrangeCoef,
   reconstructKey,
   toBN,
+  keyFromPrivate,
+  keyFromPublic,
   key2pub,
   pub2addr,
   schnorrHash,
