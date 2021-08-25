@@ -53,11 +53,12 @@ class DistributedKey {
   }
 
   setParticipantCommitment(fromIndex, commitment){
-    this.commitmentParts[fromIndex] = commitment.map(c => Point.deserialize(c))
+    // TODO: Pedersen commitment, not implemented
+    // this.commitmentParts[fromIndex] = commitment.map(c => Point.deserialize(c))
   }
 
   setParticipantPubKeys(fromIndex, A_ik){
-    this.pubKeyParts[fromIndex] = A_ik.map(A => Point.deserialize(A))
+    this.pubKeyParts[fromIndex] = A_ik
     if(this.isPubKeyDistributed()){
       let fh = this.getTotalFH()
       this.sharedKey.resolve(fh)
@@ -65,15 +66,16 @@ class DistributedKey {
   }
 
   verifyCommitment(index){
-    let Cc = this.commitmentParts[index]
-    let p1 = tss.calcPolyPoint(index, Cc)
-    let {f, h} = this.keyParts[index]
-    const mul = tss.scalarMult, G=tss.curve.g, H=tss.H;
-    let p2 = tss.pointAdd(mul(f, G), mul(h,H));
-    console.log('DistributedKey.verifyCommitment', {
-      p1: p1.serialize(),
-      p2: p2.serialize(),
-    })
+    // TODO: not implemented
+    // let Cc = this.commitmentParts[index]
+    // let p1 = tss.calcPolyPoint(index, Cc)
+    // let {f, h} = this.keyParts[index]
+    // const mul = tss.scalarMult, G=tss.curve.g, H=tss.H;
+    // let p2 = tss.pointAdd(mul(f, G), mul(h,H));
+    // console.log('DistributedKey.verifyCommitment', {
+    //   p1: p1.serialize(),
+    //   p2: p2.serialize(),
+    // })
   }
 
   getTotalFH(){
@@ -89,7 +91,7 @@ class DistributedKey {
 
   /**
    * Returns public key of participant with id of [idx]
-   * public key calculated from public key of shared polynomials coefficients.
+   * public key calculated from public key of local shared polynomials coefficients.
    * @param idx
    * @returns {[string, any]}
    */

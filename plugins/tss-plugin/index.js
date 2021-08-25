@@ -116,7 +116,7 @@ class TssPlugin extends BasePlugin {
     let t3 = Date.now()
     // 5- TODO: verify commitment
     // key.verifyCommitment(2);
-    console.log('keyGen inner times', {
+    console.log('tss-plugin.keyGen', {
       t1: t1 - t0,
       t2: t2 - t1,
       t3: t3 - t2,
@@ -132,7 +132,7 @@ class TssPlugin extends BasePlugin {
     }
   }
 
-  async broadcastKey(key){
+  broadcastKey(key){
     let walletIndexes = this.muon.getNodesWalletIndex();
     let {party} = key;
 
@@ -141,7 +141,7 @@ class TssPlugin extends BasePlugin {
     let selfFH = key.getFH(selfWalletIndex)
     key.setFH(selfWalletIndex, selfFH.f, selfFH.h);
 
-    await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+    return Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
       if(wallet === process.env.SIGN_WALLET_ADDRESS)
         return Promise.resolve(true);
 
@@ -169,7 +169,7 @@ class TssPlugin extends BasePlugin {
     key.pubKeyDistributed = true;
 
     // Public key of f polynomial coefficients.
-    let A_ik = key.f_x.coefficients.map(a_k => tss.key2pub(a_k).serialize())
+    let A_ik = key.f_x.coefficients.map(a_k => a_k.getPublic())
     // console.log({A_ik})
     let fromIndex = this.muon.getNodesWalletIndex()[process.env.SIGN_WALLET_ADDRESS]
     key.setParticipantPubKeys(fromIndex, A_ik)
@@ -186,7 +186,7 @@ class TssPlugin extends BasePlugin {
           from: process.env.SIGN_WALLET_ADDRESS,
           party: party.id,
           key: key.id,
-          pubKeys: A_ik
+          pubKeys: A_ik.map(pubKey => pubKey.encode('hex'))
         }
       )
     }))
@@ -343,6 +343,7 @@ class TssPlugin extends BasePlugin {
       throw {message: 'distributed key not found'}
     }
     let fromIndex = this.muon.getNodesWalletIndex()[from]
+    pubKeys = pubKeys.map(pub => tss.curve.keyFromPublic(pub, 'hex').getPublic())
     keys[key].setParticipantPubKeys(fromIndex, pubKeys)
   }
 }
