@@ -34,7 +34,6 @@ class BaseTssAppPlugin extends BaseAppPlugin {
   }
 
   makeSignature(request, result, resultHash) {
-    let t0 = Date.now()
     let signTimestamp = getTimestamp()
     // let signature = crypto.sign(resultHash)
 
@@ -46,11 +45,10 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let k_i = nonce.getTotalFH().f
     let K = nonce.getTotalPubKey();
     let signature = tss.schnorrSign(process.env.SIGN_WALLET_PRIVATE_KEY, k_i, K, resultHash)
-    console.log('base-tss-app-plugin.makeSignature', {time: Date.now() - t0})
     return {
       request: request._id,
       owner: process.env.SIGN_WALLET_ADDRESS,
-      pubKey: tss.key2pub(process.env.SIGN_WALLET_PRIVATE_KEY).serialize(),
+      pubKey: tss.keyFromPrivate(process.env.SIGN_WALLET_PRIVATE_KEY).getPublic().encode('hex'),
       timestamp: signTimestamp,
       data: result,
       signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`
@@ -58,15 +56,10 @@ class BaseTssAppPlugin extends BaseAppPlugin {
   }
 
   recoverSignature(request, sign) {
-    // TODO: recovery not implemented
-
-    let {owner, pubKey} = sign;
-    pubKey = Point.deserialize(pubKey);
+    let {owner, pubKey: pubKeyStr} = sign;
+    let pubKey = tss.keyFromPublic(pubKeyStr);
     if(owner !== tss.pub2addr(pubKey)) {
-      console.log({
-        owner,
-        pubKey: pubKey.serialize(),
-      })
+      console.log({owner, pubKeyStr,})
       throw {message: 'Sign recovery error: invalid pubKey address'}
     }
 
@@ -81,69 +74,34 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let Z_i = pubKey;
     let K_i = nonce.getPubKey(idx);
 
-    let p1 = tss.pointAdd(K_i, tss.scalarMult(e.neg(), Z_i))
-    let p2 = tss.scalarMult(s, tss.curve.g);
-    // console.log([p1.serialize(), p2.serialize()])
-    return p1.serialize() === p2.serialize() ? sign.owner : null;
+    let p1 = tss.pointAdd(K_i, Z_i.mul(e.neg()))
+    let p2 = tss.curve.g.mul(s);
+    return p1.encode('hex') === p2.encode('hex') ? sign.owner : null;
   }
 
   async isOtherNodesConfirmed(newRequest) {
-    let startTime = Date.now()
-    let confirmed = false
-    let allSignatures = []
     let signers = {}
 
-    let {party: partyId, nonce: nonceId} = newRequest.data.init;
+    let {party: partyId} = newRequest.data.init;
     let party = this.getTssPlugin().getParty(partyId);
-    let nonce = this.getTssPlugin().getSharedKey(nonceId);
-    let K = nonce.getTotalPubKey();
-    let tssSign = null
     let masterWalletPubKey = this.muon.getSharedWalletPubKey()
     let signersIndices;
 
     signers = await this.reqquestManager.onRequestSignFullFilled(newRequest._id)
-    {
-      let owners = Object.keys(signers)
-      allSignatures = owners.map(w => signers[w]);
 
-      let schnorrSigns = allSignatures.map(({signature}) => {
-        let [s, e] = signature.split(',').map(toBN)
-        return {s, e};
-      })
-      signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
-      tssSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, signersIndices)
-      let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
+    let owners = Object.keys(signers)
+    let allSignatures = owners.map(w => signers[w]);
 
-      // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
-      confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, tssSign)
-    }
+    let schnorrSigns = allSignatures.map(({signature}) => {
+      let [s, e] = signature.split(',').map(toBN)
+      return {s, e};
+    })
+    signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
+    let aggregatedSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, signersIndices)
+    let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
 
-    // while (!confirmed && (Date.now() - startTime) < 15000) {
-    //   await timeout(250)
-    //   allSignatures = await Signature.find({ request: newRequest._id })
-    //   signers = {}
-    //
-    //   // make signatures unique
-    //   for (let sig of allSignatures) {
-    //     signers[sig.owner] = sig
-    //   }
-    //
-    //   if (Object.keys(signers).length >= party.t) {
-    //     let owners = Object.keys(signers)
-    //     allSignatures = owners.map(w => signers[w]);
-    //
-    //     let schnorrSigns = allSignatures.map(({signature}) => {
-    //       let [s, e] = signature.split(',').map(toBN)
-    //       return {s, e};
-    //     })
-    //     signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
-    //     tssSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, signersIndices)
-    //     let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
-    //
-    //     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
-    //     confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, tssSign)
-    //   }
-    // }
+    // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
+    let confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, aggregatedSign)
 
     return [
       confirmed,
@@ -152,7 +110,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
           signers: signersIndices,
           timestamp: getTimestamp(),
           result: newRequest.data.result,
-          signature: `0x${tssSign.s.toString(16)},0x${tssSign.e.toString(16)}`,
+          signature: `0x${aggregatedSign.s.toString(16)},0x${aggregatedSign.e.toString(16)}`,
           memWriteSignature: allSignatures[0]['memWriteSignature']
       }] : []
     ]
@@ -163,7 +121,6 @@ class BaseTssAppPlugin extends BaseAppPlugin {
   }
 
   async __onRemoteWantSign(request) {
-    console.log(`__onRemoteWantSign at ${parseInt(Date.now() / 1000)}`)
     let [sign, memWrite] = await this.processRemoteRequest(request)
     // console.log('wantSign', request._id, sign)
     return { sign, memWrite }
