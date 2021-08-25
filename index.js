@@ -8,15 +8,15 @@ const BaseTssApp = require('./plugins/base/base-tss-app-plugin')
 const Gateway = require('./gateway/index')
 require('./core/global')
 
-function getEnvBootstraps(){
+function getEnvBootstraps() {
   return Object.keys(process.env)
     .filter(key => key.startsWith('PEER_BOOTSTRAP_'))
     .map(key => process.env[key]);
 }
 
-function getEnvPlugins(){
+function getEnvPlugins() {
   let pluginsStr = process.env['MUON_PLUGINS']
-  if(!pluginsStr)
+  if (!pluginsStr)
     return {}
   return pluginsStr.split('|').reduce((res, key) => {
     return {
@@ -27,7 +27,7 @@ function getEnvPlugins(){
 }
 
 function getAppParent(app) {
-  if(app.useTss){
+  if (app.useTss) {
     return BaseTssApp;
   }
   return app.isService ? BaseService : BaseApp
@@ -39,10 +39,9 @@ function getCustomApps() {
     return {}
   return pluginsStr.split('|').reduce((res, key) => {
     // check if app exist.
-    try{
+    try {
       require.resolve(`./apps/custom/${key}`);
-    }
-    catch (e) {
+    } catch (e) {
       console.error(e);
       return res;
     }
@@ -53,14 +52,13 @@ function getCustomApps() {
         ...res,
         [key]: [dynamicExtend(getAppParent(app), app), {}]
       }
-    }
-    else {
+    } else {
       return res;
     }
   }, {})
 }
 
-function getGeneralApps(){
+function getGeneralApps() {
   const appDir = path.join(__dirname, 'apps/general');
   return new Promise(function (resolve, reject) {
     let result = {};
@@ -70,9 +68,9 @@ function getGeneralApps(){
       }
       files.forEach(function (file) {
         let ext = file.split('.').pop();
-        if(ext.toLowerCase() === 'js'){
+        if (ext.toLowerCase() === 'js') {
           let app = require(`./apps/general/${file}`)
-          if(!!app.APP_NAME) {
+          if (!!app.APP_NAME) {
             result[app.APP_NAME] = [dynamicExtend(getAppParent(app), app), {}]
           }
         }
@@ -85,40 +83,45 @@ function getGeneralApps(){
 var muon;
 
 (async () => {
-  muon = new Muon({
-    libp2p: {
-      nodeId: {
-        id: process.env.PEER_ID,
-        pubKey: process.env.PEER_PUBLIC_KEY,
-        privKey: process.env.PEER_PRIVATE_KEY
+  try {
+    muon = new Muon({
+      libp2p: {
+        nodeId: {
+          id: process.env.PEER_ID,
+          pubKey: process.env.PEER_PUBLIC_KEY,
+          privKey: process.env.PEER_PRIVATE_KEY
+        },
+        port: process.env.PEER_PORT,
+        bootstrap: getEnvBootstraps()
       },
-      port: process.env.PEER_PORT,
-      bootstrap: getEnvBootstraps()
-    },
-    plugins: {
-      'remote-call': [require('./plugins/remote-call'), {}],
-      'gateway-interface': [require('./plugins/gateway-Interface'), {}],
-      'ping-pong': [require('./plugins/ping-pong'), {}],
-      // 'gw-log': [require('./plugins/gateway-log'), {}],
-      // 'stock-plugin': [require('./plugins/stock-plugin'), {}],
-      'eth': [require('./plugins/eth-app-plugin'), {}],
-      'content-verify': [require('./plugins/content-verify-plugin'), {}],
-      'content': [require('./plugins/content-app'), {}],
-      'memory': [require('./plugins/memory-plugin'), {}],
-      // 'presale': [require('./plugins/muon-presale-plugin'), {}],
-      ... getEnvPlugins(),
-      ... getCustomApps(),
-      ... await getGeneralApps(),
-    }
-  })
+      plugins: {
+        'remote-call': [require('./plugins/remote-call'), {}],
+        'gateway-interface': [require('./plugins/gateway-Interface'), {}],
+        'ping-pong': [require('./plugins/ping-pong'), {}],
+        // 'gw-log': [require('./plugins/gateway-log'), {}],
+        // 'stock-plugin': [require('./plugins/stock-plugin'), {}],
+        'eth': [require('./plugins/eth-app-plugin'), {}],
+        'content-verify': [require('./plugins/content-verify-plugin'), {}],
+        'content': [require('./plugins/content-app'), {}],
+        'memory': [require('./plugins/memory-plugin'), {}],
+        // 'presale': [require('./plugins/muon-presale-plugin'), {}],
+        ...getEnvPlugins(),
+        ...getCustomApps(),
+        ...await getGeneralApps(),
+      }
+    })
 
-  await muon.initialize();
+    await muon.initialize();
 
-  muon.start();
+    muon.start();
 
-  Gateway.start({
-    host: process.env.GATEWAY_HOST,
-    port: process.env.GATEWAY_PORT,
-  })
+    Gateway.start({
+      host: process.env.GATEWAY_HOST,
+      port: process.env.GATEWAY_PORT,
+    })
+  } catch (e) {
+    console.error(e)
+    throw e
+  }
 })()
 

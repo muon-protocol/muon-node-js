@@ -156,8 +156,16 @@ class BaseAppPlugin extends BasePlugin {
     })
     let t1= Date.now()
 
+    // user apps cannot override _onArrive method
+    if(this._onArrive){
+      newRequest.data.init = await this._onArrive(newRequest);
+    }
+    // user apps can override onArrive method
     if(this.onArrive){
-      newRequest.data.init = await this.onArrive(clone(newRequest));
+      newRequest.data.init = {
+        ... newRequest.data.init,
+        ... await this.onArrive(clone(newRequest))
+      };
     }
     let t2 = Date.now()
 

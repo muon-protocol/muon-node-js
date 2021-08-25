@@ -5,6 +5,9 @@ function dynamicExtend(superclass, proto) {
 
     for(let key in proto){
       if(proto.hasOwnProperty(key)){
+        if(key.startsWith('_') && superclass.prototype.hasOwnProperty(key)) {
+          throw {message: `User app property [${key}] override failed. Any property that starts with "_" cannot be override`}
+        }
         this[key] = proto[key]
         this.constructor.prototype[key] = proto[key]
       }

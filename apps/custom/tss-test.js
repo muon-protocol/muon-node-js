@@ -1,38 +1,7 @@
-const { axios, toBaseUnit, soliditySha3, ethCall, ethRead, timeout } = MuonAppUtils
-const tssUtils = require('../../utils/tss')
 
 module.exports = {
   APP_NAME: 'tss',
   useTss: true,
-
-  getNSign: () => 8,
-
-  // TODO: move this method into the base-tss-app-plugin
-  onArrive: async function(request){
-    let {nSign, method, data: {params}} = request;
-    switch (method) {
-      case 'test':
-        let t1 = Date.now()
-        let tssPlugin = this.muon.getPlugin(`__tss-plugin__`)
-        let party = await tssPlugin.makeParty(nSign)
-        let t2 = Date.now()
-        // console.log('party generation done.', party)
-        if(!party)
-          throw {message: 'party not generated'}
-
-        let nonce = await tssPlugin.keyGen(party)
-
-        let now = Date.now();
-        console.log('nonce key generation', {
-          partyTime: t2-t1,
-          keyTime: now - t2,
-          total: now-t1
-        })
-
-        // let sign = tssPlugin.sign(null, party);
-        return {party: party.id, nonce: nonce.id}
-    }
-  },
 
   onRequest: async function (request) {
     let {method, data: {params}} = request;
@@ -45,14 +14,8 @@ module.exports = {
   },
 
   hashRequestResult: function (request, result){
-    // let {data: {init: {party, nonce}}} = request;
-    // let tssPlugin = this.muon.getPlugin('__tss-plugin__')
     switch (request.method) {
       case 'test':
-        // let _party = tssPlugin.getParty(party)
-        // let _nonce = tssPlugin.getSharedKey(nonce)
-        // let hash = tssPlugin.hash(result, _party, _nonce);
-        // console.log({hash})
         return 'done'
       default:
         throw { message: `Unknown method: ${request.method}` }
