@@ -5,7 +5,7 @@ const PeerId = require('peer-id')
 const Node = require('./libp2p_bundle')
 const chalk = require('chalk')
 const emoji = require('node-emoji')
-const ECPoint = require('../utils/tss/point')
+const tss = require('../utils/tss')
 
 /**
  * Each wallet has a unique known index and will never change.
@@ -40,15 +40,14 @@ const MUON_WALLETS_INDEX = {
   '0x43F3a390f07a624c04c610a8e78fC30310CF747D': 15,
 }
 
+const MUON_SHARED_KEY_PUB = '04d2a77c9664a807945590d4c98fbefe89951b27fc620f9e3e0047f49c7bf1587d212a3eca5d7145b30469d9ae24c2e9291e86f71962d08bcc823460506d988ce0';
+
 class Muon extends Events {
   configs = {}
   peerId = null
   libp2p = null
   _plugins = {}
-  sharedWalletPubKey = new ECPoint(
-    '0xd2a77c9664a807945590d4c98fbefe89951b27fc620f9e3e0047f49c7bf1587d',
-    '0x212a3eca5d7145b30469d9ae24c2e9291e86f71962d08bcc823460506d988ce0'
-  );
+  sharedWalletPubKey = tss.curve.keyFromPublic(MUON_SHARED_KEY_PUB, 'hex').getPublic();
   sharedWalletAddress = '0x8f720928474f259FaB29c2D6d871cA0ae1A620eE'
 
   constructor(configs) {
