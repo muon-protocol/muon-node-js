@@ -332,7 +332,7 @@ class TssPlugin extends BasePlugin {
   }
 
   async __distributePubKey(data={}){
-    // console.log('__distributePubKey', data)
+    // console.log('__distributePubKey', data.from)
     let {parties, keys} = this
     let {from, party, key, pubKeys} = data
     if(!parties[party]) {

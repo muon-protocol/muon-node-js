@@ -2,17 +2,10 @@ const Polynomial = require('../../utils/tss/polynomial')
 const Point = require('../../utils/tss/point')
 const tss = require('../../utils/tss/index')
 const {toBN, range} = require('../../utils/tss/utils')
+const TimeoutPromise = require('../../core/timeout-promise')
 const assert = require('assert')
 
 const random = () => Math.floor(Math.random()*9999999)
-
-function WrappedPromise() {
-  var self = this;
-  this.promise = new Promise(function(resolve, reject) {
-    self.reject = reject
-    self.resolve = resolve
-  })
-}
 
 class DistributedKey {
   id = 0;
@@ -26,7 +19,7 @@ class DistributedKey {
   pubKeyParts = {};
   commitmentParts = {};
   pubKeyDistributed = false;
-  sharedKey = new WrappedPromise()
+  sharedKey = new TimeoutPromise(5000, "DistributedKey timeout")
 
   constructor(party, id){
     this.id = id || `K${Date.now()}${random()}`
@@ -104,7 +97,7 @@ class DistributedKey {
   }
 
   getTotalPubKey(){
-    assert(Object.keys(this.pubKeyParts).length >= this.party.t)
+    assert(Object.keys(this.pubKeyParts).length >= this.party.t, "DistributedKey is not completed for computing totalPubKey.")
     // calculate shared key
     let totalPubKey = null
     for(const [i, A_ik] of Object.entries(this.pubKeyParts)){

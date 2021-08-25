@@ -8,16 +8,9 @@ const uint8ArrayToString = require('uint8arrays/to-string')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
 const { omit } = require('lodash')
+const TimeoutPromise = require('../../core/timeout-promise')
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
-
-function WrappedPromise() {
-  var self = this;
-  this.promise = new Promise(function(resolve, reject) {
-    self.reject = reject
-    self.resolve = resolve
-  })
-}
 
 class RequestManager{
   requests = {}
@@ -63,7 +56,7 @@ class RequestManager{
     }
     else{
       if(this.promises[_id] === undefined)
-        this.promises[_id] = new WrappedPromise();
+        this.promises[_id] = new TimeoutPromise(10000, 'Request timed out');
       return this.promises[_id].promise;
     }
   }
