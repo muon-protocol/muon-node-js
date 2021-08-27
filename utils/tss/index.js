@@ -324,11 +324,11 @@ function toChecksumAddress(address) {
 }
 
 function schnorrHash(publicKey, msg) {
-  let {x, y} = publicKey
-  let pubKeyBuff = x.shln(256).or(y).toBuffer();
-  let msgBuff = Buffer.from(msg)
+  let address = toBN(pub2addr(publicKey))
+  let pubKeyBuff = address.toBuffer();
+  let msgBuff = toBN(msg).toBuffer()
   let buffToHash = Buffer.concat([pubKeyBuff, msgBuff])
-  return sha3(buffToHash)
+  return soliditySha3(buffToHash)
 }
 
 function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {

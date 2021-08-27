@@ -1,4 +1,4 @@
-
+const {soliditySha3} = MuonAppUtils
 module.exports = {
   APP_NAME: 'tss',
   useTss: true,
@@ -16,7 +16,7 @@ module.exports = {
   hashRequestResult: function (request, result){
     switch (request.method) {
       case 'test':
-        return 'done'
+        return soliditySha3([{type: 'string', value: result}]);
       default:
         throw { message: `Unknown method: ${request.method}` }
     }

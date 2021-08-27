@@ -40,7 +40,11 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     })
 
     // let sign = tssPlugin.sign(null, party);
-    return {party: party.id, nonce: nonce.id}
+    return {
+      party: party.id,
+      nonce: nonce.id,
+      nonceAddress: tss.pub2addr(nonce.pubKey),
+    }
   }
 
   broadcastNewRequest(request) {
