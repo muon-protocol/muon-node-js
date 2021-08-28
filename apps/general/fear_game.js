@@ -2,8 +2,8 @@ const { axios, soliditySha3 } = MuonAppUtils
 
 const APP_ID = 10
 
-async function getMilestoneReached(signature, milestoneId, address, time, tag) {
-  const result = await axios.get(
+function getMilestoneReached(signature, milestoneId, address, time, tag) {
+  return axios.get(
     'https://api.fearnft.games/api/MilestoneReached',
     {
       headers: {
@@ -14,9 +14,7 @@ async function getMilestoneReached(signature, milestoneId, address, time, tag) {
         tag
       }
     }
-  )
-
-  return result.data
+  ).then(({data}) => data)
 }
 
 module.exports = {
