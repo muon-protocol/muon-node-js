@@ -2,8 +2,8 @@ const BasePlugin = require('./base/base-plugin')
 const { promisify } = require("util");
 const Redis = require('redis');
 
-const GATEWAY_CALL_REQUEST  = `/muon/${process.env.PEER_ID}/gateway/${process.env.REDIS_GATEWAY_CHANNEL}/call/request`
-const GATEWAY_CALL_RESPONSE = `/muon/${process.env.PEER_ID}/gateway/${process.env.REDIS_GATEWAY_CHANNEL}/call/response`
+const GATEWAY_CALL_REQUEST  = `/muon/gateway/${process.env.GATEWAY_PORT}/call/request`
+const GATEWAY_CALL_RESPONSE = `/muon/gateway/${process.env.GATEWAY_PORT}/call/response`
 
 const redisConfig = {
   host: process.env.REDIS_HOST || '127.0.0.1',
@@ -72,7 +72,7 @@ class GatewayInterface extends BasePlugin{
         console.error('gateway-interface error', e)
         responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
           responseId: data ? data.callId : undefined,
-          error: e.message || "Unknown error occurred",
+          error: e.message || "GatewayInterface: Unknown error occurred",
         }))
       }
     }
@@ -87,18 +87,21 @@ class GatewayInterface extends BasePlugin{
   }
 
   async onStart(){
-    callRedis.subscribe(GATEWAY_CALL_REQUEST)
-    callRedis.on('message', this.__onGatewayCall.bind(this))
+    if(!!process.env.GATEWAY_PORT) {
+      callRedis.subscribe(GATEWAY_CALL_REQUEST)
+      callRedis.on('message', this.__onGatewayCall.bind(this))
 
-    while (true) {
-      try {
-        let [queue, dataStr] = await blpopAsync(process.env.REDIS_QUEUE, 0)
-        let data = JSON.parse(dataStr);
-        if(data) {
-          this.__onData(data)
+      // TODO: deprecated and will remove later.
+      while (true) {
+        try {
+          let [queue, dataStr] = await blpopAsync(process.env.REDIS_QUEUE, 0)
+          let data = JSON.parse(dataStr);
+          if (data) {
+            this.__onData(data)
+          }
+        } catch (e) {
+          console.error(e)
         }
-      }catch (e) {
-        console.error(e)
       }
     }
   }

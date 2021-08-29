@@ -67,9 +67,11 @@ class BaseServicePlugin extends BaseAppPlugin {
 
   broadcastNewRequest(request) {
     this.serviceProviders.map(async (provider) => {
-      this.remoteCall(provider, 'wantSign', request).then(
-        this.__onRemoteSignRequest.bind(this)
-      )
+      this.remoteCall(provider, 'wantSign', request)
+        .then(this.__onRemoteSignRequest.bind(this))
+        .catch(e => {
+          console.error('BaseServicePlugin.broadcastNewRequest', e)
+        })
     })
   }
 
