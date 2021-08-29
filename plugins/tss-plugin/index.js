@@ -50,56 +50,49 @@ class TssPlugin extends BasePlugin {
     // const peers = await this.getPartyPeers(party)
     // party.setPeers(peers)
     // await this.initParty(party)
-    try {
 
-      let party = new Party(t);
-      this.parties[party.id] = party;
-      let partyStartTime = Date.now()
+    let party = new Party(t);
+    this.parties[party.id] = party;
+    let partyStartTime = Date.now()
 
-      this.broadcast({
-        type: MSG_TYPE_JOIN_PARTY_REQ,
-        id: party.id,
-        peerId: process.env.PEER_ID,
-        wallet: process.env.SIGN_WALLET_ADDRESS,
-      })
+    this.broadcast({
+      type: MSG_TYPE_JOIN_PARTY_REQ,
+      id: party.id,
+      peerId: process.env.PEER_ID,
+      wallet: process.env.SIGN_WALLET_ADDRESS,
+    })
 
-      let partyFullFilled = new Promise((resolve, reject) => {
-        let check = () => {
-          if (Object.keys(party.partners).length >= t)
-            return resolve(party)
-          if (Date.now() - partyStartTime > 5000)
-            return resolve(null)
-          setTimeout(check, 50);
-        }
-        setTimeout(check, 50)
-      })
-
-      await partyFullFilled;
-      if(!party.isFullFilled()){
-        throw {message: `Need to ${party.t} partners, but ${Object.keys(party.partners).length} partner joined after 5 seconds.`}
+    let partyFullFilled = new Promise((resolve, reject) => {
+      let check = () => {
+        if (Object.keys(party.partners).length >= t)
+          return resolve(party)
+        if (Date.now() - partyStartTime > 5000)
+          return resolve(null)
+        setTimeout(check, 50);
       }
+      setTimeout(check, 50)
+    })
 
-      // let partners = Object.values(party.partners).filter(({peerId}) => peerId != process.env.PEER_ID)
-      // let peers = await Promise.all(partners.map(({peerId}) => this.findPeer(peerId)))
-      let peers = await this.getPartyPeers(party);
-      party.setPeers(peers);
-
-      await this.remoteCall(
-        peers,
-        RemoteMethods.setPartners,
-        {
-          id: party.id,
-          t: party.t,
-          partners: party.partners,
-        }
-      )
-
-      return party;
+    await partyFullFilled;
+    if(!party.isFullFilled()){
+      throw {message: `Need to ${party.t} partners, but ${Object.keys(party.partners).length} partner joined after 5 seconds.`}
     }
-    catch (e) {
-      console.error(e);
-      return null;
-    }
+
+    // let partners = Object.values(party.partners).filter(({peerId}) => peerId != process.env.PEER_ID)
+    // let peers = await Promise.all(partners.map(({peerId}) => this.findPeer(peerId)))
+    let peers = await this.getPartyPeers(party);
+    party.setPeers(peers);
+
+    await this.remoteCall(
+      peers,
+      RemoteMethods.setPartners,
+      {
+        id: party.id,
+        t: party.t,
+        partners: party.partners,
+      }
+    )
+    return party;
   }
 
   async keyGen(party){
@@ -247,9 +240,9 @@ class TssPlugin extends BasePlugin {
   async __onBroadcastReceived(msg) {
     try {
       let data = JSON.parse(uint8ArrayToString(msg.data));
-      this.handleBroadcastMessage(data)
+      await this.handleBroadcastMessage(data)
     } catch (e) {
-      console.error(e)
+      console.error('TssPlugin.__onBroadcastReceived', e)
     }
   }
 
