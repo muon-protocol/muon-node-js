@@ -98,8 +98,8 @@ var muon;
       'content': [require('./plugins/content-app'), {}],
       'memory': [require('./plugins/memory-plugin'), {}],
       // 'presale': [require('./plugins/muon-presale-plugin'), {}],
-      // ... getEnvPlugins(),
-      // ... getCustomApps(),
+      ... getEnvPlugins(),
+      ... getCustomApps(),
       ... await getGeneralApps(),
     }
   })
