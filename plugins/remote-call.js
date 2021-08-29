@@ -21,7 +21,7 @@ class RemoteCall extends BasePlugin {
         return this.send(response, responseStream)
       })
       .catch(error => {
-        console.error(error)
+        console.error("RemoteCall.handleCall", error)
         let response = {
           responseId: callId,
           error: {
@@ -50,7 +50,7 @@ class RemoteCall extends BasePlugin {
         }
       }
     }catch (e) {
-      console.error(e);
+      console.error("RemoteCall.handleIncomingMessage", e);
     }
   }
 
@@ -85,7 +85,7 @@ class RemoteCall extends BasePlugin {
         }
       )
     } catch (err) {
-      console.error(err)
+      console.error("RemoteCall.send", err)
     }
   }
 
@@ -105,10 +105,12 @@ class RemoteCall extends BasePlugin {
     this.send({callId, method, params}, stream)
     let remoteResult = new RemoteResult()
     this._calls[callId] = remoteResult;
+    // TODO: clear this._calls[callID] when remoteResult fullFilled.
     return remoteResult.promise
   }
 }
 
+// TODO: replace with TimeoutPromise
 function RemoteResult() {
   var self = this;
   this.promise = new Promise(function(resolve, reject) {
