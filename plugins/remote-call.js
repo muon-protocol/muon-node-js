@@ -94,9 +94,13 @@ class RemoteCall extends BasePlugin {
   }
 
   call(peer, method, params){
-    return this.muon.libp2p.dialProtocol(peer.id, [PROTOCOL])
+    return this.getPeerCallStream(peer)
       .then(({stream}) => {
         return this.callStream(stream, method, params)
+      })
+      .catch(e => {
+        console.error(`RemoteCall.call(peer, '${method}', params)`, e)
+        throw e
       })
   }
 
