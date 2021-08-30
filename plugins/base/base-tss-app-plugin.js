@@ -26,7 +26,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let tssPlugin = this.muon.getPlugin(`__tss-plugin__`)
     let party = await tssPlugin.makeParty(nSign)
     let t2 = Date.now()
-    // console.log('party generation done.', party)
+    console.log('party generation done.')
     if(!party)
       throw {message: 'party not generated'}
 

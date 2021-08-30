@@ -284,7 +284,7 @@ class TssPlugin extends BasePlugin {
    *===================================*/
 
   async __joinToParty(data={}){
-    // console.log('__joinToParty', data)
+    console.log('__joinToParty', data)
     let {id, peerId, wallet} = data
     let party = this.parties[id];
     if(party && !party.isFullFilled()){
