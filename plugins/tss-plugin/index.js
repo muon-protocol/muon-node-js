@@ -335,10 +335,11 @@ class TssPlugin extends BasePlugin {
     let {parties, keys} = this
     let {from, party, key, pubKeys} = data
     if(!parties[party]) {
-      console.log('TssPlugin.__distributePubKey>> party not fount on this node id: '+ party);
+      console.error('TssPlugin.__distributePubKey>> party not fount on this node id: '+ party);
       throw {message: 'party not found'}
     }
     if(!keys[key]){
+      console.error('TssPlugin.__distributePubKey>> distributed key not found')
       throw {message: 'distributed key not found'}
     }
     let fromIndex = this.muon.getNodesWalletIndex()[from]
