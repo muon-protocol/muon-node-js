@@ -220,7 +220,9 @@ class TssPlugin extends BasePlugin {
     console.log('tss-plugin.handleBroadcastMessage', msg);
     switch (msg.type) {
       case MSG_TYPE_JOIN_PARTY_REQ: {
+        console.log(`finding peer ${msg.peerId} ...`)
         let peer = await this.findPeer(msg.peerId)
+        console.log(`calling remote message ${RemoteMethods.joinToParty}`)
         await this.remoteCall(
           peer,
           RemoteMethods.joinToParty,
@@ -230,6 +232,7 @@ class TssPlugin extends BasePlugin {
             wallet: process.env.SIGN_WALLET_ADDRESS
           }
         )
+        console.log(`handleBroadcastMessage done`)
         break
       }
       default:
