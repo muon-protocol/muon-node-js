@@ -12,6 +12,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     super.onStart()
 
     let remoteCall = this.muon.getPlugin('remote-call')
+
     remoteCall.on(
       `remote:app-${this.APP_NAME}-wantSign`,
       this.__onRemoteWantSign.bind(this)
