@@ -135,25 +135,29 @@ class TssPlugin extends BasePlugin {
     let selfFH = key.getFH(selfWalletIndex)
     key.setFH(selfWalletIndex, selfFH.f, selfFH.h);
 
-    return Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
-      if(wallet === process.env.SIGN_WALLET_ADDRESS)
-        return Promise.resolve(true);
+    try {
+      return Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+        if (wallet === process.env.SIGN_WALLET_ADDRESS)
+          return Promise.resolve(true);
 
-      let walletIndex = walletIndexes[wallet]
-      console.log(`calling method ${RemoteMethods.distributeKey}`)
-      return this.remoteCall(
-        peer,
-        RemoteMethods.distributeKey,
-        {
-          from: process.env.SIGN_WALLET_ADDRESS,
-          party: party.id,
-          key: key.id,
-          commitment: key.commitment.map(c => c.serialize()),
-          walletIndex,
-          ... key.getFH(walletIndex),
-        }
-      ).catch(e => console.error(`tss-plugin.broadcastKey`, e))
-    }))
+        let walletIndex = walletIndexes[wallet]
+        return this.remoteCall(
+          peer,
+          RemoteMethods.distributeKey,
+          {
+            from: process.env.SIGN_WALLET_ADDRESS,
+            party: party.id,
+            key: key.id,
+            commitment: key.commitment.map(c => c.serialize()),
+            walletIndex,
+            ...key.getFH(walletIndex),
+          }
+        )
+      }))
+    }
+    catch (e) {
+      console.error(`tss-plugin.broadcastKey`, e)
+    }
   }
 
   async broadcastPubKey(key){
@@ -171,21 +175,26 @@ class TssPlugin extends BasePlugin {
     key.setParticipantPubKeys(fromIndex, A_ik)
 
     let {party} = key;
-    await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
-      if(wallet === process.env.SIGN_WALLET_ADDRESS)
-        return Promise.resolve(true);
+    try {
+      await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+        if (wallet === process.env.SIGN_WALLET_ADDRESS)
+          return Promise.resolve(true);
 
-      return this.remoteCall(
-        peer,
-        RemoteMethods.distributePubKey,
-        {
-          from: process.env.SIGN_WALLET_ADDRESS,
-          party: party.id,
-          key: key.id,
-          pubKeys: A_ik.map(pubKey => pubKey.encode('hex'))
-        }
-      ).catch(e => console.error(`tss-plugin.broadcastPubKey`, e))
-    }))
+        return this.remoteCall(
+          peer,
+          RemoteMethods.distributePubKey,
+          {
+            from: process.env.SIGN_WALLET_ADDRESS,
+            party: party.id,
+            key: key.id,
+            pubKeys: A_ik.map(pubKey => pubKey.encode('hex'))
+          }
+        )
+      }))
+    }
+    catch(e){
+      console.error(`tss-plugin.broadcastPubKey`, e)
+    }
   }
 
   getPartyPeers(party){
