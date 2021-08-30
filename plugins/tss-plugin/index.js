@@ -152,7 +152,7 @@ class TssPlugin extends BasePlugin {
           walletIndex,
           ... key.getFH(walletIndex),
         }
-      )
+      ).catch(e => console.error(`tss-plugin.broadcastKey`, e))
     }))
   }
 
@@ -184,7 +184,7 @@ class TssPlugin extends BasePlugin {
           key: key.id,
           pubKeys: A_ik.map(pubKey => pubKey.encode('hex'))
         }
-      )
+      ).catch(e => console.error(`tss-plugin.broadcastPubKey`, e))
     }))
   }
 
