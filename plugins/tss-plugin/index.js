@@ -126,6 +126,7 @@ class TssPlugin extends BasePlugin {
   }
 
   broadcastKey(key){
+    console.log(`broadcasting key shares ...`)
     let walletIndexes = this.muon.getNodesWalletIndex();
     let {party} = key;
 
@@ -139,6 +140,7 @@ class TssPlugin extends BasePlugin {
         return Promise.resolve(true);
 
       let walletIndex = walletIndexes[wallet]
+      console.log(`calling method ${RemoteMethods.distributeKey}`)
       return this.remoteCall(
         peer,
         RemoteMethods.distributeKey,
@@ -155,6 +157,7 @@ class TssPlugin extends BasePlugin {
   }
 
   async broadcastPubKey(key){
+    console.log(`broadcasting key shares Public ...`)
     // check either already distributed or not
     if(key.pubKeyDistributed)
       return;
