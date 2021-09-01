@@ -11,6 +11,7 @@ const MSG_TYPE_JOIN_PARTY_RES = 'join_party_response'
 const RemoteMethods = {
   joinToParty: 'joinToParty',
   setPartners: 'setPartners',
+  createKey: 'createKey',
   distributeKey: 'distributeKey',
   distributePubKey: 'distributePubKey',
 }
@@ -31,6 +32,7 @@ class TssPlugin extends BasePlugin {
 
     this.registerRemoteMethod(RemoteMethods.joinToParty, this.__joinToParty)
     this.registerRemoteMethod(RemoteMethods.setPartners, this.__setPartners)
+    this.registerRemoteMethod(RemoteMethods.createKey, this.__createKey)
     this.registerRemoteMethod(RemoteMethods.distributeKey, this.__distributeKey)
     this.registerRemoteMethod(RemoteMethods.distributePubKey, this.__distributePubKey)
   }
@@ -98,8 +100,7 @@ class TssPlugin extends BasePlugin {
   async keyGen(party){
     let t0 = Date.now()
     // 1- create new key
-    let key = new DKey(party)
-    this.keys[key.id] = key;
+    let key = await this.createKey(party)
     let t1 = Date.now()
     // 2- distribute key initialization
     await this.broadcastKey(key)
@@ -123,6 +124,28 @@ class TssPlugin extends BasePlugin {
       pubKey: key.getTotalPubKey(),
       address: tss.pub2addr(key.getTotalPubKey())
     }
+  }
+
+  async createKey(party){
+    // 1- create new key
+    let key = new DKey(party)
+    this.keys[key.id] = key;
+
+    await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+      if (wallet === process.env.SIGN_WALLET_ADDRESS)
+        return Promise.resolve(true);
+
+      return this.remoteCall(
+        peer,
+        RemoteMethods.createKey,
+        {
+          party: party.id,
+          key: key.id,
+        }
+      )
+    }))
+
+    return key;
   }
 
   broadcastKey(key){
@@ -321,6 +344,21 @@ class TssPlugin extends BasePlugin {
     this.parties[id].setPeers(peers)
   }
 
+  async __createKey(data={}){
+    let {parties, keys} = this
+    let {party, key} = data
+    if(!parties[party]) {
+      console.log('TssPlugin.__distributeKey>> party not fount on this node id: '+ party);
+      throw {message: 'party not found'}
+    }
+    if(!!keys[key]){
+      console.log(`TssPlugin.__createKey>> key already exist [${key}]`);
+      throw {message: `key already exist [${key}]`}
+    }
+    keys[key] = new DKey(parties[party], key)
+    return true;
+  }
+
   async __distributeKey(data={}){
     // console.log('__distributeKey', data)
     let {parties, keys} = this
@@ -329,9 +367,9 @@ class TssPlugin extends BasePlugin {
       console.log('TssPlugin.__distributeKey>> party not fount on this node id: '+ party);
       throw {message: 'party not found'}
     }
-    if(!keys[key]){
-      keys[key] = new DKey(parties[party], key)
-      this.broadcastKey(keys[key])
+    if(!keys[party]) {
+      console.log('TssPlugin.__distributeKey>> key not fount on this node id: '+ key);
+      throw {message: 'key not found'}
     }
     let fromIndex = this.muon.getNodesWalletIndex()[from]
     keys[key].setFH(fromIndex, f, h)
