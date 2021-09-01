@@ -134,6 +134,8 @@ class TssPlugin extends BasePlugin {
     let selfWalletIndex = walletIndexes[process.env.SIGN_WALLET_ADDRESS]
     let selfFH = key.getFH(selfWalletIndex)
     key.setFH(selfWalletIndex, selfFH.f, selfFH.h);
+    let A_ik = key.f_x.coefficients.map(a_k => a_k.getPublic())
+    key.setParticipantPubKeys(selfWalletIndex, A_ik)
 
     try {
       return Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
@@ -150,6 +152,7 @@ class TssPlugin extends BasePlugin {
             key: key.id,
             commitment: key.commitment.map(c => c.serialize()),
             walletIndex,
+            pubKeys: A_ik.map(pubKey => pubKey.encode('hex')),
             ...key.getFH(walletIndex),
           }
         )
@@ -160,42 +163,42 @@ class TssPlugin extends BasePlugin {
     }
   }
 
-  async broadcastPubKey(key){
-    console.log(`broadcasting key shares Public ...`)
-    // check either already distributed or not
-    if(key.pubKeyDistributed)
-      return;
-
-    key.pubKeyDistributed = true;
-
-    // Public key of f polynomial coefficients.
-    let A_ik = key.f_x.coefficients.map(a_k => a_k.getPublic())
-    // console.log({A_ik})
-    let fromIndex = this.muon.getNodesWalletIndex()[process.env.SIGN_WALLET_ADDRESS]
-    key.setParticipantPubKeys(fromIndex, A_ik)
-
-    let {party} = key;
-    try {
-      await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
-        if (wallet === process.env.SIGN_WALLET_ADDRESS)
-          return Promise.resolve(true);
-
-        return this.remoteCall(
-          peer,
-          RemoteMethods.distributePubKey,
-          {
-            from: process.env.SIGN_WALLET_ADDRESS,
-            party: party.id,
-            key: key.id,
-            pubKeys: A_ik.map(pubKey => pubKey.encode('hex'))
-          }
-        )
-      }))
-    }
-    catch(e){
-      console.error(`tss-plugin.broadcastPubKey`, e)
-    }
-  }
+  // async broadcastPubKey(key){
+  //   console.log(`broadcasting key shares Public ...`)
+  //   // check either already distributed or not
+  //   if(key.pubKeyDistributed)
+  //     return;
+  //
+  //   key.pubKeyDistributed = true;
+  //
+  //   // Public key of f polynomial coefficients.
+  //   let A_ik = key.f_x.coefficients.map(a_k => a_k.getPublic())
+  //   // console.log({A_ik})
+  //   let fromIndex = this.muon.getNodesWalletIndex()[process.env.SIGN_WALLET_ADDRESS]
+  //   key.setParticipantPubKeys(fromIndex, A_ik)
+  //
+  //   let {party} = key;
+  //   try {
+  //     await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+  //       if (wallet === process.env.SIGN_WALLET_ADDRESS)
+  //         return Promise.resolve(true);
+  //
+  //       return this.remoteCall(
+  //         peer,
+  //         RemoteMethods.distributePubKey,
+  //         {
+  //           from: process.env.SIGN_WALLET_ADDRESS,
+  //           party: party.id,
+  //           key: key.id,
+  //           pubKeys: A_ik.map(pubKey => pubKey.encode('hex'))
+  //         }
+  //       )
+  //     }))
+  //   }
+  //   catch(e){
+  //     console.error(`tss-plugin.broadcastPubKey`, e)
+  //   }
+  // }
 
   getPartyPeers(party){
     let partners = Object.values(party.partners).filter(({peerId}) => peerId!=process.env.PEER_ID)
@@ -321,7 +324,7 @@ class TssPlugin extends BasePlugin {
   async __distributeKey(data={}){
     // console.log('__distributeKey', data)
     let {parties, keys} = this
-    let {from, commitment, party, key, f, h} = data
+    let {from, commitment, party, key, pubKeys, f, h} = data
     if(!parties[party]) {
       console.log('TssPlugin.__distributeKey>> party not fount on this node id: '+ party);
       throw {message: 'party not found'}
@@ -334,9 +337,12 @@ class TssPlugin extends BasePlugin {
     keys[key].setFH(fromIndex, f, h)
     keys[key].setParticipantCommitment(fromIndex, commitment)
 
-    if(keys[key].isKeyDistributed()){
-      this.broadcastPubKey(keys[key])
-    }
+    pubKeys = pubKeys.map(pub => tss.curve.keyFromPublic(pub, 'hex').getPublic())
+    keys[key].setParticipantPubKeys(fromIndex, pubKeys)
+
+    // if(keys[key].isKeyDistributed()){
+    //   this.broadcastPubKey(keys[key])
+    // }
   }
 
   async __distributePubKey(data={}){
