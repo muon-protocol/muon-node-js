@@ -97,7 +97,7 @@ class RemoteCall extends BasePlugin {
     return this.getPeerCallStream(peer)
       .then(({stream}) => {
         if(!stream)
-          console.log('no stream call ...')
+          console.log('no stream call ... ')
         return this.callStream(stream, method, params)
       })
       .catch(e => {
