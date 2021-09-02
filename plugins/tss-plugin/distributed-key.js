@@ -18,10 +18,10 @@ class DistributedKey {
   keyParts = {};
   pubKeyParts = {};
   commitmentParts = {};
-  pubKeyDistributed = false;
-  sharedKey = new TimeoutPromise(5000, "DistributedKey timeout")
+  keyDistributed = false;
+  sharedKey = null;
 
-  constructor(party, id){
+  constructor(party, id, timeout){
     this.id = id || `K${Date.now()}${random()}`
     this.party = party;
     this.f_x = new Polynomial(party.t, tss.curve);
@@ -32,6 +32,7 @@ class DistributedKey {
     //   let H = tss.scalarMult(this.h_x.coefficients[i], tss.H)
     //   return tss.pointAdd(A, H)
     // })
+    this.sharedKey = new TimeoutPromise(timeout, "DistributedKey timeout")
   }
 
   setFH(fromIndex, f, h){

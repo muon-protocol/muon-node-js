@@ -128,10 +128,10 @@ class TssPlugin extends BasePlugin {
 
   async createKey(party){
     // 1- create new key
-    let key = new DKey(party)
+    let key = new DKey(party, null, 5000)
     this.keys[key.id] = key;
 
-    await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+    let keyCreationResult = await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
       if (wallet === process.env.SIGN_WALLET_ADDRESS)
         return Promise.resolve(true);
 
@@ -144,12 +144,13 @@ class TssPlugin extends BasePlugin {
         }
       )
     }))
-
+    console.log('key created '+ key.id, {keyCreationResult});
     return key;
   }
 
-  broadcastKey(key){
-    console.log(`broadcasting key shares ...`)
+  async broadcastKey(key){
+    console.log(`broadcasting key shares ...`, key.id)
+    key.keyDistributed = true;
     let walletIndexes = this.muon.getNodesWalletIndex();
     let {party} = key;
 
@@ -160,8 +161,7 @@ class TssPlugin extends BasePlugin {
     let A_ik = key.f_x.coefficients.map(a_k => a_k.getPublic())
     key.setParticipantPubKeys(selfWalletIndex, A_ik)
 
-    try {
-      return Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+    let distKeyResult = await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
         if (wallet === process.env.SIGN_WALLET_ADDRESS)
           return Promise.resolve(true);
 
@@ -180,10 +180,8 @@ class TssPlugin extends BasePlugin {
           }
         )
       }))
-    }
-    catch (e) {
-      console.error(`tss-plugin.broadcastKey`, e)
-    }
+    console.log('TssPlugin.broadcastKey', {distKeyResult})
+    return distKeyResult
   }
 
   // async broadcastPubKey(key){
@@ -345,6 +343,7 @@ class TssPlugin extends BasePlugin {
   }
 
   async __createKey(data={}){
+    console.log('TssPlugin.__createKey', data)
     let {parties, keys} = this
     let {party, key} = data
     if(!parties[party]) {
@@ -367,7 +366,7 @@ class TssPlugin extends BasePlugin {
       console.log('TssPlugin.__distributeKey>> party not fount on this node id: '+ party);
       throw {message: 'party not found'}
     }
-    if(!keys[party]) {
+    if(!keys[key]) {
       console.log('TssPlugin.__distributeKey>> key not fount on this node id: '+ key);
       throw {message: 'key not found'}
     }
@@ -378,9 +377,10 @@ class TssPlugin extends BasePlugin {
     pubKeys = pubKeys.map(pub => tss.curve.keyFromPublic(pub, 'hex').getPublic())
     keys[key].setParticipantPubKeys(fromIndex, pubKeys)
 
-    // if(keys[key].isKeyDistributed()){
-    //   this.broadcastPubKey(keys[key])
-    // }
+    if(!keys[key].keyDistributed){
+      this.broadcastKey(keys[key]).catch(console.error)
+    }
+    return true;
   }
 
   async __distributePubKey(data={}){
