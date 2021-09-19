@@ -508,7 +508,7 @@ class TssPlugin extends CallablePlugin {
           .catch(e => 'error')
       }))
     // console.log('TssPlugin.broadcastKey', {distKeyResult})
-    return distKeyResult
+    return distKeyResult;
   }
 
   // async broadcastPubKey(key){
