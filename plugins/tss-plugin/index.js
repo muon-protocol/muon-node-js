@@ -584,13 +584,13 @@ class TssPlugin extends CallablePlugin {
       case MSG_TYPE_NEED_GROUP: {
         let {peerId, wallet} = msg;
         this.nodesNeedGroup[wallet] = {peerId, wallet};
-        // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
+        console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
         break;
       }
       case MSG_TYPE_JOINED_TO_GROUP: {
         let {wallet} = msg;
         delete this.nodesNeedGroup[wallet];
-        // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
+        console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
         break;
       }
       case MSG_TYPE_JOIN_PARTY_REQ: {
