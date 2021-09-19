@@ -365,7 +365,7 @@ class TssPlugin extends CallablePlugin {
     if (this.joiningTssGroup)
       throw {message: 'Already joining to group'};
 
-    let party = new Party(t, this.TSS_MAX, null, 5000);
+    let party = new Party(t, this.TSS_MAX, null, 15000);
     this.newParty = party;
     this.parties[party.id] = party;
     this.joiningTssGroup = party.id;
