@@ -106,7 +106,7 @@ class TssParty {
       }, {})
   }
 
-  get walletIndecies(){
+  get walletIndexes(){
     let {partners} = this
     return Object.values(partners)
       .reduce((obj, p) => {
