@@ -686,9 +686,10 @@ class TssPlugin extends CallablePlugin {
     })
     let peers = await this.getPartyPeers(this.parties[id])
     this.parties[id].setPeers(peers)
-    if (config.isTssParty) {
+    // TODO: check here
+    // if (config.isTssParty) {
       this.tssParty = this.parties[id]
-    }
+    // }
     this.groupStatus = GroupStatus.Joined;
     this.joiningTssGroup = null;
     console.log('joined to group');
