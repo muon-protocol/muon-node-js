@@ -93,11 +93,11 @@ class TssPlugin extends CallablePlugin {
     while (!this.isReady) {
       try {
         // TODO: check this field changes.
-        this.groupStatus = GroupStatus.Checking;
+        // this.groupStatus = GroupStatus.Checking;
 
         let joinedToExistingGroup = await this.tryToJoinExistingGroup(3)
         if (joinedToExistingGroup) {
-          console.log('tss joined to existing group.')
+          console.log('tss joined to existing group.');
           break;
         }
 
