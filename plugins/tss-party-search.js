@@ -170,10 +170,10 @@ class TssPartySearchPlugin extends CallablePlugin {
     return this.muon.getPlugin('tss-plugin')
   }
 
-  async searchParty(){
+  async searchParty(numTry = 10){
     let {TSS_THRESHOLD, TSS_MAX} = this.tssPlugin;
-    let numTry = 10, search;
-    while (numTry > 0) {
+    let n = numTry, search;
+    while (n > 0) {
       try {
         console.log('trying to find existing tss group ...')
         search = new Search(TSS_THRESHOLD, TSS_MAX);
@@ -196,7 +196,7 @@ class TssPartySearchPlugin extends CallablePlugin {
         console.log('TsPlugin.searchParty', e, e.stack)
       }
       timeout(5000);
-      numTry--;
+      n--;
     }
     return null
   }

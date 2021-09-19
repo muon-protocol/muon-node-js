@@ -77,7 +77,6 @@ class TssPlugin extends CallablePlugin {
   }
 
   async joinToGroup() {
-
     try {
       /**
        * check and load previews tss config.
@@ -87,25 +86,34 @@ class TssPlugin extends CallablePlugin {
         console.log('tss loaded from storage.')
         return true
       }
-
-      let joinedToExistingGroup = await this.tryToJoinExistingGroup()
-      if (joinedToExistingGroup) {
-        console.log('tss joined to existing group.')
-        return true
-      }
-
-      // TODO: check this field changes.
-      this.groupStatus = GroupStatus.ReadyToJoin;
-
-      /**
-       * if previews config cannot be loaded, create and save new one
-       */
-      await this.tryToCreateTssParty();
-
-      this.groupStatus = GroupStatus.Joined;
     } catch (e) {
-      console.error('TssPlugin.joinToGroup', e, e.stack);
+      console.error('TssPlugin.joinToGroup', e, e.stack)
     }
+
+    while (!this.isReady) {
+      try {
+        // TODO: check this field changes.
+        this.groupStatus = GroupStatus.Checking;
+
+        let joinedToExistingGroup = await this.tryToJoinExistingGroup(10)
+        if (joinedToExistingGroup) {
+          console.log('tss joined to existing group.')
+          break;
+        }
+
+        // TODO: check this field changes.
+        this.groupStatus = GroupStatus.ReadyToJoin;
+
+        /**
+         * if previews config cannot be loaded, create and save new one
+         */
+        await this.tryToCreateTssParty(10);
+      } catch (e) {
+        console.error('TssPlugin.joinToGroup', e, e.stack);
+      }
+    }
+
+    this.groupStatus = GroupStatus.Joined;
   }
 
   async loadSavedTss() {
@@ -184,8 +192,8 @@ class TssPlugin extends CallablePlugin {
     this.muon.saveConfig(tssConfig, 'tss.conf.json')
   }
 
-  async tryToJoinExistingGroup() {
-    let partyToJoin = await this.muon.getPlugin('tss-party-search').searchParty();
+  async tryToJoinExistingGroup(numTry = 10) {
+    let partyToJoin = await this.muon.getPlugin('tss-party-search').searchParty(numTry);
     // console.log({partyToJoin})
     if (!partyToJoin)
       return false
@@ -268,14 +276,15 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
-  async tryToCreateTssParty() {
+  async tryToCreateTssParty(numTry) {
     /**
      * If failed, retry after 5 seconds.
      *
      */
-    while (!this.isReady) {
+    let n = numTry
+    while (n > 0) {
       await timeout(5000 + parseInt(15000 * Math.random()))
-      console.log('trying to connect to tss group ...')
+      console.log('trying to create a new tss group ...')
       try {
         let party = await this.makeParty(this.TSS_THRESHOLD, {config: {isTssParty: true}});
         this.tssParty = party;
@@ -305,6 +314,7 @@ class TssPlugin extends CallablePlugin {
       } catch (e) {
         console.error('TssPlugin.tryToCreateTssParty', e, e.stack);
       }
+      n--;
     }
   }
 
@@ -542,7 +552,7 @@ class TssPlugin extends CallablePlugin {
       case MSG_TYPE_JOIN_PARTY_REQ: {
         if (this.groupStatus !== GroupStatus.ReadyToJoin)
           return;
-        let {id, peerId} = msg;;
+        let {id, peerId} = msg;
         /**
          * Join to the group with lower id, on concurrent request.
          * Ignore if id is grater than current group id.
@@ -556,7 +566,7 @@ class TssPlugin extends CallablePlugin {
         this.clearTimeout = setTimeout(() => {
           this.clearTimeout = null;
           this.joiningTssGroup = null
-        }, 3000)
+        }, 6000)
         let peer = await this.findPeer(peerId)
         await this.remoteCall(
           peer,

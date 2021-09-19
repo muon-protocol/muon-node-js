@@ -80,16 +80,6 @@ class TssParty {
     return Object.keys(partners).length >= max;
   }
 
-  get onlinePartners(){
-    let {partners} = this
-    return Object.values(partners)
-      .filter(p => (!!p.peer || p.wallet===process.env.SIGN_WALLET_ADDRESS))
-      .reduce((obj, p) => {
-        obj[p.wallet] = p
-        return obj;
-      }, {})
-  }
-
   getPeers(){
     let peersWallet = Object.keys(this.partners).filter(wallet => wallet !== process.env.SIGN_WALLET_ADDRESS)
     return peersWallet.map(w => this.partners[w].peer).filter(p => !!p)
@@ -107,13 +97,13 @@ class TssParty {
   }
 
   get onlinePartners(){
-    let {partners} = this;
-    let onlineList = Object.values(partners)
-      .filter(({wallet, peer}) => (!!peer || wallet === process.env.SIGN_WALLET_ADDRESS))
-    return onlineList.reduce((obj, p) => {
-      obj[p.wallet] = p
-      return obj;
-    }, {})
+    let {partners} = this
+    return Object.values(partners)
+      .filter(p => (!!p.peer || p.wallet===process.env.SIGN_WALLET_ADDRESS))
+      .reduce((obj, p) => {
+        obj[p.wallet] = p
+        return obj;
+      }, {})
   }
 }
 
