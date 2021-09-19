@@ -178,7 +178,7 @@ class Muon extends Events {
 
   getNodesWalletIndex() {
     // return MUON_WALLETS_INDEX
-    let tssPlugin = this.getPlugin('tss-plugin')
+    let tssPlugin = this.getPlugin('tss-plugin');
     // let partners = tssPlugin.tssKey.party.partners;
     if(!tssPlugin.tssParty)
       return {};
