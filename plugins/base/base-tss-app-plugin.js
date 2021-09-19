@@ -56,10 +56,12 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let party = tssPlugin.getParty(partyId)
     let nonce = tssPlugin.getSharedKey(nonceId)
 
-    Object.values(party.onlinePartners)
-      .filter(({wallet}) => wallet!==process.env.SIGN_WALLET_ADDRESS)
-      .map(async ({peer}) => {
-        this.remoteCall(peer, 'wantSign', request)
+    Object.values(party.partners)
+      .filter(({wallet}) => nonce.partners.includes(wallet))
+      .map(async ({peer, wallet}) => {
+        if(wallet === process.env.SIGN_WALLET_ADDRESS)
+          return true;
+        return this.remoteCall(peer, 'wantSign', request)
           .then(this.__onRemoteSignRequest.bind(this))
           .catch(e => {
             // console.log('base-tss-app-plugin: on broadcast request error', e)
