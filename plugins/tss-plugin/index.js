@@ -691,7 +691,7 @@ class TssPlugin extends CallablePlugin {
       this.tssParty = this.parties[id]
     // }
     this.groupStatus = GroupStatus.Joined;
-    this.joiningTssGroup = null;
+    // this.joiningTssGroup = null;
     console.log('joined to group');
   }
 
