@@ -330,7 +330,7 @@ class TssPlugin extends CallablePlugin {
 
     if (defaultPeers) {
       // TODO: not implemented
-      throw {message: "not implemented"}
+      throw {message: "not implemented"};
     } else {
       this.broadcast({
         type: MSG_TYPE_JOIN_PARTY_REQ,
