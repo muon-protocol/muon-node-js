@@ -8,7 +8,9 @@ const {toBN} = require('../../utils/tss/utils')
 const path = require('path')
 const {timeout} = require('../../utils/helpers');
 
-const MSG_TYPE_JOIN_PARTY_REQ = 'join_party_request';
+const MSG_TYPE_NEED_GROUP = 'MSG_TYPE_NEED_GROUP';
+const MSG_TYPE_JOINED_TO_GROUP = 'MSG_TYPE_JOINED_TO_GROUP';
+const MSG_TYPE_JOIN_PARTY_REQ = 'MSG_TYPE_JOIN_PARTY_REQ';
 
 const RemoteMethods = {
   joinToParty: 'joinToParty',
@@ -39,6 +41,8 @@ class TssPlugin extends CallablePlugin {
   keys = {}
   tssKey = null;
   tssParty = null;
+
+  nodesNeedGroup = {}
 
   constructor(...params) {
     super(...params)
@@ -100,6 +104,10 @@ class TssPlugin extends CallablePlugin {
           console.log('tss joined to existing group.');
           break;
         }
+
+        if(this.isReady)
+          break;
+        this.informNeedGroup();
 
         // TODO: check this field changes.
         this.groupStatus = GroupStatus.ReadyToJoin;
@@ -168,6 +176,22 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
+  informNeedGroup(){
+    this.broadcast({
+      type: MSG_TYPE_NEED_GROUP,
+      peerId: process.env.PEER_ID,
+      wallet: process.env.SIGN_WALLET_ADDRESS,
+    })
+  }
+
+  informJoinedToGroup() {
+    this.broadcast({
+      type: MSG_TYPE_JOINED_TO_GROUP,
+      peerId: process.env.PEER_ID,
+      wallet: process.env.SIGN_WALLET_ADDRESS,
+    })
+  }
+
   saveTssConfig(party, key) {
     let tssConfig = {
       party: {
@@ -189,6 +213,8 @@ class TssPlugin extends CallablePlugin {
       }
     }
     // console.log('TssPlugin.saveTssConfig', tssConfig);
+
+    // console.log('save config temporarily disabled for test.')
     this.muon.saveConfig(tssConfig, 'tss.conf.json')
   }
 
@@ -276,45 +302,50 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
-  async tryToCreateTssParty(numTry) {
+  async tryToCreateTssParty() {
+    let {nodesNeedGroup, TSS_THRESHOLD} = this;
     /**
-     * If failed, retry after 5 seconds.
-     *
+     * needs at least TSS_THRESHOLD number of nodes.
      */
-    let n = numTry
-    while (n > 0) {
-      await timeout(5000 + parseInt(15000 * Math.random()))
-      console.log('trying to create a new tss group ...')
-      try {
-        let party = await this.makeParty(this.TSS_THRESHOLD, {config: {isTssParty: true}});
-        this.tssParty = party;
+    if(Object.keys(nodesNeedGroup).length < TSS_THRESHOLD-1)
+      return;
+    let selfWallet = process.env.SIGN_WALLET_ADDRESS
+    let wallets = Object.keys(nodesNeedGroup);
+    /**
+     * lower wallet address has more priority to create group
+     */
+    if(wallets.findIndex(w => w.toLowerCase() < selfWallet.toLowerCase()) >= 0)
+      return;
 
-        let key = await this.keyGen(party);
-        let callResult = await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
-          if (wallet === process.env.SIGN_WALLET_ADDRESS)
-            return Promise.resolve(true);
+    console.log('trying to create a new tss group ...')
+    try {
+      let party = await this.makeParty(this.TSS_THRESHOLD, {config: {isTssParty: true}});
+      this.tssParty = party;
 
-          return this.remoteCall(
-            peer,
-            RemoteMethods.storeTssKey,
-            {
-              party: party.id,
-              key: key.id,
-            }
-          ).catch(() => false)
-        }))
-        this.saveTssConfig(party, key)
+      let key = await this.keyGen(party)
+      let callResult = await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+        if (wallet === process.env.SIGN_WALLET_ADDRESS)
+          return Promise.resolve(true);
 
-        this.parties[party.id] = party
-        this.keys[key.id] = key
-        this.tssKey = key;
-        this.isReady = true;
-        console.log('tss ready.')
-        break;
-      } catch (e) {
-        console.error('TssPlugin.tryToCreateTssParty', e, e.stack);
-      }
-      n--;
+        return this.remoteCall(
+          peer,
+          RemoteMethods.storeTssKey,
+          {
+            party: party.id,
+            key: key.id,
+          }
+        ).catch(() => false)
+      }))
+      this.saveTssConfig(party, key)
+
+      this.parties[party.id] = party
+      this.keys[key.id] = key
+      this.tssKey = key;
+      this.isReady = true;
+      this.informJoinedToGroup()
+      console.log('tss ready.')
+    } catch (e) {
+      console.error('TssPlugin.tryToCreateTssParty', e, e.stack);
     }
   }
 
@@ -335,6 +366,7 @@ class TssPlugin extends CallablePlugin {
       throw {message: 'Already joining to group'};
 
     let party = new Party(t, this.TSS_MAX, null, 5000);
+    this.newParty = party;
     this.parties[party.id] = party;
     this.joiningTssGroup = party.id;
 
@@ -549,6 +581,18 @@ class TssPlugin extends CallablePlugin {
   async handleBroadcastMessage(msg) {
     // console.log('tss-plugin.handleBroadcastMessage', msg);
     switch (msg.type) {
+      case MSG_TYPE_NEED_GROUP: {
+        let {peerId, wallet} = msg;
+        this.nodesNeedGroup[wallet] = {peerId, wallet};
+        // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
+        break;
+      }
+      case MSG_TYPE_JOINED_TO_GROUP: {
+        let {wallet} = msg;
+        delete this.nodesNeedGroup[wallet];
+        // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
+        break;
+      }
       case MSG_TYPE_JOIN_PARTY_REQ: {
         if (this.groupStatus !== GroupStatus.ReadyToJoin)
           return;
@@ -562,7 +606,7 @@ class TssPlugin extends CallablePlugin {
         console.log(`joining to group ${id}`)
         this.joiningTssGroup = id;
         if(this.clearTimeout)
-          clearTimeout(this.clearTimeout)
+          clearTimeout(this.clearTimeout);
         this.clearTimeout = setTimeout(() => {
           this.clearTimeout = null;
           this.joiningTssGroup = null
@@ -782,6 +826,7 @@ class TssPlugin extends CallablePlugin {
     this.saveTssConfig(party, key);
     this.tssKey = key
     this.isReady = true;
+    this.informJoinedToGroup()
     console.log('save done')
     return true;
   }

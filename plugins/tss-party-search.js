@@ -136,7 +136,7 @@ class TssPartySearchPlugin extends CallablePlugin {
   }
 
   async handleBroadcastMessage(msg){
-    console.log('TssPartySearch.handleBroadcastMessage', msg);
+    // console.log('TssPartySearch.handleBroadcastMessage', msg);
     let tssPlugin = this.muon.getPlugin('tss-plugin')
     switch (msg.type) {
       case MSG_TYPE_PARTY_SEARCH_REQ:{
