@@ -105,6 +105,15 @@ class TssParty {
         return obj;
       }, {})
   }
+
+  get walletIndecies(){
+    let {partners} = this
+    return Object.values(partners)
+      .reduce((obj, p) => {
+        obj[p.wallet] = p.i
+        return obj;
+      }, {})
+  }
 }
 
 module.exports = TssParty;

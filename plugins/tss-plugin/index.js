@@ -462,14 +462,15 @@ class TssPlugin extends CallablePlugin {
   }
 
   getNodesWalletIndex(party) {
-    return Object.keys(party.partners).reduce((obj, w) => ({...obj, [w]: party.partners[w].i}), {})
+    return party.walletIndexes
   }
 
   async broadcastKey(key) {
     // console.log(`broadcasting key shares ...`, key.id)
     key.keyDistributed = true;
-    let walletIndexes = this.muon.getNodesWalletIndex();
     let {party} = key;
+    // let walletIndexes = this.muon.getNodesWalletIndex();
+    let walletIndexes = party.walletIndexes;
 
     // set key self FH
 
@@ -784,7 +785,8 @@ class TssPlugin extends CallablePlugin {
     }
     keys[key].partners = partners
 
-    let fromIndex = this.muon.getNodesWalletIndex()[from]
+    // let fromIndex = this.muon.getNodesWalletIndex()[from]
+    let fromIndex = parties[party].walletIndexes[from]
     keys[key].setFH(fromIndex, f, h)
     keys[key].setParticipantCommitment(fromIndex, commitment)
 
@@ -809,7 +811,8 @@ class TssPlugin extends CallablePlugin {
       console.error('TssPlugin.__distributePubKey>> distributed key not found')
       throw {message: 'distributed key not found'}
     }
-    let fromIndex = this.getNodesWalletIndex(parties[party])[from]
+    // let fromIndex = this.getNodesWalletIndex(parties[party])[from]
+    let fromIndex = parties[party].walletIndexes[from]
     pubKeys = pubKeys.map(pub => tssModule.curve.keyFromPublic(pub, 'hex').getPublic())
     keys[key].setParticipantPubKeys(fromIndex, pubKeys)
   }
