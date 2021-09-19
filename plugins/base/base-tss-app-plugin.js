@@ -27,26 +27,16 @@ class BaseTssAppPlugin extends BaseAppPlugin {
   }
 
   async _onArrive(request){
-    let {nSign} = request;
-    let t1 = Date.now()
     let tssPlugin = this.muon.getPlugin(`tss-plugin`)
     if(!tssPlugin.isReady){
       throw {message: 'Tss not initialized'};
     }
     let party = tssPlugin.tssKey.party;
-    let t2 = Date.now()
     // console.log('party generation done.')
     if(!party)
       throw {message: 'party not generated'}
 
     let nonce = await tssPlugin.keyGen(party)
-
-    let now = Date.now();
-    console.log('nonce key generation', {
-      partyTime: t2-t1,
-      keyTime: now - t2,
-      total: now-t1
-    })
 
     // let sign = tssPlugin.sign(null, party);
     return {

@@ -456,7 +456,7 @@ class TssPlugin extends CallablePlugin {
           ).catch(e => 'error')
         })
     )
-    // console.log('key created '+ key.id, {callResult});
+    console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
     key.partners = partners.filter((p, i) => callResult[i]!=='error').map(p => p.wallet)
     return key;
   }
