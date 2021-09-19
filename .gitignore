@@ -44,3 +44,4 @@ Thumbs.db
 # Environment files
 *.env
 .venv*
+*.conf.json

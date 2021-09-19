@@ -3,6 +3,7 @@
   "ignore": [
     "*.test.js",
     "__test__/*",
+    "config/",
     "fixtures/*"
   ]
 }

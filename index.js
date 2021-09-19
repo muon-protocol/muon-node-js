@@ -7,6 +7,7 @@ const BaseService = require('./plugins/base/base-service-plugin')
 const BaseTssApp = require('./plugins/base/base-tss-app-plugin')
 const Gateway = require('./gateway/index')
 require('./core/global')
+const bootstrap = require('./core/bootstrap')
 
 function getEnvBootstraps() {
   return Object.keys(process.env)
@@ -83,9 +84,19 @@ function getGeneralApps() {
 var muon;
 
 (async () => {
+  let config = await bootstrap();
+  let {
+    net,
+    peerId,
+    account,
+    tss,
+    ... otherConfigs
+  } = config
   try {
     muon = new Muon({
       libp2p: {
+        // TODO: replace env.peerId with config.peerId
+        // nodeId: peerId,
         nodeId: {
           id: process.env.PEER_ID,
           pubKey: process.env.PEER_PUBLIC_KEY,
@@ -104,11 +115,18 @@ var muon;
         'content-verify': [require('./plugins/content-verify-plugin'), {}],
         'content': [require('./plugins/content-app'), {}],
         'memory': [require('./plugins/memory-plugin'), {}],
+        'nodes-info': [require('./plugins/nodes-info-collector'), {}],
+        'tss-plugin': [require('./plugins/tss-plugin'), {}],
+        'tss-party-search': [require('./plugins/tss-party-search'), {}],
         // 'presale': [require('./plugins/muon-presale-plugin'), {}],
         ...getEnvPlugins(),
         ...getCustomApps(),
         ...await getGeneralApps(),
-      }
+      },
+      net,
+      account,
+      tss,
+      ...otherConfigs,
     })
 
     await muon.initialize();
@@ -120,7 +138,7 @@ var muon;
       port: process.env.GATEWAY_PORT,
     })
   } catch (e) {
-    console.error(e)
+    console.error(e);
     throw e
   }
 })()

@@ -8,8 +8,19 @@ const assert = require('assert')
 const random = () => Math.floor(Math.random()*9999999)
 
 class DistributedKey {
+  /**
+   * id of key
+   * @type {number}
+   */
   id = 0;
+  /**
+   * party that this key created from.
+   */
   party = null;
+  /**
+   * partners of party, that cooperate to create this key
+   */
+  partners = [];
   f_x = null
   h_x = null;
   // pedersen commitment
@@ -19,7 +30,11 @@ class DistributedKey {
   pubKeyParts = {};
   commitmentParts = {};
   keyDistributed = false;
-  sharedKey = null;
+  timeoutPromise = null;
+
+  share = null;
+  publicKey = null
+  address = null
 
   constructor(party, id, timeout){
     this.id = id || `K${Date.now()}${random()}`
@@ -32,7 +47,18 @@ class DistributedKey {
     //   let H = tss.scalarMult(this.h_x.coefficients[i], tss.H)
     //   return tss.pointAdd(A, H)
     // })
-    this.sharedKey = new TimeoutPromise(timeout, "DistributedKey timeout")
+    this.timeoutPromise = new TimeoutPromise(timeout, "DistributedKey timeout")
+  }
+
+  static load(party, _key){
+    let key = new DistributedKey(party, _key.id);
+    key.id = _key.id;
+    key.f_x = null;
+    key.h_x = null;
+    key.share = _key.share;
+    key.publicKey = _key.publicKey
+    key.timeoutPromise.resolve(key);
+    return key
   }
 
   setFH(fromIndex, f, h){
@@ -55,7 +81,9 @@ class DistributedKey {
     this.pubKeyParts[fromIndex] = A_ik
     if(this.isPubKeyDistributed()){
       let fh = this.getTotalFH()
-      this.sharedKey.resolve(fh)
+      this.share = fh.f;
+      this.publicKey = this.getTotalPubKey();
+      this.timeoutPromise.resolve(this)
     }
   }
 
@@ -98,7 +126,11 @@ class DistributedKey {
   }
 
   getTotalPubKey(){
-    assert(Object.keys(this.pubKeyParts).length >= this.party.t, "DistributedKey is not completed for computing totalPubKey.")
+    assert(
+      // TODO: replace with this.partners.length
+      Object.keys(this.pubKeyParts).length >= this.party.t,
+      `DistributedKey is not completed for computing totalPubKey. {t: ${this.party.t}, n: ${Object.keys(this.pubKeyParts).length}}`
+    )
     // calculate shared key
     let totalPubKey = null
     for(const [i, A_ik] of Object.entries(this.pubKeyParts)){
@@ -108,19 +140,20 @@ class DistributedKey {
   }
 
   isKeyDistributed(){
-    let {keyParts, party: {t, partners}} = this
+    let {keyParts, party: {t, partners, onlinePartners}} = this
     // All nodes (except current node) must share their part of shared key.
-    return Object.keys(keyParts).length >= Object.keys(partners).length-1;
+    return Object.keys(keyParts).length >= Object.keys(onlinePartners).length-1;
   }
 
   isPubKeyDistributed(){
-    let {pubKeyParts, party: {t, partners}} = this
+    let {pubKeyParts, party: {t, partners, onlinePartners}} = this
     // All nodes must share their part of shared key.
-    return Object.keys(pubKeyParts).length >= Object.keys(partners).length;
+    // return Object.keys(pubKeyParts).length >= Object.keys(onlinePartners).length;
+    return Object.keys(pubKeyParts).length === this.partners.length;
   }
 
-  getSharedKey(){
-    return this.sharedKey.promise;
+  waitToFulfill(){
+    return this.timeoutPromise.promise;
   }
 }
 

@@ -1,6 +1,8 @@
 const BasePlugin = require('./base/base-plugin.js')
 const pipe = require('it-pipe')
 const {newCallId} = require('../utils/helpers')
+const uint8ArrayToString = require('uint8arrays/to-string')
+const crypto = require('../utils/crypto')
 
 const PROTOCOL = '/muon/remote-call/1.0.0'
 
@@ -11,8 +13,8 @@ class RemoteCall extends BasePlugin {
     this.muon.libp2p.handle(PROTOCOL, this.handler.bind(this))
   }
 
-  handleCall(callId, method, params, responseStream){
-    return this.emit(`remote:${method}`, params)
+  handleCall(callId, method, params, callerWallet, responseStream, peerId){
+    return this.emit(`remote:${method}`, params, {wallet: callerWallet, peerId})
       .then(result => {
         let response = {
           responseId: callId,
@@ -32,12 +34,15 @@ class RemoteCall extends BasePlugin {
       })
   }
 
-  async handleIncomingMessage(message, stream){
+  async handleIncomingMessage(signAndMessage, stream, peerId){
     try {
+      let [sign, message] = signAndMessage.toString().split('|')
+      let sigOwner = crypto.recover(message, sign)
+      // TODO: filter out unrecognized wallets message.
       let data = JSON.parse(message)
       if('method' in data) {
         let {callId, method, params={}} = data;
-        await this.handleCall(callId, method, params, stream);
+        await this.handleCall(callId, method, params, sigOwner, stream, peerId);
       }
       else if('responseId' in data){
         let {responseId, response=undefined, error=undefined} = data;
@@ -54,14 +59,14 @@ class RemoteCall extends BasePlugin {
     }
   }
 
-  async handler ({ connection, stream }) {
+  async handler ({ connection, stream , ...otherOptions}) {
     try {
       await pipe(
         stream,
         async (source) => {
           for await (const message of source) {
             // console.info(`Remote call ${connection.remotePeer.toB58String()}`, message)
-            this.handleIncomingMessage(message, stream)
+            this.handleIncomingMessage(message, stream, connection.remotePeer)
           }
         }
       )
@@ -73,14 +78,16 @@ class RemoteCall extends BasePlugin {
     }
   }
 
-  async send (data, stream) {
+  async send (data, stream, peer) {
+    let strData = JSON.stringify(data)
+    let signature = crypto.sign(strData)
     try {
       await pipe(
-        [JSON.stringify(data)],
+        [`${signature}|${strData}`],
         stream,
         async (source) => {
           for await (const message of source) {
-            this.handleIncomingMessage(message, stream)
+            this.handleIncomingMessage(message, stream, peer)
           }
         }
       )
@@ -98,7 +105,7 @@ class RemoteCall extends BasePlugin {
       .then(({stream}) => {
         if(!stream)
           console.log('no stream call ... ')
-        return this.callStream(stream, method, params)
+        return this.callStream(stream, peer, method, params)
       })
       .catch(e => {
         console.error(`RemoteCall.call(peer, '${method}', params)`, e)
@@ -106,9 +113,9 @@ class RemoteCall extends BasePlugin {
       })
   }
 
-  callStream(stream, method, params){
+  callStream(stream, peer, method, params){
     let callId = newCallId();
-    this.send({callId, method, params}, stream)
+    this.send({callId, method, params}, stream, peer)
     let remoteResult = new RemoteResult()
     this._calls[callId] = remoteResult;
     // TODO: clear this._calls[callID] when remoteResult fullFilled.

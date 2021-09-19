@@ -261,29 +261,37 @@ function shareKey(privateKey, t, n, indices, polynomial) {
 //   return prod(arr);
 // }
 
-function lagrangeCoef(j, t, shares) {
+function lagrangeCoef(j, t, shares, index) {
+  let _x = BN.isBN(index) ? index : toBN(index);
   let prod = arr => arr.reduce((acc, current) => acc.mul(current), toBN(1));
   let x_j = toBN(shares[j].i)
   let arr = range(0, t).filter(k => k!==j).map(k => {
     let x_k = toBN(shares[k].i)
     // [numerator, denominator]
-    return [x_k.neg(), x_j.sub(x_k)]
+    return [_x.sub(x_k), x_j.sub(x_k)]
   });
   let numerator = prod(arr.map(a => a[0]))
   let denominator = prod(arr.map(a => a[1]))
   return numerator.mul(denominator.invm(curve.n));
 }
 
-function reconstructKey(shares, t) {
+function reconstructKey(shares, t, index=0) {
   assert(shares.length >= t);
-  let sum = new BigNumber(0);
+  let sum = toBN(0);
   for (let j = 0; j < t; j++) {
-    let coef = lagrangeCoef(j, t, shares)
-    let key = new BigNumber(shares[j].key.getPrivate().toString())
-    sum = sum.plus(key.multipliedBy(coef))
+    let coef = lagrangeCoef(j, t, shares, index)
+    let key = shares[j].key.getPrivate()
+    sum = sum.add(key.mul(coef))
   }
-  sum = toBN('0x'+sum.integerValue().toString(16))
   return sum.umod(curve.n);
+}
+
+function addKeys(key1, key2) {
+  return key1.add(key2).umod(curve.n)
+}
+
+function subKeys(key1, key2) {
+  return key1.sub(key2).umod(curve.n)
 }
 
 function keyFromPrivate(prv) {
@@ -348,7 +356,7 @@ function schnorrAggregateSigs(t, sigs, indices){
   assert(sigs.length >= t);
   let ts = toBN(0)
   range(0, t).map(j => {
-    let coef = lagrangeCoef(j, t, indices.map(i => ({i})));
+    let coef = lagrangeCoef(j, t, indices.map(i => ({i})), 0);
     ts.iadd(sigs[j].s.mul(coef))
   })
   let s = ts.umod(curve.n)
@@ -367,6 +375,8 @@ module.exports = {
   lagrangeCoef,
   reconstructKey,
   toBN,
+  addKeys,
+  subKeys,
   keyFromPrivate,
   keyFromPublic,
   key2pub,

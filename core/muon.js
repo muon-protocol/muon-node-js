@@ -6,6 +6,8 @@ const Node = require('./libp2p_bundle')
 const chalk = require('chalk')
 const emoji = require('node-emoji')
 const tss = require('../utils/tss')
+const fs = require('fs')
+const TimeoutPromise = require('./timeout-promise')
 
 /**
  * Each wallet has a unique known index and will never change.
@@ -53,6 +55,7 @@ class Muon extends Events {
   constructor(configs) {
     super()
     this.configs = configs
+    this.firstPeerConnect = new TimeoutPromise();
   }
 
   async initialize() {
@@ -79,22 +82,8 @@ class Muon extends Events {
       }
     })
 
-    libp2p.connectionManager.on('peer:connect', (connection) => {
-      console.log(
-        emoji.get('moon'),
-        chalk.blue(' Node connected to '),
-        emoji.get('large_blue_circle'),
-        chalk.blue(` ${connection.remotePeer.toB58String()}`)
-      )
-    })
-
-    libp2p.on('peer:discovery', function (peerId) {
-      console.log('found peer: ', peerId.toB58String())
-    })
-
-    // setInterval(() => {
-    //   nodeListener.pubsub.publish(REQUEST_BROADCAST_CHANNEL, uint8ArrayFromString('Hello world.'))
-    // }, 1000)
+    libp2p.connectionManager.on('peer:connect', this.onPeerConnect.bind(this))
+    libp2p.on('peer:discovery', this.onPeerDiscovery.bind(this))
 
     this.peerId = peerId
     this.libp2p = libp2p
@@ -113,6 +102,21 @@ class Muon extends Events {
     return this._plugins[pluginName]
   }
 
+  onPeerConnect(connection){
+    console.log(
+      emoji.get('moon'),
+      chalk.blue(' Node connected to '),
+      emoji.get('large_blue_circle'),
+      chalk.blue(` ${connection.remotePeer.toB58String()}`)
+    )
+    this.firstPeerConnect.resolve(true)
+  }
+
+  onPeerDiscovery(peerId){
+    this.firstPeerConnect.resolve(true)
+    console.log('found peer: ', peerId.toB58String())
+  }
+
   getAppByName(appName) {
     if (!appName) return null
     let keys = Object.keys(this._plugins)
@@ -126,7 +130,7 @@ class Muon extends Events {
   async start() {
     console.log(
       emoji.get('moon'),
-      chalk.green(` peer [${process.env.PEER_ID}] starting ...`)
+      chalk.green(` peer [${this.peerId.toB58String()}] starting ...`)
     )
     await this.libp2p.start()
 
@@ -144,7 +148,11 @@ class Muon extends Events {
     }
   }
 
-  _onceStarted() {
+  async _onceStarted() {
+    console.log('waiting for first peer connect ...');
+    // wait for first peer connect;
+    await this.firstPeerConnect.waitToFulfill();
+
     console.log('muon started')
     for (let pluginName in this._plugins) {
       this._plugins[pluginName].onStart()
@@ -152,7 +160,9 @@ class Muon extends Events {
   }
 
   getSharedWalletPubKey() {
-    return this.sharedWalletPubKey
+    // return this.sharedWalletPubKey
+    let tssPlugin = this.getPlugin('tss-plugin')
+    return tssPlugin.tssKey.publicKey
   }
 
   getSharedWalletAddress() {
@@ -160,11 +170,33 @@ class Muon extends Events {
   }
 
   getNodesWalletList() {
-    return Object.keys(MUON_WALLETS_INDEX)
+    // return Object.keys(MUON_WALLETS_INDEX)
+    let tssPlugin = this.getPlugin('tss-plugin')
+    let partners = tssPlugin.tssKey.party.partners;
+    return Object.keys(partners);
   }
 
   getNodesWalletIndex() {
-    return MUON_WALLETS_INDEX
+    // return MUON_WALLETS_INDEX
+    let tssPlugin = this.getPlugin('tss-plugin')
+    // let partners = tssPlugin.tssKey.party.partners;
+    if(!tssPlugin.tssParty)
+      return {};
+    let partners = tssPlugin.tssParty.partners;
+    return Object.keys(partners).reduce((obj, w) => ({...obj, [w]: partners[w].i}), {})
+  }
+
+  get peerIdStr(){
+    return this.peerId.toB58String();
+  }
+
+  get configDir(){
+    let baseDir = `${process.env.PWD}/config/`
+    return !!process.env.CONFIG_BASE_PATH ? `${baseDir}${process.env.CONFIG_BASE_PATH}/` : baseDir
+  }
+
+  saveConfig(data, fileName){
+    fs.writeFileSync(`${this.configDir}/${fileName}`, JSON.stringify(data, null, 2))
   }
 }
 
