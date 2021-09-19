@@ -740,7 +740,7 @@ class TssPlugin extends CallablePlugin {
       return null;
 
     let {nonce: nonceId} = data
-    if (nonceId === tssKey.id)
+    if (!!tssKey && nonceId === tssKey.id)
       return null;
 
     let nonce = this.keys[nonceId]
