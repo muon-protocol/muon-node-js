@@ -274,7 +274,7 @@ class TssPlugin extends CallablePlugin {
      *
      */
     while (!this.isReady) {
-      await timeout(5000 + parseInt(5000 * Math.random()))
+      await timeout(5000 + parseInt(15000 * Math.random()))
       console.log('trying to connect to tss group ...')
       try {
         let party = await this.makeParty(this.TSS_THRESHOLD, {config: {isTssParty: true}});
@@ -551,7 +551,12 @@ class TssPlugin extends CallablePlugin {
           return;
         console.log(`joining to group ${id}`)
         this.joiningTssGroup = id;
-        setTimeout(() => this.joiningTssGroup = null, 6000)
+        if(this.clearTimeout)
+          clearTimeout(this.clearTimeout)
+        this.clearTimeout = setTimeout(() => {
+          this.clearTimeout = null;
+          this.joiningTssGroup = null
+        }, 3000)
         let peer = await this.findPeer(peerId)
         await this.remoteCall(
           peer,
