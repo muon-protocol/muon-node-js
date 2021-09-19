@@ -744,7 +744,7 @@ class TssPlugin extends CallablePlugin {
       return null;
 
     let nonce = this.keys[nonceId]
-    let keyPart = tssModule.addKeys(nonce.share, tssKey.share)
+    let keyPart = tssModule.addKeys(nonce.share, tssKey.share);
     return {
       id: tssKey.id,
       recoveryShare: `0x${keyPart.toString(16)}`,
