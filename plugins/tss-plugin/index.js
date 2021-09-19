@@ -767,7 +767,7 @@ class TssPlugin extends CallablePlugin {
       console.log(`TssPlugin.__createKey>> key already exist [${key}]`);
       throw {message: `key already exist [${key}]`}
     }
-    keys[key] = new DKey(parties[party], key)
+    keys[key] = new DKey(parties[party], key);
     return true;
   }
 
