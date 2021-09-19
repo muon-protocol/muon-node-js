@@ -611,7 +611,7 @@ class TssPlugin extends CallablePlugin {
         this.clearTimeout = setTimeout(() => {
           this.clearTimeout = null;
           this.joiningTssGroup = null
-        }, 6000)
+        }, 18000)
         let peer = await this.findPeer(peerId)
         await this.remoteCall(
           peer,
@@ -679,7 +679,7 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.__setPartners', data)
     let {id, t, max, partners, config} = data;
     if (!this.joiningTssGroup || this.joiningTssGroup !== id)
-      throw {message: `Crete group with id ${id} not allowed.`}
+      throw {message: `Create group with id ${id} not allowed.`}
     if (!this.parties[id])
       this.parties[id] = new Party(t, max, id)
     Object.values(partners).map(p => {
