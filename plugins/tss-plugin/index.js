@@ -270,17 +270,33 @@ class TssPlugin extends CallablePlugin {
     this.tssParty = party;
     let nonce = await this.keyGen(party);
 
-    let keyResults = await this.remoteCall(
-      // online partners
-      onlinePartners.map(p => p.peer),
-      RemoteMethods.recoverMyKey,
-      {nonce: nonce.id,}
+    let keyResults = await Promise.all(
+      onlinePartners.map(p => {
+        return this.remoteCall(
+          // online partners
+          p.peer,
+          RemoteMethods.recoverMyKey,
+          {nonce: nonce.id,}
+          ).catch(e => null)
+        }
+      )
     )
-    // console.log({keyResults})
-    let shares = onlinePartners.map((p, j) => ({
-      i: p.i,
-      key: tssModule.keyFromPrivate(keyResults[j].recoveryShare)
-    }))
+    let shares = onlinePartners
+      .map((p, j) => {
+          if(!keyResults[j])
+            return null
+          return {
+            i: p.i,
+            key: tssModule.keyFromPrivate(keyResults[j].recoveryShare)
+          }
+        }
+      )
+      .filter(s => !!s)
+    if(shares.length < party.t) {
+      console.log(`Need's of ${party.t} result to recover the Key, but received ${shares.n} result.`)
+      return false;
+    }
+
     let myIndex = party.partners[process.env.SIGN_WALLET_ADDRESS].i;
     let reconstructed = tssModule.reconstructKey(shares, this.TSS_THRESHOLD, myIndex)
     // console.log({recon: reconstructed.toString(16)})
@@ -510,43 +526,6 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.broadcastKey', {distKeyResult})
     return distKeyResult;
   }
-
-  // async broadcastPubKey(key){
-  //   console.log(`broadcasting key shares Public ...`)
-  //   // check either already distributed or not
-  //   if(key.pubKeyDistributed)
-  //     return;
-  //
-  //   key.pubKeyDistributed = true;
-  //
-  //   // Public key of f polynomial coefficients.
-  //   let A_ik = key.f_x.coefficients.map(a_k => a_k.getPublic())
-  //   // console.log({A_ik})
-  //   let fromIndex = this.muon.getNodesWalletIndex()[process.env.SIGN_WALLET_ADDRESS]
-  //   key.setParticipantPubKeys(fromIndex, A_ik)
-  //
-  //   let {party} = key;
-  //   try {
-  //     await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
-  //       if (wallet === process.env.SIGN_WALLET_ADDRESS)
-  //         return Promise.resolve(true);
-  //
-  //       return this.remoteCall(
-  //         peer,
-  //         RemoteMethods.distributePubKey,
-  //         {
-  //           from: process.env.SIGN_WALLET_ADDRESS,
-  //           party: party.id,
-  //           key: key.id,
-  //           pubKeys: A_ik.map(pubKey => pubKey.encode('hex'))
-  //         }
-  //       )
-  //     }))
-  //   }
-  //   catch(e){
-  //     console.error(`tss-plugin.broadcastPubKey`, e)
-  //   }
-  // }
 
   getPartyPeers(party) {
     let partners = Object.values(party.partners).filter(({peerId}) => peerId !== process.env.PEER_ID)
