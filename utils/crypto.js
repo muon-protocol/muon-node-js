@@ -1,5 +1,6 @@
 const ethers = require('ethers')
 const Web3 = require('web3')
+const {hashCallOutput} = require('./node-utils/eth')
 const BN = Web3.utils.BN
 const web3 = new Web3();
 const PRIVATE_KEY = process.env.SIGN_WALLET_PRIVATE_KEY
@@ -40,24 +41,6 @@ function getMessageHash(requestId, timestamp, price){
     { type: 'bytes32', value: toFixedHex(timestamp) },
     { type: 'bytes32', value: toFixedHex(price)}
   );
-}
-
-function hashCallOutput(address, method, abi, result, outputFilter=[]){
-  let methodAbi = abi.find(({name, type}) => (name===method && type === 'function'))
-  if(!methodAbi) {
-    throw {message: `Abi of method (${method}) not found`}
-  }
-  let abiOutputs = methodAbi.outputs
-  if(outputFilter.length > 0){
-    abiOutputs = outputFilter.map(key => {
-      return methodAbi.outputs.find(({name}) => (name===key))
-    })
-  }
-  // console.log('signing:',abiOutputs)
-  let params = abiOutputs.map(({name, type}) => ({type, value: (!name || typeof result === "string") ?  result : result[name]}))
-  params = [{type: 'address', value: address}, ...params]
-  let hash = web3.utils.soliditySha3(...params)
-  return hash;
 }
 
 function signCallOutput(address, method, abi, result, outputFilter=[]){

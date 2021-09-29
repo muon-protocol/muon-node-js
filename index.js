@@ -28,10 +28,10 @@ function getEnvPlugins() {
 }
 
 function getAppParent(app) {
-  if (app.useTss) {
-    return BaseTssApp;
+  if (app.useTss === false) {
+    return app.isService ? BaseService : BaseApp
   }
-  return app.isService ? BaseService : BaseApp
+  return BaseTssApp;
 }
 
 function getCustomApps() {
@@ -111,7 +111,7 @@ var muon;
         'ping-pong': [require('./plugins/ping-pong'), {}],
         // 'gw-log': [require('./plugins/gateway-log'), {}],
         // 'stock-plugin': [require('./plugins/stock-plugin'), {}],
-        'eth': [require('./plugins/eth-app-plugin'), {}],
+        // 'eth': [require('./plugins/eth-app-plugin'), {}],
         'content-verify': [require('./plugins/content-verify-plugin'), {}],
         'content': [require('./plugins/content-app'), {}],
         'memory': [require('./plugins/memory-plugin'), {}],

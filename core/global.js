@@ -6,7 +6,12 @@ const { timeout } = require('../utils/helpers')
 const util = require('ethereumjs-util')
 const ws = require('ws')
 const ethSigUtil = require('eth-sig-util')
-const { read: ethRead, call: ethCall } = require('../utils/node-utils/eth')
+const {
+  read: ethRead,
+  call: ethCall,
+  getTokenInfo: ethGetTokenInfo,
+  hashCallOutput: ethHashCallOutput,
+} = require('../utils/node-utils/eth')
 
 function soliditySha3(params) {
   return web3Instance.utils.soliditySha3(...params)
@@ -21,6 +26,8 @@ global.MuonAppUtils = {
   toBN: Web3.utils.toBN,
   ethRead,
   ethCall,
+  ethGetTokenInfo,
+  ethHashCallOutput,
   toBaseUnit,
   soliditySha3,
   ecRecover: util.ecrecover,

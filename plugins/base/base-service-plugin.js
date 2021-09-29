@@ -60,7 +60,9 @@ class BaseServicePlugin extends BaseAppPlugin {
         // console.log({latency})
       }
       this.serviceProviders = otherProviders
-    } catch (e) {}
+    } catch (e) {
+      console.log('BaseServicePlugin.updatePeerList', e)
+    }
 
     setTimeout(this.updatePeerList.bind(this), 30000)
   }
@@ -77,7 +79,7 @@ class BaseServicePlugin extends BaseAppPlugin {
 
   async __onRemoteWantSign(request) {
     let [sign, memWrite] = await this.processRemoteRequest(request)
-    console.log('wantSign', request._id, sign)
+    console.log('BaseServicePlugin.__onRemoteWantSign', request._id, sign)
     return { sign, memWrite }
   }
 }

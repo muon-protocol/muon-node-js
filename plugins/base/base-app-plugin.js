@@ -241,6 +241,7 @@ class BaseAppPlugin extends BasePlugin {
       let memWrite = this.getMemWrite(request, result)
       return [this.makeSignature(request, result, hash2), memWrite]
     } else {
+      console.log({hash1, hash2})
       throw { message: 'Request not confirmed' }
     }
   }
@@ -282,6 +283,28 @@ class BaseAppPlugin extends BasePlugin {
   }
 
   async isOtherNodesConfirmed(newRequest) {
+
+    let signers = await this.reqquestManager.onRequestSignFullFilled(newRequest._id)
+
+    let owners = Object.keys(signers)
+    let allSignatures = owners.map(w => signers[w]);
+
+    let confirmed = Object.keys(signers).length >= newRequest.nSign
+
+    return [
+      confirmed,
+      allSignatures
+        .map((sig) => ({
+          owner: sig['owner'],
+          timestamp: sig['timestamp'],
+          result: sig['data'],
+          signature: sig['signature'],
+          memWriteSignature: sig['memWriteSignature']
+        }))
+    ]
+  }
+
+  async isOtherNodesConfirmed0(newRequest) {
     let secondsToCheck = 0
     let confirmed = false
     let allSignatures = []
@@ -440,7 +463,7 @@ class BaseAppPlugin extends BasePlugin {
   }
 
   async __onRemoteSignRequest(data = {}) {
-    // console.log('RemoteCall.requestSignature', {sign, memWrite})
+    // console.log('BaseAppPlugin.__onRemoteSignRequest', data)
     try {
       let {sign, memWrite} = data;
       // let request = await Request.findOne({_id: sign.request})
@@ -464,9 +487,12 @@ class BaseAppPlugin extends BasePlugin {
           })
         }
       }
+      else{
+        console.log(`BaseAppPlugin.__onRemoteSignRequest >> Request not found id:${sign.request}`)
+      }
     }
     catch (e) {
-      console.error(e);
+      console.error('BaseAppPlugin.__onRemoteSignRequest', e);
     }
   }
 }

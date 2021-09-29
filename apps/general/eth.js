@@ -1,13 +1,10 @@
-const BaseApp = require('./base/base-app-plugin')
-const BaseTssApp = require('./base/base-tss-app-plugin')
-const NodeUtils = require('../utils/node-utils')
+const { soliditySha3, ethCall, ethGetTokenInfo, ethHashCallOutput } = MuonAppUtils
 
-class EthAppPlugin extends BaseTssApp {
-  APP_NAME = 'eth'
+module.exports = {
+  APP_NAME: 'eth',
 
-  async onRequest(request){
+  onRequest: async function (request) {
     let {method, data: {params}} = request;
-    // console.dir({method, params}, {depth: null})
     switch (method) {
       case 'call':{
         let {
@@ -28,32 +25,32 @@ class EthAppPlugin extends BaseTssApp {
         if(!Array.isArray(outputs))
           throw {message: 'Outputs should be an array'}
 
-        let result = await NodeUtils.eth.call(contractAddress, contractMethod, contractParams, abi, network)
+        let result = await ethCall(contractAddress, contractMethod, contractParams, abi, network)
         return result;
       }
       case 'addBridgeToken':{
         let {mainTokenAddress, mainNetwork, targetNetwork} = params;
 
         let result = {
-          token: await NodeUtils.eth.getTokenInfo(mainTokenAddress, mainNetwork),
+          token: await ethGetTokenInfo(mainTokenAddress, mainNetwork),
           tokenId: mainTokenAddress,
         }
-        return result;
+        return result
       }
       default:
         throw {message: `Unknown method ${method}`}
     }
-  }
+  },
 
-  hashRequestResult(request, result) {
+  hashRequestResult: (request, result) => {
     switch (request.method) {
       case 'call': {
         let {address, method, abi, outputs} = request.data.params;
-        return NodeUtils.eth.hashCallOutput(address, method, abi, result, outputs)
+        return ethHashCallOutput(address, method, abi, result, outputs)
       }
       case 'addBridgeToken': {
         let {token, tokenId} = result;
-        return NodeUtils.eth.soliditySha3([
+        return soliditySha3([
           {type: 'uint256', value: tokenId},
           {type: 'string', value: token.name},
           {type: 'string', value: token.symbol},
@@ -65,6 +62,3 @@ class EthAppPlugin extends BaseTssApp {
     }
   }
 }
-
-module.exports = EthAppPlugin
-

@@ -8,6 +8,9 @@ const {flattenObject, sortObject, getTimestamp} = require('../helpers')
 const crypto = require('../crypto')
 const ERC20_ABI = require('../../data/ERC20-ABI')
 
+const _generalWeb3Instance = new Web3();
+const soliditySha3 = _generalWeb3Instance.utils.soliditySha3
+
 const _networksWeb3 = {
   ganache: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_GANACHE)),
   eth: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ETH)),
@@ -34,6 +37,24 @@ function getWeb3Sync(network) {
   else
     throw {message: `invalid network "${network}"`}
 
+}
+
+function hashCallOutput(address, method, abi, result, outputFilter=[]){
+  let methodAbi = abi.find(({name, type}) => (name===method && type === 'function'))
+  if(!methodAbi) {
+    throw {message: `Abi of method (${method}) not found`}
+  }
+  let abiOutputs = methodAbi.outputs
+  if(outputFilter.length > 0){
+    abiOutputs = outputFilter.map(key => {
+      return methodAbi.outputs.find(({name}) => (name===key))
+    })
+  }
+  // console.log('signing:',abiOutputs)
+  let params = abiOutputs.map(({name, type}) => ({type, value: (!name || typeof result === "string") ?  result : result[name]}))
+  params = [{type: 'address', value: address}, ...params]
+  let hash = _generalWeb3Instance.utils.soliditySha3(...params)
+  return hash;
 }
 
 function getTokenInfo(address, network) {
@@ -80,20 +101,20 @@ function isEqualResult(request, result) {
   switch (request.method) {
     case 'call': {
       let {address, method, abi, outputs} = request.data.callInfo;
-      let hash1 = crypto.hashCallOutput(address, method, abi, request.data.result, outputs)
-      let hash2 = crypto.hashCallOutput(address, method, abi, result, outputs)
+      let hash1 = hashCallOutput(address, method, abi, request.data.result, outputs)
+      let hash2 = hashCallOutput(address, method, abi, result, outputs)
       return hash1 == hash2
     }
     case 'addBridgeToken': {
       let {token: t1, tokenId: id1} = request.data.result;
       let {token: t2, tokenId: id2} = result;
-      let hash1 = crypto.soliditySha3([
+      let hash1 = soliditySha3([
         {type: 'uint256', value: id1},
         {type: 'string', value: t1.name},
         {type: 'string', value: t1.symbol},
         {type: 'uint8', value: t1.decimals},
       ]);
-      let hash2 = crypto.soliditySha3([
+      let hash2 = soliditySha3([
         {type: 'uint256', value: id2},
         {type: 'string', value: t2.name},
         {type: 'string', value: t2.symbol},
@@ -128,7 +149,7 @@ async function signRequest(request, result) {
         {type: 'string', value: token.symbol},
         {type: 'uint8', value: token.decimals},
       ]
-      signature = crypto.sign(crypto.soliditySha3(dataToSign))
+      signature = crypto.sign(soliditySha3(dataToSign))
       break;
     }
     default:
@@ -161,7 +182,7 @@ function recoverSignature(request, sign) {
         {type: 'string', value: token.symbol},
         {type: 'uint8', value: token.decimals},
       ]
-      signer = crypto.recover(crypto.soliditySha3(dataToSign), signature)
+      signer = crypto.recover(soliditySha3(dataToSign), signature)
       break;
     }
     default:
@@ -234,6 +255,8 @@ class Subscribe extends EventEmbitter{
 module.exports = {
   getWeb3,
   getWeb3Sync,
+  hashCallOutput,
+  soliditySha3,
   getTransaction,
   getTransactionReceipt,
   call,
