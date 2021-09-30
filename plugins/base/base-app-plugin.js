@@ -64,7 +64,7 @@ class RequestManager{
 
 class BaseAppPlugin extends BasePlugin {
   APP_NAME = null
-  reqquestManager = new RequestManager();
+  requestManager = new RequestManager();
 
   constructor(...args) {
     super(...args)
@@ -179,7 +179,7 @@ class BaseAppPlugin extends BasePlugin {
       newRequest.data.memWrite = memWrite
     }
 
-    this.reqquestManager.addRequest(newRequest);
+    this.requestManager.addRequest(newRequest);
 
     // await newRequest.save()
 
@@ -187,7 +187,7 @@ class BaseAppPlugin extends BasePlugin {
     if (!!memWrite) {
       sign.memWriteSignature = memWrite.signature
     }
-    this.reqquestManager.addSignature(newRequest._id, sign.owner, sign);
+    this.requestManager.addSignature(newRequest._id, sign.owner, sign);
     // new Signature(sign).save()
 
     this.broadcastNewRequest(newRequest)
@@ -284,7 +284,7 @@ class BaseAppPlugin extends BasePlugin {
 
   async isOtherNodesConfirmed(newRequest) {
 
-    let signers = await this.reqquestManager.onRequestSignFullFilled(newRequest._id)
+    let signers = await this.requestManager.onRequestSignFullFilled(newRequest._id)
 
     let owners = Object.keys(signers)
     let allSignatures = owners.map(w => signers[w]);
@@ -455,7 +455,7 @@ class BaseAppPlugin extends BasePlugin {
     try {
       // console.log('RemoteCall.getRequestData', data)
       // let req = await Request.findOne({_id: data._id})
-      let req = this.reqquestManager.getRequest(data._id)
+      let req = this.requestManager.getRequest(data._id)
       return req
     }catch (e) {
       console.error(e);
@@ -467,7 +467,7 @@ class BaseAppPlugin extends BasePlugin {
     try {
       let {sign, memWrite} = data;
       // let request = await Request.findOne({_id: sign.request})
-      let request = this.reqquestManager.getRequest(sign.request)
+      let request = this.requestManager.getRequest(sign.request)
       if (request) {
         // TODO: check response similarity
         let signer = this.recoverSignature(request, sign)
@@ -476,7 +476,7 @@ class BaseAppPlugin extends BasePlugin {
             // TODO: validate memWright signature
             sign.memWriteSignature = memWrite.signature
           }
-          this.reqquestManager.addSignature(request._id, sign.owner, sign)
+          this.requestManager.addSignature(request._id, sign.owner, sign)
           // let newSignature = new Signature(sign)
           // await newSignature.save()
         } else {

@@ -129,7 +129,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let masterWalletPubKey = this.muon.getSharedWalletPubKey()
     let signersIndices;
 
-    signers = await this.reqquestManager.onRequestSignFullFilled(newRequest._id)
+    signers = await this.requestManager.onRequestSignFullFilled(newRequest._id)
 
     let owners = Object.keys(signers)
     let allSignatures = owners.map(w => signers[w]);
