@@ -52,11 +52,16 @@ class ContentApp extends SimpleApp {
     }
   }
 
+  prepareOutput(content, format){
+    return format.toLowerCase() === 'json' ? JSON.parse(content) : content;
+  }
+
   @gatewayMethod('get_content')
-  async responseToGatewayRequestData(data){
-    let content = await Content.findOne({cid: data.cid});
+  async responseToGatewayRequestData(data={}){
+    let {cid, format='string'} = data;
+    let content = await Content.findOne({cid});
     if(content){
-      return content.content;
+      return this.prepareOutput(content.content, format);
     }else{
       let cid = new CID(data.cid);
       let providers = await all(this.muon.libp2p.contentRouting.findProviders(cid, {timeout: 5000}))
@@ -64,7 +69,7 @@ class ContentApp extends SimpleApp {
         if(provider.id.toB58String() !== process.env.PEER_ID){
           let peer = await this.muon.libp2p.peerRouting.findPeer(provider.id);
           let request = await this.remoteCall(peer, 'get_content', data)
-          return request
+          return this.prepareOutput(request, format)
         }
       }
       return null
