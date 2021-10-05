@@ -48,6 +48,7 @@
     "lodash": "^4.17.21",
     "mkdirp": "^1.0.4",
     "mongoose": "^5.12.5",
+    "node-cache": "^5.1.2",
     "nodemon": "^2.0.7",
     "prompt-sync": "^4.2.0",
     "pull-pushable": "^2.2.0",

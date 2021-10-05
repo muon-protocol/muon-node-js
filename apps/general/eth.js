@@ -1,4 +1,4 @@
-const { soliditySha3, ethCall, ethGetTokenInfo, ethHashCallOutput } = MuonAppUtils
+const { soliditySha3, ethCall, ethGetTokenInfo, ethHashCallOutput, toBN } = MuonAppUtils
 
 module.exports = {
   APP_NAME: 'eth',
