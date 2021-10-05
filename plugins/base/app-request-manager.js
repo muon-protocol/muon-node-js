@@ -1,51 +1,82 @@
+/**
+ * ======== Muon Apps request manager ===========
+ *
+ * AppRequestManager stores all pending request in node-cache for a specific ttl.
+ * pending requests will clear after ttl.
+ *
+ */
+
 const TimeoutPromise = require('../../core/timeout-promise')
+const NodeCache = require('node-cache');
+
+const requestCache = new NodeCache({
+  /**
+   * stdTTL: (default: 0) the standard ttl as number in seconds for every generated cache element
+   */
+  // stdTTL: 6*3600, // 6 hours
+  stdTTL: 30*60, // 30 minutes
+
+  /**
+   * useClones: (default: true) en/disable cloning of variables.
+   * If true you'll get a copy of the cached variable.
+   * If false you'll save and get just the reference.
+   */
+  useClones: false,
+});
 
 class AppRequestManager{
-  requests = {}
-  signatures = {}
-  promises = {};
 
   constructor(){
   }
 
+  getItem(reqId){
+    return requestCache.get(reqId.toString());
+  }
+
   addRequest(req){
-    this.requests[req._id] = req;
+    if(!requestCache.has(req._id)){
+      requestCache.set(req._id.toString(), {
+        request: req,
+        signatures: {},
+        promise: null,
+      });
+    }
   }
 
   getRequest(_id){
-    return this.requests[_id]
+    return requestCache.get(_id.toString()).request
   }
 
   addSignature(reqId, owner, sign){
-    if(this.signatures[reqId] === undefined)
-      this.signatures[reqId] = {}
-    if(this.signatures[reqId][owner] === undefined){
-      this.signatures[reqId][owner] = sign
+    let item = this.getItem(reqId);
+    if(item.signatures[owner] === undefined){
+      item.signatures[owner] = sign
       if(this.isRequestFullFilled(reqId)){
-        if(this.promises[reqId])
-          this.promises[reqId].resolve(this.signatures[reqId])
+        if(item.promise)
+          item.promise.resolve(item.signatures)
       }
     }
   }
 
   isRequestFullFilled(_id){
-    let req = this.requests[_id]
-    let sigs = this.signatures[_id]
-    return !!sigs && Object.keys(sigs).length >= req.nSign;
+    let item = this.getItem(_id);
+    let {request: {nSign}, signatures: sigs} = item
+    return !!sigs && Object.keys(sigs).length >= nSign;
   }
 
   onRequestSignFullFilled(_id){
-    if(!this.requests[_id])
+    let item = this.getItem(_id);
+    if(!item)
       return Promise.reject({message: "RequestManager: request not added to RequestManager"})
-    let req = this.requests[_id]
-    let sigs = this.signatures[_id]
-    if(sigs && Object.keys(sigs).length >= req.nSign){
-      return Promise.resolve(sigs)
+
+    let {request, signatures} = item;
+    if(signatures && Object.keys(signatures).length >= request.nSign){
+      return Promise.resolve(signatures)
     }
     else{
-      if(this.promises[_id] === undefined)
-        this.promises[_id] = new TimeoutPromise(10000, 'Request timed out');
-      return this.promises[_id].promise;
+      if(item.promise === null)
+        item.promise = new TimeoutPromise(10000, 'Request timed out');
+      return item.promise.promise;
     }
   }
 }
