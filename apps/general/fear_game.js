@@ -2,19 +2,17 @@ const { axios, soliditySha3 } = MuonAppUtils
 
 const APP_ID = 10
 
-function getMilestoneReached(signature, milestoneId, address, time, tag) {
-  return axios.get(
-    'https://api.fearnft.games/api/MilestoneReached',
-    {
+function getMilestoneReached(address, signature, message) {
+  return axios
+    .post('https://api.fear.io/api/claimReward', '', {
+      timeout: 60000,
       headers: {
-        signature,
-        milestoneId,
         address,
-        time,
-        tag
+        signature,
+        message
       }
-    }
-  ).then(({data}) => data)
+    })
+    .then(({ data }) => data)
 }
 
 module.exports = {
@@ -28,29 +26,22 @@ module.exports = {
     } = request
     switch (method) {
       case 'claim':
-        let { address, milestoneId, signature, time, tag } = params
-        if (!milestoneId) throw { message: 'Invalid milestone Id' }
-        if (!time) throw { message: 'invalid claim time' }
+        let { address, signature, message } = params
+        if (!message) throw { message: 'Invalid message' }
         if (!address) throw { message: 'Invalid sender address' }
         if (!signature) throw { message: 'Request signature undefined' }
-        if (!tag) throw { message: 'Invalid tag' }
 
-        let result = await getMilestoneReached(
-          signature,
-          milestoneId,
-          address,
-          time,
-          tag
-        )
-
-        if (!result.reached) {
+        let result = await getMilestoneReached(address, signature, message)
+        console.log({ result })
+        if (!result.claimed) {
           throw { message: 'address not allowed for claim' }
         }
 
         return {
           appId: APP_ID,
           address,
-          milestoneId
+          trackingId: result.trackingId,
+          reward: result.reward
         }
 
       default:
@@ -62,11 +53,15 @@ module.exports = {
     let { method } = request
     switch (method) {
       case 'claim':
-        let { address, milestoneId } = result
+        let { address, trackingId, reward } = result
         return soliditySha3([
           { type: 'uint256', value: APP_ID },
           { type: 'address', value: address },
-          { type: 'uint256', value: milestoneId }
+          { type: 'uint256', value: reward },
+          {
+            type: 'string',
+            value: trackingId
+          }
         ])
 
       default:
