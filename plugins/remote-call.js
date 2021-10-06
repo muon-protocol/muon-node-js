@@ -35,11 +35,21 @@ class RemoteCall extends BasePlugin {
   }
 
   async handleIncomingMessage(signAndMessage, stream, peerId){
+    let collatralPlugin = this.muon.getPlugin('collateral');
     try {
       let [sign, message] = signAndMessage.toString().split('|')
       let sigOwner = crypto.recover(message, sign)
-      // TODO: filter out unrecognized wallets message.
       let data = JSON.parse(message)
+
+      // TODO: filter out unrecognized wallets message.
+      let validWallets = collatralPlugin.getWallets()
+      if(!validWallets.includes(sigOwner)){
+        throw {message: `Unrecognized request owner ${sigOwner}`}
+        // let {responseId} = data;
+        // let remoteResult = this._calls[responseId]
+        // return remoteResult && remoteResult.reject({message: `Unrecognized request owner ${sigOwner}`})
+      }
+
       if('method' in data) {
         let {callId, method, params={}} = data;
         await this.handleCall(callId, method, params, sigOwner, stream, peerId);
@@ -51,7 +61,6 @@ class RemoteCall extends BasePlugin {
           remoteResult.resolve(response)
         else {
           console.log('remote side error', error)
-          remoteResult.reject(error)
         }
       }
     }catch (e) {
