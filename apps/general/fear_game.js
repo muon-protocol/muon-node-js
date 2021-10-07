@@ -32,7 +32,6 @@ module.exports = {
         if (!signature) throw { message: 'Request signature undefined' }
 
         let result = await getMilestoneReached(address, signature, message)
-        console.log({ result })
         if (!result.claimed) {
           throw { message: 'address not allowed for claim' }
         }
@@ -53,15 +52,13 @@ module.exports = {
     let { method } = request
     switch (method) {
       case 'claim':
-        let { address, trackingId, reward } = result
+        let { address, reward } = result
+
         return soliditySha3([
           { type: 'uint256', value: APP_ID },
           { type: 'address', value: address },
-          { type: 'uint256', value: reward },
-          {
-            type: 'string',
-            value: trackingId
-          }
+          { type: 'string', value: request.data.result.trackingId },
+          { type: 'uint256', value: reward }
         ])
 
       default:
