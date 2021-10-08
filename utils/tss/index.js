@@ -1,8 +1,8 @@
 const {BN, toBN, randomHex, sha3, soliditySha3, range} = require('./utils')
 const assert = require('assert')
 const elliptic = require('elliptic');
-const BigNumber = require('bignumber.js')
-BigNumber.set({DECIMAL_PLACES: 300})
+// const BigNumber = require('bignumber.js')
+// BigNumber.set({DECIMAL_PLACES: 300})
 const Point = require('./point');
 const Curve = require('./curve');
 const ZERO = toBN(0)

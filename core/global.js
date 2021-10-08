@@ -2,7 +2,7 @@ const axios = require('axios')
 const Web3 = require('web3')
 const web3Instance = new Web3()
 const { toBaseUnit } = require('../utils/crypto')
-const { timeout } = require('../utils/helpers')
+const { timeout, floatToBN } = require('../utils/helpers')
 const util = require('ethereumjs-util')
 const ws = require('ws')
 const ethSigUtil = require('eth-sig-util')
@@ -24,6 +24,7 @@ global.MuonAppUtils = {
   timeout,
   BN: Web3.utils.BN,
   toBN: Web3.utils.toBN,
+  floatToBN,
   ethRead,
   ethCall,
   ethGetTokenInfo,
