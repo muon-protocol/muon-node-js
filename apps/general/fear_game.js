@@ -1,4 +1,4 @@
-const { axios, soliditySha3 } = MuonAppUtils
+const { axios, soliditySha3, floatToBN } = MuonAppUtils
 
 const APP_ID = 10
 
@@ -17,7 +17,6 @@ function getMilestoneReached(address, signature, message) {
 
 module.exports = {
   APP_NAME: 'fear_game',
-  isService: true,
 
   onRequest: async (request) => {
     let {
@@ -40,7 +39,7 @@ module.exports = {
           appId: APP_ID,
           address,
           trackingId: result.trackingId,
-          reward: result.reward
+          reward: floatToBN(3, 18).toString(10)
         }
 
       default:
