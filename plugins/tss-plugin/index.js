@@ -338,7 +338,11 @@ class TssPlugin extends CallablePlugin {
       let party = await this.makeParty(this.TSS_THRESHOLD, {config: {isTssParty: true}});
       this.tssParty = party;
 
-      let key = await this.keyGen(party)
+      let key;
+      do {
+        key = await this.keyGen(party)
+      }while(tssModule.HALF_N.lt(key.getTotalPubKey().x));
+
       let callResult = await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
         if (wallet === process.env.SIGN_WALLET_ADDRESS)
           return Promise.resolve(true);
@@ -564,13 +568,13 @@ class TssPlugin extends CallablePlugin {
       case MSG_TYPE_NEED_GROUP: {
         let {peerId, wallet} = msg;
         this.nodesNeedGroup[wallet] = {peerId, wallet};
-        console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
+        // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
         break;
       }
       case MSG_TYPE_JOINED_TO_GROUP: {
         let {wallet} = msg;
         delete this.nodesNeedGroup[wallet];
-        console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
+        // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
         break;
       }
       case MSG_TYPE_JOIN_PARTY_REQ: {

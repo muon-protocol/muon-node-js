@@ -12,6 +12,7 @@ const THREE = toBN(3)
 
 const EC = require('elliptic').ec;
 const curve = new EC('secp256k1');
+const HALF_N = curve.n.shrn(1).addn(1);
 /**
  * Let H be elements of G, such that nobody knows log, h
  * used for pedersen commitment
@@ -386,5 +387,6 @@ module.exports = {
   schnorrVerify,
   schnorrAggregateSigs,
   // use
-  H
+  H,
+  HALF_N,
 }
