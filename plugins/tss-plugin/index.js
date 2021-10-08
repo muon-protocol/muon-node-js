@@ -444,12 +444,12 @@ class TssPlugin extends CallablePlugin {
     let t3 = Date.now()
     // 5- TODO: verify commitment
     // key.verifyCommitment(2);
-    console.log('tss-plugin.keyGen', {
-      t1: t1 - t0,
-      t2: t2 - t1,
-      t3: t3 - t2,
-      total: t3 - t0,
-    })
+    // console.log('tss-plugin.keyGen', {
+    //   t1: t1 - t0,
+    //   t2: t2 - t1,
+    //   t3: t3 - t2,
+    //   total: t3 - t0,
+    // })
     return key;
   }
 

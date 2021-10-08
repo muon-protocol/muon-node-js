@@ -146,14 +146,14 @@ class BaseAppPlugin extends BasePlugin {
     let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
     let t5 = Date.now()
 
-    console.log('base-app-plugin.__onRequestArrived',{
-      t1: t1-t0,
-      t2: t2-t1,
-      t3: t3-t2,
-      t4: t4-t3,
-      t5: t5-t4,
-      '*': t5-t0
-    })
+    // console.log('base-app-plugin.__onRequestArrived',{
+    //   t1: t1-t0,
+    //   t2: t2-t1,
+    //   t3: t3-t2,
+    //   t4: t4-t3,
+    //   t5: t5-t4,
+    //   '*': t5-t0
+    // })
 
     if (confirmed) {
       newRequest['confirmedAt'] = getTimestamp()
