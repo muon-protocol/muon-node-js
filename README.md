@@ -11,8 +11,6 @@ By enabling auto update any commit to the repository will trigger the update and
 #### Enable
     bash ./scripts/auto-update.sh "setup"
 #### Update credentials
-
-
     cat >>~/.netrc <<EOF
     machine github.com
         login <USERNAME>
