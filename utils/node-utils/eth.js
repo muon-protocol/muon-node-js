@@ -39,7 +39,7 @@ function getWeb3Sync(network) {
 
 }
 
-function hashCallOutput(address, method, abi, result, outputFilter=[]){
+function hashCallOutput(address, method, abi, result, outputFilter=[], extraParams=[]){
   let methodAbi = abi.find(({name, type}) => (name===method && type === 'function'))
   if(!methodAbi) {
     throw {message: `Abi of method (${method}) not found`}
@@ -52,7 +52,7 @@ function hashCallOutput(address, method, abi, result, outputFilter=[]){
   }
   // console.log('signing:',abiOutputs)
   let params = abiOutputs.map(({name, type}) => ({type, value: (!name || typeof result === "string") ?  result : result[name]}))
-  params = [{type: 'address', value: address}, ...params]
+  params = [{type: 'address', value: address}, ...params, ...extraParams]
   let hash = _generalWeb3Instance.utils.soliditySha3(...params)
   return hash;
 }

@@ -1,13 +1,13 @@
-const { soliditySha3, ethCall, ethGetTokenInfo, ethHashCallOutput, toBN } = MuonAppUtils
+const { soliditySha3, ethCall, ethGetTokenInfo, ethHashCallOutput } = MuonAppUtils
 
 module.exports = {
-  APP_NAME: 'eth',
-  APP_ID: 2,
+  APP_NAME: 'bridge',
+  APP_ID: 3,
 
   onRequest: async function (request) {
     let {method, data: {params}} = request;
     switch (method) {
-      case 'call':{
+      case 'claim':{
         let {
           address: contractAddress,
           method: contractMethod,
@@ -29,6 +29,15 @@ module.exports = {
         let result = await ethCall(contractAddress, contractMethod, contractParams, abi, network)
         return result;
       }
+      case 'addBridgeToken':{
+        let {mainTokenAddress, mainNetwork, targetNetwork} = params;
+
+        let result = {
+          token: await ethGetTokenInfo(mainTokenAddress, mainNetwork),
+          tokenId: mainTokenAddress,
+        }
+        return result
+      }
       default:
         throw {message: `Unknown method ${method}`}
     }
@@ -36,16 +45,19 @@ module.exports = {
 
   hashRequestResult: (request, result) => {
     switch (request.method) {
-      case 'call': {
+      case 'claim': {
         let {address, method, abi, outputs} = request.data.params;
-        return ethHashCallOutput(
-          address,
-          method,
-          abi,
-          result,
-          outputs,
-          [{type: 'uint8', value: this.APP_ID}]
-        )
+        return ethHashCallOutput(address, method, abi, result, outputs, [{type: 'uint8', value: this.APP_ID}])
+      }
+      case 'addBridgeToken': {
+        let {token, tokenId} = result;
+        return soliditySha3([
+          {type: 'uint256', value: tokenId},
+          {type: 'string', value: token.name},
+          {type: 'string', value: token.symbol},
+          {type: 'uint8', value: token.decimals},
+          {type: 'uint8', value: this.APP_ID}
+        ]);
       }
       default:
         return null;
