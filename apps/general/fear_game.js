@@ -41,7 +41,7 @@ module.exports = {
           appId: APP_ID,
           address,
           trackingId: result.trackingId,
-          reward: floatToBN(3, 18).toString(10)
+          reward: floatToBN(result.reward, 18).toString(10)
         }
 
       default:
