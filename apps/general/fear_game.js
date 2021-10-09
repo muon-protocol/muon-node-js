@@ -31,6 +31,8 @@ module.exports = {
         if (!signature) throw { message: 'Request signature undefined' }
 
         let result = await getMilestoneReached(address, signature, message)
+        // TODO change condition after test
+        // if (!result.claimed || result.reward == 0) {
         if (!result.claimed) {
           throw { message: 'address not allowed for claim' }
         }
