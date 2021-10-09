@@ -45,7 +45,7 @@ function hashCallOutput(address, method, abi, result, outputFilter=[], extraPara
     throw {message: `Abi of method (${method}) not found`}
   }
   let abiOutputs = methodAbi.outputs
-  if(outputFilter.length > 0){
+  if(!!outputFilter && outputFilter.length > 0){
     abiOutputs = outputFilter.map(key => {
       return methodAbi.outputs.find(({name}) => (name===key))
     })

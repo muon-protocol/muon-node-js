@@ -1,5 +1,52 @@
 const { soliditySha3, ethCall, ethGetTokenInfo, ethHashCallOutput } = MuonAppUtils
 
+const ABI_getTx = [
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_txId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getTx",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "txId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "fromChain",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "toChain",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+];
+
 module.exports = {
   APP_NAME: 'bridge',
   APP_ID: 3,
@@ -9,24 +56,17 @@ module.exports = {
     switch (method) {
       case 'claim':{
         let {
-          address: contractAddress,
-          method: contractMethod,
-          params: contractParams = [],
-          abi,
-          outputs=[],
-          network="eth"
+          depositAddress,
+          depositTxId,
+          depositNetwork="eth"
         } = params;
 
-        if (!contractAddress)
+        if (!depositAddress)
           throw {message: 'Invalid contract "address"'}
-        if (!contractMethod)
-          throw {message: 'Invalid contract method name'}
-        if (!abi)
-          throw {message: 'Invalid contract method abi'}
-        if(!Array.isArray(outputs))
-          throw {message: 'Outputs should be an array'}
+        if (!depositTxId)
+          throw {message: 'Invalid depositTxId'}
 
-        let result = await ethCall(contractAddress, contractMethod, contractParams, abi, network)
+        let result = await ethCall(depositAddress, 'getTx', [depositTxId], ABI_getTx, depositNetwork)
         return result;
       }
       case 'addBridgeToken':{
@@ -43,11 +83,11 @@ module.exports = {
     }
   },
 
-  hashRequestResult: (request, result) => {
+  hashRequestResult: function (request, result) {
     switch (request.method) {
       case 'claim': {
-        let {address, method, abi, outputs} = request.data.params;
-        return ethHashCallOutput(address, method, abi, result, outputs, [{type: 'uint8', value: this.APP_ID}])
+        let {depositAddress} = request.data.params;
+        return ethHashCallOutput(depositAddress, 'getTx', ABI_getTx, result, [], [{type: 'uint8', value: this.APP_ID}])
       }
       case 'addBridgeToken': {
         let {token, tokenId} = result;
