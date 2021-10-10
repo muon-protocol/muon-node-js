@@ -31,17 +31,15 @@ module.exports = {
         if (!signature) throw { message: 'Request signature undefined' }
 
         let result = await getMilestoneReached(address, signature, message)
-        // TODO change condition after test
-        // if (!result.claimed || result.reward == 0) {
-        if (!result.claimed) {
+        if (!result.claimed || result.reward == 0) {
           throw { message: 'address not allowed for claim' }
         }
 
         return {
           appId: APP_ID,
           address,
-          trackingId: result.trackingId,
-          reward: floatToBN(result.reward, 18).toString(10)
+          reward: floatToBN(result.reward, 18).toString(10),
+          trackingId: result.trackingId
         }
 
       default:
@@ -58,8 +56,8 @@ module.exports = {
         return soliditySha3([
           { type: 'uint256', value: APP_ID },
           { type: 'address', value: address },
-          { type: 'string', value: request.data.result.trackingId },
-          { type: 'uint256', value: reward }
+          { type: 'uint256', value: reward },
+          { type: 'string', value: request.data.result.trackingId }
         ])
 
       default:
