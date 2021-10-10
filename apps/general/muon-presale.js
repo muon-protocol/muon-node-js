@@ -48,6 +48,7 @@ const DEPOSIT_LOCK = 'muon-deposit-lock'
 
 module.exports = {
   APP_NAME: 'presale',
+  useTss: false,
 
   onArrive: async function (request) {
     let {
