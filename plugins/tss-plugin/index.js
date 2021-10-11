@@ -166,11 +166,14 @@ class TssPlugin extends CallablePlugin {
     try {
       Object.values(tssParty.onlinePartners)
         .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
-        .map(p => this.remoteCall(
-          p.peer,
-          RemoteMethods.informEntrance
-        ).catch(e => {
-        }))
+        .map(p => {
+          if(!!p.peer) {
+            this.remoteCall(
+              p.peer,
+              RemoteMethods.informEntrance
+            ).catch(e => {})
+          }
+        })
     } catch (e) {
       console.error('TssPlugin.informEntrance', e, e.stack)
     }
