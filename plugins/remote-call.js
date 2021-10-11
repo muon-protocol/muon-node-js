@@ -118,7 +118,7 @@ class RemoteCall extends BasePlugin {
       })
       .catch(e => {
         console.error(`RemoteCall.call(peer, '${method}', params)`, e)
-        throw e
+        throw e;
       })
   }
 
