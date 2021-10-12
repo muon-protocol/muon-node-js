@@ -34,7 +34,7 @@ module.exports = {
     }
   },
 
-  hashRequestResult: (request, result) => {
+  hashRequestResult: function (request, result) {
     switch (request.method) {
       case 'call': {
         let {address, method, abi, outputs} = request.data.params;
