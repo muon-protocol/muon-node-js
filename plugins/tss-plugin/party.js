@@ -49,7 +49,7 @@ class TssParty {
         i: partnerIndex,
         ...partner
       }
-      if(this.isFullFilled()) {
+      if(this.isFulfilled()) {
         this.timeoutPromise.resolve(this)
       }
     }
@@ -75,7 +75,7 @@ class TssParty {
     return Object.keys(partners).length >= t;
   }
 
-  isFullFilled(){
+  isFulfilled(){
     let {partners, t, max} = this;
     return Object.keys(partners).length >= max;
   }

@@ -659,7 +659,7 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.__joinToParty', data)
     let {id, peerId, wallet} = data
     let party = this.parties[id];
-    if (party && !party.isFullFilled()) {
+    if (party && !party.isFulfilled()) {
       this.parties[id].addPartner({peerId, wallet})
     }
     // else{

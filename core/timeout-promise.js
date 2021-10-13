@@ -8,18 +8,18 @@
  */
 function TimeoutPromise(timeout, timeoutMessage, options={}) {
   var self = this;
-  this.isFullFilled = false;
+  this.isFulfilled = false;
   this.options = options;
   this.promise = new Promise(function(resolve, reject) {
     self._reject = reject
     self._resolve = resolve
   })
   this.resolve = function resolve() {
-    this.isFullFilled = true;
+    this.isFulfilled = true;
     this._resolve(...arguments)
   }
   this.reject = function () {
-    this.isFullFilled = true;
+    this.isFulfilled = true;
     if(this.options.resolveOnTimeout)
       this._resolve(null)
     else
@@ -32,7 +32,7 @@ function TimeoutPromise(timeout, timeoutMessage, options={}) {
 
   if(timeout) {
     setTimeout(() => {
-      if(!self.isFullFilled) {
+      if(!self.isFulfilled) {
         self.reject({message: timeoutMessage || 'Promise timed out'})
       }
     }, timeout)
