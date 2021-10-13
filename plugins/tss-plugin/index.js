@@ -459,6 +459,12 @@ class TssPlugin extends CallablePlugin {
   async createKey(party) {
     // 1- create new key
     let key = new DKey(party, null, 5000)
+    /**
+     * TODO: check from misbehavior
+     * prevent app crash
+     */
+    key.timeoutPromise.promise.catch(console.error)
+
     this.keys[key.id] = key;
 
     let partners = Object.values(party.onlinePartners)
@@ -746,7 +752,7 @@ class TssPlugin extends CallablePlugin {
     let {parties, keys} = this
     let {party, key} = data
     if (!parties[party]) {
-      console.log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party);
+      console.log('TssPlugin.__createKey>> party not fount on this node id: ' + party);
       throw {message: 'party not found'}
     }
     if (!!keys[key]) {
