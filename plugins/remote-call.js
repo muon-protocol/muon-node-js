@@ -60,7 +60,8 @@ class RemoteCall extends BasePlugin {
         if(!error)
           remoteResult.resolve(response)
         else {
-          console.log('remote side error', error)
+          console.log('remote side error', error);
+          remoteResult.reject(error)
         }
       }
     }catch (e) {
