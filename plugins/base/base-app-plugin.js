@@ -165,7 +165,7 @@ class BaseAppPlugin extends BasePlugin {
         '__v'
         // 'data.memWrite'
       ]),
-      signatures
+      signatures: confirmed ? signatures : []
     }
 
     if (confirmed) {

@@ -60,7 +60,8 @@ class RemoteCall extends BasePlugin {
         if(!error)
           remoteResult.resolve(response)
         else {
-          console.log('remote side error', error)
+          console.log('remote side error', error);
+          remoteResult.reject(error)
         }
       }
     }catch (e) {
@@ -118,7 +119,7 @@ class RemoteCall extends BasePlugin {
       })
       .catch(e => {
         console.error(`RemoteCall.call(peer, '${method}', params)`, e)
-        throw e
+        throw e;
       })
   }
 

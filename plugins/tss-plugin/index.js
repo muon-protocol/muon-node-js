@@ -166,11 +166,14 @@ class TssPlugin extends CallablePlugin {
     try {
       Object.values(tssParty.onlinePartners)
         .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
-        .map(p => this.remoteCall(
-          p.peer,
-          RemoteMethods.informEntrance
-        ).catch(e => {
-        }))
+        .map(p => {
+          if(!!p.peer) {
+            this.remoteCall(
+              p.peer,
+              RemoteMethods.informEntrance
+            ).catch(e => {})
+          }
+        })
     } catch (e) {
       console.error('TssPlugin.informEntrance', e, e.stack)
     }
@@ -456,6 +459,12 @@ class TssPlugin extends CallablePlugin {
   async createKey(party) {
     // 1- create new key
     let key = new DKey(party, null, 5000)
+    /**
+     * TODO: check from misbehavior
+     * prevent app crash
+     */
+    key.timeoutPromise.promise.catch(console.error)
+
     this.keys[key.id] = key;
 
     let partners = Object.values(party.onlinePartners)
@@ -743,7 +752,7 @@ class TssPlugin extends CallablePlugin {
     let {parties, keys} = this
     let {party, key} = data
     if (!parties[party]) {
-      console.log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party);
+      console.log('TssPlugin.__createKey>> party not fount on this node id: ' + party);
       throw {message: 'party not found'}
     }
     if (!!keys[key]) {
