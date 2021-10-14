@@ -2,14 +2,16 @@ const { axios, soliditySha3, floatToBN } = MuonAppUtils
 
 const APP_ID = 10
 
-function getMilestoneReached(address, signature, message) {
+function getMilestoneReached(address, signature, message, amount, chain) {
   return axios
     .post('https://api.fear.io/api/claimReward', '', {
       timeout: 60000,
       headers: {
         address,
         signature,
-        message
+        message,
+        amount,
+        chain
       }
     })
     .then(({ data }) => data)
@@ -25,13 +27,21 @@ module.exports = {
     } = request
     switch (method) {
       case 'claim':
-        let { address, signature, message } = params
+        let { address, signature, message, chain, amount } = params
         if (!message) throw { message: 'Invalid message' }
         if (!address) throw { message: 'Invalid sender address' }
         if (!signature) throw { message: 'Request signature undefined' }
+        if (!amount) throw { message: 'Invalid amount' }
+        if (!chain) throw { message: 'Invalid chain' }
 
-        let result = await getMilestoneReached(address, signature, message)
-        if (!result.claimed || result.reward == 0) {
+        let result = await getMilestoneReached(
+          address,
+          signature,
+          message,
+          amount,
+          chain
+        )
+        if (!result.claimed) {
           throw { message: 'address not allowed for claim' }
         }
 
