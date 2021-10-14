@@ -41,7 +41,7 @@ module.exports = {
           amount,
           chain
         )
-        if (!result.claimed) {
+        if (!result.claimed || result.reward == 0) {
           throw { message: 'address not allowed for claim' }
         }
 
