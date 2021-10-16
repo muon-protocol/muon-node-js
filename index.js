@@ -1,7 +1,7 @@
 const Muon = require('./core/muon');
 const path = require('path');
 const fs = require('fs');
-const {dynamicExtend} = require('./core/utils')
+const {dynamicExtend, dynamicExtend2, dynamicExtend3} = require('./core/utils')
 const BaseApp = require('./plugins/base/base-app-plugin')
 const BaseService = require('./plugins/base/base-service-plugin')
 const BaseTssApp = require('./plugins/base/base-tss-app-plugin')
