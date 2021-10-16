@@ -2,18 +2,27 @@ const BaseAppPlugin = require('./base-app-plugin')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const tss = require('../../utils/tss');
 const {toBN} = require('../../utils/tss/utils')
+const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
 
+@remoteApp
 class BaseTssAppPlugin extends BaseAppPlugin {
 
-  async onStart() {
-    super.onStart()
-
-    let remoteCall = this.muon.getPlugin('remote-call')
-    remoteCall.on(
-      `remote:app-${this.APP_NAME}-wantSign`,
-      this.__onRemoteWantSign.bind(this)
-    )
-  }
+  // async onStart() {
+  //   // console.log({
+  //   //   0: this,
+  //   //   1: this.__proto__,
+  //   //   2: this.__proto__.__proto__,
+  //   //   3: this.__proto__.__proto__.__proto__,
+  //   //   4: this.__proto__.__proto__.__proto__.__proto__,
+  //   // })
+  //   super.onStart()
+  //   this.registerRemoteMethod('wantSign', this.__onRemoteWantSign.bind(this))
+  //   // let remoteCall = this.muon.getPlugin('remote-call')
+  //   // remoteCall.on(
+  //   //   `remote:app-${this.APP_NAME}-wantSign`,
+  //   //   this.__onRemoteWantSign.bind(this)
+  //   // )
+  // }
 
   getNSign () {
     if(!this.tssPlugin.isReady)
@@ -167,6 +176,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     return this.muon.getPlugin('tss-plugin');
   }
 
+  @remoteMethod('wantSign')
   async __onRemoteWantSign(request) {
     let {nonce: nonceId} = request.data.init;
     let nonce = this.tssPlugin.getSharedKey(nonceId);
