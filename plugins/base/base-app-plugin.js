@@ -1,4 +1,4 @@
-const BasePlugin = require('./base-plugin')
+const CallablePlugin = require('./callable-plugin')
 const Request = require('../../gateway/models/Request')
 const Signature = require('../../gateway/models/Signature')
 const PeerId = require('peer-id')
@@ -12,7 +12,7 @@ const AppRequestManager = require('./app-request-manager');
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
-class BaseAppPlugin extends BasePlugin {
+class BaseAppPlugin extends CallablePlugin {
   APP_NAME = null
   requestManager = new AppRequestManager();
 
@@ -363,15 +363,15 @@ class BaseAppPlugin extends BasePlugin {
     )
   }
 
-  remoteMethodEndpoint(title) {
-    return `app-${this.APP_NAME}-${title}`
-  }
+  // remoteMethodEndpoint(title) {
+  //   return `app-${this.APP_NAME}-${title}`
+  // }
 
-  remoteCall(peer, methodName, data) {
-    let remoteCall = this.muon.getPlugin('remote-call')
-    let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
-    return remoteCall.call(peer, remoteMethodEndpoint, data)
-  }
+  // remoteCall(peer, methodName, data) {
+  //   let remoteCall = this.muon.getPlugin('remote-call')
+  //   let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
+  //   return remoteCall.call(peer, remoteMethodEndpoint, data)
+  // }
 
   /**
    * hash parameters that smart contract need it.
