@@ -7,23 +7,6 @@ const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators
 @remoteApp
 class BaseTssAppPlugin extends BaseAppPlugin {
 
-  // async onStart() {
-  //   // console.log({
-  //   //   0: this,
-  //   //   1: this.__proto__,
-  //   //   2: this.__proto__.__proto__,
-  //   //   3: this.__proto__.__proto__.__proto__,
-  //   //   4: this.__proto__.__proto__.__proto__.__proto__,
-  //   // })
-  //   super.onStart()
-  //   this.registerRemoteMethod('wantSign', this.__onRemoteWantSign.bind(this))
-  //   // let remoteCall = this.muon.getPlugin('remote-call')
-  //   // remoteCall.on(
-  //   //   `remote:app-${this.APP_NAME}-wantSign`,
-  //   //   this.__onRemoteWantSign.bind(this)
-  //   // )
-  // }
-
   getNSign () {
     if(!this.tssPlugin.isReady)
       throw {message: 'Tss not initialized'};

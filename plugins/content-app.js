@@ -1,4 +1,3 @@
-// const SimpleApp = require('./base/base-simple-app-plugin')
 const BaseApp = require('./base/base-app-plugin')
 const Content = require('../gateway/models/Content')
 const CID = require('cids')
