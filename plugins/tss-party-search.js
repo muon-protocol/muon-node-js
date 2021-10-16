@@ -3,6 +3,7 @@ const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
 const {timeout} = require('../utils/helpers')
 const Party = require('./tss-plugin/party')
+const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
 const MSG_TYPE_PARTY_SEARCH_REQ = 'search_party_request'
 
@@ -102,6 +103,7 @@ class Search {
   }
 }
 
+@remoteApp
 class TssPartySearchPlugin extends CallablePlugin {
 
   searches = {};
@@ -110,8 +112,6 @@ class TssPartySearchPlugin extends CallablePlugin {
     let broadcastChannel = this.getBroadcastChannel()
     await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
     this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
-
-    this.registerRemoteMethod(RemoteMethods.searchPartyResult, this.__searchPartyResult.bind(this))
   }
 
   getBroadcastChannel() {
@@ -207,6 +207,7 @@ class TssPartySearchPlugin extends CallablePlugin {
    *
    *===================================*/
 
+  @remoteMethod(RemoteMethods.searchPartyResult)
   async __searchPartyResult(data={}){
     // console.log('TssPlugin.__searchPartyResult', data)
     let {searchId, ...response} = data

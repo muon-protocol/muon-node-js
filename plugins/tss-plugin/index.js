@@ -7,6 +7,7 @@ const tssModule = require('../../utils/tss')
 const {toBN} = require('../../utils/tss/utils')
 const path = require('path')
 const {timeout} = require('../../utils/helpers');
+const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
 
 const MSG_TYPE_NEED_GROUP = 'MSG_TYPE_NEED_GROUP';
 const MSG_TYPE_JOINED_TO_GROUP = 'MSG_TYPE_JOINED_TO_GROUP';
@@ -32,6 +33,7 @@ const GroupStatus = {
   Joined: 4,
 }
 
+@remoteApp
 class TssPlugin extends CallablePlugin {
 
   groupStatus = GroupStatus.Initial;
@@ -52,16 +54,6 @@ class TssPlugin extends CallablePlugin {
     let broadcastChannel = this.getBroadcastChannel()
     await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
     this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
-
-    this.registerRemoteMethod(RemoteMethods.joinToParty, this.__joinToParty.bind(this))
-    this.registerRemoteMethod(RemoteMethods.setPartners, this.__setPartners.bind(this))
-    this.registerRemoteMethod(RemoteMethods.addNewPartner, this.__addNewPartner.bind(this))
-    this.registerRemoteMethod(RemoteMethods.recoverMyKey, this.__recoverMyKey.bind(this))
-    this.registerRemoteMethod(RemoteMethods.createKey, this.__createKey.bind(this))
-    this.registerRemoteMethod(RemoteMethods.distributeKey, this.__distributeKey.bind(this))
-    this.registerRemoteMethod(RemoteMethods.distributePubKey, this.__distributePubKey.bind(this))
-    this.registerRemoteMethod(RemoteMethods.storeTssKey, this.__storeTssKey.bind(this))
-    this.registerRemoteMethod(RemoteMethods.informEntrance, this.__informEntrance.bind(this))
 
     // TODO: peer finding fail if immediately try to join group
     setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
@@ -654,7 +646,7 @@ class TssPlugin extends CallablePlugin {
    *           Remote Methods
    *
    *===================================*/
-
+  @remoteMethod(RemoteMethods.joinToParty)
   async __joinToParty(data = {}) {
     // console.log('TssPlugin.__joinToParty', data)
     let {id, peerId, wallet} = data
@@ -667,6 +659,7 @@ class TssPlugin extends CallablePlugin {
     // }
   }
 
+  @remoteMethod(RemoteMethods.setPartners)
   async __setPartners(data = {}) {
     // console.log('TssPlugin.__setPartners', data)
     let {id, t, max, partners, config} = data;
@@ -688,6 +681,7 @@ class TssPlugin extends CallablePlugin {
     console.log('joined to group');
   }
 
+  @remoteMethod(RemoteMethods.addNewPartner)
   async __addNewPartner(data = {}, callerInfo) {
     // console.log('TssPlugin.__addNewPartner', data)
     let {party: partyId, partner} = data;
@@ -724,6 +718,7 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
+  @remoteMethod(RemoteMethods.recoverMyKey)
   async __recoverMyKey(data = {}, callerInfo) {
     // console.log('TssPlugin.__recoverMyKey', data, callerInfo.wallet)
     let {tssParty, tssKey} = this
@@ -747,6 +742,7 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
+  @remoteMethod(RemoteMethods.createKey)
   async __createKey(data = {}) {
     // console.log('TssPlugin.__createKey', data)
     let {parties, keys} = this
@@ -763,6 +759,7 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
+  @remoteMethod(RemoteMethods.distributeKey)
   async __distributeKey(data = {}) {
     // console.log('TssPlugin.__distributeKey', data)
     let {parties, keys} = this
@@ -791,6 +788,7 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
+  @remoteMethod(RemoteMethods.distributePubKey)
   async __distributePubKey(data = {}) {
     // console.log('__distributePubKey', data.from)
     let {parties, keys} = this
@@ -809,6 +807,7 @@ class TssPlugin extends CallablePlugin {
     keys[key].setParticipantPubKeys(fromIndex, pubKeys)
   }
 
+  @remoteMethod(RemoteMethods.storeTssKey)
   async __storeTssKey(data = {}) {
     // console.log('TssPlugin.__storeTssKey', data)
     let {party: partyId, key: keyId} = data
@@ -827,6 +826,7 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
+  @remoteMethod(RemoteMethods.informEntrance)
   async __informEntrance(data = {}, callerInfo) {
     // console.log('TssPlugin.__informEntrance', data)
     let peer = await this.findPeer(callerInfo.peerId);
