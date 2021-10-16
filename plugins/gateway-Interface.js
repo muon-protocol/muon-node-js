@@ -60,7 +60,7 @@ class GatewayInterface extends BasePlugin{
             response = await this.emit(`call/${app}/request`, method, params, nSign)
           }
           else{
-            throw {message: 'app method handler not defined'}
+            throw {message: `app:[${app}] method:[${method}] handler not defined`}
           }
         }
         else{
