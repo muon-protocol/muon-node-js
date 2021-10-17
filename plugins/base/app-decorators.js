@@ -1,3 +1,15 @@
+const CallablePlugin = require('./callable-plugin')
+
+function classNames(target){
+  let names = []
+  let tmp = target
+  while (!!tmp && !!tmp.name){
+    names.push(tmp.name)
+    tmp = Object.getPrototypeOf(tmp);
+  }
+  return names;
+}
+
 module.exports.remoteMethod = function (title) {
   return function (target, property, descriptor) {
     if(!target.__remoteMethods)
@@ -17,6 +29,8 @@ module.exports.gatewayMethod = function (title) {
 }
 
 module.exports.remoteApp = function (target) {
+  if(!classNames(target).includes('CallablePlugin'))
+    throw {message: 'RemoteApp should be CallablePlugin.'}
   const original = target;
   original.prototype._remoteApp_original_onStart = target.prototype.onStart
 
