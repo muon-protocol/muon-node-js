@@ -297,7 +297,7 @@ class BaseAppPlugin extends CallablePlugin {
       let data = JSON.parse(uint8ArrayToString(msg.data))
       if (data && data.type === 'new_request') {
         let peerId = PeerId.createFromCID(data.peerId)
-        let peer = await this.muon.libp2p.peerRouting.findPeer(peerId)
+        let peer = await this.findPeer(peerId)
         let request = await remoteCall.call(
           peer,
           `app-${this.APP_NAME}-get-request`,

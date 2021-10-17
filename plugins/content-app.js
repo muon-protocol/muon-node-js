@@ -67,7 +67,7 @@ class ContentApp extends BaseApp {
       let providers = await all(this.muon.libp2p.contentRouting.findProviders(cid, {timeout: 5000}))
       for(let provider of providers){
         if(provider.id.toB58String() !== process.env.PEER_ID){
-          let peer = await this.muon.libp2p.peerRouting.findPeer(provider.id);
+          let peer = await this.findPeer(provider.id);
           let request = await this.remoteCall(peer, 'get_content', data)
           return this.prepareOutput(request, format)
         }

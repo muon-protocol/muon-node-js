@@ -56,8 +56,8 @@ class TssPlugin extends CallablePlugin {
     this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
 
     // TODO: peer finding fail if immediately try to join group
-    setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
-    // this.joinToGroup();
+    // setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
+    this.joinToGroup();
   }
 
   get TSS_THRESHOLD() {
@@ -535,7 +535,7 @@ class TssPlugin extends CallablePlugin {
   getPartyPeers(party) {
     let partners = Object.values(party.partners).filter(({peerId}) => peerId !== process.env.PEER_ID)
     let peerIds = partners.map(({peerId}) => peerId)
-    return Promise.all(peerIds.map(peerId => this.findPeer(peerId)))
+    return Promise.all(peerIds.map(peerId => this.findPeer(peerId).catch(e => null)))
   }
 
   getParty(id) {
