@@ -4,16 +4,19 @@ const APP_ID = 10
 
 function getMilestoneReached(address, signature, message, amount, chain) {
   return axios
-    .post('https://api.fear.io/api/claimReward', '', {
-      timeout: 60000,
-      headers: {
+    .post(
+      'https://api.fear.io/api/claimReward',
+      {
         address,
         signature,
         message,
         amount,
         chain
+      },
+      {
+        timeout: 60000
       }
-    })
+    )
     .then(({ data }) => data)
 }
 
@@ -44,7 +47,6 @@ module.exports = {
         if (!result.claimed || result.reward == 0) {
           throw { message: 'address not allowed for claim' }
         }
-
         return {
           appId: APP_ID,
           address,
