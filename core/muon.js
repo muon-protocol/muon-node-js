@@ -84,6 +84,7 @@ class Muon extends Events {
 
     libp2p.connectionManager.on('peer:connect', this.onPeerConnect.bind(this))
     libp2p.on('peer:discovery', this.onPeerDiscovery.bind(this))
+    // libp2p._dht.on('peer', () => this.firstPeerConnect.resolve(true));
 
     this.peerId = peerId
     this.libp2p = libp2p
@@ -110,9 +111,11 @@ class Muon extends Events {
       chalk.blue(` ${connection.remotePeer.toB58String()}`)
     )
     this.firstPeerConnect.resolve(true)
+    this.emit('peer', connection.remotePeer)
   }
 
   onPeerDiscovery(peerId){
+    this.emit('peer', peerId)
     this.firstPeerConnect.resolve(true)
     console.log('found peer: ', peerId.toB58String())
   }
@@ -149,9 +152,10 @@ class Muon extends Events {
   }
 
   async _onceStarted() {
-    console.log('waiting for first peer connect ...');
-    // wait for first peer connect;
-    await this.firstPeerConnect.waitToFulfill();
+    // TODO:
+    // console.log('waiting for first peer connect ...');
+    // // wait for first peer connect;
+    // await this.firstPeerConnect.waitToFulfill();
 
     console.log('muon started')
     for (let pluginName in this._plugins) {

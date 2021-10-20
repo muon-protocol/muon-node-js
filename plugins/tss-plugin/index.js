@@ -12,6 +12,7 @@ const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators
 const MSG_TYPE_NEED_GROUP = 'MSG_TYPE_NEED_GROUP';
 const MSG_TYPE_JOINED_TO_GROUP = 'MSG_TYPE_JOINED_TO_GROUP';
 const MSG_TYPE_JOIN_PARTY_REQ = 'MSG_TYPE_JOIN_PARTY_REQ';
+const MSG_TYPE_INFORM_ENTRANCE = 'MSG_TYPE_INFORM_ENTRANCE';
 
 const RemoteMethods = {
   joinToParty: 'joinToParty',
@@ -57,7 +58,9 @@ class TssPlugin extends CallablePlugin {
 
     // TODO: peer finding fail if immediately try to join group
     // setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
-    this.joinToGroup();
+    this.muon.once('peer', () => {
+      this.joinToGroup();
+    })
   }
 
   get TSS_THRESHOLD() {
@@ -123,18 +126,17 @@ class TssPlugin extends CallablePlugin {
     // load party
     let party = Party.load(tssConfig.party);
     this.parties[party.id] = party
-    while (true) {
-      try {
-        let peers = await this.getPartyPeers(party);
-        party.setPeers(peers);
-        // if(peers.filter(p => !!p).length >= party.t)
-        break;
-      } catch (e) {
-        console.log('TssPlugin.loadSavedTss', e)
-      }
-      await timeout(5000);
-    }
-    console.log('done');
+    // while (true) {
+    //   try {
+    //     let peers = await this.getPartyPeers(party);
+    //     party.setPeers(peers);
+    //     // if(peers.filter(p => !!p).length >= party.t)
+    //     break;
+    //   } catch (e) {
+    //     console.log('TssPlugin.loadSavedTss', e)
+    //   }
+    //   await timeout(5000);
+    // }
 
     let _key = {
       ...tssConfig.key,
@@ -155,19 +157,27 @@ class TssPlugin extends CallablePlugin {
 
   async informEntrance() {
     let {tssKey, tssParty} = this
-    try {
-      Object.values(tssParty.onlinePartners)
-        .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
-        .map(p => {
-          if(!!p.peer) {
-            this.remoteCall(
-              p.peer,
-              RemoteMethods.informEntrance
-            ).catch(e => {})
-          }
-        })
-    } catch (e) {
-      console.error('TssPlugin.informEntrance', e, e.stack)
+    // try {
+    //   Object.values(tssParty.onlinePartners)
+    //     .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
+    //     .map(p => {
+    //       if(!!p.peer) {
+    //         this.remoteCall(
+    //           p.peer,
+    //           RemoteMethods.informEntrance
+    //         ).catch(e => {})
+    //       }
+    //     })
+    // } catch (e) {
+    //   console.error('TssPlugin.informEntrance', e, e.stack)
+    // }
+    for(let i=0 ; i<3 ; i++) {
+      await timeout(5000)
+      this.broadcast({
+        type: MSG_TYPE_INFORM_ENTRANCE,
+        peerId: process.env.PEER_ID,
+        wallet: process.env.SIGN_WALLET_ADDRESS,
+      })
     }
   }
 
@@ -608,6 +618,20 @@ class TssPlugin extends CallablePlugin {
         )
         break
       }
+      case MSG_TYPE_INFORM_ENTRANCE: {
+        let {peerId, wallet} = msg;
+        // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
+        // TODO: is this message from 'wallet'
+        let peer = await this.findPeer(peerId);
+        if (this.isReady) {
+          this.tssParty.setWalletPeer(wallet, peer)
+          this.remoteCall(
+            peer,
+            RemoteMethods.informEntrance
+          ).catch(e => {})
+        }
+        break;
+      }
       default:
         console.log(`unknown message`, msg);
     }
@@ -623,9 +647,11 @@ class TssPlugin extends CallablePlugin {
   }
 
   broadcast(data) {
-    let broadcastChannel = this.getBroadcastChannel()
-    if (!broadcastChannel)
+    let broadcastChannel = this.getBroadcastChannel();
+    if (!broadcastChannel) {
+      console.log('broadcast channel not defined')
       return;
+    }
     let str = JSON.stringify(data)
     this.muon.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(str))
   }

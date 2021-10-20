@@ -70,6 +70,12 @@ class TssParty {
     })
   }
 
+  setWalletPeer(wallet, peer){
+    if(this.partners[wallet] !== undefined) {
+      this.partners[wallet].peer = peer
+    }
+  }
+
   hasEnoughPartners(){
     let {partners, t} = this;
     return Object.keys(partners).length >= t;
