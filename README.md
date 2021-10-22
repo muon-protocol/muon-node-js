@@ -9,7 +9,7 @@
 ### Auto Update
 By enabling auto update any commit to the repository will trigger the update and server will restart.
 #### Enable
-    bash ./scripts/auto-update.sh "setup"
+    bash ./scripts/auto-update.sh -a setup -p '<PM2_APP_NAME|PM2_APP_ID>'
 #### Update credentials
     cat >>~/.netrc <<EOF
     machine github.com
