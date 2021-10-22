@@ -5,7 +5,6 @@
 
     $ env-cmd -f ./1.env babel-node index.js
     
-
 ### Auto Update
 By enabling auto update any commit to the repository will trigger the update and server will restart.
 #### Enable
