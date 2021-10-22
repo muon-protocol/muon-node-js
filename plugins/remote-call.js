@@ -58,14 +58,14 @@ class RemoteCall extends BasePlugin {
   }
 
   async handleIncomingMessage(signAndMessage, stream, peerId){
-    let collatralPlugin = this.muon.getPlugin('collateral');
+    let collateralPlugin = this.muon.getPlugin('collateral');
     try {
       let [sign, message] = signAndMessage.toString().split('|')
       let sigOwner = crypto.recover(message, sign)
       let data = JSON.parse(message)
 
       // TODO: filter out unrecognized wallets message.
-      let validWallets = collatralPlugin.getWallets()
+      let validWallets = collateralPlugin.getWallets()
       if(!validWallets.includes(sigOwner)){
         throw {message: `Unrecognized request owner ${sigOwner}`}
         // let {responseId} = data;

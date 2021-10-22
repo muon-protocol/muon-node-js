@@ -52,9 +52,11 @@ class TssPlugin extends CallablePlugin {
   }
 
   async onStart() {
-    let broadcastChannel = this.getBroadcastChannel()
-    await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
-    this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
+    super.onStart();
+
+    // let broadcastChannel = this.BROADCAST_CHANNEL
+    // await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
+    // this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
 
     // TODO: peer finding fail if immediately try to join group
     // setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
@@ -71,11 +73,8 @@ class TssPlugin extends CallablePlugin {
     return this.muon.configs.net.tss.max;
   }
 
-  getBroadcastChannel() {
-    return `muon/tss/comm/broadcast`;
-  }
-
   async joinToGroup() {
+    this.informEntrance();
     try {
       /**
        * check and load previews tss config.
@@ -151,7 +150,6 @@ class TssPlugin extends CallablePlugin {
     this.tssParty = party;
     this.tssKey = key;
     this.isReady = true
-    this.informEntrance()
     return true;
   }
 
@@ -521,6 +519,12 @@ class TssPlugin extends CallablePlugin {
       .map(({wallet, peerId, peer}) => {
         if(wallet === process.env.SIGN_WALLET_ADDRESS)
           return true
+        // TODO: sometimes peer is undefined
+        if(!peer)
+          return 'error';
+        // if(!peer){
+        //   console.log({wallet, peerId, peer})
+        // }
         let walletIndex = walletIndexes[wallet]
         return this.remoteCall(
           peer,
@@ -624,7 +628,7 @@ class TssPlugin extends CallablePlugin {
         // TODO: is this message from 'wallet'
         let peer = await this.findPeer(peerId);
         if (this.isReady) {
-          this.tssParty.setWalletPeer(wallet, peer)
+          this.tssParty.setWalletPeer(wallet, peer);
           this.remoteCall(
             peer,
             RemoteMethods.informEntrance
@@ -637,23 +641,13 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
-  async __onBroadcastReceived(msg) {
+  async onBroadcastReceived(data) {
     try {
-      let data = JSON.parse(uint8ArrayToString(msg.data));
+      // let data = JSON.parse(uint8ArrayToString(msg.data));
       await this.handleBroadcastMessage(data)
     } catch (e) {
       console.error('TssPlugin.__onBroadcastReceived', e)
     }
-  }
-
-  broadcast(data) {
-    let broadcastChannel = this.getBroadcastChannel();
-    if (!broadcastChannel) {
-      console.log('broadcast channel not defined')
-      return;
-    }
-    let str = JSON.stringify(data)
-    this.muon.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(str))
   }
 
   callParty(party, remoteMethod, data) {

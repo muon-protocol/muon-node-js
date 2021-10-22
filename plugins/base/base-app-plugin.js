@@ -43,18 +43,8 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onStart() {
+    super.onStart();
     // console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
-    /**
-     * Subscribe to app broadcast channel
-     */
-    let broadcastChannel = this.getBroadcastChannel()
-    if (broadcastChannel) {
-      await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
-      this.muon.libp2p.pubsub.on(
-        broadcastChannel,
-        this.__onBroadcastReceived.bind(this)
-      )
-    }
     /**
      * Remote call handlers
      */
@@ -79,8 +69,12 @@ class BaseAppPlugin extends CallablePlugin {
       )
   }
 
-  getBroadcastChannel() {
-    return this.APP_NAME ? `muon/${this.APP_NAME}/request/broadcast` : null
+  /**
+   * Override BasePlugin BROADCAST_CHANNEL
+   */
+  get BROADCAST_CHANNEL() {
+    // return this.APP_NAME ? `muon/${this.APP_NAME}/request/broadcast` : null
+    return this.APP_NAME ? super.BROADCAST_CHANNEL : null
   }
 
   async __onRequestArrived(method, params, nSign) {
@@ -291,10 +285,10 @@ class BaseAppPlugin extends CallablePlugin {
     ]
   }
 
-  async __onBroadcastReceived(msg) {
+  async onBroadcastReceived(data) {
     let remoteCall = this.muon.getPlugin('remote-call')
     try {
-      let data = JSON.parse(uint8ArrayToString(msg.data))
+      // let data = JSON.parse(uint8ArrayToString(msg.data))
       if (data && data.type === 'new_request') {
         let peerId = PeerId.createFromCID(data.peerId)
         let peer = await this.findPeer(peerId)
@@ -349,18 +343,11 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   broadcastNewRequest(request) {
-    let broadcastChannel = this.getBroadcastChannel()
-    if (!broadcastChannel) return
-    let data = {
+    this.broadcast({
       type: 'new_request',
       peerId: process.env.PEER_ID,
       _id: request._id
-    }
-    let dataStr = JSON.stringify(data)
-    this.muon.libp2p.pubsub.publish(
-      broadcastChannel,
-      uint8ArrayFromString(dataStr)
-    )
+    })
   }
 
   // remoteMethodEndpoint(title) {

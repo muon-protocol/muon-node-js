@@ -106,29 +106,12 @@ class Search {
 @remoteApp
 class TssPartySearchPlugin extends CallablePlugin {
 
+  // TODO: replace with node-cache.
   searches = {};
 
-  async onStart() {
-    let broadcastChannel = this.getBroadcastChannel()
-    await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
-    this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
-  }
-
-  getBroadcastChannel() {
-    return `muon/tss/party-search/broadcast`;
-  }
-
-  broadcast(data) {
-    let broadcastChannel = this.getBroadcastChannel()
-    if (!broadcastChannel)
-      return;
-    let str = JSON.stringify(data)
-    this.muon.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(str))
-  }
-
-  async __onBroadcastReceived(msg) {
+  async onBroadcastReceived(data) {
     try {
-      let data = JSON.parse(uint8ArrayToString(msg.data));
+      // let data = JSON.parse(uint8ArrayToString(msg.data));
       await this.handleBroadcastMessage(data)
     } catch (e) {
       console.error('TssPlugin.__onBroadcastReceived', e)
