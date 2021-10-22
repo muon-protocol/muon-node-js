@@ -106,7 +106,7 @@ module.exports = {
       case 'test_speed':
       case 'test_redis':
       case 'lock':
-        return result
+        return soliditySha3([{type: 'string', value: result}])
       case 'btc_price':
         let hash = soliditySha3([
           { type: 'uint256', value: request.data.result.time },
