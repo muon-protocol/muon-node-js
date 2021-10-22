@@ -1,5 +1,8 @@
 {
   "verbose": true,
+  "env": {
+    "BABEL_DISABLE_CACHE": 1
+  },
   "ignore": [
     "*.test.js",
     "__test__/*",
