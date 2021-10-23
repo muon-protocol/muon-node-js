@@ -51,7 +51,8 @@ module.exports = {
           appId: APP_ID,
           address,
           reward: floatToBN(result.reward, 18).toString(10),
-          trackingId: result.trackingId
+          trackingId: result.trackingId,
+          chain
         }
 
       default:
@@ -63,13 +64,14 @@ module.exports = {
     let { method } = request
     switch (method) {
       case 'claim':
-        let { address, reward } = result
+        let { address, reward, chain } = result
 
         return soliditySha3([
           { type: 'uint256', value: APP_ID },
           { type: 'address', value: address },
           { type: 'uint256', value: reward },
-          { type: 'string', value: request.data.result.trackingId }
+          { type: 'string', value: request.data.result.trackingId },
+          { type: 'uint256', value: chain }
         ])
 
       default:
