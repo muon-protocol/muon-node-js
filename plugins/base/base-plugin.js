@@ -62,7 +62,7 @@ module.exports = class BasePlugin extends Events{
     if (broadcastChannel && this.onBroadcastReceived) {
 
       if(process.env.VERBOSE) {
-        console.log('======== Registering broadcast handler ========', this.BROADCAST_CHANNEL)
+        console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
       }
       await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
       this.muon.libp2p.pubsub.on(broadcastChannel, this.__onPluginBroadcastReceived.bind(this))
