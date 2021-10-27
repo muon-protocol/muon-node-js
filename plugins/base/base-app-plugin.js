@@ -94,7 +94,8 @@ class BaseAppPlugin extends CallablePlugin {
       owner: process.env.SIGN_WALLET_ADDRESS,
       peerId: process.env.PEER_ID,
       data: {
-        params
+        params,
+        timestamp: startedAt,
       },
       startedAt
     })
