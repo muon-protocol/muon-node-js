@@ -37,10 +37,10 @@ module.exports = {
   hashRequestResult: function (request, result) {
     switch (request.method) {
       case 'call': {
-        let {address, method, abi, outputs, hashTimestamp} = request.data.params;
+        let {timestamp, params: {address, method, abi, outputs, hashTimestamp}} = request.data;
         let extraHashParams = [
           {type: 'uint8', value: this.APP_ID},
-          ...(hashTimestamp ? [{type: 'uint256', value: request.startedAt}] : [])
+          ...(hashTimestamp ? [{type: 'uint256', value: timestamp}] : [])
         ]
         return ethHashCallOutput(
           address,
