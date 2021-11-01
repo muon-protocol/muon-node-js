@@ -73,19 +73,19 @@ class CollateralInfoPlugin extends BasePlugin{
   }
 
   get GroupId(){
-    return this.groupInfo.group;
+    return this.groupInfo?.group;
   }
 
   get TssThreshold(){
-    return this.networkInfo.tssThreshold;
+    return this.networkInfo?.tssThreshold;
   }
 
   get MinGroupSize(){
-    return this.networkInfo.minGroupSize;
+    return this.networkInfo?.minGroupSize;
   }
 
   get MaxGroupSize(){
-    return this.networkInfo.maxGroupSize;
+    return this.networkInfo?.maxGroupSize;
   }
 }
 

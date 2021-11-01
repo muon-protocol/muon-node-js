@@ -53,6 +53,14 @@ class TssPlugin extends CallablePlugin {
     super(...params)
   }
 
+  get BROADCAST_CHANNEL(){
+    let baseChannel = super.BROADCAST_CHANNEL;
+    if(!!this.collateralPlugin.GroupId)
+      return `${baseChannel}/group_${this.collateralPlugin.GroupId}`;
+    else
+      return null;
+  }
+
   async onStart() {
     super.onStart();
 
@@ -63,8 +71,9 @@ class TssPlugin extends CallablePlugin {
     // TODO: peer finding fail if immediately try to join group
     // setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
     let collateralPlugin = this.muon.getPlugin('collateral');
-    collateralPlugin.once('loaded', () => {
+    collateralPlugin.once('loaded', async () => {
       // this.joinToGroup();
+      await this.registerBroadcastHandler();
       this.loadTssInfo();
     })
   }
