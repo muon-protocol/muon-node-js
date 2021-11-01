@@ -94,17 +94,16 @@ module.exports = class BasePlugin extends Events{
       let validWallets = collateralPlugin.getWallets()
       if(!validWallets.includes(sigOwner)){
         throw {message: `Unrecognized request owner ${sigOwner}`}
-        // let {responseId} = data;
-        // let remoteResult = this._calls[responseId]
-        // return remoteResult && remoteResult.reject({message: `Unrecognized request owner ${sigOwner}`})
+      }
+      else{
+        /*eslint no-undef: "error"*/
+        await this.onBroadcastReceived(data);
       }
 
-      /*eslint no-undef: "error"*/
-      await this.onBroadcastReceived(data)
     }
     catch (e) {
       console.log('BasePlugin.__onPluginBroadcastReceived', e)
-      throw e;
+      // throw e;
     }
   }
 }

@@ -187,7 +187,7 @@ class Muon extends Events {
     if(!tssPlugin.tssParty)
       return {};
     let partners = tssPlugin.tssParty.partners;
-    return Object.keys(partners).reduce((obj, w) => ({...obj, [w]: partners[w].i}), {})
+    return Object.keys(partners).reduce((obj, w) => ({...obj, [w]: partners[w].wallet}), {})
   }
 
   get peerIdStr(){
