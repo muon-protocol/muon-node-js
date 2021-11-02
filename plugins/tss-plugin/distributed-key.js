@@ -19,6 +19,7 @@ class DistributedKey {
   party = null;
   /**
    * partners of party, that cooperate to create this key
+   * TODO: when we load the key, partners is empty. is this ok ?
    */
   partners = [];
   f_x = null

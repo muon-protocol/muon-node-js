@@ -97,7 +97,7 @@ module.exports = class BasePlugin extends Events{
       }
       else{
         /*eslint no-undef: "error"*/
-        await this.onBroadcastReceived(data);
+        await this.onBroadcastReceived(data, {wallet: sigOwner});
       }
 
     }
