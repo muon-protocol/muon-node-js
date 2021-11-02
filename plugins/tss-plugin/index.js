@@ -11,8 +11,6 @@ const BroadcastMessage = {
   NeedGroup: 'BROADCAST_MSG_NEED_GROUP',
   JoinedToGroup: 'BROADCAST_MSG_JOINED_TO_GROUP',
   JoinPartyRequest: 'BROADCAST_MSG_JOIN_PARTY_REQ',
-  InformEntrance: 'BROADCAST_MSG_INFORM_ENTRANCE',
-  TssKeyCreated: 'BROADCAST_MSG_TSS_KEY_CREATED',
   WhoIsThere: 'BROADCAST_MSG_WHO_IS_THERE',
 };
 
@@ -178,7 +176,7 @@ class TssPlugin extends CallablePlugin {
     this.parties[party.id] = party
     this.tssParty = party;
 
-    this.informEntrance();
+    this.tryToFindOthers(3);
 
     // validate tssConfig
     let tssConfig = this.getTssConfig();
@@ -202,23 +200,13 @@ class TssPlugin extends CallablePlugin {
       let key = await this.tryToCreateTssKey();
       if (key) {
         console.log(`TSS key generated with this partners`, key.partners);
-        /**
-         * TODO
-         * some times missed node doesnt recover his key.
-         */
-        let partnersPeerInfo = key.partners.reduce((obj, w) => {
-          obj[w] = w === process.env.SIGN_WALLET_ADDRESS ? process.env.PEER_ID : party.partners[w].peer.id.toB58String()
-          return obj;
-        }, {});
-        this.broadcast({
-          type: BroadcastMessage.TssKeyCreated,
-          peerIds: partnersPeerInfo
-        })
       }
       else{
+        await timeout(6000);
+
         this.tryToFindOthers();
 
-        while (true) {
+        while (!this.isReady) {
           await timeout(5000);
           let onlinePartners = Object.values(this.tssParty.onlinePartners)
             .filter(({wallet:w}) => w !== process.env.SIGN_WALLET_ADDRESS);
@@ -236,23 +224,10 @@ class TssPlugin extends CallablePlugin {
 
           if(statuses.length >= this.collateralPlugin.TssThreshold){
             await this.tryToRecoverTssKey(onlinePartners.map(p => p.wallet));
-            break;
           }
         }
       }
     }
-
-    // TODO: update/refresh smart contract with this tss key
-    if (sharedKey.addr === ADDRESS_ZERO) {
-    } else {
-    }
-  }
-
-  tryToFindOthers() {
-    this.broadcast({
-      type: BroadcastMessage.WhoIsThere,
-      peerId: process.env.PEER_ID,
-    })
   }
 
   async loadSavedTss() {
@@ -279,13 +254,13 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
-  async informEntrance() {
-    for (let i = 0; i < 3; i++) {
-      await timeout(5000)
+  async tryToFindOthers(numTry=1) {
+    for (let i = 0 ; i < numTry ; i++) {
       this.broadcast({
-        type: BroadcastMessage.InformEntrance,
+        type: BroadcastMessage.WhoIsThere,
         peerId: process.env.PEER_ID,
       })
+      await timeout(5000)
     }
   }
 
@@ -325,8 +300,8 @@ class TssPlugin extends CallablePlugin {
     }
     // TODO: backup previews key.
 
-    // console.log('save config temporarily disabled for test.', tssConfig)
-    this.muon.saveConfig(tssConfig, `tss.conf.json`);
+    console.log('save config temporarily disabled for test.', tssConfig)
+    // this.muon.saveConfig(tssConfig, `tss.conf.json`);
   }
 
   async tryToRecoverTssKey(partners){
@@ -807,48 +782,6 @@ class TssPlugin extends CallablePlugin {
         )
         break
       }
-      // TODO: replace with WhoIsThere
-      case BroadcastMessage.InformEntrance: {
-        let {peerId} = msg;
-        // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
-        // TODO: is this message from 'wallet'
-        let peer = await this.findPeer(peerId);
-        if (!!this.tssParty) {
-          this.tssParty.setWalletPeer(callerInfo.wallet, peer);
-          this.remoteCall(
-            peer,
-            RemoteMethods.iAmHere
-          ).catch(e => {
-          })
-        }
-        break;
-      }
-      case BroadcastMessage.TssKeyCreated: {
-        if(!this.tssKey){
-          console.log('I need tss key');
-          let {peerIds} = msg;
-          console.log('partners peer info', peerIds)
-
-          /**
-           * This Node may not connected to key partners.
-           * Before call recovery method, we connect the node to key partners.
-           */
-          let partnersWithoutPeer = Object.keys(peerIds).filter(w => {
-            return w !== process.env.SIGN_WALLET_ADDRESS && !this.tssParty.partners[w].peer
-          })
-
-          let peers = await Promise.all(partnersWithoutPeer.map(w => this.findPeer(peerIds[w]).catch(e => null)))
-          if (peers.includes(null)) {
-            throw {message: 'peer not found to broadcast'}
-          }
-          partnersWithoutPeer.map((w, i) => {
-            this.tssParty.setWalletPeer(w, peers[i]);
-          });
-
-          await this.tryToRecoverTssKey(Object.keys(peerIds));
-        }
-        break;
-      }
       case BroadcastMessage.WhoIsThere: {
         let {peerId} = msg;
         let peer = await this.findPeer(peerId);
@@ -874,17 +807,6 @@ class TssPlugin extends CallablePlugin {
     } catch (e) {
       console.error('TssPlugin.__onBroadcastReceived', e)
     }
-  }
-
-  callParty(party, remoteMethod, data) {
-    return Promise.all(
-      Object.values(party.partners)
-        .filter(p => {
-          // filter out current node & partners that not connected
-          return !!p.peer && p.wallet !== process.env.SIGN_WALLET_ADDRESS
-        })
-        .map(({peer}) => this.remoteCall(peer, remoteMethod, data))
-    )
   }
 
   /**==================================
