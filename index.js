@@ -116,6 +116,7 @@ var muon;
         'memory': [require('./plugins/memory-plugin'), {}],
         'tss-plugin': [require('./plugins/tss-plugin'), {}],
         'tss-party-search': [require('./plugins/tss-party-search'), {}],
+        'network-status': [require('./plugins/network-status'), {}],
         ...getEnvPlugins(),
         ...getCustomApps(),
         ...await getGeneralApps(),
