@@ -13,6 +13,7 @@ const BroadcastMessage = {
   JoinPartyRequest: 'BROADCAST_MSG_JOIN_PARTY_REQ',
   InformEntrance: 'BROADCAST_MSG_INFORM_ENTRANCE',
   TssKeyCreated: 'BROADCAST_MSG_TSS_KEY_CREATED',
+  WhoIsThere: 'BROADCAST_MSG_WHO_IS_THERE',
 };
 
 const RemoteMethods = {
@@ -24,7 +25,8 @@ const RemoteMethods = {
   distributeKey: 'distributeKey',
   distributePubKey: 'distributePubKey',
   storeTssKey: 'storeTssKey',
-  informEntrance: 'informEntrance',
+  iAmHere: "iAmHere",
+  checkTssStatus: "checkTssStatus",
 }
 
 const GroupStatus = {
@@ -182,36 +184,75 @@ class TssPlugin extends CallablePlugin {
     let tssConfig = this.getTssConfig();
 
     if(tssConfig){
-      let key = DKey.load(this.tssParty, tssConfig.key);
+      let _key = {
+        ...tssConfig.key,
+        share: toBN(tssConfig.key.share),
+        publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
+      }
+      let key = DKey.load(this.tssParty, _key);
       this.keys[key.id] = key;
       this.tssKey = key;
       this.isReady = true
       console.log('tss ready');
     }
     else{
-      if (sharedKey.addr === ADDRESS_ZERO) {
-        console.log('waiting to partners get online...');
-        await party.waitToGetOnline();
+      console.log('waiting to partners get online...');
+      await party.waitToGetOnline();
 
-        let key = await this.tryToCreateTssKey();
-        if (key) {
-          console.log(`TSS key generated with this partners`, key.partners);
-          /**
-           * TODO
-           * some times missed node doesnt recover his key.
-           */
-          let partnersPeerInfo = key.partners.reduce((obj, w) => {
-            obj[w] = w === process.env.SIGN_WALLET_ADDRESS ? process.env.PEER_ID : party.partners[w].peer.id.toB58String()
-            return obj;
-          }, {});
-          this.broadcast({
-            type: BroadcastMessage.TssKeyCreated,
-            peerIds: partnersPeerInfo
-          })
+      let key = await this.tryToCreateTssKey();
+      if (key) {
+        console.log(`TSS key generated with this partners`, key.partners);
+        /**
+         * TODO
+         * some times missed node doesnt recover his key.
+         */
+        let partnersPeerInfo = key.partners.reduce((obj, w) => {
+          obj[w] = w === process.env.SIGN_WALLET_ADDRESS ? process.env.PEER_ID : party.partners[w].peer.id.toB58String()
+          return obj;
+        }, {});
+        this.broadcast({
+          type: BroadcastMessage.TssKeyCreated,
+          peerIds: partnersPeerInfo
+        })
+      }
+      else{
+        this.tryToFindOthers();
+
+        while (true) {
+          await timeout(5000);
+          let onlinePartners = Object.values(this.tssParty.onlinePartners)
+            .filter(({wallet:w}) => w !== process.env.SIGN_WALLET_ADDRESS);
+
+          let statuses = await Promise.all(onlinePartners.map(p => {
+            return this.remoteCall(
+              p.peer,
+              RemoteMethods.checkTssStatus
+            ).catch(e => 'error')
+          }))
+
+          let filter = statuses.map(s => s.isReady)
+          onlinePartners = onlinePartners.filter((p, i) => filter[i]);
+          statuses = statuses.filter((s, i) => filter[i]);
+
+          if(statuses.length >= this.collateralPlugin.TssThreshold){
+            await this.tryToRecoverTssKey(onlinePartners.map(p => p.wallet));
+            break;
+          }
         }
-      } else {
       }
     }
+
+    // TODO: update/refresh smart contract with this tss key
+    if (sharedKey.addr === ADDRESS_ZERO) {
+    } else {
+    }
+  }
+
+  tryToFindOthers() {
+    this.broadcast({
+      type: BroadcastMessage.WhoIsThere,
+      peerId: process.env.PEER_ID,
+    })
   }
 
   async loadSavedTss() {
@@ -244,7 +285,6 @@ class TssPlugin extends CallablePlugin {
       this.broadcast({
         type: BroadcastMessage.InformEntrance,
         peerId: process.env.PEER_ID,
-        wallet: process.env.SIGN_WALLET_ADDRESS,
       })
     }
   }
@@ -285,12 +325,12 @@ class TssPlugin extends CallablePlugin {
     }
     // TODO: backup previews key.
 
-    console.log('save config temporarily disabled for test.', tssConfig)
-    // this.muon.saveConfig(tssConfig, `tss.conf.json`)
+    // console.log('save config temporarily disabled for test.', tssConfig)
+    this.muon.saveConfig(tssConfig, `tss.conf.json`);
   }
 
-  async tryToRecoverTssKey(peerIds){
-    let partners = Object.keys(peerIds).map(w => this.tssParty.partners[w]);
+  async tryToRecoverTssKey(partners){
+    partners = partners.map(w => this.tssParty.partners[w]);
 
     if(partners.length < this.collateralPlugin.TssThreshold)
       throw {message: "No enough online partners to recover key."};
@@ -722,7 +762,7 @@ class TssPlugin extends CallablePlugin {
   async verify(hash, sign) {
   }
 
-  async handleBroadcastMessage(msg) {
+  async handleBroadcastMessage(msg, callerInfo) {
     // console.log('tss-plugin.handleBroadcastMessage', msg);
     switch (msg.type) {
       case BroadcastMessage.NeedGroup: {
@@ -767,16 +807,17 @@ class TssPlugin extends CallablePlugin {
         )
         break
       }
+      // TODO: replace with WhoIsThere
       case BroadcastMessage.InformEntrance: {
-        let {peerId, wallet} = msg;
+        let {peerId} = msg;
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
         // TODO: is this message from 'wallet'
         let peer = await this.findPeer(peerId);
         if (!!this.tssParty) {
-          this.tssParty.setWalletPeer(wallet, peer);
+          this.tssParty.setWalletPeer(callerInfo.wallet, peer);
           this.remoteCall(
             peer,
-            RemoteMethods.informEntrance
+            RemoteMethods.iAmHere
           ).catch(e => {
           })
         }
@@ -804,7 +845,20 @@ class TssPlugin extends CallablePlugin {
             this.tssParty.setWalletPeer(w, peers[i]);
           });
 
-          await this.tryToRecoverTssKey(peerIds);
+          await this.tryToRecoverTssKey(Object.keys(peerIds));
+        }
+        break;
+      }
+      case BroadcastMessage.WhoIsThere: {
+        let {peerId} = msg;
+        let peer = await this.findPeer(peerId);
+        if (!!this.tssParty) {
+          this.tssParty.setWalletPeer(callerInfo.wallet, peer);
+          this.remoteCall(
+            peer,
+            RemoteMethods.iAmHere
+          ).catch(e => {
+          })
         }
         break;
       }
@@ -813,10 +867,10 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
-  async onBroadcastReceived(data) {
+  async onBroadcastReceived(data={}, callerInfo) {
     try {
       // let data = JSON.parse(uint8ArrayToString(msg.data));
-      await this.handleBroadcastMessage(data)
+      await this.handleBroadcastMessage(data, callerInfo)
     } catch (e) {
       console.error('TssPlugin.__onBroadcastReceived', e)
     }
@@ -1018,12 +1072,20 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
-  @remoteMethod(RemoteMethods.informEntrance)
-  async __informEntrance(data = {}, callerInfo) {
-    // console.log('TssPlugin.__informEntrance', data)
+  @remoteMethod(RemoteMethods.iAmHere)
+  async __iAmHere(data={}, callerInfo) {
+    // console.log('TssPlugin.__iAmHere', data)
     let peer = await this.findPeer(callerInfo.peerId);
     if (!!this.tssParty) {
       this.tssParty.setWalletPeer(callerInfo.wallet, peer)
+    }
+  }
+
+  @remoteMethod(RemoteMethods.checkTssStatus)
+  async __checkTssStatus(data={}, callerInfo) {
+    return {
+      isReady: this.isReady,
+      address: this.tssKey.address,
     }
   }
 }

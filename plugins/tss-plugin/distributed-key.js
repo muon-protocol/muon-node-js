@@ -58,6 +58,7 @@ class DistributedKey {
     key.h_x = null;
     key.share = _key.share;
     key.publicKey = _key.publicKey
+    key.address = tss.pub2addr(_key.publicKey)
     key.timeoutPromise.resolve(key);
     return key
   }
@@ -84,6 +85,7 @@ class DistributedKey {
       let fh = this.getTotalFH()
       this.share = fh.f;
       this.publicKey = this.getTotalPubKey();
+      this.address = tss.pub2addr(this.publicKey);
       this.timeoutPromise.resolve(this)
     }
   }

@@ -162,6 +162,9 @@ class BaseTssAppPlugin extends BaseAppPlugin {
 
   @remoteMethod('wantSign')
   async __onRemoteWantSign(request) {
+    if(!this.tssPlugin.isReady)
+      throw {message: "TSS is not ready"};
+
     let {nonce: nonceId} = request.data.init;
     let nonce = this.tssPlugin.getSharedKey(nonceId);
     // wait for nonce broadcast complete
