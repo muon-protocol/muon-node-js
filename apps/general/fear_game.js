@@ -2,6 +2,8 @@ const { axios, soliditySha3, floatToBN } = MuonAppUtils
 
 const APP_ID = 10
 
+const getTimestamp = () => Math.floor(Date.now() / 1000)
+
 function getMilestoneReached(address, signature, message, amount, chain) {
   return axios
     .post(
@@ -47,12 +49,15 @@ module.exports = {
         if (!result.claimed || result.reward == 0) {
           throw { message: 'address not allowed for claim' }
         }
+        let startedAt = getTimestamp()
+
         return {
           appId: APP_ID,
           address,
           reward: floatToBN(result.reward, 18).toString(10),
           trackingId: result.trackingId,
-          chain
+          chain,
+          muonTimestamp: startedAt
         }
 
       default:
@@ -65,13 +70,13 @@ module.exports = {
     switch (method) {
       case 'claim':
         let { address, reward, chain } = result
-
         return soliditySha3([
           { type: 'uint256', value: APP_ID },
           { type: 'address', value: address },
           { type: 'uint256', value: reward },
           { type: 'string', value: request.data.result.trackingId },
-          { type: 'uint256', value: chain }
+          { type: 'uint256', value: chain },
+          { type: 'uint256', value: request.data.result.muonTimestamp }
         ])
 
       default:
