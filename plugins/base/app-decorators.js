@@ -12,6 +12,9 @@ function classNames(target){
 
 module.exports.remoteMethod = function (title) {
   return function (target, property, descriptor) {
+    if(property === 'function'){
+      throw {message: `Error at [${target.constructor.name}]: Anonymous function not allowed as remote method. Define this method with a name.`}
+    }
     if(!target.__remoteMethods)
       target.__remoteMethods = []
     target.__remoteMethods.push({title, property})

@@ -93,6 +93,10 @@ class TssPlugin extends CallablePlugin {
     return this.muon.getPlugin('collateral')
   }
 
+  get leaderPlugin() {
+    return this.muon.getPlugin('group-leader');
+  }
+
   get networkStatus() {
     return this.muon.getPlugin('network-status');
   }
@@ -176,6 +180,8 @@ class TssPlugin extends CallablePlugin {
     this.parties[party.id] = party
     this.tssParty = party;
 
+    this.emit('party-load');
+
     this.tryToFindOthers(3);
 
     // validate tssConfig
@@ -194,11 +200,11 @@ class TssPlugin extends CallablePlugin {
       console.log('tss ready');
     }
     else{
-      console.log('waiting to partners get online...');
-      await party.waitToGetOnline();
+      console.log('waiting to leader be selected ...');
+      let leader = await this.leaderPlugin.waitToLeaderSelect();
 
-      let key = await this.tryToCreateTssKey();
-      if (key) {
+      if (this.isNeedToCreateKey() && leader === process.env.SIGN_WALLET_ADDRESS) {
+        let key = await this.tryToCreateTssKey();
         console.log(`TSS key generated with this partners`, key.partners);
       }
       else{
@@ -228,6 +234,11 @@ class TssPlugin extends CallablePlugin {
         }
       }
     }
+  }
+
+  async isNeedToCreateKey(){
+    // TODO: not implemented.
+    return true;
   }
 
   async loadSavedTss() {
@@ -462,21 +473,6 @@ class TssPlugin extends CallablePlugin {
   }
 
   async tryToCreateTssKey() {
-    let selfWallet = process.env.SIGN_WALLET_ADDRESS
-    /**
-     * TODO: search in online partners.
-     * prevent race condition between two smallest wallet.
-     * smallest wallet may connect late and causes the race condition.
-     */
-
-      // TODO: handle key creation timeout
-    let wallets = Object.keys(this.tssParty.partners);
-    /**
-     * lower wallet address has more priority to create group
-     */
-    if (wallets.findIndex(w => w.toLowerCase() < selfWallet.toLowerCase()) >= 0)
-      return;
-
     try {
 
       let key;
@@ -576,10 +572,13 @@ class TssPlugin extends CallablePlugin {
     return party;
   }
 
-  async keyGen(party) {
+  async keyGen(party, id) {
+    if(!party)
+      party = this.tssParty;
+
     let t0 = Date.now()
     // 1- create new key
-    let key = await this.createKey(party)
+    let key = await this.createKey(party, id)
     let t1 = Date.now()
     // 2- distribute key initialization
     await this.broadcastKey(key)
@@ -598,9 +597,9 @@ class TssPlugin extends CallablePlugin {
     return key;
   }
 
-  async createKey(party) {
+  async createKey(party, id=null) {
     // 1- create new key
-    let key = new DKey(party, null, 5000)
+    let key = new DKey(party, id, 5000)
     /**
      * TODO: check from misbehavior
      * prevent app crash
@@ -1009,7 +1008,7 @@ class TssPlugin extends CallablePlugin {
   async __checkTssStatus(data={}, callerInfo) {
     return {
       isReady: this.isReady,
-      address: this.tssKey.address,
+      address: this.tssKey?.address,
     }
   }
 }

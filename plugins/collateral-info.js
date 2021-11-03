@@ -16,7 +16,8 @@ class CollateralInfoPlugin extends BasePlugin{
 
     this.muon.once('peer', () => {
       // Listen to contract events and inform any changes.
-      this._watchContractEvents();
+      // TODO: uncomment this. (commented for debug)
+      // this._watchContractEvents();
 
       this._loadCollateralInfo();
     })
