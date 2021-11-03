@@ -65,17 +65,17 @@ class TssPlugin extends CallablePlugin {
   async onStart() {
     super.onStart();
 
-    // let broadcastChannel = this.BROADCAST_CHANNEL
-    // await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
-    // this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
-
-    // TODO: peer finding fail if immediately try to join group
-    // setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
-    let collateralPlugin = this.muon.getPlugin('collateral');
-    collateralPlugin.once('loaded', async () => {
-      // this.joinToGroup();
+    this.collateralPlugin.once('loaded', async () => {
+      /**
+       * Normally, broadcast subscription will done inside the super.onStart().
+       * But, at the start time, BROADCAST_CHANNEL has a null value and while BROADCAST_CHANNEL is null, subscription will ignored.
+       * So, now that BROADCAST_CHANNEL has a value, we call registerBroadcastHandler again to subscribe to group channel.
+       */
       await this.registerBroadcastHandler();
+
       this.loadTssInfo();
+
+      // this.collateralPlugin.onEvent('AddPartner', txs => console.log('AddPartner....', txs))
     })
   }
 
@@ -741,13 +741,14 @@ class TssPlugin extends CallablePlugin {
     // console.log('tss-plugin.handleBroadcastMessage', msg);
     switch (msg.type) {
       case BroadcastMessage.NeedGroup: {
-        let {peerId, wallet} = msg;
+        let {peerId} = msg;
+        let {wallet} = callerInfo
         this.nodesNeedGroup[wallet] = {peerId, wallet};
         // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
         break;
       }
       case BroadcastMessage.JoinedToGroup: {
-        let {wallet} = msg;
+        let {wallet} = callerInfo;
         delete this.nodesNeedGroup[wallet];
         // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
         break;
@@ -815,9 +816,10 @@ class TssPlugin extends CallablePlugin {
    *
    *===================================*/
   @remoteMethod(RemoteMethods.joinToParty)
-  async __joinToParty(data = {}) {
+  async __joinToParty(data = {}, callerInfo) {
     // console.log('TssPlugin.__joinToParty', data)
-    let {id, peerId, wallet} = data
+    let {id} = data
+    let {peerId, wallet} = callerInfo;
     let party = this.parties[id];
     if (party && !party.isFulfilled()) {
       this.parties[id].addPartner({peerId, wallet})

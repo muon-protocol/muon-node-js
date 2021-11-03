@@ -1,6 +1,7 @@
 const BasePlugin = require('./base/base-plugin')
 const ethUtil = require('../utils/node-utils/eth');
 const GroupManagerABI = require('../data/GroupManager-ABI');
+const ERC20ABI = require('../data/ERC20-ABI');
 
 class CollateralInfoPlugin extends BasePlugin{
 
@@ -8,15 +9,20 @@ class CollateralInfoPlugin extends BasePlugin{
   groupInfo = null;
   networkInfo = null
 
+  _eventSubscribe = null;
+
   async onStart(){
     super.onStart();
 
     this.muon.once('peer', () => {
-      this.loadCollateralInfo();
+      // Listen to contract events and inform any changes.
+      this._watchContractEvents();
+
+      this._loadCollateralInfo();
     })
   }
 
-  async loadCollateralInfo(){
+  async _loadCollateralInfo(){
     let myWallet = process.env.SIGN_WALLET_ADDRESS;
 
     this.groupInfo = await this.contractCall('getNodeGroupInfo', [myWallet]);
@@ -34,7 +40,7 @@ class CollateralInfoPlugin extends BasePlugin{
     }, {});
 
     if(process.env.VERBOSE) {
-      console.log('CollateralInfo.loadCollateralInfo: Info loaded.', {
+      console.log('CollateralInfo._loadCollateralInfo: Info loaded.', {
         networkInfo: this.networkInfo,
         groupInfo: this.groupInfo
       });
@@ -45,6 +51,47 @@ class CollateralInfoPlugin extends BasePlugin{
     // TODO: update interval/watch network events.
 
     this.emit('loaded');
+  }
+
+  _watchContractEvents() {
+    this._eventSubscribe = ethUtil.subscribeLogEvent(
+        this.Network,
+        this.GroupManagerAddress,
+        GroupManagerABI,
+        'allEvents', // watch to all events
+        15000, // request interval in seconds
+        0 // no need to previews events
+      );
+    this._eventSubscribe.on('event', this._onRawEvent.bind(this));
+
+    // let test = ethUtil.subscribeLogEvent(
+    //     'eth',
+    //     '0xdac17f958d2ee523a2206206994597c13d831ec7',
+    //     ERC20ABI,
+    //     'Transfer',
+    //     10000
+    //   );
+    // test.on('event', this.onEvent.bind(this))
+  }
+
+  _onRawEvent(txs, network, contractAddress) {
+    let importantEvents = ['AddPartner', 'DeletePartner'];
+    let filteredEvents = {}
+    txs.forEach(e => {
+      if(importantEvents.includes(e.event)){
+        if(filteredEvents[e.event] === undefined)
+          filteredEvents[e.event] = [];
+        filteredEvents[e.event].push(e)
+      }
+    })
+    Object.keys(filteredEvents).forEach(name => {
+      this.emit(`event:${name}`, filteredEvents[name]);
+    })
+    // console.log('event detected', txs, network, contractAddress)
+  }
+
+  onEvent(name, callback){
+    this.on(`event:${name}`, callback);
   }
 
   getWallets(){

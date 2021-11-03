@@ -200,14 +200,14 @@ async function createCID(request) {
   return cid.toString()
 }
 
-const subscribeLogEvent = (network, contractAddress, contractAbi, eventName, interval = 5000) => {
-  let subscribe =  new Subscribe(network, contractAddress, contractAbi, eventName, interval)
+const subscribeLogEvent = (network, contractAddress, contractAbi, eventName, interval = 5000, blockSeek=0) => {
+  let subscribe =  new Subscribe(network, contractAddress, contractAbi, eventName, interval, blockSeek)
   return subscribe
 }
 
 
 class Subscribe extends EventEmbitter{
-  constructor(network, contractAddress, abi, eventName, interval=15000){
+  constructor(network, contractAddress, abi, eventName, interval=15000, blockSeek=0){
     super()
     let web3 = getWeb3Sync(network);
     let contract = new web3.eth.Contract(abi, contractAddress)
@@ -216,6 +216,7 @@ class Subscribe extends EventEmbitter{
     this.network = network;
     this.interval = interval
     this.contract = contract;
+    this.blockSeek = blockSeek
     this.lastBlock = -1;
     this.eventName = eventName;
     this._handler = this._handler.bind(this)
@@ -225,7 +226,8 @@ class Subscribe extends EventEmbitter{
 
   async _handler(){
     if(this.lastBlock < 0) {
-      let lastBlock = await this.web3.eth.getBlockNumber() - 9000;
+      let lastBlock = await this.web3.eth.getBlockNumber() - this.blockSeek + 1;
+      lastBlock = Math.max(lastBlock, 0);
       console.log(`watch ${this.network}:${this.contract._address} (${this.eventName}) from block ${lastBlock}`)
       this.lastBlock = lastBlock;
     }
@@ -241,7 +243,7 @@ class Subscribe extends EventEmbitter{
         if(result.length > 0) {
           let lastBlock = Math.max(...result.map(({blockNumber}) => blockNumber))
           this.lastBlock = lastBlock + 1;
-          txs = result.map(({transactionHash, returnValues, blockNumber}) => ({blockNumber,transactionHash, returnValues}))
+          txs = result.map(({transactionHash, returnValues, blockNumber, event}) => ({event, blockNumber,transactionHash, returnValues}))
           this.emit('event', txs, network, contract._address)
         }
       } else {
