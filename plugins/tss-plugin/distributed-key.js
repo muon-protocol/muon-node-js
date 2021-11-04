@@ -121,6 +121,10 @@ class DistributedKey {
    * @returns {[string, any]}
    */
   getPubKey(idx){
+    // TODO: should throw an error when key not completed.
+    if(!this.isPubKeyDistributed()){
+      throw {message: 'DistributedKey not fully distributed yet.'}
+    }
     return Object.entries(this.pubKeyParts)
       // .filter(([i, A_ik]) => parseInt(i) !== idx)
       .reduce((acc, [i, A_ik]) => {

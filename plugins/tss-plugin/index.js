@@ -205,7 +205,7 @@ class TssPlugin extends CallablePlugin {
 
       if (this.isNeedToCreateKey() && leader === process.env.SIGN_WALLET_ADDRESS) {
         let key = await this.tryToCreateTssKey();
-        console.log(`TSS key generated with this partners`, key.partners);
+        console.log(`TSS key generated with ${key.partners.length} partners`);
       }
       else{
         await timeout(6000);
@@ -237,8 +237,20 @@ class TssPlugin extends CallablePlugin {
   }
 
   async isNeedToCreateKey(){
-    // TODO: not implemented.
-    return true;
+    let myWallet = process.env.SIGN_WALLET_ADDRESS;
+    let onlinePartners = Object.values(this.tssParty.onlinePartners).filter(p => (p.wallet !== myWallet))
+    let statuses = await Promise.all(onlinePartners.map(p => {
+      return this.remoteCall(
+        p.peer,
+        RemoteMethods.checkTssStatus
+      ).catch(e => 'error')
+    }))
+
+    // TODO: is this ok?
+    let numReadyNodes = statuses.map(s => (s.isReady?1:0))
+      .reduce((sum, r) => (sum+r), 0);
+
+    return numReadyNodes < this.collateralPlugin.TssThreshold;
   }
 
   async loadSavedTss() {
@@ -311,7 +323,7 @@ class TssPlugin extends CallablePlugin {
     }
     // TODO: backup previews key.
 
-    console.log('save config temporarily disabled for test.', tssConfig)
+    // console.log('save config temporarily disabled for test.', tssConfig)
     // this.muon.saveConfig(tssConfig, `tss.conf.json`);
   }
 
@@ -670,6 +682,8 @@ class TssPlugin extends CallablePlugin {
     }
 
     let keyPartners = key.partners.map(w => party.partners[w]);
+    // TODO: Debug part remove it in production // 00000
+    if(!!peerIds) await timeout(Math.floor(Math.random()*2500));
     let distKeyResult = await Promise.all(
       keyPartners
         .map(({wallet, peer}) => {
