@@ -2,9 +2,8 @@ const BaseAppPlugin = require('./base-app-plugin')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const tss = require('../../utils/tss');
 const {toBN} = require('../../utils/tss/utils')
-const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
+const {remoteMethod, gatewayMethod} = require('../base/app-decorators')
 
-@remoteApp
 class BaseTssAppPlugin extends BaseAppPlugin {
 
   getNSign () {

@@ -13,6 +13,10 @@ const AppRequestManager = require('./app-request-manager');
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
 class BaseAppPlugin extends CallablePlugin {
+
+  // TODO: if any error occurred inside onStart event, won't be cached.
+  //  example: set an app name too null, error will occurs but won't cached.
+
   APP_NAME = null
   requestManager = new AppRequestManager();
 
@@ -51,13 +55,13 @@ class BaseAppPlugin extends CallablePlugin {
     this.muon
       .getPlugin('remote-call')
       .on(
-        `remote:app-${this.APP_NAME}-get-request`,
+        `app-${this.APP_NAME}-get-request`,
         this.__onRemoteWantRequest.bind(this)
       )
     this.muon
       .getPlugin('remote-call')
       .on(
-        `remote:app-${this.APP_NAME}-request-sign`,
+        `app-${this.APP_NAME}-request-sign`,
         this.__onRemoteSignRequest.bind(this)
       )
     this.muon
@@ -286,17 +290,17 @@ class BaseAppPlugin extends CallablePlugin {
     ]
   }
 
-  async onBroadcastReceived(data) {
+  async onBroadcastReceived(data={}) {
     let remoteCall = this.muon.getPlugin('remote-call')
+    let {method, params} = data;
     try {
-      // let data = JSON.parse(uint8ArrayToString(msg.data))
-      if (data && data.type === 'new_request') {
-        let peerId = PeerId.createFromCID(data.peerId)
+      if (method === 'new_request') {
+        let peerId = PeerId.createFromCID(params.peerId)
         let peer = await this.findPeer(peerId)
         let request = await remoteCall.call(
           peer,
           `app-${this.APP_NAME}-get-request`,
-          { _id: data._id }
+          { _id: params._id }
         )
         if (request) {
           // console.log(`request info found: `, request)
@@ -306,7 +310,7 @@ class BaseAppPlugin extends CallablePlugin {
             memWrite
           })
         } else {
-          // console.log(`request info not found "${data.id}"`)
+          // console.log(`request info not found "${params.id}"`)
         }
       }
     } catch (e) {
@@ -345,9 +349,11 @@ class BaseAppPlugin extends CallablePlugin {
 
   broadcastNewRequest(request) {
     this.broadcast({
-      type: 'new_request',
-      peerId: process.env.PEER_ID,
-      _id: request._id
+      method: 'new_request',
+      params: {
+        peerId: process.env.PEER_ID,
+        _id: request._id
+      },
     })
   }
 

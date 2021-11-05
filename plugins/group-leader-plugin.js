@@ -1,5 +1,5 @@
 const CallablePlugin = require('./base/callable-plugin')
-const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
+const {remoteMethod, gatewayMethod} = require('./base/app-decorators')
 const tssModule = require('../utils/tss')
 const {timeout} = require('../utils/helpers');
 const TimeoutPromise = require('../core/timeout-promise')
@@ -11,7 +11,6 @@ const RemoteMethods = {
   WhoIsLeader: 'WhoIsLeader',
 }
 
-@remoteApp
 class GroupLeaderPlugin extends CallablePlugin {
   // TODO: How about adversarial behavior?
 
@@ -46,6 +45,8 @@ class GroupLeaderPlugin extends CallablePlugin {
   _leaderSelectPromise = new TimeoutPromise();
 
   async onStart() {
+    super.onStart();
+
     this.TssPlugin.once('party-load', this._checkStatus.bind(this))
   }
 

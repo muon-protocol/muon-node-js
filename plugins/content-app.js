@@ -2,9 +2,8 @@ const BaseApp = require('./base/base-app-plugin')
 const Content = require('../gateway/models/Content')
 const CID = require('cids')
 const all = require('it-all')
-const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
+const {remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
-@remoteApp
 class ContentApp extends BaseApp {
   APP_NAME = 'content'
 
@@ -15,6 +14,8 @@ class ContentApp extends BaseApp {
   }
 
   async onStart() {
+    super.onStart();
+
     this.muon.getPlugin('gateway-interface').on('confirmed', this.onGatewayConfirmed.bind(this))
 
     let contents = await Content.find({});

@@ -37,6 +37,7 @@ class RemoteCall extends BasePlugin {
   }
 
   handleCall(callId, method, params, callerWallet, responseStream, peerId){
+    // console.log('=========== RemoteCall.handleCall', method)
     return this.emit(`remote:${method}`, params, {wallet: callerWallet, peerId})
       .then(result => {
         let response = {
@@ -54,6 +55,13 @@ class RemoteCall extends BasePlugin {
           }
         };
         return this.send(response, responseStream)
+      })
+  }
+
+  handleBroadcast(method, params, callerWallet) {
+    return this.emit(`remote:${method}`, params, {wallet: callerWallet})
+      .catch(error => {
+        console.error("RemoteCall.handleBroadcast", error)
       })
   }
 
@@ -171,6 +179,14 @@ class RemoteCall extends BasePlugin {
       resultPromise
     });
     return resultPromise.promise;
+  }
+
+  on(title, callback, options={}) {
+    super.on(`remote:${title}`, callback);
+  }
+
+  hasMethodHandler(method) {
+    return this.listenerCount(`remote:${method}`) > 0;
   }
 }
 

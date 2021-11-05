@@ -3,7 +3,7 @@ const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
 const {timeout} = require('../utils/helpers')
 const Party = require('./tss-plugin/party')
-const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
+const {remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
 const MSG_TYPE_PARTY_SEARCH_REQ = 'search_party_request'
 
@@ -103,7 +103,6 @@ class Search {
   }
 }
 
-@remoteApp
 class TssPartySearchPlugin extends CallablePlugin {
 
   // TODO: replace with node-cache.
@@ -121,10 +120,11 @@ class TssPartySearchPlugin extends CallablePlugin {
   async handleBroadcastMessage(msg){
     // console.log('TssPartySearch.handleBroadcastMessage', msg);
     let tssPlugin = this.muon.getPlugin('tss-plugin')
-    switch (msg.type) {
+    let {method, params} = msg;
+    switch (method) {
       case MSG_TYPE_PARTY_SEARCH_REQ:{
         if(tssPlugin.isReady) {
-          let {searchId, peerId} = msg;
+          let {searchId, peerId} = params;
           let peer = await this.findPeer(peerId)
           let {tssParty} = tssPlugin
           await this.remoteCall(
@@ -162,10 +162,12 @@ class TssPartySearchPlugin extends CallablePlugin {
         search = new Search(TSS_THRESHOLD, TSS_MAX);
         this.searches[search.id] = search
         this.broadcast({
-          type: MSG_TYPE_PARTY_SEARCH_REQ,
-          searchId: search.id,
-          peerId: process.env.PEER_ID,
-          wallet: process.env.SIGN_WALLET_ADDRESS,
+          method: MSG_TYPE_PARTY_SEARCH_REQ,
+          params: {
+            searchId: search.id,
+            peerId: process.env.PEER_ID,
+            wallet: process.env.SIGN_WALLET_ADDRESS,
+          }
         })
         // wait to fulfill
         await timeout(3000)

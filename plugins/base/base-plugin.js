@@ -4,6 +4,16 @@ const crypto = require('../../utils/crypto')
 const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
 
+function classNames(target){
+  let names = []
+  let tmp = target
+  while (!!tmp && (tmp.name || tmp.constructor.name)){
+    names.push(tmp.name || tmp.constructor.name)
+    tmp = Object.getPrototypeOf(tmp);
+  }
+  return names;
+}
+
 module.exports = class BasePlugin extends Events{
   muon = null;
   configs = {}
@@ -27,6 +37,51 @@ module.exports = class BasePlugin extends Events{
    */
   async onStart(){
     this.registerBroadcastHandler()
+
+    let {__remoteMethods, __gatewayMethods} = this;
+
+    if(__remoteMethods) {
+      __remoteMethods.forEach(item => {
+        this.registerRemoteMethod(item.title, this[item.property].bind(this))
+      })
+    }
+    if(__gatewayMethods) {
+      let gateway = this.muon.getPlugin('gateway-interface')
+
+      let isApp = classNames(Object.getPrototypeOf(this)).includes('BaseAppPlugin')
+
+      __gatewayMethods.forEach(item =>{
+        console.log('========', item)
+        if(isApp)
+          gateway.registerAppCall(this.APP_NAME, item.title, this[item.property].bind(this))
+        else
+          gateway.registerMuonCall(item.title, this[item.property].bind(this))
+      })
+    }
+  }
+
+  remoteCall(peer, methodName, data){
+    let remoteCall = this.muon.getPlugin('remote-call')
+    let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
+    if(Array.isArray(peer)){
+      return Promise.all(peer.map(p => remoteCall.call(p, remoteMethodEndpoint, data)))
+    }
+    else{
+      return remoteCall.call(peer, remoteMethodEndpoint, data)
+    }
+  }
+
+  registerRemoteMethod(title, method){
+    let remoteCall = this.muon.getPlugin('remote-call')
+    if(process.env.VERBOSE){
+      console.log(`Registering remote method: ${this.remoteMethodEndpoint(title)}`)
+    }
+    remoteCall.on(this.remoteMethodEndpoint(title), method)
+  }
+
+  remoteMethodEndpoint(title) {
+    let superClass = Object.getPrototypeOf(this);
+    return `${superClass.constructor.name}.${title}`
   }
 
   async findPeer(peerId){
@@ -73,13 +128,17 @@ module.exports = class BasePlugin extends Events{
     let broadcastChannel = this.BROADCAST_CHANNEL
     if (!broadcastChannel || !this.onBroadcastReceived) {
       let currentPlugin = Object.getPrototypeOf(this);
-      console.log(`Broadcast not available for plugin ${currentPlugin.constructor.name}`)
+      console.trace(`broadcast not available for plugin ${currentPlugin.constructor.name}`)
       return;
     }
     let dataStr = JSON.stringify(data)
     let signature = crypto.sign(dataStr)
     let msg = `${signature}|${dataStr}`
     this.muon.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(msg))
+  }
+
+  broadcastToMethod(method, params) {
+    this.broadcast({method, params})
   }
 
   async __onPluginBroadcastReceived(msg){
@@ -92,12 +151,27 @@ module.exports = class BasePlugin extends Events{
 
       let collateralPlugin = this.muon.getPlugin('collateral');
       let validWallets = collateralPlugin.getWallets()
+
+      let {method, params} = data;
+
       if(!validWallets.includes(sigOwner)){
         throw {message: `Unrecognized request owner ${sigOwner}`}
       }
       else{
         /*eslint no-undef: "error"*/
-        await this.onBroadcastReceived(data, {wallet: sigOwner});
+        if(method) {
+          let _endpoint = this.remoteMethodEndpoint(method);
+          let remoteCall = this.muon.getPlugin('remote-call');
+          if (remoteCall.hasMethodHandler(_endpoint)) {
+            await remoteCall.handleBroadcast(_endpoint, params, sigOwner);
+          }
+          else {
+            await this.onBroadcastReceived(data, {wallet: sigOwner});
+          }
+        }
+        else{
+          await this.onBroadcastReceived(data, {wallet: sigOwner});
+        }
       }
 
     }

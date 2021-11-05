@@ -9,21 +9,23 @@ class MemoryPlugin extends BasePlugin {
 
   broadcastWrite(memWrite) {
     this.broadcast({
-      type: 'mem_write',
-      peerId: process.env.PEER_ID,
-      memWrite
+      method: 'mem_write',
+      params: {
+        peerId: process.env.PEER_ID,
+        memWrite
+      }
     })
   }
 
-  async onBroadcastReceived(data) {
+  async onBroadcastReceived(msg={}) {
+    let {method, params} = msg;
     try {
-      // let data = JSON.parse(uint8ArrayToString(msg.data));
-      if (data && data.type === 'mem_write' && !!data.memWrite) {
-        if(this.checkSignature(data.memWrite)){
-          this.storeMemWrite(data.memWrite);
+      if (method === 'mem_write' && !!params.memWrite) {
+        if(this.checkSignature(params.memWrite)){
+          this.storeMemWrite(params.memWrite);
         }
         else{
-          console.log('memWrite signature mismatch', data.memWrite)
+          console.log('memWrite signature mismatch', params.memWrite)
         }
       }
     } catch (e) {

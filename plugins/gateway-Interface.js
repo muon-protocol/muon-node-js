@@ -35,7 +35,7 @@ class GatewayInterface extends BasePlugin{
   async __handleCallResponse(callData, response){
     let {callId, app, method, params} = callData;
 
-    if(response.confirmed){
+    if(response?.confirmed){
       await this.emit('confirmed', response)
     }
 
@@ -46,6 +46,7 @@ class GatewayInterface extends BasePlugin{
   }
 
   async __onGatewayCall(channel, message){
+    // console.log('=========== GatewayInterface.__onGatewayCall', channel, message)
     let data
     if(channel === GATEWAY_CALL_REQUEST){
       try {
@@ -64,7 +65,13 @@ class GatewayInterface extends BasePlugin{
           }
         }
         else{
-          response = await this.emit(`call/muon/${method}`, params, nSign)
+          let methodId = `call/muon/${method}`;
+          if(this.listenerCount(methodId) > 0) {
+            response = await this.emit(methodId, params, nSign)
+          }
+          else{
+            throw {message: `method:[${method}] handler not defined`}
+          }
         }
         await this.__handleCallResponse(data, response)
       }
@@ -79,10 +86,33 @@ class GatewayInterface extends BasePlugin{
   }
 
   registerAppCall(app, method, callback){
-    this.on(`call/${app}/${method}`, callback)
+    if(!app || !method || !callback){
+      throw {message: `App callback registration failed. app name: [${app}]`}
+    }
+    if(!method){
+      throw {message: `App["${app}"] callback registration failed. method name: [${method}]`}
+    }
+    if(!callback){
+      throw {message: `App["${app}"].${method} callback registration failed. callback not defined`}
+    }
+    let methodId = `call/${app}/${method}`
+    if(process.env.VERBOSE){
+      console.log(`Registering gateway method: ${methodId}`)
+    }
+    this.on(methodId, callback)
   }
 
   registerMuonCall(method, callback){
+    if(!method){
+      throw {message: `Global gateway callback registration failed. method name: [${method}]`}
+    }
+    if(!callback){
+      throw {message: `Global gateway callback (${method}) registration failed. callback not defined`}
+    }
+    let methodId = `call/muon/${method}`
+    if(process.env.VERBOSE){
+      console.log(`Registering gateway method: ${methodId}`)
+    }
     this.on(`call/muon/${method}`, callback)
   }
 

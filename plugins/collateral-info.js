@@ -41,10 +41,12 @@ class CollateralInfoPlugin extends BasePlugin{
     }, {});
 
     if(process.env.VERBOSE) {
-      console.log('CollateralInfo._loadCollateralInfo: Info loaded.', {
-        networkInfo: this.networkInfo,
-        groupInfo: this.groupInfo
-      });
+      console.log('CollateralInfo._loadCollateralInfo: Info loaded.'
+      //   , {
+      //   networkInfo: this.networkInfo,
+      //   groupInfo: this.groupInfo
+      // }
+      );
     }
 
     // TODO: collateral info validation

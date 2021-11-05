@@ -1,15 +1,10 @@
-const BasePlugin = require('./base/base-plugin')
-const {timeout} = require('../utils/helpers')
+const CallablePlugin = require('./base/callable-plugin')
+const {remoteMethod} = require('./base/app-decorators')
 
-class PingPong extends BasePlugin {
-
+class PingPong extends CallablePlugin {
+  @remoteMethod('ping')
   async ping(data){
-    // await timeout(2000 + Math.floor(Math.random() * 3000));
     return 'Pong'
-  }
-
-  async onStart() {
-    this.muon.getPlugin('remote-call').on('remote:ping', this.ping)
   }
 }
 

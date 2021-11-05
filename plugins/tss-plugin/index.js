@@ -5,7 +5,7 @@ const tssModule = require('../../utils/tss')
 const {toBN} = require('../../utils/tss/utils')
 const path = require('path')
 const {timeout} = require('../../utils/helpers');
-const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
+const {remoteMethod, gatewayMethod} = require('../base/app-decorators')
 
 const BroadcastMessage = {
   NeedGroup: 'BROADCAST_MSG_NEED_GROUP',
@@ -37,7 +37,6 @@ const GroupStatus = {
 
 const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000';
 
-@remoteApp
 class TssPlugin extends CallablePlugin {
 
   groupStatus = GroupStatus.Initial;
@@ -99,6 +98,10 @@ class TssPlugin extends CallablePlugin {
 
   get networkStatus() {
     return this.muon.getPlugin('network-status');
+  }
+
+  get GroupAddress() {
+    return this.isReady ? this.tssKey.address : null;
   }
 
   async joinToGroup() {
@@ -280,8 +283,10 @@ class TssPlugin extends CallablePlugin {
   async tryToFindOthers(numTry=1) {
     for (let i = 0 ; i < numTry ; i++) {
       this.broadcast({
-        type: BroadcastMessage.WhoIsThere,
-        peerId: process.env.PEER_ID,
+        method: BroadcastMessage.WhoIsThere,
+        params: {
+          peerId: process.env.PEER_ID,
+        }
       })
       await timeout(5000)
     }
@@ -289,17 +294,21 @@ class TssPlugin extends CallablePlugin {
 
   informNeedGroup() {
     this.broadcast({
-      type: BroadcastMessage.NeedGroup,
-      peerId: process.env.PEER_ID,
-      wallet: process.env.SIGN_WALLET_ADDRESS,
+      method: BroadcastMessage.NeedGroup,
+      params: {
+        peerId: process.env.PEER_ID,
+        wallet: process.env.SIGN_WALLET_ADDRESS,
+      }
     })
   }
 
   informJoinedToGroup() {
     this.broadcast({
-      type: BroadcastMessage.JoinedToGroup,
-      peerId: process.env.PEER_ID,
-      wallet: process.env.SIGN_WALLET_ADDRESS,
+      method: BroadcastMessage.JoinedToGroup,
+      params: {
+        peerId: process.env.PEER_ID,
+        wallet: process.env.SIGN_WALLET_ADDRESS,
+      }
     })
   }
 
@@ -548,10 +557,12 @@ class TssPlugin extends CallablePlugin {
       throw {message: "not implemented"};
     } else {
       this.broadcast({
-        type: BroadcastMessage.JoinPartyRequest,
-        id: party.id,
-        peerId: process.env.PEER_ID,
-        wallet: process.env.SIGN_WALLET_ADDRESS,
+        method: BroadcastMessage.JoinPartyRequest,
+        params: {
+          id: party.id,
+          peerId: process.env.PEER_ID,
+          wallet: process.env.SIGN_WALLET_ADDRESS,
+        }
       })
       await party.waitToFulfill()
     }
@@ -682,8 +693,15 @@ class TssPlugin extends CallablePlugin {
     }
 
     let keyPartners = key.partners.map(w => party.partners[w]);
-    // TODO: Debug part remove it in production // 00000
-    if(!!peerIds) await timeout(Math.floor(Math.random()*2500));
+    // // TODO: Debug part remove it in production, or be sure that, DEBUG env variable is cleared.
+    if(process.env.DEBUG) {
+      /**
+       * It makes a random delay in key generation process.
+       * It is helpful when you run a local dev network.
+       */
+      if(!!peerIds)
+        await timeout(Math.floor(Math.random()*2500));
+    }
     let distKeyResult = await Promise.all(
       keyPartners
         .map(({wallet, peer}) => {
@@ -751,10 +769,11 @@ class TssPlugin extends CallablePlugin {
   }
 
   async handleBroadcastMessage(msg, callerInfo) {
+    let {method, params} = msg;
     // console.log('tss-plugin.handleBroadcastMessage', msg);
-    switch (msg.type) {
+    switch (method) {
       case BroadcastMessage.NeedGroup: {
-        let {peerId} = msg;
+        let {peerId} = params;
         let {wallet} = callerInfo
         this.nodesNeedGroup[wallet] = {peerId, wallet};
         // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
@@ -769,7 +788,7 @@ class TssPlugin extends CallablePlugin {
       case BroadcastMessage.JoinPartyRequest: {
         if (this.groupStatus !== GroupStatus.ReadyToJoin)
           return;
-        let {id, peerId} = msg;
+        let {id, peerId} = params;
         /**
          * Join to the group with lower id, on concurrent request.
          * Ignore if id is grater than current group id.
@@ -797,7 +816,7 @@ class TssPlugin extends CallablePlugin {
         break
       }
       case BroadcastMessage.WhoIsThere: {
-        let {peerId} = msg;
+        let {peerId} = params;
         let peer = await this.findPeer(peerId);
         if (!!this.tssParty) {
           this.tssParty.setWalletPeer(callerInfo.wallet, peer);
@@ -816,7 +835,6 @@ class TssPlugin extends CallablePlugin {
 
   async onBroadcastReceived(data={}, callerInfo) {
     try {
-      // let data = JSON.parse(uint8ArrayToString(msg.data));
       await this.handleBroadcastMessage(data, callerInfo)
     } catch (e) {
       console.error('TssPlugin.__onBroadcastReceived', e)
@@ -914,6 +932,7 @@ class TssPlugin extends CallablePlugin {
       return null;
 
     let nonce = this.keys[nonceId]
+    await nonce.waitToFulfill();
     let keyPart = tssModule.addKeys(nonce.share, tssKey.share);
     return {
       id: tssKey.id,

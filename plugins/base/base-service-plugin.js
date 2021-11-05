@@ -30,7 +30,7 @@ class BaseServicePlugin extends BaseAppPlugin {
 
     let remoteCall = this.muon.getPlugin('remote-call')
     remoteCall.on(
-      `remote:app-${this.APP_NAME}-wantSign`,
+      `app-${this.APP_NAME}-wantSign`,
       this.__onRemoteWantSign.bind(this)
     )
 

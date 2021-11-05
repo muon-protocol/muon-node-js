@@ -1,82 +1,73 @@
-const CallablePlugin = require('./callable-plugin')
 
 function classNames(target){
   let names = []
   let tmp = target
-  while (!!tmp && !!tmp.name){
-    names.push(tmp.name)
+  while (!!tmp && (tmp.name || tmp.constructor.name)){
+    names.push(tmp.name || tmp.constructor.name)
     tmp = Object.getPrototypeOf(tmp);
   }
   return names;
 }
 
-module.exports.remoteMethod = function (title) {
+function isCallable(target) {
+  return classNames(target).includes('CallablePlugin')
+}
+
+function isApp(target) {
+  return classNames(target).includes('BaseAppPlugin')
+}
+
+function validateTarget(target) {
+  if(!isCallable(target)) {
+    throw {message: `@remoteMethod and @gatewayMethod decorators, can only be used at CallablePlugin.`}
+  }
+}
+
+module.exports.remoteMethod = function (title, options={}) {
   return function (target, property, descriptor) {
+    validateTarget(target);
     if(property === 'function'){
       throw {message: `Error at [${target.constructor.name}]: Anonymous function not allowed as remote method. Define this method with a name.`}
     }
     if(!target.__remoteMethods)
       target.__remoteMethods = []
-    target.__remoteMethods.push({title, property})
+    let titleIndex = target.__remoteMethods.findIndex(m => (m.title === title))
+    if(titleIndex >= 0)
+      throw {message: `ERROR at [${target.constructor.name}]: Remote method with title "${title}" already defined`}
+    // if(__allGatewayMethods[title])
+    let propIndex = target.__remoteMethods.findIndex(m => (m.property === property))
+    if(propIndex >= 0)
+      throw {message: `ERROR at [${target.constructor.name}]: Remote method with property "${property}" already defined`}
+    target.__remoteMethods.push({title, property, options})
     return descriptor
   }
 }
+
+const __globalGatewayMethods = {};
 
 module.exports.gatewayMethod = function (title) {
   return function (target, property, descriptor) {
+    validateTarget(target);
+    if(property === 'function'){
+      throw {message: `Error at [${target.constructor.name}]: Anonymous function not allowed as gateway method. Define this method with a name.`}
+    }
     if(!target.__gatewayMethods)
       target.__gatewayMethods = []
+    let titleIndex = target.__gatewayMethods.findIndex(m => (m.title === title))
+    if(titleIndex >= 0)
+      throw {message: `ERROR at [${target.constructor.name}]: Gateway method with title "${title}" already defined`}
+    // if(__allGatewayMethods[title])
+    let propIndex = target.__gatewayMethods.findIndex(m => (m.property === property))
+    if(propIndex >= 0)
+      throw {message: `ERROR at [${target.constructor.name}]: Gateway method with property "${property}" already defined`}
+
+    // TODO: only one handler should be defined for muon call.
+    if(!isApp(target)) {
+      if(__globalGatewayMethods[title])
+        throw {message: `Multiple definition of global @gatewayMethod("${title}").`}
+      __globalGatewayMethods[title] = true;
+    }
     target.__gatewayMethods.push({title, property})
     return descriptor
   }
-}
-
-module.exports.remoteApp = function (target) {
-  if(!classNames(target).includes('CallablePlugin'))
-    throw {message: 'RemoteApp should be CallablePlugin.'}
-  const original = target;
-  original.prototype._remoteApp_original_onStart = target.prototype.onStart
-
-  function construct(constructor, args) {
-    const c = function () {
-      return constructor.apply(this, args);
-    }
-
-    const originalOnStart = constructor.prototype._remoteApp_original_onStart;
-
-    c.prototype = constructor.prototype;
-    if(constructor.prototype.__remoteMethods || constructor.prototype.__gatewayMethods) {
-      c.prototype.onStart = async function (...args) {
-        await originalOnStart.apply(this, args);
-
-        if(constructor.prototype.__remoteMethods) {
-          for (let i = 0; i < constructor.prototype.__remoteMethods.length; i++) {
-            let item = constructor.prototype.__remoteMethods[i];
-            // console.log('########## registering remote method', item, this.remoteMethodEndpoint(item.title))
-            this.registerRemoteMethod(item.title, this[item.property].bind(this))
-          }
-        }
-
-        if(constructor.prototype.__gatewayMethods) {
-          let gateway = this.muon.getPlugin('gateway-interface')
-          for (let i = 0; i < constructor.prototype.__gatewayMethods.length; i++) {
-            let item = constructor.prototype.__gatewayMethods[i];
-            // let logTitle = `${this.APP_NAME}.${item.title}`
-            // console.log(`registering gateway method: ${logTitle} >> ${target.name}.${item.property}`)
-            gateway.registerAppCall(this.APP_NAME, item.title, this[item.property].bind(this))
-          }
-        }
-      }
-    }
-    return new c();
-  }
-
-  const f = function (...args) {
-    return construct(original, args);
-  }
-
-  f.prototype = original.prototype;
-  Object.defineProperty(f, 'name', {value: `RemoteApp(${original.name})`, writable: false})
-
-  return f;
 }

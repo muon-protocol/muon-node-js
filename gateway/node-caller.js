@@ -1,13 +1,15 @@
 const Redis = require('redis');
 const {newCallId} = require('../utils/helpers')
 
-const redisCongig = {
+const redisConfig = {
   host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT || 6379
+  port: process.env.REDIS_PORT || 6379,
+  user: process.env.REDIS_USER || undefined,
+  password: process.env.REDIS_PASS || undefined
 }
-const callRedis = Redis.createClient(redisCongig);
-const responseRedis = Redis.createClient(redisCongig);
-const broadcastRedis = Redis.createClient(redisCongig);
+const callRedis = Redis.createClient(redisConfig);
+const responseRedis = Redis.createClient(redisConfig);
+const broadcastRedis = Redis.createClient(redisConfig);
 
 const GATEWAY_CALL_REQUEST  = `/muon/gateway/${process.env.GATEWAY_PORT}/call/request`
 const GATEWAY_CALL_RESPONSE = `/muon/gateway/${process.env.GATEWAY_PORT}/call/response`
@@ -43,14 +45,6 @@ responseRedis.on('message', (channel, message) => {
 
 let calls = {}
 
-function makeCall(method, params, nSign){
-  let callId = newCallId();
-  callRedis.publish(GATEWAY_CALL_REQUEST, JSON.stringify({callId, method, params, nSign}))
-  let callResult = new CallResult()
-  calls[callId] = callResult;
-  return callResult.promise
-}
-
 function CallResult() {
   var self = this;
   this.promise = new Promise(function(resolve, reject) {
@@ -64,9 +58,17 @@ function broadcast(data){
   broadcastRedis.lpush(process.env.REDIS_QUEUE, redisMessage);
 }
 
-function appCall(app, method, params, nSign){
+function callApp(app, method, params, nSign){
   let callId = newCallId();
   callRedis.publish(GATEWAY_CALL_REQUEST, JSON.stringify({callId, app, method, params, nSign}))
+  let callResult = new CallResult()
+  calls[callId] = callResult;
+  return callResult.promise
+}
+
+function callMuon(method, params) {
+  let callId = newCallId();
+  callRedis.publish(GATEWAY_CALL_REQUEST, JSON.stringify({callId, method, params}))
   let callResult = new CallResult()
   calls[callId] = callResult;
   return callResult.promise
@@ -75,7 +77,7 @@ function appCall(app, method, params, nSign){
 module.exports = {
   GATEWAY_CALL_REQUEST,
   GATEWAY_CALL_RESPONSE,
-  call: makeCall,
-  appCall,
+  callApp,
+  callMuon,
   broadcast
 }
