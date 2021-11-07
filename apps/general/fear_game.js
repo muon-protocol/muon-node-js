@@ -57,7 +57,7 @@ module.exports = {
           reward: floatToBN(result.reward, 18).toString(10),
           trackingId: result.trackingId,
           chain,
-          muonTimestamp: startedAt
+          muonTimestamp: request.data.timestamp
         }
 
       default:

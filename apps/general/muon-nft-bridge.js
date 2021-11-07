@@ -19,7 +19,7 @@ const ABI_getTx = [
 ]
 
 module.exports = {
-  APP_NAME: 'bridge',
+  APP_NAME: 'nft_bridge',
   APP_ID: 4,
 
   onRequest: async function (request) {
