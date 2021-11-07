@@ -37,12 +37,16 @@ module.exports = class BasePlugin extends Events{
    */
   async onStart(){
     this.registerBroadcastHandler()
+    this.registerDecoratorMethods();
+  }
 
+  registerDecoratorMethods() {
+    // TODO: handle inheritance. collect methods from prototype chain.
     let {__remoteMethods, __gatewayMethods} = this;
 
     if(__remoteMethods) {
       __remoteMethods.forEach(item => {
-        this.registerRemoteMethod(item.title, this[item.property].bind(this))
+        this.registerRemoteMethod(item.title, this[item.property].bind(this), item.options)
       })
     }
     if(__gatewayMethods) {
@@ -51,7 +55,6 @@ module.exports = class BasePlugin extends Events{
       let isApp = classNames(Object.getPrototypeOf(this)).includes('BaseAppPlugin')
 
       __gatewayMethods.forEach(item =>{
-        console.log('========', item)
         if(isApp)
           gateway.registerAppCall(this.APP_NAME, item.title, this[item.property].bind(this))
         else
@@ -71,12 +74,12 @@ module.exports = class BasePlugin extends Events{
     }
   }
 
-  registerRemoteMethod(title, method){
+  registerRemoteMethod(title, method, options){
     let remoteCall = this.muon.getPlugin('remote-call')
     if(process.env.VERBOSE){
       console.log(`Registering remote method: ${this.remoteMethodEndpoint(title)}`)
     }
-    remoteCall.on(this.remoteMethodEndpoint(title), method)
+    remoteCall.on(this.remoteMethodEndpoint(title), method, options)
   }
 
   remoteMethodEndpoint(title) {
@@ -114,7 +117,7 @@ module.exports = class BasePlugin extends Events{
   async registerBroadcastHandler(){
     let broadcastChannel = this.BROADCAST_CHANNEL
     /*eslint no-undef: "error"*/
-    if (broadcastChannel && this.onBroadcastReceived) {
+    if (broadcastChannel && (this.onBroadcastReceived || Object.keys(this.__broadcastMethods || {}).length > 0)) {
 
       if(process.env.VERBOSE) {
         console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
@@ -124,12 +127,41 @@ module.exports = class BasePlugin extends Events{
     }
   }
 
-  broadcast(data){
+  throwNoBroadcastError(method) {
+    let currentPlugin = Object.getPrototypeOf(this);
+    console.trace(`broadcast not available for ${currentPlugin.constructor.name}` + (method ? `.${method}` : ``))
+  }
+
+  broadcast(data) {
+    if(!this.BROADCAST_CHANNEL)
+      return this.throwNoBroadcastError();
+    let {method, params} = data;
+    if(!this.onBroadcastReceived){
+      if(!this.__broadcastMethods?.[method]){
+        this.throwNoBroadcastError(method);
+      }
+    }
+    let dataStr = JSON.stringify(data)
+    let signature = crypto.sign(dataStr)
+    let msg = `${signature}|${dataStr}`
+    this.muon.libp2p.pubsub.publish(this.BROADCAST_CHANNEL, uint8ArrayFromString(msg))
+  }
+
+  broadcast0(data){
     let broadcastChannel = this.BROADCAST_CHANNEL
-    if (!broadcastChannel || !this.onBroadcastReceived) {
-      let currentPlugin = Object.getPrototypeOf(this);
-      console.trace(`broadcast not available for plugin ${currentPlugin.constructor.name}`)
-      return;
+
+    if(!this.BROADCAST_CHANNEL)
+      return this.throwNoBroadcastError()
+
+    if (!this.onBroadcastReceived) {
+      /**
+       * check if remoteCall handler exist for this broadcast
+       */
+      let remoteCall = this.muon.getPlugin('remote-call');
+      let _remoteMethodEndpoint = this.remoteMethodEndpoint(data.method);
+      if(!data.method || !remoteCall.hasMethodHandler(_remoteMethodEndpoint)){
+        return this.throwNoBroadcastError();
+      }
     }
     let dataStr = JSON.stringify(data)
     let signature = crypto.sign(dataStr)
@@ -143,35 +175,31 @@ module.exports = class BasePlugin extends Events{
 
   async __onPluginBroadcastReceived(msg){
     try{
-      // let data = JSON.parse(uint8ArrayToString(msg.data));
-
       let [sign, message] = uint8ArrayToString(msg.data).split('|');
       let sigOwner = crypto.recover(message, sign)
       let data = JSON.parse(message)
 
       let collateralPlugin = this.muon.getPlugin('collateral');
-      let validWallets = collateralPlugin.getWallets()
+      let groupWallets = collateralPlugin.groupWallets
 
       let {method, params} = data;
-
-      if(!validWallets.includes(sigOwner)){
-        throw {message: `Unrecognized request owner ${sigOwner}`}
+      let methodHandler = this.__broadcastMethods?.[method];
+      if(methodHandler){
+        if(!groupWallets[sigOwner]){
+          let otherGroupWallets = collateralPlugin.otherGroupWallets;
+          if(!methodHandler?.options?.allowFromOtherGroups || !otherGroupWallets[sigOwner]) {
+            // console.log({groupWallets, otherGroupWallets, methodHandler})
+            throw {message: `Unrecognized broadcast owner ${sigOwner}`}
+          }
+        }
+        await this[methodHandler.property](params, {wallet: sigOwner});
+      }
+      else if(!groupWallets[sigOwner]){
+        throw {message: `Unrecognized broadcast owner ${sigOwner}`}
       }
       else{
         /*eslint no-undef: "error"*/
-        if(method) {
-          let _endpoint = this.remoteMethodEndpoint(method);
-          let remoteCall = this.muon.getPlugin('remote-call');
-          if (remoteCall.hasMethodHandler(_endpoint)) {
-            await remoteCall.handleBroadcast(_endpoint, params, sigOwner);
-          }
-          else {
-            await this.onBroadcastReceived(data, {wallet: sigOwner});
-          }
-        }
-        else{
-          await this.onBroadcastReceived(data, {wallet: sigOwner});
-        }
+        await this.onBroadcastReceived(data, {wallet: sigOwner});
       }
 
     }

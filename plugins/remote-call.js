@@ -32,13 +32,37 @@ const PROTOCOL = '/muon/remote-call/1.0.0'
 
 class RemoteCall extends BasePlugin {
 
+  _remoteMethodOptions = {}
+
   async onStart() {
     this.muon.libp2p.handle(PROTOCOL, this.handler.bind(this))
+    this.collateralPlugin = this.muon.getPlugin('collateral');
   }
 
-  handleCall(callId, method, params, callerWallet, responseStream, peerId){
+  hasPermission(method, callerInfo) {
+    let {wallet} = callerInfo;
+    let options = this._remoteMethodOptions[method] || {};
+    if(!this.collateralPlugin.groupWallets[wallet]){
+      if(!options.allowFromOtherGroups || !this.collateralPlugin.otherGroupWallets[wallet]){
+          return false
+      }
+    }
+    return true;
+  }
+
+  checkPermissions(method, callerInfo){
+    // TODO: merge with broadcast sender validation
+    if(this.hasPermission(method, callerInfo))
+      return Promise.resolve(true)
+    else
+      return Promise.reject({message: `Permission denied for request "${method}" from ${callerInfo.wallet}`})
+  }
+
+  handleCall(method, params, callId, responseStream, callerInfo){
     // console.log('=========== RemoteCall.handleCall', method)
-    return this.emit(`remote:${method}`, params, {wallet: callerWallet, peerId})
+    return this.checkPermissions(method, callerInfo).then(() => {
+      return this.emit(`remote:${method}`, params, callerInfo)
+    })
       .then(result => {
         let response = {
           responseId: callId,
@@ -59,31 +83,24 @@ class RemoteCall extends BasePlugin {
   }
 
   handleBroadcast(method, params, callerWallet) {
-    return this.emit(`remote:${method}`, params, {wallet: callerWallet})
+    let callerInfo = {wallet: callerWallet}
+    return this.checkPermissions(method, callerInfo).then(() => {
+      return this.emit(`remote:${method}`, params, callerInfo)
+    })
       .catch(error => {
         console.error("RemoteCall.handleBroadcast", error)
       })
   }
 
   async handleIncomingMessage(signAndMessage, stream, peerId){
-    let collateralPlugin = this.muon.getPlugin('collateral');
     try {
       let [sign, message] = signAndMessage.toString().split('|')
       let sigOwner = crypto.recover(message, sign)
       let data = JSON.parse(message)
 
-      // TODO: filter out unrecognized wallets message.
-      let validWallets = collateralPlugin.getWallets()
-      if(!validWallets.includes(sigOwner)){
-        throw {message: `Unrecognized request owner ${sigOwner}`}
-        // let {responseId} = data;
-        // let remoteResult = this._calls[responseId]
-        // return remoteResult && remoteResult.reject({message: `Unrecognized request owner ${sigOwner}`})
-      }
-
       if('method' in data) {
         let {callId, method, params={}} = data;
-        await this.handleCall(callId, method, params, sigOwner, stream, peerId);
+        await this.handleCall(method, params, callId, stream, {wallet: sigOwner, peerId});
       }
       else if('responseId' in data){
         let {responseId, response=undefined, error=undefined} = data;
@@ -182,6 +199,7 @@ class RemoteCall extends BasePlugin {
   }
 
   on(title, callback, options={}) {
+    this._remoteMethodOptions[title] = options
     super.on(`remote:${title}`, callback);
   }
 

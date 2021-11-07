@@ -100,7 +100,7 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   async leaderAlreadySelected(){
     let responses = await this.callParty(RemoteMethods.WhoIsLeader)
-    let leaderCount = responses.filter(r => !!r.leader)
+    let leaderCount = responses.filter(r => !!r?.leader)
       .map(r => `${r.lastElection}-${r.leader}`)
       .reduce((obj, val) => {
         if(obj[val] === undefined)

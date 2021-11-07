@@ -7,6 +7,9 @@ class CollateralInfoPlugin extends BasePlugin{
 
   config = null;
   groupInfo = null;
+  otherGroupsInfo = {}
+  _groupWallets = {}
+  _otherGroupWallets = {}
   networkInfo = null
 
   _eventSubscribe = null;
@@ -23,22 +26,43 @@ class CollateralInfoPlugin extends BasePlugin{
     })
   }
 
+  get groupWallets() {
+    return this._groupWallets
+  }
+
+  get otherGroupWallets() {
+    return this._otherGroupWallets
+  }
+
   async _loadCollateralInfo(){
     let myWallet = process.env.SIGN_WALLET_ADDRESS;
 
-    this.groupInfo = await this.contractCall('getNodeGroupInfo', [myWallet]);
-
+    this.groupInfo = await this.contractCall('getUserGroupInfo', [myWallet]);
     let _networkInfo = await this.contractCall('getNetworkInfo');
-
     // remove prefixed "_" from keys;
     this.networkInfo = Object.keys(_networkInfo).reduce((res, key) => {
       let keyWithout_ = key.startsWith('_') ? key.slice(1) : key
       res = {
         ...res,
         [keyWithout_]: _networkInfo[key]
-      }
+      };
       return res;
     }, {});
+
+    // load other groups info
+    let lastGroupId = await this.contractCall('lastGroupId');
+    for(let i=parseInt(lastGroupId) ; i>0 ; i--) {
+      if(i.toString() === this.groupInfo.group.toString())
+        continue;
+      this.otherGroupsInfo[i.toString()] = await this.contractCall('getGroupInfo', [i]);
+    }
+
+    const arr2obj = arr => arr.reduce((obj, w) => (obj[w]=true, obj), {})
+    this._groupWallets = arr2obj(this.groupInfo?.partners || [])
+    this._otherGroupWallets = Object.values(this.otherGroupsInfo)
+      .map(g => g.partners)
+      .map(arr2obj)
+      .reduce((acc, c) => ({...acc, ...c}), {});
 
     if(process.env.VERBOSE) {
       console.log('CollateralInfo._loadCollateralInfo: Info loaded.'

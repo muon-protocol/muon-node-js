@@ -16,7 +16,7 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "node",
+        "name": "user",
         "type": "address"
       }
     ],
@@ -35,7 +35,7 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "node",
+        "name": "user",
         "type": "address"
       }
     ],
@@ -75,14 +75,8 @@
     "type": "event"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "balances",
+    "inputs": [],
+    "name": "lastGroupId",
     "outputs": [
       {
         "internalType": "uint256",
@@ -123,26 +117,6 @@
     "constant": true
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "nodesGroupId",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function",
-    "constant": true
-  },
-  {
     "inputs": [],
     "name": "owner",
     "outputs": [
@@ -162,26 +136,6 @@
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "stakeBalances",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function",
-    "constant": true
   },
   {
     "inputs": [
@@ -214,11 +168,61 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_node",
+        "name": "",
         "type": "address"
       }
     ],
-    "name": "getNodeGroup",
+    "name": "users",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "group",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "partnerIndex",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "balance",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "stakeBalance",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "stakeTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum GroupManager.StakeDuration",
+        "name": "stakeDuration",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bool",
+        "name": "stakeAutoRenewal",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "getUserGroup",
     "outputs": [
       {
         "internalType": "uint256",
@@ -276,11 +280,11 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_node",
+        "name": "_user",
         "type": "address"
       }
     ],
-    "name": "getNodeCollatral",
+    "name": "getUserCollatral",
     "outputs": [
       {
         "internalType": "uint256",
@@ -346,7 +350,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_node",
+        "name": "_user",
         "type": "address"
       },
       {
@@ -355,7 +359,7 @@
         "type": "uint256"
       }
     ],
-    "name": "adminAddNodeToGroup",
+    "name": "adminAddUserToGroup",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -364,7 +368,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_node",
+        "name": "_user",
         "type": "address"
       },
       {
@@ -373,7 +377,7 @@
         "type": "uint256"
       }
     ],
-    "name": "adminDeleteNodeFromGroup",
+    "name": "adminDeleteUserFromGroup",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -465,11 +469,11 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_node",
+        "name": "_user",
         "type": "address"
       }
     ],
-    "name": "getNodeGroupInfo",
+    "name": "getUserGroupInfo",
     "outputs": [
       {
         "internalType": "bool",

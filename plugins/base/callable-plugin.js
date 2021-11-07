@@ -11,6 +11,12 @@ function classNames(target){
   return names;
 }
 
+/**
+ * Moved to base-plugin
+ * This plugin will remove soon.
+ *
+ * @type {module.CallablePlugin}
+ */
 module.exports = class CallablePlugin extends BasePlugin {
 
   async onStart(){

@@ -1,59 +1,67 @@
 const CallablePlugin = require('./base/callable-plugin')
-const {remoteMethod, gatewayMethod} = require('./base/app-decorators')
+const {remoteMethod, gatewayMethod, broadcastMethod} = require('./base/app-decorators')
+const {timeout} = require('../utils/helpers')
 
 const RemoteMethods = {
-  HelloWorld: "hello-broadcast-method"
+  WhoIsTssReadyResponse: "WhoIsTssReadyResponse"
+}
+
+const BroadcastMethods = {
+  WhoIsTssReady: "WhoIsTssReady"
 }
 
 class NetworkStatusPlugin extends CallablePlugin {
+  _walletPeerId = {}
 
   async onStart() {
     super.onStart();
 
-    this.muon.getPlugin('group-leader').once('leader-change', this.tick.bind(this))
+    // this.muon.getPlugin('collateral').on('loaded', this.tick.bind(this))
   }
 
-  get TssPlugin() {
+  get tssPlugin() {
     return this.muon.getPlugin('tss-plugin');
   }
 
+  get RemoteCall() {
+    return this.muon.getPlugin('remote-call');
+  }
+
   async tick() {
+    if(!this.tssPlugin.isReady) {
+      console.log('================================ tick ================================')
+      this.broadcastToMethod(BroadcastMethods.WhoIsTssReady, {peerId: process.env.PEER_ID})
+    }
+
+    setTimeout(this.tick.bind(this), 5000)
   }
 
-  async onBroadcastReceived(msg={}, callerInfo) {
-    let {method, params} = msg
-    console.log({method, params})
+  @broadcastMethod(BroadcastMethods.WhoIsTssReady, {allowFromOtherGroups: true})
+  async __whoIsTssReady(data={}, callerInfo) {
+    let {peerId} = data;
+    if(!peerId || !this.tssPlugin.isReady)
+      return;
+    let peer = await this.findPeer(peerId)
+    await this.remoteCall(peer, RemoteMethods.WhoIsTssReadyResponse)
   }
 
-  @remoteMethod(RemoteMethods.HelloWorld, {allowFromOtherGroups: true})
-  async __firstBroadcastMethodEver(data={}, callerInfo) {
-    console.log('$$$$$$$$$$$$$$ Congratulation! you did it. $$$$$$$$$$$$', {data, callerInfo})
+  @remoteMethod(RemoteMethods.WhoIsTssReadyResponse, {allowFromOtherGroups: true})
+  async _onTssReadyNodeResponse(data={}, callerInfo) {
+    console.log("NetworkStatusPlugin_onTssReadyNodeResponse", {data, caller: callerInfo.wallet})
   }
 
   @gatewayMethod('status')
   async __getStatus() {
-    let tssReady = this.TssPlugin.isReady;
+    let tssReady = this.tssPlugin.isReady;
     return {
       tssReady,
-      group: this.TssPlugin.GroupAddress,
+      group: this.tssPlugin.GroupAddress,
     }
-  }
-
-  @gatewayMethod('test')
-  async __test() {
-    this.broadcastToMethod(RemoteMethods.HelloWorld, {id: 'list'})
-    return this.BROADCAST_CHANNEL;
   }
 
   @gatewayMethod('forward-request')
   async __forwardRequest(data={}) {
     return {...data, message: "forward-request"}
-  }
-
-  @remoteMethod('test', {allowFromOtherGroups: true})
-  async __TestRemoteMethod(data={}, callerInfo) {
-    console.log('NetworkStatus.__TestRemoteMethod', data);
-    return true;
   }
 }
 
