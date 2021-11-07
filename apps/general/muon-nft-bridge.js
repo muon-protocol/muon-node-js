@@ -1,5 +1,4 @@
-const { soliditySha3, ethCall, ethGetTokenInfo, ethHashCallOutput } =
-  MuonAppUtils
+const { soliditySha3, ethCall, ethGetNftInfo, ethHashCallOutput } = MuonAppUtils
 
 const ABI_getTx = [
   {
@@ -45,9 +44,8 @@ module.exports = {
       }
       case 'addBridgeToken': {
         let { mainTokenAddress, mainNetwork, targetNetwork } = params
-
         let result = {
-          token: await ethGetTokenInfo(mainTokenAddress, mainNetwork),
+          token: await ethGetNftInfo(mainTokenAddress, mainNetwork),
           tokenId: mainTokenAddress
         }
         return result
@@ -75,13 +73,12 @@ module.exports = {
       }
       case 'addBridgeToken': {
         let { token, tokenId } = result
+
         return soliditySha3([
           { type: 'uint256', value: tokenId },
           { type: 'string', value: token.name },
           { type: 'string', value: token.symbol },
-          { type: 'uint8', value: token.decimals },
-          { type: 'uint8', value: this.APP_ID },
-          { type: 'uint256', value: request.data.timestamp }
+          { type: 'uint8', value: this.APP_ID }
         ])
       }
       default:

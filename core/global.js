@@ -10,7 +10,8 @@ const {
   read: ethRead,
   call: ethCall,
   getTokenInfo: ethGetTokenInfo,
-  hashCallOutput: ethHashCallOutput,
+  getNftInfo: ethGetNftInfo,
+  hashCallOutput: ethHashCallOutput
 } = require('../utils/node-utils/eth')
 
 function soliditySha3(params) {
@@ -28,6 +29,7 @@ global.MuonAppUtils = {
   ethRead,
   ethCall,
   ethGetTokenInfo,
+  ethGetNftInfo,
   ethHashCallOutput,
   toBaseUnit,
   soliditySha3,

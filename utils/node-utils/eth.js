@@ -1,14 +1,15 @@
 const Web3 = require('web3')
-const EventEmbitter = require('events');
-const HttpProvider = Web3.providers.HttpProvider;
-const WebsocketProvider = Web3.providers.WebsocketProvider;
+const EventEmbitter = require('events')
+const HttpProvider = Web3.providers.HttpProvider
+const WebsocketProvider = Web3.providers.WebsocketProvider
 const CID = require('cids')
 const multihashing = require('multihashing-async')
-const {flattenObject, sortObject, getTimestamp} = require('../helpers')
+const { flattenObject, sortObject, getTimestamp } = require('../helpers')
 const crypto = require('../crypto')
 const ERC20_ABI = require('../../data/ERC20-ABI')
+const ERC721_ABI = require('../../data/ERC721-ABI')
 
-const _generalWeb3Instance = new Web3();
+const _generalWeb3Instance = new Web3()
 const soliditySha3 = _generalWeb3Instance.utils.soliditySha3
 
 const _networksWeb3 = {
@@ -21,105 +22,126 @@ const _networksWeb3 = {
   ftm: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTM)),
   ftmtest: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTMTEST)),
   xdai: new Web3(new HttpProvider('https://rpc.xdaichain.com/')),
-  sokol: new Web3(new HttpProvider('https://sokol.poa.network'))
+  sokol: new Web3(new HttpProvider('https://sokol.poa.network')),
+  polygon: new Web3(new HttpProvider('https://rpc-mainnet.maticvigil.com/')),
+  mumbai: new Web3(new HttpProvider('https://rpc-mumbai.maticvigil.com/'))
 }
 
 function getWeb3(network) {
-  if (_networksWeb3[network])
-    return Promise.resolve(_networksWeb3[network])
-  else
-    return Promise.reject({message: `invalid network "${network}"`})
+  if (_networksWeb3[network]) return Promise.resolve(_networksWeb3[network])
+  else return Promise.reject({ message: `invalid network "${network}"` })
 }
 
 function getWeb3Sync(network) {
-  if (_networksWeb3[network])
-    return _networksWeb3[network]
-  else
-    throw {message: `invalid network "${network}"`}
-
+  if (_networksWeb3[network]) return _networksWeb3[network]
+  else throw { message: `invalid network "${network}"` }
 }
 
-function hashCallOutput(address, method, abi, result, outputFilter=[], extraParams=[]){
-  let methodAbi = abi.find(({name, type}) => (name===method && type === 'function'))
-  if(!methodAbi) {
-    throw {message: `Abi of method (${method}) not found`}
+function hashCallOutput(
+  address,
+  method,
+  abi,
+  result,
+  outputFilter = [],
+  extraParams = []
+) {
+  let methodAbi = abi.find(
+    ({ name, type }) => name === method && type === 'function'
+  )
+  if (!methodAbi) {
+    throw { message: `Abi of method (${method}) not found` }
   }
   let abiOutputs = methodAbi.outputs
-  if(!!outputFilter && outputFilter.length > 0){
-    abiOutputs = outputFilter.map(key => {
-      return methodAbi.outputs.find(({name}) => (name===key))
+  if (!!outputFilter && outputFilter.length > 0) {
+    abiOutputs = outputFilter.map((key) => {
+      return methodAbi.outputs.find(({ name }) => name === key)
     })
   }
   // console.log('signing:',abiOutputs)
-  let params = abiOutputs.map(({name, type}) => ({type, value: (!name || typeof result === "string") ?  result : result[name]}))
-  params = [{type: 'address', value: address}, ...params, ...extraParams]
+  let params = abiOutputs.map(({ name, type }) => ({
+    type,
+    value: !name || typeof result === 'string' ? result : result[name]
+  }))
+  params = [{ type: 'address', value: address }, ...params, ...extraParams]
   let hash = _generalWeb3Instance.utils.soliditySha3(...params)
-  return hash;
+  return hash
 }
 
 function getTokenInfo(address, network) {
-  return getWeb3(network).then(async web3 => {
-
-    let contract = new web3.eth.Contract(ERC20_ABI, address);
+  return getWeb3(network).then(async (web3) => {
+    let contract = new web3.eth.Contract(ERC20_ABI, address)
     return {
       symbol: await contract.methods.symbol().call(),
       name: await contract.methods.name().call(),
-      decimals: await contract.methods.decimals().call(),
-    };
+      decimals: await contract.methods.decimals().call()
+    }
+  })
+}
+function getNftInfo(address, network) {
+  return getWeb3(network).then(async (web3) => {
+    let contract = new web3.eth.Contract(ERC721_ABI, address)
+    return {
+      symbol: await contract.methods.symbol().call(),
+      name: await contract.methods.name().call()
+    }
   })
 }
 
 function getTransaction(txHash, network) {
-  return getWeb3(network).then(web3 => web3.eth.getTransaction(txHash))
+  return getWeb3(network).then((web3) => web3.eth.getTransaction(txHash))
 }
 
 function getTransactionReceipt(txHash, network) {
-  return getWeb3(network).then(web3 => web3.eth.getTransactionReceipt(txHash))
+  return getWeb3(network).then((web3) => web3.eth.getTransactionReceipt(txHash))
 }
 
 function call(contractAddress, methodName, params, abi, network) {
-  return getWeb3(network)
-    .then(web3 => {
-      let contract = new web3.eth.Contract(abi, contractAddress);
-      return contract.methods[methodName](...params).call();
-    })
+  return getWeb3(network).then((web3) => {
+    let contract = new web3.eth.Contract(abi, contractAddress)
+    return contract.methods[methodName](...params).call()
+  })
 }
 
 function read(contractAddress, property, params, abi, network) {
-  return getWeb3(network)
-    .then(web3 => {
-      let contract = new web3.eth.Contract(abi, contractAddress);
-      return contract.methods[property].call(...params);
-    })
+  return getWeb3(network).then((web3) => {
+    let contract = new web3.eth.Contract(abi, contractAddress)
+    return contract.methods[property].call(...params)
+  })
 }
 
 function isEqualObject(obj1, obj2) {
-  return objectToStr(obj1) === objectToStr(obj2);
+  return objectToStr(obj1) === objectToStr(obj2)
 }
 
 function isEqualResult(request, result) {
   switch (request.method) {
     case 'call': {
-      let {address, method, abi, outputs} = request.data.callInfo;
-      let hash1 = hashCallOutput(address, method, abi, request.data.result, outputs)
+      let { address, method, abi, outputs } = request.data.callInfo
+      let hash1 = hashCallOutput(
+        address,
+        method,
+        abi,
+        request.data.result,
+        outputs
+      )
       let hash2 = hashCallOutput(address, method, abi, result, outputs)
       return hash1 == hash2
     }
     case 'addBridgeToken': {
-      let {token: t1, tokenId: id1} = request.data.result;
-      let {token: t2, tokenId: id2} = result;
+      let { token: t1, tokenId: id1 } = request.data.result
+      let { token: t2, tokenId: id2 } = result
       let hash1 = soliditySha3([
-        {type: 'uint256', value: id1},
-        {type: 'string', value: t1.name},
-        {type: 'string', value: t1.symbol},
-        {type: 'uint8', value: t1.decimals},
-      ]);
+        { type: 'uint256', value: id1 },
+        { type: 'string', value: t1.name },
+        { type: 'string', value: t1.symbol },
+        { type: 'uint8', value: t1.decimals }
+      ])
       let hash2 = soliditySha3([
-        {type: 'uint256', value: id2},
-        {type: 'string', value: t2.name},
-        {type: 'string', value: t2.symbol},
-        {type: 'uint8', value: t2.decimals},
-      ]);
+        { type: 'uint256', value: id2 },
+        { type: 'string', value: t2.name },
+        { type: 'string', value: t2.symbol },
+        { type: 'uint8', value: t2.decimals }
+      ])
       return hash1 == hash2
     }
   }
@@ -137,23 +159,23 @@ async function signRequest(request, result) {
 
   switch (request.method) {
     case 'call': {
-      let {abi, address, method, outputs} = request.data.callInfo
+      let { abi, address, method, outputs } = request.data.callInfo
       signature = crypto.signCallOutput(address, method, abi, result, outputs)
-      break;
+      break
     }
     case 'addBridgeToken': {
-      let {token, tokenId} = result
+      let { token, tokenId } = result
       let dataToSign = [
-        {type: 'uint256', value: tokenId},
-        {type: 'string', value: token.name},
-        {type: 'string', value: token.symbol},
-        {type: 'uint8', value: token.decimals},
+        { type: 'uint256', value: tokenId },
+        { type: 'string', value: token.name },
+        { type: 'string', value: token.symbol },
+        { type: 'uint8', value: token.decimals }
       ]
       signature = crypto.sign(soliditySha3(dataToSign))
-      break;
+      break
     }
     default:
-      throw {message: `Unknown eth app method: ${request.method}`}
+      throw { message: `Unknown eth app method: ${request.method}` }
   }
 
   return {
@@ -161,35 +183,42 @@ async function signRequest(request, result) {
     owner: process.env.SIGN_WALLET_ADDRESS,
     timestamp: signTimestamp,
     data: result,
-    signature,
+    signature
   }
 }
 
 function recoverSignature(request, sign) {
   let signer = null
-  let {data:result, signature} = sign;
+  let { data: result, signature } = sign
   switch (request.method) {
     case 'call': {
-      let {address, method, abi, outputs} = request.data.callInfo
-      signer = crypto.recoverCallOutputSignature(address, method, abi, result, outputs, signature)
-      break;
+      let { address, method, abi, outputs } = request.data.callInfo
+      signer = crypto.recoverCallOutputSignature(
+        address,
+        method,
+        abi,
+        result,
+        outputs,
+        signature
+      )
+      break
     }
-    case 'addBridgeToken':{
-      let {token, tokenId} = result
+    case 'addBridgeToken': {
+      let { token, tokenId } = result
       let dataToSign = [
-        {type: 'uint256', value: tokenId},
-        {type: 'string', value: token.name},
-        {type: 'string', value: token.symbol},
-        {type: 'uint8', value: token.decimals},
+        { type: 'uint256', value: tokenId },
+        { type: 'string', value: token.name },
+        { type: 'string', value: token.symbol },
+        { type: 'uint8', value: token.decimals }
       ]
       signer = crypto.recover(soliditySha3(dataToSign), signature)
-      break;
+      break
     }
     default:
-      throw {message: `Unknown eth app method: ${request.method}`}
+      throw { message: `Unknown eth app method: ${request.method}` }
   }
 
-  return signer;
+  return signer
 }
 
 async function createCID(request) {
@@ -200,54 +229,79 @@ async function createCID(request) {
   return cid.toString()
 }
 
-const subscribeLogEvent = (network, contractAddress, contractAbi, eventName, interval = 5000) => {
-  let subscribe =  new Subscribe(network, contractAddress, contractAbi, eventName, interval)
+const subscribeLogEvent = (
+  network,
+  contractAddress,
+  contractAbi,
+  eventName,
+  interval = 5000
+) => {
+  let subscribe = new Subscribe(
+    network,
+    contractAddress,
+    contractAbi,
+    eventName,
+    interval
+  )
   return subscribe
 }
 
-
-class Subscribe extends EventEmbitter{
-  constructor(network, contractAddress, abi, eventName, interval=15000){
+class Subscribe extends EventEmbitter {
+  constructor(network, contractAddress, abi, eventName, interval = 15000) {
     super()
-    let web3 = getWeb3Sync(network);
+    let web3 = getWeb3Sync(network)
     let contract = new web3.eth.Contract(abi, contractAddress)
 
-    this.web3 = web3;
-    this.network = network;
+    this.web3 = web3
+    this.network = network
     this.interval = interval
-    this.contract = contract;
-    this.lastBlock = -1;
-    this.eventName = eventName;
+    this.contract = contract
+    this.lastBlock = -1
+    this.eventName = eventName
     this._handler = this._handler.bind(this)
 
     this.timeout = setTimeout(this._handler, interval)
   }
 
-  async _handler(){
-    if(this.lastBlock < 0) {
-      let lastBlock = await this.web3.eth.getBlockNumber() - 9000;
-      console.log(`watch ${this.network}:${this.contract._address} (${this.eventName}) from block ${lastBlock}`)
-      this.lastBlock = lastBlock;
+  async _handler() {
+    if (this.lastBlock < 0) {
+      let lastBlock = (await this.web3.eth.getBlockNumber()) - 9000
+      console.log(
+        `watch ${this.network}:${this.contract._address} (${this.eventName}) from block ${lastBlock}`
+      )
+      this.lastBlock = lastBlock
     }
 
-    let {contract, eventName, lastBlock, network} = this;
-    contract.getPastEvents(eventName, {
-      // filter: {id: id},
-      fromBlock: lastBlock,
-      toBlock: 'latest'
-    }, (error, result) => {
-      if (!error) {
-        let txs = [];
-        if(result.length > 0) {
-          let lastBlock = Math.max(...result.map(({blockNumber}) => blockNumber))
-          this.lastBlock = lastBlock + 1;
-          txs = result.map(({transactionHash, returnValues, blockNumber}) => ({blockNumber,transactionHash, returnValues}))
-          this.emit('event', txs, network, contract._address)
+    let { contract, eventName, lastBlock, network } = this
+    contract.getPastEvents(
+      eventName,
+      {
+        // filter: {id: id},
+        fromBlock: lastBlock,
+        toBlock: 'latest'
+      },
+      (error, result) => {
+        if (!error) {
+          let txs = []
+          if (result.length > 0) {
+            let lastBlock = Math.max(
+              ...result.map(({ blockNumber }) => blockNumber)
+            )
+            this.lastBlock = lastBlock + 1
+            txs = result.map(
+              ({ transactionHash, returnValues, blockNumber }) => ({
+                blockNumber,
+                transactionHash,
+                returnValues
+              })
+            )
+            this.emit('event', txs, network, contract._address)
+          }
+        } else {
+          this.emit('error', error, network, contract._address)
         }
-      } else {
-        this.emit('error', error, network, contract._address)
       }
-    })
+    )
     setTimeout(this._handler, this.interval)
   }
 }
@@ -268,4 +322,5 @@ module.exports = {
   createCID,
   subscribeLogEvent,
   getTokenInfo,
+  getNftInfo
 }
