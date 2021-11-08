@@ -117,6 +117,7 @@ var muon;
         'tss-plugin': [require('./plugins/tss-plugin'), {}],
         'tss-party-search': [require('./plugins/tss-party-search'), {}],
         'network-status': [require('./plugins/network-status'), {}],
+        'request-forwarder': [require('./plugins/request-forwarder'), {}],
         'group-leader': [require('./plugins/group-leader-plugin'), {}],
         ...getEnvPlugins(),
         ...getCustomApps(),
