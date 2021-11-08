@@ -206,7 +206,7 @@ class TssPlugin extends CallablePlugin {
       console.log('waiting to leader be selected ...');
       let leader = await this.leaderPlugin.waitToLeaderSelect();
 
-      if (this.isNeedToCreateKey() && leader === process.env.SIGN_WALLET_ADDRESS) {
+      if (leader === process.env.SIGN_WALLET_ADDRESS && await this.isNeedToCreateKey()) {
         let key = await this.tryToCreateTssKey();
         console.log(`TSS key generated with ${key.partners.length} partners`);
       }

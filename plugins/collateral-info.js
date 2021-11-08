@@ -40,14 +40,11 @@ class CollateralInfoPlugin extends BasePlugin{
     this.groupInfo = await this.contractCall('getUserGroupInfo', [myWallet]);
     let _networkInfo = await this.contractCall('getNetworkInfo');
     // remove prefixed "_" from keys;
-    this.networkInfo = Object.keys(_networkInfo).reduce((res, key) => {
-      let keyWithout_ = key.startsWith('_') ? key.slice(1) : key
-      res = {
-        ...res,
-        [keyWithout_]: _networkInfo[key]
-      };
-      return res;
-    }, {});
+    this.networkInfo = {
+      tssThreshold: parseInt(_networkInfo._tssThreshold),
+      minGroupSize: parseInt(_networkInfo._minGroupSize),
+      maxGroupSize: parseInt(_networkInfo._maxGroupSize)
+    }
 
     // load other groups info
     let lastGroupId = await this.contractCall('lastGroupId');
