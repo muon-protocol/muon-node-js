@@ -122,7 +122,7 @@ class RemoteCall extends BasePlugin {
     let signature = crypto.sign(strData)
     try {
       await pipe(
-        [`${signature}|${strData}`],
+        [Buffer.from(`${signature}|${strData}`)],
         stream,
         async (source) => {
           for await (const message of source) {
