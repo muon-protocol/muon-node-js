@@ -7,10 +7,10 @@ const ABI_getTx = [
     outputs: [
       { internalType: 'uint256', name: 'txId', type: 'uint256' },
       { internalType: 'uint256', name: 'tokenId', type: 'uint256' },
-      { internalType: 'uint256[]', name: 'nftId', type: 'uint256[]' },
       { internalType: 'uint256', name: 'fromChain', type: 'uint256' },
       { internalType: 'uint256', name: 'toChain', type: 'uint256' },
-      { internalType: 'address', name: 'user', type: 'address' }
+      { internalType: 'address', name: 'user', type: 'address' },
+      { internalType: 'uint256[]', name: 'nftId', type: 'uint256[]' }
     ],
     stateMutability: 'view',
     type: 'function'
@@ -59,17 +59,20 @@ module.exports = {
     switch (request.method) {
       case 'claim': {
         let { depositAddress } = request.data.params
-        return ethHashCallOutput(
-          depositAddress,
-          'getTx',
-          ABI_getTx,
-          result,
-          [],
-          [
-            { type: 'uint8', value: this.APP_ID },
-            { type: 'uint256', value: request.data.timestamp }
-          ]
-        )
+
+        let { txId, tokenId, fromChain, toChain, user, nftId } = result
+
+        return soliditySha3([
+          { type: 'address', value: depositAddress },
+          { type: 'uint256', value: txId },
+          { type: 'uint256', value: tokenId },
+          { type: 'uint256', value: fromChain },
+          { type: 'uint256', value: toChain },
+          { type: 'address', value: user },
+          { type: 'uint8', value: this.APP_ID },
+          { type: 'uint256', value: request.data.timestamp },
+          { type: 'uint256[]', value: nftId }
+        ])
       }
       case 'addBridgeToken': {
         let { token, tokenId } = result
