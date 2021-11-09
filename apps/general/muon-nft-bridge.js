@@ -7,7 +7,7 @@ const ABI_getTx = [
     outputs: [
       { internalType: 'uint256', name: 'txId', type: 'uint256' },
       { internalType: 'uint256', name: 'tokenId', type: 'uint256' },
-      { internalType: 'uint256', name: 'nftId', type: 'uint256' },
+      { internalType: 'uint256[]', name: 'nftId', type: 'uint256[]' },
       { internalType: 'uint256', name: 'fromChain', type: 'uint256' },
       { internalType: 'uint256', name: 'toChain', type: 'uint256' },
       { internalType: 'address', name: 'user', type: 'address' }
