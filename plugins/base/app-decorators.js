@@ -29,8 +29,17 @@ module.exports.remoteMethod = function (title, options={}) {
     if(property === 'function'){
       throw {message: `Error at [${target.constructor.name}]: Anonymous function not allowed as remote method. Define this method with a name.`}
     }
-    if(!target.__remoteMethods)
+    console.log(
+      '========================='
+      ,`${target.constructor.name}`
+      ,descriptor.value
+      ,!!target?.__remoteMethods
+      ,target.hasOwnProperty(`__remoteMethods`)
+      // ,target
+    )
+    if(!target.hasOwnProperty(`__remoteMethods`)) {
       target.__remoteMethods = []
+    }
 
     let titleIndex = target.__remoteMethods.findIndex(m => (m.title === title))
     if(titleIndex >= 0)
@@ -41,7 +50,18 @@ module.exports.remoteMethod = function (title, options={}) {
       throw {message: `ERROR at [${target.constructor.name}]: Remote method with property "${property}" already defined`}
 
     target.__remoteMethods.push({title, property, options})
-    return descriptor
+    // if(['ContentApp', 'BaseAppPlugin'].includes(target.constructor.name)){
+    //   // DEBUG
+    //   console.log("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$", {
+    //     "target": target,
+    //     "target.name": target.name,
+    //     "target.prototype": target.prototype,
+    //     "target.constructor": target.constructor,
+    //     "target.constructor.name": target.constructor.name,
+    //     "target.constructor.prototype": target.constructor.prototype,
+    //   })
+    // }
+    // return descriptor
   }
 }
 
@@ -53,7 +73,7 @@ module.exports.gatewayMethod = function (title) {
     if(property === 'function'){
       throw {message: `Error at [${target.constructor.name}]: Anonymous function not allowed as gateway method. Define this method with a name.`}
     }
-    if(!target.__gatewayMethods)
+    if(!target.hasOwnProperty('__gatewayMethods'))
       target.__gatewayMethods = []
     let titleIndex = target.__gatewayMethods.findIndex(m => (m.title === title))
     if(titleIndex >= 0)
@@ -80,7 +100,7 @@ module.exports.broadcastMethod = function (title, options={}) {
     if(property === 'function'){
       throw {message: `Error at [${target.constructor.name}]: Anonymous function not allowed as broadcast method. Define this method with a name.`}
     }
-    if(!target.__broadcastMethods)
+    if(!target.hasOwnProperty('__broadcastMethods'))
       target.__broadcastMethods = {}
 
     if(!!target.__broadcastMethods[title])

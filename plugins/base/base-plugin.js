@@ -40,13 +40,34 @@ module.exports = class BasePlugin extends Events{
     this.registerDecoratorMethods();
   }
 
+  getDecoratorMethods() {
+    let methods = {
+      __remoteMethods: [],
+      __gatewayMethods: [],
+    }
+    let tmp = Object.getPrototypeOf(this);
+    while (!!tmp && (tmp.name || tmp.constructor.name)){
+      if(tmp.hasOwnProperty('__remoteMethods'))
+        Array.prototype.push.apply(methods.__remoteMethods, tmp.__remoteMethods)
+      if(tmp.hasOwnProperty('__gatewayMethods'))
+        Array.prototype.push.apply(methods.__gatewayMethods, tmp.__gatewayMethods)
+      tmp = Object.getPrototypeOf(tmp);
+    }
+    return methods;
+  }
+
   registerDecoratorMethods() {
     // TODO: handle inheritance. collect methods from prototype chain.
-    let {__remoteMethods, __gatewayMethods} = this;
+    let {__remoteMethods, __gatewayMethods} = this.getDecoratorMethods();
+    // if(this.constructor.name === 'DynamicExtended(tss@BaseTssAppPlugin)')
+      console.log(`${this.constructor.name}.__remoteMethods`, {__remoteMethods})
 
     if(__remoteMethods) {
       __remoteMethods.forEach(item => {
-        this.registerRemoteMethod(item.title, this[item.property].bind(this), item.options)
+        if(!this[item.property])
+          console.log("==============", `${this.constructor.name} doesn't have property ${item.property}` )
+        else
+          this.registerRemoteMethod(item.title, this[item.property].bind(this), item.options)
       })
     }
     if(__gatewayMethods) {

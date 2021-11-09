@@ -8,9 +8,15 @@ const uint8ArrayToString = require('uint8arrays/to-string')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
 const { omit } = require('lodash')
+const {remoteMethod} = require('./app-decorators')
 const AppRequestManager = require('./app-request-manager');
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
+
+const RemoteMethods = {
+  GetRequestData: "GetRequestData",
+  SignRequest: "SignRequest",
+}
 
 class BaseAppPlugin extends CallablePlugin {
 
@@ -52,18 +58,18 @@ class BaseAppPlugin extends CallablePlugin {
     /**
      * Remote call handlers
      */
-    this.muon
-      .getPlugin('remote-call')
-      .on(
-        `app-${this.APP_NAME}-get-request`,
-        this.__onRemoteWantRequest.bind(this)
-      )
-    this.muon
-      .getPlugin('remote-call')
-      .on(
-        `app-${this.APP_NAME}-request-sign`,
-        this.__onRemoteSignRequest.bind(this)
-      )
+    // this.muon
+    //   .getPlugin('remote-call')
+    //   .on(
+    //     `app-${this.APP_NAME}-get-request`,
+    //     this.__onRemoteWantRequest.bind(this)
+    //   )
+    // this.muon
+    //   .getPlugin('remote-call')
+    //   .on(
+    //     `app-${this.APP_NAME}-request-sign`,
+    //     this.__onRemoteSignRequest.bind(this)
+    //   )
     this.muon
       .getPlugin('gateway-interface')
       .registerAppCall(
@@ -297,15 +303,15 @@ class BaseAppPlugin extends CallablePlugin {
       if (method === 'new_request') {
         let peerId = PeerId.createFromCID(params.peerId)
         let peer = await this.findPeer(peerId)
-        let request = await remoteCall.call(
+        let request = await this.remoteCall(
           peer,
-          `app-${this.APP_NAME}-get-request`,
+          RemoteMethods.GetRequestData,
           { _id: params._id }
         )
         if (request) {
           // console.log(`request info found: `, request)
           let [sign, memWrite] = await this.processRemoteRequest(request)
-          await remoteCall.call(peer, `app-${this.APP_NAME}-request-sign`, {
+          await this.remoteCall(peer, RemoteMethods.SignRequest, {
             sign,
             memWrite
           })
@@ -395,6 +401,7 @@ class BaseAppPlugin extends CallablePlugin {
    * This methods will call from remote peer
    */
 
+  @remoteMethod(RemoteMethods.GetRequestData, {allowFromOtherGroups: true})
   async __onRemoteWantRequest(data) {
     try {
       // console.log('RemoteCall.getRequestData', data)
@@ -406,6 +413,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
+  @remoteMethod(RemoteMethods.SignRequest, {allowFromOtherGroups: true})
   async __onRemoteSignRequest(data = {}) {
     // console.log('BaseAppPlugin.__onRemoteSignRequest', data)
     try {

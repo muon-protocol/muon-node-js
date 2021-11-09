@@ -4,6 +4,7 @@ const CID = require('cids')
 const all = require('it-all')
 const {remoteMethod, gatewayMethod} = require('./base/app-decorators')
 
+//TODO: convert to base plugin
 class ContentApp extends BaseApp {
   APP_NAME = 'content'
 
