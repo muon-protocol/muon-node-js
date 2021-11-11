@@ -9,8 +9,8 @@ function classNames(target){
   return names;
 }
 
-function isCallable(target) {
-  return classNames(target).includes('CallablePlugin')
+function isBasePlugin(target) {
+  return classNames(target).includes('BasePlugin')
 }
 
 function isApp(target) {
@@ -18,8 +18,8 @@ function isApp(target) {
 }
 
 function validateTarget(target) {
-  if(!isCallable(target)) {
-    throw {message: `@remoteMethod and @gatewayMethod decorators, can only be used at CallablePlugin.`}
+  if(!isBasePlugin(target)) {
+    throw {message: `@remoteMethod and @gatewayMethod decorators, can only be used at BasePlugin.`}
   }
 }
 

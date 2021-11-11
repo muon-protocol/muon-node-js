@@ -44,6 +44,7 @@ module.exports = class BasePlugin extends Events{
     let methods = {
       __remoteMethods: [],
       __gatewayMethods: [],
+      __broadcastMethods: {}
     }
     let tmp = Object.getPrototypeOf(this);
     while (!!tmp && (tmp.name || tmp.constructor.name)){
@@ -51,6 +52,12 @@ module.exports = class BasePlugin extends Events{
         Array.prototype.push.apply(methods.__remoteMethods, tmp.__remoteMethods)
       if(tmp.hasOwnProperty('__gatewayMethods'))
         Array.prototype.push.apply(methods.__gatewayMethods, tmp.__gatewayMethods)
+      if(tmp.hasOwnProperty('__broadcastMethods')) {
+        methods.__broadcastMethods = {
+          ... methods.__broadcastMethods,
+          ... tmp.__broadcastMethods,
+        }
+      }
       tmp = Object.getPrototypeOf(tmp);
     }
     return methods;
@@ -137,8 +144,10 @@ module.exports = class BasePlugin extends Events{
 
   async registerBroadcastHandler(){
     let broadcastChannel = this.BROADCAST_CHANNEL
+    let {__broadcastMethods} = this.getDecoratorMethods();
+    console.log("==============", `${this.constructor.name}`, {__broadcastMethods})
     /*eslint no-undef: "error"*/
-    if (broadcastChannel && (this.onBroadcastReceived || Object.keys(this.__broadcastMethods || {}).length > 0)) {
+    if (broadcastChannel && (this.onBroadcastReceived || Object.keys(__broadcastMethods || {}).length > 0)) {
 
       if(process.env.VERBOSE) {
         console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
