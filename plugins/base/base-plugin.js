@@ -66,8 +66,6 @@ module.exports = class BasePlugin extends Events{
   registerDecoratorMethods() {
     // TODO: handle inheritance. collect methods from prototype chain.
     let {__remoteMethods, __gatewayMethods} = this.getDecoratorMethods();
-    // if(this.constructor.name === 'DynamicExtended(tss@BaseTssAppPlugin)')
-      console.log(`${this.constructor.name}.__remoteMethods`, {__remoteMethods})
 
     if(__remoteMethods) {
       __remoteMethods.forEach(item => {
@@ -145,7 +143,6 @@ module.exports = class BasePlugin extends Events{
   async registerBroadcastHandler(){
     let broadcastChannel = this.BROADCAST_CHANNEL
     let {__broadcastMethods} = this.getDecoratorMethods();
-    console.log("==============", `${this.constructor.name}`, {__broadcastMethods})
     /*eslint no-undef: "error"*/
     if (broadcastChannel && (this.onBroadcastReceived || Object.keys(__broadcastMethods || {}).length > 0)) {
 

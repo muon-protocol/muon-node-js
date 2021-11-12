@@ -29,14 +29,14 @@ module.exports.remoteMethod = function (title, options={}) {
     if(property === 'function'){
       throw {message: `Error at [${target.constructor.name}]: Anonymous function not allowed as remote method. Define this method with a name.`}
     }
-    console.log(
-      '========================='
-      ,`${target.constructor.name}`
-      ,descriptor.value
-      ,!!target?.__remoteMethods
-      ,target.hasOwnProperty(`__remoteMethods`)
-      // ,target
-    )
+    // console.log(
+    //   '========================='
+    //   ,`${target.constructor.name}`
+    //   ,descriptor.value
+    //   ,!!target?.__remoteMethods
+    //   ,target.hasOwnProperty(`__remoteMethods`)
+    //   // ,target
+    // )
     if(!target.hasOwnProperty(`__remoteMethods`)) {
       target.__remoteMethods = []
     }
