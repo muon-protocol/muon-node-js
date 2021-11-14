@@ -75,7 +75,7 @@ class AppRequestManager{
     }
     else{
       if(item.promise === null)
-        item.promise = new TimeoutPromise(10000, 'Request timed out');
+        item.promise = new TimeoutPromise(30000, 'Request timed out');
       return item.promise.promise;
     }
   }
