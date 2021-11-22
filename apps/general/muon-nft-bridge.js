@@ -16,6 +16,15 @@ const ABI_getTx = [
     type: 'function'
   }
 ]
+const ABI_getTokenId = [
+  {
+    inputs: [{ internalType: 'address', name: '_addr', type: 'address' }],
+    name: 'getTokenId',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]
 
 module.exports = {
   APP_NAME: 'nft_bridge',
@@ -43,10 +52,24 @@ module.exports = {
         return result
       }
       case 'addBridgeToken': {
-        let { mainTokenAddress, mainNetwork, targetNetwork } = params
+        let { mainTokenAddress, mainNetwork, targetNetwork, sourceBridge } =
+          params
+
+        let currentId = await ethCall(
+          sourceBridge,
+          'getTokenId',
+          [mainTokenAddress],
+          ABI_getTokenId,
+          mainNetwork
+        )
+        let token = await ethGetNftInfo(mainTokenAddress, mainNetwork)
+
         let result = {
-          token: await ethGetNftInfo(mainTokenAddress, mainNetwork),
-          tokenId: mainTokenAddress
+          token: {
+            symbol: token.symbol.replace('μ-', ''),
+            name: token.name.replace('Muon ', '')
+          },
+          tokenId: currentId == 0 ? mainTokenAddress : currentId
         }
         return result
       }
