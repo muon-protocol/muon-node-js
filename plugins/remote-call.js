@@ -43,7 +43,7 @@ class RemoteCall extends BasePlugin {
           responseId: callId,
           response: result
         };
-        return this.send(response, responseStream)
+        return response
       })
       .catch(error => {
         console.error("RemoteCall.handleCall", error)
@@ -53,7 +53,7 @@ class RemoteCall extends BasePlugin {
             message: error.message || 'Somethings went wrong'
           }
         };
-        return this.send(response, responseStream)
+        return response
       })
   }
 
@@ -68,16 +68,84 @@ class RemoteCall extends BasePlugin {
       let validWallets = collateralPlugin.getWallets()
       if(!validWallets.includes(sigOwner)){
         throw {message: `Unrecognized request owner ${sigOwner}`}
-        // let {responseId} = data;
-        // let remoteResult = this._calls[responseId]
-        // return remoteResult && remoteResult.reject({message: `Unrecognized request owner ${sigOwner}`})
       }
 
       if('method' in data) {
         let {callId, method, params={}} = data;
-        await this.handleCall(callId, method, params, sigOwner, stream, peerId);
+        return await this.handleCall(callId, method, params, sigOwner, stream, peerId);
       }
-      else if('responseId' in data){
+      else{
+        // TODO: what to do?
+      }
+    }catch (e) {
+      console.error("RemoteCall.handleIncomingMessage", e);
+    }
+  }
+
+  async handler ({ connection, stream , ...otherOptions}) {
+    try {
+      let response;
+      await pipe(
+        stream,
+        async (source) => {
+          for await (const message of source) {
+            response = await this.handleIncomingMessage(message, stream, connection.remotePeer)
+          }
+        }
+      )
+      if(response) {
+        await pipe([this.prepareSendData(response)], stream)
+      }
+    } catch (err) {
+      console.error("RemoteCall.handler", err)
+    } finally {
+      // Replies are done on new streams, so let's close this stream so we don't leak it
+      await pipe([], stream)
+    }
+  }
+
+  prepareSendData(data) {
+    let strData = JSON.stringify(data)
+    let signature = crypto.sign(strData)
+    return Buffer.from(`${signature}|${strData}`);
+  }
+
+  async send (data, stream, peer) {
+    try {
+      await pipe(
+        [this.prepareSendData(data)],
+        stream,
+        async (source) => {
+          for await (const message of source) {
+            await this.handleSendResponse(message)
+          }
+        }
+      )
+    } catch (err) {
+      console.error("RemoteCall.send", err)
+    }
+    finally {
+      // Replies are done on new streams, so let's close this stream so we don't leak it
+      await pipe([], stream);
+    }
+  }
+
+  async handleSendResponse(signAndMessage){
+    let collateralPlugin = this.muon.getPlugin('collateral');
+    try {
+      let [sign, message] = signAndMessage.toString().split('|')
+      let sigOwner = crypto.recover(message, sign)
+      let data = JSON.parse(message)
+
+      // TODO: filter out unrecognized wallets message.
+      let validWallets = collateralPlugin.getWallets()
+      if(!validWallets.includes(sigOwner)){
+        throw {message: `Unrecognized message owner ${sigOwner}`}
+        // let {responseId} = data;
+        // let remoteResult = this._calls[responseId]
+        // return remoteResult && remoteResult.reject({message: `Unrecognized request owner ${sigOwner}`})
+      }
+      if('responseId' in data){
         let {responseId, response=undefined, error=undefined} = data;
         // let remoteResult = this._calls[responseId]
         let {resultPromise=null} = callCache.get(responseId);
@@ -93,45 +161,11 @@ class RemoteCall extends BasePlugin {
           // TODO: what to do? it may timed out.
         }
       }
+      else{
+        // TODO: what to do? it may timed out.
+      }
     }catch (e) {
-      console.error("RemoteCall.handleIncomingMessage", e);
-    }
-  }
-
-  async handler ({ connection, stream , ...otherOptions}) {
-    try {
-      await pipe(
-        stream,
-        async (source) => {
-          for await (const message of source) {
-            // console.info(`Remote call ${connection.remotePeer.toB58String()}`, message)
-            this.handleIncomingMessage(message, stream, connection.remotePeer)
-          }
-        }
-      )
-      // console.log('await pipe([], stream)')
-      // Replies are done on new streams, so let's close this stream so we don't leak it
-      // await pipe([], stream)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  async send (data, stream, peer) {
-    let strData = JSON.stringify(data)
-    let signature = crypto.sign(strData)
-    try {
-      await pipe(
-        [Buffer.from(`${signature}|${strData}`)],
-        stream,
-        async (source) => {
-          for await (const message of source) {
-            this.handleIncomingMessage(message, stream, peer)
-          }
-        }
-      )
-    } catch (err) {
-      console.error("RemoteCall.send", err)
+      console.error("RemoteCall.handleSendResponse", e);
     }
   }
 

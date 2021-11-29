@@ -20,6 +20,9 @@ function getMilestoneReached(address, signature, message, amount, chain) {
       }
     )
     .then(({ data }) => data)
+    .catch(err => {
+      return err?.response?.data;
+    })
 }
 
 module.exports = {
@@ -47,7 +50,10 @@ module.exports = {
           chain
         )
         if (!result.claimed || result.reward == 0) {
-          throw { message: 'address not allowed for claim' }
+          if(result?.eid?.message)
+            throw {message: result.eid.message}
+          else
+            throw { message: 'address not allowed for claim' }
         }
         let startedAt = getTimestamp()
 
