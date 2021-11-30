@@ -53,7 +53,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
       .map(async ({peer, wallet}) => {
         if(wallet === process.env.SIGN_WALLET_ADDRESS)
           return true;
-        return this.remoteCall(peer, 'wantSign', request)
+        return this.remoteCall(peer, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT})
           .then(this.__onRemoteSignRequest.bind(this))
           .catch(e => {
             // console.log('base-tss-app-plugin: on broadcast request error', e)

@@ -29,6 +29,7 @@ const ABI_getTokenId = [
 module.exports = {
   APP_NAME: 'nft_bridge',
   APP_ID: 4,
+  REMOTE_CALL_TIMEOUT: 20000,
 
   onRequest: async function (request) {
     let {

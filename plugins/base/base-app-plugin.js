@@ -14,6 +14,7 @@ const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
 class BaseAppPlugin extends CallablePlugin {
   APP_NAME = null
+  REMOTE_CALL_TIMEOUT = 15000
   requestManager = new AppRequestManager();
 
   constructor(...args) {
