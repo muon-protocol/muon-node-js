@@ -56,14 +56,16 @@ module.exports = {
         let { mainTokenAddress, mainNetwork, targetNetwork, sourceBridge } =
           params
 
-        let currentId = await ethCall(
-          sourceBridge,
-          'getTokenId',
-          [mainTokenAddress],
-          ABI_getTokenId,
-          mainNetwork
-        )
-        let token = await ethGetNftInfo(mainTokenAddress, mainNetwork)
+        let [currentId, token] = await Promise.all([
+          await ethCall(
+            sourceBridge,
+            'getTokenId',
+            [mainTokenAddress],
+            ABI_getTokenId,
+            mainNetwork
+          ),
+          await ethGetNftInfo(mainTokenAddress, mainNetwork)
+        ])
 
         let result = {
           token: {
@@ -94,7 +96,6 @@ module.exports = {
           { type: 'uint256', value: toChain },
           { type: 'address', value: user },
           { type: 'uint8', value: this.APP_ID },
-          { type: 'uint256', value: request.data.timestamp },
           { type: 'uint256[]', value: nftId }
         ])
       }
