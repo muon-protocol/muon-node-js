@@ -17,7 +17,7 @@ module.exports = {
     }
   },
 
-  hashRequestResut: function (request, result) {
+  hashRequestResult: function (request, result) {
     let {
       method,
       data: { params }
