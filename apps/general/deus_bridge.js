@@ -1,9 +1,9 @@
 const { ethCall, soliditySha3 } = MuonAppUtils
 
-const ABI_getTx = [
+const ABI_getTransaction = [
   {
-    inputs: [{ internalType: 'uint256', name: '_txId', type: 'uint256' }],
-    name: 'getTx',
+    inputs: [{ internalType: 'uint256', name: 'txId_', type: 'uint256' }],
+    name: 'getTransaction',
     outputs: [
       { internalType: 'uint256', name: 'txId', type: 'uint256' },
       { internalType: 'uint256', name: 'tokenId', type: 'uint256' },
@@ -11,7 +11,8 @@ const ABI_getTx = [
       { internalType: 'uint256', name: 'fromChain', type: 'uint256' },
       { internalType: 'uint256', name: 'toChain', type: 'uint256' },
       { internalType: 'address', name: 'user', type: 'address' },
-      { internalType: 'uint256', name: 'txBlockNo', type: 'uint256' }
+      { internalType: 'uint256', name: 'txBlockNo', type: 'uint256' },
+      { internalType: 'uint256', name: 'currentBlockNo', type: 'uint256' }
     ],
     stateMutability: 'view',
     type: 'function'
@@ -43,6 +44,7 @@ module.exports = {
     switch (method) {
       case 'claim':
         let { depositAddress, depositTxId, depositNetwork } = params
+
         if (!depositAddress) throw { message: 'Invalid contarct address' }
         if (!depositTxId) throw { message: 'Invalid depositTxId' }
         if (!depositNetwork) throw { message: 'Invalid network' }
@@ -60,10 +62,9 @@ module.exports = {
           depositAddress,
           'getTransaction',
           [depositTxId],
-          ABI_getTx,
+          ABI_getTransaction,
           depositNetwork
         )
-
         if (currentBlockNo < txBlockNo + confirmationBlock[depositNetwork])
           throw { message: 'Bridge: confirmationTime is not finished yet' }
 
