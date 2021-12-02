@@ -14,27 +14,55 @@ const soliditySha3 = _generalWeb3Instance.utils.soliditySha3
 
 const _networksWeb3 = {
   ganache: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_GANACHE)),
-  eth: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ETH)),
-  ropsten: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ROPSTEN)),
-  rinkeby: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_RINKEBY)),
-  bsc: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSC)),
-  bsctest: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSCTEST)),
-  ftm: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTM)),
-  ftmtest: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTMTEST)),
-  xdai: new Web3(new HttpProvider('https://rpc.xdaichain.com/')),
-  sokol: new Web3(new HttpProvider('https://sokol.poa.network')),
-  polygon: new Web3(new HttpProvider('https://rpc-mainnet.maticvigil.com/')),
-  mumbai: new Web3(new HttpProvider('https://rpc-mumbai.maticvigil.com/'))
+  // ethereum mani net
+  1: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ETH)),
+  3: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ROPSTEN)),
+  4: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_RINKEBY)),
+  56: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSC)),
+  97: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSCTEST)),
+  250: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTM)),
+  4002: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTMTEST)),
+  100: new Web3(new HttpProvider('https://rpc.xdaichain.com/')),
+  77: new Web3(new HttpProvider('https://sokol.poa.network')),
+  137: new Web3(new HttpProvider('https://rpc-mainnet.maticvigil.com/')),
+  80001: new Web3(new HttpProvider('https://rpc-mumbai.maticvigil.com/')),
+  43113: new Web3(new HttpProvider("https://api.avax-test.network/ext/bc/C/rpc")),
+  43114: new Web3(new HttpProvider("https://api.avax.network/ext/bc/C/rpc")),
+}
+
+const nameToChainIdMap = {
+  local: 'ganache',
+  eth: 1, // Ethereum mainnet
+  ropsten: 3, // Ethereum ropsten testnet
+  rinkeby: 4, // Ethereum rinkeby testnet
+  bsc: 56, // Binance Smart Chain mainnet
+  bsctest: 97, // Binance Smart Chain testnet
+  ftm: 250, // Fantom mainnet
+  ftmtest: 4002, // Fantom testnet
+  xdai:100, // Xdai mainnet
+  sokol: 77, // Xdai testnet
+  polygon: 137, // polygon mainnet
+  mumbai: 80001, // Polygon mumbai testnet
+  fuji: 43113, // Avalanche Fuji Testnet
+  avax: 43114, // Avalanche Mainnet
 }
 
 function getWeb3(network) {
-  if (_networksWeb3[network]) return Promise.resolve(_networksWeb3[network])
-  else return Promise.reject({ message: `invalid network "${network}"` })
+  if (_networksWeb3[network])
+    return Promise.resolve(_networksWeb3[network]);
+  else if (_networksWeb3[nameToChainIdMap[network]])
+    return Promise.resolve(_networksWeb3[nameToChainIdMap[network]]);
+  else
+    return Promise.reject({ message: `invalid network "${network}"` })
 }
 
 function getWeb3Sync(network) {
-  if (_networksWeb3[network]) return _networksWeb3[network]
-  else throw { message: `invalid network "${network}"` }
+  if (_networksWeb3[network])
+    return _networksWeb3[network];
+  else if (_networksWeb3[nameToChainIdMap[network]])
+    return _networksWeb3[nameToChainIdMap[network]];
+  else
+    throw { message: `invalid network "${network}"` }
 }
 
 function hashCallOutput(
