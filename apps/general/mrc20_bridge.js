@@ -18,7 +18,7 @@ const ABI_getTx = [
 ]
 
 module.exports = {
-  APP_NAME: 'fear_bridge',
+  APP_NAME: 'mrc20_bridge',
   APP_ID: 5,
 
   onRequest: async function (request) {

@@ -1,5 +1,5 @@
 module.exports = {
-  APP_NAME: 'fear_presale',
+  APP_NAME: 'mrc20_presale',
   APP_ID: 6,
 
   onRequest: async function (request) {
