@@ -2017,10 +2017,7 @@ module.exports = {
           throw { message: 'Request signature mismatch' }
 
         let maxCap = new BN(
-          toBaseUnit(
-            allocation[forAddress].toString(),
-            presaleToken.decimals
-          ).toString()
+          toBaseUnit(allocation[forAddress].toString(), 18).toString()
         )
         let allPurchase = {}
         for (let index = 0; index < Object.keys(chainMap).length; index++) {
@@ -2038,13 +2035,10 @@ module.exports = {
           .filter((chain) => chain != chainId)
           .reduce((sum, chain) => sum.add(allPurchase[chain]), new BN(0))
         let finalMaxCap = maxCap.sub(sum).toString()
-        let tokenPrice = toBaseUnit(
-          token.price.toString(),
-          presaleToken.decimals
-        ).toString()
+        let tokenPrice = toBaseUnit(token.price.toString(), 18).toString()
         let presaleTokenPrice = toBaseUnit(
           presaleToken.price.toString(),
-          presaleToken.decimals
+          18
         ).toString()
         const data = {
           token: token.address,
