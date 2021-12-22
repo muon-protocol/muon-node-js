@@ -15,16 +15,6 @@ function getAllowance() {
     .then(({ data }) => data)
 }
 
-// const muonPresaleABI_eth = [
-//   {
-//     inputs: [{ internalType: 'address', name: '', type: 'address' }],
-//     name: 'balances',
-//     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-//     stateMutability: 'view',
-//     type: 'function'
-//   }
-// ]
-
 const muonPresaleABI = [
   {
     inputs: [{ internalType: 'address', name: '', type: 'address' }],
@@ -45,16 +35,6 @@ const muonPresale = {
   [chainMap.BSC]: '0x059ce16319da782e2909c9e15f3232233649a321',
   [chainMap.XDAI]: '0x059ce16319Da782E2909c9e15f3232233649a321'
 }
-
-// const ethContractAddress = '0xA0b0AA5D2bd1738504577E1883537C9af3392454'
-// const bscContractAddress = '0x059ce16319da782e2909c9e15f3232233649a321'
-// const xdaiContractAddress = '0x059ce16319Da782E2909c9e15f3232233649a321'
-// const ethNetwork = 'eth'
-// const bscNetWork = 'bsc'
-// const xdaiNetwork = 'xdai'
-// const xDaiChainId = 100
-// const bscChainId = 56
-// const ethChainId = 1
 
 const DEPOSIT_LOCK = 'muon-deposit-lock'
 
@@ -136,16 +116,9 @@ module.exports = {
             throw { message: 'Request signature mismatch' }
         }
 
-        // let locked = await this.memRead({
-        //   nSign,
-        //   'data.name': 'forAddress',
-        //   'data.value': forAddress
-        // })
-
         let allPurchase = {}
         for (let index = 0; index < Object.keys(chainMap).length; index++) {
           const chainId = chainMap[Object.keys(chainMap)[index]]
-          // TODO change name contract and abi
           let purchase = await ethCall(
             muonPresale[chainId],
             'balances',
@@ -164,38 +137,13 @@ module.exports = {
           throw { message: 'Token not allowed for deposit' }
 
         token = tokenList[token]
-        // token = {
-        //   decimals: 18,
-        //   address: '0x4Ef4E0b448AC75b7285c334e215d384E7227A2E6',
-        //   price: 1
-        // }
-        // allowance = {
-        //   ...allowance,
-        //   '0x5629227C1E2542DbC5ACA0cECb7Cd3E02C82AD0a': 20000
-        // }
+
         if (allowance[forAddress] === undefined)
           throw { message: 'address not allowed for deposit' }
 
         let maxCap = new BN(
           toBaseUnit(allowance[forAddress].toString(), '18').toString()
         )
-        // ethPurchase = new BN(ethPurchase)
-        // bscPurchase = new BN(bscPurchase)
-        // xdaiPurchase = new BN(xdaiPurchase)
-        // let sum
-        // switch (chainId) {
-        //   case chainMap.ETH:
-        //     sum = allPurchase[chainMap.BSC].add(allPurchase[chainMap.XDAI])
-        //     break
-        //   case chainMap.BSC:
-        //     sum = allPurchase[chainMap.ETH].add(allPurchase[chainMap.XDAI])
-        //     break
-        //   case chainMap.XDAI:
-        //     sum = allPurchase[chainMap.BSC].add(allPurchase[chainMap.ETH])
-        //     break
-        //   default:
-        //     break
-        // }
         let sum = Object.keys(allPurchase)
           .filter((chain) => chain != chainId)
           .reduce((sum, chain) => sum.add(allPurchase[chain]), new BN(0))
