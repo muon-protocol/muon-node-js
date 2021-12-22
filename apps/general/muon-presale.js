@@ -15,15 +15,15 @@ function getAllowance() {
     .then(({ data }) => data)
 }
 
-const muonPresaleABI_eth = [
-  {
-    inputs: [{ internalType: 'address', name: '', type: 'address' }],
-    name: 'balances',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function'
-  }
-]
+// const muonPresaleABI_eth = [
+//   {
+//     inputs: [{ internalType: 'address', name: '', type: 'address' }],
+//     name: 'balances',
+//     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+//     stateMutability: 'view',
+//     type: 'function'
+//   }
+// ]
 
 const muonPresaleABI = [
   {
@@ -34,15 +34,27 @@ const muonPresaleABI = [
     type: 'function'
   }
 ]
-const ethContractAddress = '0xA0b0AA5D2bd1738504577E1883537C9af3392454'
-const bscContractAddress = '0x059ce16319da782e2909c9e15f3232233649a321'
-const xdaiContractAddress = '0x059ce16319Da782E2909c9e15f3232233649a321'
-const ethNetwork = 'eth'
-const bscNetWork = 'bsc'
-const xdaiNetwork = 'xdai'
-const xDaiChainId = 100
-const bscChainId = 56
-const ethChainId = 1
+
+const chainMap = {
+  ETH: 1,
+  BSC: 56,
+  XDAI: 100
+}
+const muonPresale = {
+  [chainMap.ETH]: '0xA0b0AA5D2bd1738504577E1883537C9af3392454',
+  [chainMap.BSC]: '0x059ce16319da782e2909c9e15f3232233649a321',
+  [chainMap.XDAI]: '0x059ce16319Da782E2909c9e15f3232233649a321'
+}
+
+// const ethContractAddress = '0xA0b0AA5D2bd1738504577E1883537C9af3392454'
+// const bscContractAddress = '0x059ce16319da782e2909c9e15f3232233649a321'
+// const xdaiContractAddress = '0x059ce16319Da782E2909c9e15f3232233649a321'
+// const ethNetwork = 'eth'
+// const bscNetWork = 'bsc'
+// const xdaiNetwork = 'xdai'
+// const xDaiChainId = 100
+// const bscChainId = 56
+// const ethChainId = 1
 
 const DEPOSIT_LOCK = 'muon-deposit-lock'
 
@@ -100,9 +112,9 @@ module.exports = {
         if (!amount) throw { message: 'Invalid deposit amount' }
         if (!forAddress) throw { message: 'Invalid sender address' }
         if (!sign) throw { message: 'Request signature undefined' }
-        if (token === 'xdai' && chainId != xDaiChainId)
+        if (token === 'xdai' && chainId != chainMap.XDAI)
           throw { message: 'Token and chain is not matched' }
-        if ((token === 'busd' || token === 'bnb') && chainId != bscChainId)
+        if ((token === 'busd' || token === 'bnb') && chainId != chainMap.BSC)
           throw { message: 'Token and chain is not matched' }
         else {
           let typedData = {
@@ -130,28 +142,19 @@ module.exports = {
         //   'data.value': forAddress
         // })
 
-        let ethPurchase = await ethCall(
-          ethContractAddress,
-          'balances',
-          [forAddress],
-          muonPresaleABI_eth,
-          ethNetwork
-        )
-        let bscPurchase = await ethCall(
-          bscContractAddress,
-          'balances',
-          [forAddress],
-          muonPresaleABI,
-          bscNetWork
-        )
-
-        let xdaiPurchase = await ethCall(
-          xdaiContractAddress,
-          'balances',
-          [forAddress],
-          muonPresaleABI,
-          xdaiNetwork
-        )
+        let allPurchase = {}
+        for (let index = 0; index < Object.keys(chainMap).length; index++) {
+          const chainId = chainMap[Object.keys(chainMap)[index]]
+          // TODO change name contract and abi
+          let purchase = await ethCall(
+            muonPresale[chainId],
+            'balances',
+            [forAddress],
+            muonPresaleABI,
+            chainId
+          )
+          allPurchase = { ...allPurchase, [chainId]: new BN(purchase) }
+        }
 
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
@@ -176,23 +179,27 @@ module.exports = {
         let maxCap = new BN(
           toBaseUnit(allowance[forAddress].toString(), '18').toString()
         )
-        ethPurchase = new BN(ethPurchase)
-        bscPurchase = new BN(bscPurchase)
-        xdaiPurchase = new BN(xdaiPurchase)
-        let sum
-        switch (chainId) {
-          case ethChainId:
-            sum = bscPurchase.add(xdaiPurchase)
-            break
-          case bscChainId:
-            sum = ethPurchase.add(xdaiPurchase)
-            break
-          case xDaiChainId:
-            sum = bscPurchase.add(ethPurchase)
-            break
-          default:
-            break
-        }
+        // ethPurchase = new BN(ethPurchase)
+        // bscPurchase = new BN(bscPurchase)
+        // xdaiPurchase = new BN(xdaiPurchase)
+        // let sum
+        // switch (chainId) {
+        //   case chainMap.ETH:
+        //     sum = allPurchase[chainMap.BSC].add(allPurchase[chainMap.XDAI])
+        //     break
+        //   case chainMap.BSC:
+        //     sum = allPurchase[chainMap.ETH].add(allPurchase[chainMap.XDAI])
+        //     break
+        //   case chainMap.XDAI:
+        //     sum = allPurchase[chainMap.BSC].add(allPurchase[chainMap.ETH])
+        //     break
+        //   default:
+        //     break
+        // }
+        let sum = Object.keys(allPurchase)
+          .filter((chain) => chain != chainId)
+          .reduce((sum, chain) => sum.add(allPurchase[chain]), new BN(0))
+
         let finalMaxCap = maxCap.sub(sum)
         finalMaxCap = finalMaxCap.toString()
         const data =
@@ -220,6 +227,31 @@ module.exports = {
         if (lock.length !== 1) throw { message: 'Atomic run failed.' }
         return data
       }
+      case 'claim':
+        let { address } = params
+        if (!address) throw { message: 'Invalid address' }
+
+        let allPurchase = {}
+        for (let index = 0; index < Object.keys(chainMap).length; index++) {
+          const chainId = chainMap[Object.keys(chainMap)[index]]
+
+          let purchase = await ethCall(
+            muonPresale[chainId],
+            'balances',
+            [address],
+            muonPresaleABI,
+            chainId
+          )
+          allPurchase = { ...allPurchase, [chainId]: new BN(purchase) }
+        }
+        let sum = Object.keys(allPurchase).reduce(
+          (sum, chain) => sum.add(allPurchase[chain]),
+          new BN(0)
+        )
+        return {
+          address,
+          sum: sum.toString()
+        }
       default:
         throw { message: `Unknown method ${params}` }
     }
@@ -254,6 +286,13 @@ module.exports = {
                 { type: 'uint256', value: addressMaxCap[1] }
               ])
         return data
+      }
+      case 'claim': {
+        const { address, sum } = result
+        return soliditySha3([
+          { type: 'address', value: address },
+          { type: 'uint256', value: sum }
+        ])
       }
       default:
         return null
