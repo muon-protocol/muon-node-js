@@ -175,31 +175,6 @@ module.exports = {
         if (lock.length !== 1) throw { message: 'Atomic run failed.' }
         return data
       }
-      case 'claim':
-        let { address } = params
-        if (!address) throw { message: 'Invalid address' }
-
-        let allPurchase = {}
-        for (let index = 0; index < Object.keys(chainMap).length; index++) {
-          const chainId = chainMap[Object.keys(chainMap)[index]]
-
-          let purchase = await ethCall(
-            muonPresale[chainId],
-            'balances',
-            [address],
-            muonPresaleABI,
-            chainId
-          )
-          allPurchase = { ...allPurchase, [chainId]: new BN(purchase) }
-        }
-        let sum = Object.keys(allPurchase).reduce(
-          (sum, chain) => sum.add(allPurchase[chain]),
-          new BN(0)
-        )
-        return {
-          address,
-          sum: sum.toString()
-        }
       default:
         throw { message: `Unknown method ${params}` }
     }
@@ -235,13 +210,7 @@ module.exports = {
               ])
         return data
       }
-      case 'claim': {
-        const { address, sum } = result
-        return soliditySha3([
-          { type: 'address', value: address },
-          { type: 'uint256', value: sum }
-        ])
-      }
+
       default:
         return null
     }
