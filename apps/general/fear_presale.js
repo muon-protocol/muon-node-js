@@ -1917,7 +1917,6 @@ const ABI_balances = [
     type: 'function'
   }
 ]
-// TODO: uncommect lock code
 // TODO: change to main network
 
 const chainMap = {
