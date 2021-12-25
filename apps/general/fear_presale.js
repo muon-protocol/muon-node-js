@@ -1997,7 +1997,12 @@ module.exports = {
         if ((token === 'busd' || token === 'bnb') && chainId != chainMap.BSC)
           throw { message: 'Token and chain is not matched' }
 
-        if (allocation[forAddress] === undefined)
+        // TODO remove this condition for production
+        let allocationForAddress = allocation[forAddress]
+          ? allocation[forAddress]
+          : 500
+
+        if (allocationForAddress === undefined)
           throw { message: 'address not allowed for deposit' }
 
         let tokenList = await getTokens()
@@ -2021,7 +2026,7 @@ module.exports = {
           throw { message: 'Request signature mismatch' }
 
         let maxCap = new BN(
-          toBaseUnit(allocation[forAddress].toString(), 18).toString()
+          toBaseUnit(allocationForAddress.toString(), 18).toString()
         )
         let allPurchase = {}
         for (let index = 0; index < Object.keys(chainMap).length; index++) {
