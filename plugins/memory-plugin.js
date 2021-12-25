@@ -32,13 +32,15 @@ class MemoryPlugin extends BasePlugin {
   }
 
   checkSignature(memWrite){
+    let collateralPlugin = this.muon.getPlugin('collateral');
+
     let {signatures} = memWrite;
     let hash = this.hashMemWrite(memWrite)
     if(hash !== memWrite.hash) {
       console.log('hash mismatch', [hash, memWrite.hash])
       return false
     }
-    let allowedList = this.muon.getNodesWalletList();
+    let allowedList = collateralPlugin.getWallets();
     let sigOwners = signatures.map(sig => crypto.recover(hash, sig));
     for(const address of sigOwners){
       let index = allowedList.findIndex(addr => (addr.toLowerCase()===address.toLowerCase()))

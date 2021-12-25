@@ -34,6 +34,7 @@ class DistributedKey {
 
   share = null;
   publicKey = null
+  partnersPubKey = {}
   address = null
 
   constructor(party, id, timeout){
@@ -118,11 +119,14 @@ class DistributedKey {
    * @returns {[string, any]}
    */
   getPubKey(idx){
-    return Object.entries(this.pubKeyParts)
+    if(!this.partnersPubKey[idx]) {
+      this.partnersPubKey[idx] = Object.entries(this.pubKeyParts)
       // .filter(([i, A_ik]) => parseInt(i) !== idx)
-      .reduce((acc, [i, A_ik]) => {
-        return tss.pointAdd(acc, tss.calcPolyPoint(idx, A_ik))
-      }, null)
+        .reduce((acc, [i, A_ik]) => {
+          return tss.pointAdd(acc, tss.calcPolyPoint(idx, A_ik))
+        }, null)
+    }
+    return this.partnersPubKey[idx]
   }
 
   getTotalPubKey(){
