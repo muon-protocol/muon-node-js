@@ -15,6 +15,24 @@ module.exports = {
   isService: true,
 
   /**
+   * Methods that run only on the current node.
+   * returned value will return to client.
+   */
+  readOnlyMethods: [
+    'myReadOnlyMethod'
+  ],
+
+  myReadOnlyMethod: async function(params){
+    return {
+      message: "sample readonly method",
+      data: [
+        "value 0",
+        "value 1"
+      ]
+    }
+  },
+
+  /**
    * App initialization hook
    * @returns {Promise<void>}
    */
