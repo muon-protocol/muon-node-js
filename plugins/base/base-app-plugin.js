@@ -16,6 +16,7 @@ class BaseAppPlugin extends CallablePlugin {
   APP_NAME = null
   REMOTE_CALL_TIMEOUT = 15000
   requestManager = new AppRequestManager();
+  readOnlyMethods = []
 
   constructor(...args) {
     super(...args)
@@ -61,13 +62,22 @@ class BaseAppPlugin extends CallablePlugin {
         `remote:app-${this.APP_NAME}-request-sign`,
         this.__onRemoteSignRequest.bind(this)
       )
-    this.muon
-      .getPlugin('gateway-interface')
-      .registerAppCall(
-        this.APP_NAME,
-        'request',
-        this.__onRequestArrived.bind(this)
-      )
+
+    let gateway = this.muon.getPlugin('gateway-interface')
+    gateway.registerAppCall(
+      this.APP_NAME,
+      'request',
+      this.__onRequestArrived.bind(this)
+    )
+
+    /**
+     * register readonly methods
+     */
+    if(this.readOnlyMethods.length > 0){
+      this.readOnlyMethods.forEach(method => {
+        gateway.registerAppCall(this.APP_NAME, method, this[method].bind(this))
+      })
+    }
   }
 
   /**
