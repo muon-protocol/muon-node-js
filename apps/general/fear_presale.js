@@ -1936,6 +1936,29 @@ module.exports = {
   APP_NAME: 'fear_presale',
   APP_ID: 6,
 
+  readOnlyMethods: ['checkLock'],
+
+  checkLock: async function (params) {
+    const { forAddress } = params
+    let lock = await this.readNodeMem({
+      'data.name': DEPOSIT_LOCK,
+      'data.value': forAddress
+    })
+
+    if (lock) {
+      return {
+        message: `Address locked for for 6 minutes.`,
+        lock: true,
+        lockTime: 6 * 60,
+        expireAt: lock.expireAt
+      }
+    }
+    return {
+      message: `Address can swap`,
+      lock: false
+    }
+  },
+
   onArrive: async function (request) {
     const {
       method,
