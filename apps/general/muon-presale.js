@@ -28,19 +28,21 @@ const muonPresaleABI = [
 const chainMap = {
   ETH: 1,
   BSC: 56,
-  XDAI: 100
+  XDAI: 100,
+  POLYGON: 137
 }
 const muonPresale = {
   [chainMap.ETH]: '0xA0b0AA5D2bd1738504577E1883537C9af3392454',
   [chainMap.BSC]: '0x059ce16319da782e2909c9e15f3232233649a321',
-  [chainMap.XDAI]: '0x059ce16319Da782E2909c9e15f3232233649a321'
+  [chainMap.XDAI]: '0x059ce16319Da782E2909c9e15f3232233649a321',
+  [chainMap.POLYGON]: '0x7D907cF11a3F23d42c5C58426C3b8021F654964C'
 }
 
 const DEPOSIT_LOCK = 'muon-deposit-lock'
 
 module.exports = {
   APP_NAME: 'presale',
-  useTss: false,
+  APP_ID: 8,
 
   onArrive: async function (request) {
     let {
@@ -76,12 +78,14 @@ module.exports = {
       nSign,
       data: { params }
     } = request
+
     switch (method) {
       case 'deposit': {
         let { token, amount, forAddress, chainId, time, sign } = params
         let currentTime = getTimestamp()
 
-        if (!chainId) throw { message: 'Invalid chainId' }
+        if (!chainId || chainId != chainMap.POLYGON)
+          throw { message: 'Invalid chainId' }
         if (!time) throw { message: 'invalid deposit time' }
         if (currentTime - time > 20)
           throw {
@@ -92,10 +96,6 @@ module.exports = {
         if (!amount) throw { message: 'Invalid deposit amount' }
         if (!forAddress) throw { message: 'Invalid sender address' }
         if (!sign) throw { message: 'Request signature undefined' }
-        if (token === 'xdai' && chainId != chainMap.XDAI)
-          throw { message: 'Token and chain is not matched' }
-        if ((token === 'busd' || token === 'bnb') && chainId != chainMap.BSC)
-          throw { message: 'Token and chain is not matched' }
         else {
           let typedData = {
             types: {
@@ -116,19 +116,6 @@ module.exports = {
             throw { message: 'Request signature mismatch' }
         }
 
-        let allPurchase = {}
-        for (let index = 0; index < Object.keys(chainMap).length; index++) {
-          const chainId = chainMap[Object.keys(chainMap)[index]]
-          let purchase = await ethCall(
-            muonPresale[chainId],
-            'balances',
-            [forAddress],
-            muonPresaleABI,
-            chainId
-          )
-          allPurchase = { ...allPurchase, [chainId]: new BN(purchase) }
-        }
-
         let [tokenList, allowance] = await Promise.all([
           getTokens(),
           getAllowance()
@@ -141,98 +128,83 @@ module.exports = {
         if (allowance[forAddress] === undefined)
           throw { message: 'address not allowed for deposit' }
 
-        let maxCap = new BN(
-          toBaseUnit(allowance[forAddress].toString(), '18').toString()
-        )
-        let sum = Object.keys(allPurchase)
-          .filter((chain) => chain != chainId)
-          .reduce((sum, chain) => sum.add(allPurchase[chain]), new BN(0))
+        let maxCap = toBaseUnit(
+          allowance[forAddress].toString(),
+          '18'
+        ).toString()
 
-        let finalMaxCap = maxCap.sub(sum)
-        finalMaxCap = finalMaxCap.toString()
-        const data =
-          chainId == 1
-            ? {
-                token: token.address,
-                tokenPrice: toBaseUnit(token.price.toString(), 18).toString(),
-                amount,
-                time,
-                forAddress,
-                addressMaxCap: finalMaxCap
-              }
-            : {
-                token: token.address,
-                tokenPrice: toBaseUnit(token.price.toString(), 18).toString(),
-                amount,
-                time,
-                forAddress,
-                addressMaxCap: [finalMaxCap, chainId]
-              }
         let lock = await this.readNodeMem(
           { 'data.name': DEPOSIT_LOCK, 'data.value': forAddress },
           { distinct: 'owner' }
         )
         if (lock.length !== 1) throw { message: 'Atomic run failed.' }
-        return data
+        return {
+          token: token.address,
+          tokenPrice: toBaseUnit(token.price.toString(), 18).toString(),
+          amount,
+          time,
+          forAddress,
+          addressMaxCap: [maxCap, chainId]
+        }
       }
+      case 'claim':
+        let { address } = params
+        if (!address) throw { message: 'Invalid address' }
+        let allPurchase = {}
+        for (let index = 0; index < Object.keys(chainMap).length; index++) {
+          const chainId = chainMap[Object.keys(chainMap)[index]]
+
+          let purchase = await ethCall(
+            muonPresale[chainId],
+            'balances',
+            [address],
+            muonPresaleABI,
+            chainId
+          )
+          allPurchase = { ...allPurchase, [chainId]: new BN(purchase) }
+        }
+        let sum = Object.keys(allPurchase).reduce(
+          (sum, chain) => sum.add(allPurchase[chain]),
+          new BN(0)
+        )
+        return {
+          address,
+          sum: sum.toString()
+        }
       default:
         throw { message: `Unknown method ${params}` }
     }
   },
 
-  hashRequestResult: (request, result) => {
+  hashRequestResult: function (request, result) {
     let {
       method,
       data: { params }
     } = request
     switch (method) {
       case 'deposit': {
-        let { chainId } = params
         let { token, tokenPrice, amount, forAddress, addressMaxCap } = result
-        const data =
-          chainId == 1
-            ? soliditySha3([
-                { type: 'address', value: token },
-                { type: 'uint256', value: tokenPrice },
-                { type: 'uint256', value: amount },
-                { type: 'uint256', value: request.data.result.time },
-                { type: 'address', value: forAddress },
-                { type: 'uint256', value: addressMaxCap }
-              ])
-            : soliditySha3([
-                { type: 'address', value: token },
-                { type: 'uint256', value: tokenPrice },
-                { type: 'uint256', value: amount },
-                { type: 'uint256', value: request.data.result.time },
-                { type: 'address', value: forAddress },
-                { type: 'uint256', value: addressMaxCap[0] },
-                { type: 'uint256', value: addressMaxCap[1] }
-              ])
-        return data
+        return soliditySha3([
+          { type: 'address', value: token },
+          { type: 'uint256', value: tokenPrice },
+          { type: 'uint256', value: amount },
+          { type: 'uint256', value: request.data.result.time },
+          { type: 'address', value: forAddress },
+          { type: 'uint256', value: addressMaxCap[0] },
+          { type: 'uint256', value: addressMaxCap[1] },
+          { type: 'uint8', value: this.APP_ID }
+        ])
       }
-
+      case 'claim': {
+        const { address, sum } = result
+        return soliditySha3([
+          { type: 'address', value: address },
+          { type: 'uint256', value: sum },
+          { type: 'uint8', value: this.APP_ID }
+        ])
+      }
       default:
         return null
     }
   }
-
-  // onMemWrite: (req, res) => {
-  //   let {
-  //     method,
-  //     data: {
-  //       params: { forAddress, amount },
-  //       result: { time }
-  //     }
-  //   } = req
-  //   switch (method) {
-  //     case 'deposit': {
-  //       return {
-  //         ttl: 6 * 60,
-  //         data: [{ name: 'forAddress', type: 'address', value: forAddress }]
-  //       }
-  //     }
-  //     default:
-  //       return null
-  //   }
-  // }
 }
