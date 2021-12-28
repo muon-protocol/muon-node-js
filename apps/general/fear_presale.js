@@ -1920,17 +1920,19 @@ const ABI_balances = [
 // TODO: change to main network
 
 const chainMap = {
-  MAINNET: 4,
+  ETH: 4,
   BSC: 97,
   MATIC: 80001
 }
 const MRC20Presale = {
-  [chainMap.MAINNET]: '0xd59E6ba7240AA2C4638710fc922635c04f1Efbe3',
-  [chainMap.BSC]: '0xD971224953f2681A9AbD3fA01Ae26B6593fbdc47',
-  [chainMap.MATIC]: '0x28e069A798734fc9A56C05D5A49d636B243b0EF8'
+  [chainMap.ETH]: '0x344f0bbFbDeB4D4dBdA4defe4A21deaaE1f222bd',
+  [chainMap.BSC]: '0x3f8F21bcABE70230Db6cBC16624C3d6D9f772D2D',
+  [chainMap.MATIC]: '0x3f8F21bcABE70230Db6cBC16624C3d6D9f772D2D'
 }
 
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
+const START_TIME = 1640682618
+const PUBLIC_TIME = START_TIME * 1000 + 24 * 60 * 60 * 1000
 
 module.exports = {
   APP_NAME: 'fear_presale',
@@ -1940,6 +1942,15 @@ module.exports = {
 
   checkLock: async function (params) {
     const { forAddress } = params
+    const userAllocationAmount = allocation[forAddress]
+    if (!userAllocationAmount) {
+      return {
+        message: `This wallet is not in allocation list`,
+        lock: true,
+        lockTime: PUBLIC_TIME,
+        expireAt: PUBLIC_TIME
+      }
+    }
     let lock = await this.readNodeMem({
       'data.name': DEPOSIT_LOCK,
       'data.value': forAddress
