@@ -1950,7 +1950,8 @@ const MRC20Presale = {
 }
 
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1640682618
+const START_TIME = 1640785030
+
 // TODO change 59 min to 60 min after Mr.teimori change mongodb
 
 const PUBLIC_TIME = START_TIME * 1000 + 24 * 59 * 60 * 1000
