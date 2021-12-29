@@ -1,5 +1,12 @@
-const { axios, toBaseUnit, soliditySha3, BN, recoverTypedMessage, ethCall } =
-  MuonAppUtils
+const {
+  axios,
+  toBaseUnit,
+  soliditySha3,
+  BN,
+  recoverTypedMessage,
+  Web3,
+  ethCall
+} = MuonAppUtils
 
 function getTokens() {
   return {
@@ -41,7 +48,6 @@ const allocation = {
   '0xDBb67ccCbbf6B165FfECe5942755bCc5D484874E': 1000,
   '0x163984bf0aaaF0C67C9D67C61384F5B5336222F4': 1000,
   '0x2d188004640c1cb3241D01057d76294a650a054E': 1000,
-  '0x5629227C1E2542DbC5ACA0cECb7Cd3E02C82AD0a': 1500,
   '0x4CC129Ca88ff495C1E1Fb33688FEf77461dD2b10': 1000.5,
   '0xa1D8d972560C2f8144AF871Db508F0B0B10a3fBf': 33031.75363444654,
   '0x28A4C2aEee2181cb29394b68E8afee37C72F4082': 985.8585293926004,
@@ -1917,6 +1923,19 @@ const ABI_balances = [
     type: 'function'
   }
 ]
+
+const ABI_totalBalance = [
+  {
+    inputs: [],
+    name: 'totalBalance',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]
+
+const IDO_PARTICIPANT_TOKENS = 2900000
+
 // TODO: change to main network
 
 const chainMap = {
@@ -1932,7 +1951,9 @@ const MRC20Presale = {
 
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
 const START_TIME = 1640682618
-const PUBLIC_TIME = START_TIME * 1000 + 24 * 60 * 60 * 1000
+// TODO change 59 min to 60 min after Mr.teimori change mongodb
+
+const PUBLIC_TIME = START_TIME * 1000 + 24 * 59 * 60 * 1000
 
 module.exports = {
   APP_NAME: 'fear_presale',
@@ -1942,15 +1963,19 @@ module.exports = {
 
   checkLock: async function (params) {
     const { forAddress } = params
-    const userAllocationAmount = allocation[forAddress]
-    if (!userAllocationAmount) {
+    const allocationForAddress = allocation[forAddress]
+    let currentTime = Date.now()
+
+    if (!allocationForAddress && currentTime < PUBLIC_TIME) {
       return {
         message: `This wallet is not in allocation list`,
         lock: true,
         lockTime: PUBLIC_TIME,
-        expireAt: PUBLIC_TIME
+        expireAt: PUBLIC_TIME,
+        PUBLIC_TIME
       }
     }
+
     let lock = await this.readNodeMem({
       'data.name': DEPOSIT_LOCK,
       'data.value': forAddress
@@ -1961,12 +1986,14 @@ module.exports = {
         message: `Address locked for for 6 minutes.`,
         lock: true,
         lockTime: 6 * 60,
-        expireAt: lock.expireAt
+        expireAt: lock.expireAt,
+        PUBLIC_TIME
       }
     }
     return {
       message: `Address can swap`,
-      lock: false
+      lock: false,
+      PUBLIC_TIME
     }
   },
 
@@ -2030,12 +2057,10 @@ module.exports = {
         if ((token === 'busd' || token === 'bnb') && chainId != chainMap.BSC)
           throw { message: 'Token and chain is not matched' }
 
-        // TODO remove this condition for production
         let allocationForAddress = allocation[forAddress]
-          ? allocation[forAddress]
-          : 500
+        let currentTime = Date.now()
 
-        if (allocationForAddress === undefined)
+        if (allocationForAddress === undefined && currentTime < PUBLIC_TIME)
           throw { message: 'address not allowed for deposit' }
 
         let tokenList = await getTokens()
@@ -2058,30 +2083,62 @@ module.exports = {
         if (signer.toLowerCase() !== forAddress.toLowerCase())
           throw { message: 'Request signature mismatch' }
 
-        let maxCap = new BN(
-          toBaseUnit(allocationForAddress.toString(), 18).toString()
-        )
-        let allPurchase = {}
-        for (let index = 0; index < Object.keys(chainMap).length; index++) {
-          const chainId = chainMap[Object.keys(chainMap)[index]]
-          let purchase = await ethCall(
-            MRC20Presale[chainId],
-            'balances',
-            [forAddress],
-            ABI_balances,
-            chainId
-          )
-          allPurchase = { ...allPurchase, [chainId]: new BN(purchase) }
-        }
-        let sum = Object.keys(allPurchase)
-          .filter((chain) => chain != chainId)
-          .reduce((sum, chain) => sum.add(allPurchase[chain]), new BN(0))
-        let finalMaxCap = maxCap.sub(sum).toString()
-        let tokenPrice = toBaseUnit(token.price.toString(), 18).toString()
+        let tokenPrice = toBaseUnit(token.price.toString(), 18)
         let presaleTokenPrice = toBaseUnit(
           presaleToken.price.toString(),
           18
         ).toString()
+        let finalMaxCap
+        if (currentTime < PUBLIC_TIME) {
+          let maxCap = new BN(
+            toBaseUnit(allocationForAddress.toString(), 18).toString()
+          )
+          let allPurchase = {}
+          for (let index = 0; index < Object.keys(chainMap).length; index++) {
+            const chainId = chainMap[Object.keys(chainMap)[index]]
+            let purchase = await ethCall(
+              MRC20Presale[chainId],
+              'balances',
+              [forAddress],
+              ABI_balances,
+              chainId
+            )
+            allPurchase = { ...allPurchase, [chainId]: new BN(purchase) }
+          }
+          let sum = Object.keys(allPurchase)
+            .filter((chain) => chain != chainId)
+            .reduce((sum, chain) => sum.add(allPurchase[chain]), new BN(0))
+          finalMaxCap = maxCap.sub(sum).toString()
+        } else {
+          let totalBalance = {}
+          for (let index = 0; index < Object.keys(chainMap).length; index++) {
+            const chainId = chainMap[Object.keys(chainMap)[index]]
+            let purchase = await ethCall(
+              MRC20Presale[chainId],
+              'totalBalance',
+              [],
+              ABI_totalBalance,
+              chainId
+            )
+            totalBalance = { ...totalBalance, [chainId]: new BN(purchase) }
+          }
+          let sum = Object.keys(totalBalance).reduce(
+            (sum, chain) => sum.add(totalBalance[chain]),
+            new BN(0)
+          )
+
+          let baseToken = new BN(10).pow(new BN(token.decimals))
+          let usdAmount = new BN(amount).mul(tokenPrice).div(baseToken)
+          let usdMaxCap = IDO_PARTICIPANT_TOKENS * 0.1
+          if (
+            Web3.utils.fromWei(usdAmount, 'ether') +
+              Web3.utils.fromWei(sum, 'ether') >
+            usdMaxCap
+          )
+            throw { message: 'Amount is not valid' }
+          finalMaxCap = toBaseUnit(usdMaxCap.toString(), 18).toString()
+        }
+
         const data = {
           token: token.address,
           presaleTokenPrice,
@@ -2089,7 +2146,7 @@ module.exports = {
           extraParameters: [
             finalMaxCap,
             chainId,
-            tokenPrice,
+            tokenPrice.toString(),
             amount,
             ...(hashTimestamp ? [request.data.timestamp] : [])
           ]
