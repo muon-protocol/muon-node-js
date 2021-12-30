@@ -29,7 +29,9 @@ const confirmationBlock = {
   bsctest: 30,
   Avax: 24,
   ftm: 6,
-  ftmtest: 6
+  ftmtest: 6,
+  arbitrum: 6,
+  metis: 35
 }
 
 module.exports = {

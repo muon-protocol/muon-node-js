@@ -13,28 +13,33 @@ function getTokens() {
     eth: {
       decimals: 18,
       address: '0x0000000000000000000000000000000000000000',
-      price: 4010.92
+      price: 4010.92,
+      chains: [4]
     },
     bnb: {
       decimals: 18,
       address: '0x0000000000000000000000000000000000000000',
-      price: 554.7
+      price: 554.7,
+      chains: [97]
     },
     ert: {
       decimals: 18,
       address: '0xb9B5FFC3e1404E3Bb7352e656316D6C5ce6940A1',
-      price: 10
+      price: 10,
+      chains: [4]
     },
     ert_d6: {
       decimals: 6,
       address: '0xfBB0Aa52B82dD2173D8ce97065b2f421216A312A',
-      price: 1
+      price: 1,
+      chains: [97, 4]
     },
 
     ertmumbai: {
       decimals: 18,
       address: '0x701048911b1f1121E33834d3633227A954978d53',
-      price: 1
+      price: 1,
+      chains: [80001]
     }
   }
   // return axios
@@ -2055,9 +2060,6 @@ module.exports = {
         if (!sign) throw { message: 'Request signature undefined' }
         if (!chainId) throw { message: 'Invalid chainId' }
 
-        if ((token === 'busd' || token === 'bnb') && chainId != chainMap.BSC)
-          throw { message: 'Token and chain is not matched' }
-
         let allocationForAddress = allocation[forAddress]
         let currentTime = Date.now()
 
@@ -2067,7 +2069,10 @@ module.exports = {
         let tokenList = await getTokens()
         if (!Object.keys(tokenList).includes(token.toLowerCase()))
           throw { message: 'Token not allowed for deposit' }
+
         token = tokenList[token.toLowerCase()]
+        if (!token.chains.includes(chainId))
+          throw { message: 'Token and chain is not matched' }
 
         let typedData = {
           types: {
