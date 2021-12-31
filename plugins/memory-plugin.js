@@ -151,11 +151,36 @@ class MemoryPlugin extends BasePlugin {
       return Memory.distinct(distinct, query)
     }
     else{
+      let expirationCheck = {
+        $or: [
+          {expireAt: {$eq: null}},
+          {expireAt: {$gt: Date.now()}}
+        ]
+      }
+
+      let {$or: orPart, $and: andPart=[], ...otherParts} = query;
+
+      // query may have "or" element itself.
+      let mixedOr = !!orPart ? {
+        // query may have "and" element itself.
+        $and: [
+          ...andPart,
+          {$or: orPart},
+          expirationCheck
+        ]
+      } : expirationCheck;
+
+      let finalQuery = {
+        ...otherParts,
+        type: Memory.types.Node,
+        ...mixedOr
+      }
+
       if(multi) {
-        return Memory.find({...query, type: Memory.types.Node})
+        return Memory.find(finalQuery)
       }
       else {
-        return Memory.findOne({...query, type: Memory.types.Node})
+        return Memory.findOne(finalQuery)
       }
     }
   }
