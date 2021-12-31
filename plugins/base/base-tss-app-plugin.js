@@ -83,8 +83,6 @@ class BaseTssAppPlugin extends BaseAppPlugin {
       owner: process.env.SIGN_WALLET_ADDRESS,
       // tss shared public key
       pubKey: tss.keyFromPrivate(tssKey.share).getPublic().encode('hex'),
-      // nonce pubkey corresponding to current node.
-      noncePubKey: nonce.getPubKey(currentNodeIndex).encode('hex'),
       timestamp: signTimestamp,
       data: result,
       signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`
@@ -93,7 +91,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
 
   recoverSignature(request, sign) {
     let tt0 = Date.now();
-    let {owner, pubKey: pubKeyStr, noncePubKey: noncePubKeyStr} = sign;
+    let {owner, pubKey: pubKeyStr} = sign;
     let pubKey = tss.keyFromPublic(pubKeyStr);
     // TODO: need to recheck
     // if(owner !== tss.pub2addr(pubKey)) {
@@ -111,10 +109,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     // let idx = this.muon.getNodesWalletIndex()[sign.owner];
     let idx = nonce.party.partners[owner].i;
     let Z_i = pubKey;
-
-    // TODO: need to security check. (detect of adversarially behaviors)
-    // let K_i = nonce.getPubKey(idx);
-    let K_i = tss.keyFromPublic(noncePubKeyStr);
+    let K_i = nonce.getPubKey(idx);
 
     let p1 = tss.pointAdd(K_i, Z_i.mul(e.neg())).encode('hex')
     let p2 = tss.curve.g.mul(s).encode('hex');
