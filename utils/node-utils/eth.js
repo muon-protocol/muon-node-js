@@ -26,8 +26,13 @@ const _networksWeb3 = {
   77: new Web3(new HttpProvider('https://sokol.poa.network')),
   137: new Web3(new HttpProvider('https://rpc-mainnet.maticvigil.com/')),
   80001: new Web3(new HttpProvider('https://rpc-mumbai.maticvigil.com/')),
-  43113: new Web3(new HttpProvider("https://api.avax-test.network/ext/bc/C/rpc")),
-  43114: new Web3(new HttpProvider("https://api.avax.network/ext/bc/C/rpc")),
+  43113: new Web3(
+    new HttpProvider('https://api.avax-test.network/ext/bc/C/rpc')
+  ),
+  43114: new Web3(new HttpProvider('https://api.avax.network/ext/bc/C/rpc')),
+  421611: new Web3(new HttpProvider('https://rinkeby.arbitrum.io/rpc')),
+  42161: new Web3(new HttpProvider('https://arb1.arbitrum.io/rpc')),
+  1088: new Web3(new HttpProvider(' https://andromeda.metis.io/?owner=1088'))
 }
 
 const nameToChainIdMap = {
@@ -39,30 +44,29 @@ const nameToChainIdMap = {
   bsctest: 97, // Binance Smart Chain testnet
   ftm: 250, // Fantom mainnet
   ftmtest: 4002, // Fantom testnet
-  xdai:100, // Xdai mainnet
+  xdai: 100, // Xdai mainnet
   sokol: 77, // Xdai testnet
   polygon: 137, // polygon mainnet
   mumbai: 80001, // Polygon mumbai testnet
   fuji: 43113, // Avalanche Fuji Testnet
   avax: 43114, // Avalanche Mainnet
+  arbitrumTestnet: 421611, //Arbitrum Testnet
+  arbitrum: 42161, // Arbitrum
+  metis: 1088 // Metis
 }
 
 function getWeb3(network) {
-  if (_networksWeb3[network])
-    return Promise.resolve(_networksWeb3[network]);
+  if (_networksWeb3[network]) return Promise.resolve(_networksWeb3[network])
   else if (_networksWeb3[nameToChainIdMap[network]])
-    return Promise.resolve(_networksWeb3[nameToChainIdMap[network]]);
-  else
-    return Promise.reject({ message: `invalid network "${network}"` })
+    return Promise.resolve(_networksWeb3[nameToChainIdMap[network]])
+  else return Promise.reject({ message: `invalid network "${network}"` })
 }
 
 function getWeb3Sync(network) {
-  if (_networksWeb3[network])
-    return _networksWeb3[network];
+  if (_networksWeb3[network]) return _networksWeb3[network]
   else if (_networksWeb3[nameToChainIdMap[network]])
-    return _networksWeb3[nameToChainIdMap[network]];
-  else
-    throw { message: `invalid network "${network}"` }
+    return _networksWeb3[nameToChainIdMap[network]]
+  else throw { message: `invalid network "${network}"` }
 }
 
 function hashCallOutput(
