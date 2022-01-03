@@ -1,9 +1,9 @@
 const { soliditySha3, ethCall, ethGetNftInfo, BN, Web3 } = MuonAppUtils
 
 export const MuonNFTBridge = {
-  4: '0x4cA69fB6394f248F647480da6e0398FB9B4FbE62',
-  97: '0x2FD1006AAD539fB96C1D00A7E800700046069bDa',
-  80001: '0x9C8e7E17738C2230154028e6E92AC73110e4530a'
+  4: '0xBcaC0a63597fCDC2f8CF7c8EE834761689dBeB30',
+  97: '0xc617bf2DF901624E1cF4c609Fd484AAF462Ca555',
+  80001: '0x344f0bbFbDeB4D4dBdA4defe4A21deaaE1f222bd'
 }
 
 const ABI_getTx = [
@@ -93,11 +93,15 @@ module.exports = {
           ),
           await ethGetNftInfo(mainTokenAddress, mainNetwork)
         ])
+        console.log({
+          currentId,
+          mainTokenAddress
+        })
 
         let sourceChain = mainNetwork
-        if (currentId != 0) {
+        if (currentId == 0) {
           let mainContract = `0x${new BN(currentId).toString(16)}`
-
+          console.log(mainContract)
           let sourceInfo = await ethCall(
             mainTokenAddress,
             'sourceInfo',
@@ -105,7 +109,7 @@ module.exports = {
             ABI_sourceInfo,
             mainNetwork
           )
-          console.log(sourceInfo)
+          console.log({ sourceInfo })
           if (
             Web3.utils.toChecksumAddress(mainContract) ===
             Web3.utils.toChecksumAddress(sourceContractToken)
@@ -113,7 +117,14 @@ module.exports = {
             sourceChain = sourceChainToken
           }
         }
-
+        console.log({
+          token: {
+            symbol: token.symbol.replace('μ-', ''),
+            name: token.name.replace('Muon ', '')
+          },
+          tokenId: currentId == 0 ? mainTokenAddress : currentId,
+          sourceChain
+        })
         let result = {
           token: {
             symbol: token.symbol.replace('μ-', ''),
