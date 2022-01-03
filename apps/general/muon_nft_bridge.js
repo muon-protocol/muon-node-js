@@ -1,4 +1,10 @@
-const { soliditySha3, ethCall, ethGetNftInfo, ethHashCallOutput } = MuonAppUtils
+const { soliditySha3, ethCall, ethGetNftInfo, BN, Web3 } = MuonAppUtils
+
+export const MuonNFTBridge = {
+  4: '0xBcaC0a63597fCDC2f8CF7c8EE834761689dBeB30',
+  97: '0xc617bf2DF901624E1cF4c609Fd484AAF462Ca555',
+  80001: '0x344f0bbFbDeB4D4dBdA4defe4A21deaaE1f222bd'
+}
 
 const ABI_getTx = [
   {
@@ -25,6 +31,52 @@ const ABI_getTokenId = [
     type: 'function'
   }
 ]
+
+const ABI_sourceInfo = [
+  {
+    inputs: [],
+    name: 'sourceInfo',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: '_sourceChain',
+        type: 'uint256'
+      },
+      {
+        internalType: 'address',
+        name: '_sourceContract',
+        type: 'address'
+      }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]
+
+const findSourceChain = async (mainTokenAddress, mainNetwork) => {
+  try {
+    let sourceInfo = await ethCall(
+      mainTokenAddress,
+      'sourceInfo',
+      [],
+      ABI_sourceInfo,
+      mainNetwork
+    )
+    let tokenId = await ethCall(
+      MuonNFTBridge[sourceInfo._sourceChain],
+      'getTokenId',
+      [sourceInfo._sourceContract],
+      ABI_getTokenId,
+      Number(sourceInfo._sourceChain)
+    )
+    if (tokenId != 0) {
+      return sourceInfo._sourceChain
+    }
+    return mainNetwork
+  } catch (error) {
+    return mainNetwork
+  }
+}
 
 module.exports = {
   APP_NAME: 'nft_bridge',
@@ -53,12 +105,11 @@ module.exports = {
         return result
       }
       case 'addBridgeToken': {
-        let { mainTokenAddress, mainNetwork, targetNetwork, sourceBridge } =
-          params
-
+        let { mainTokenAddress, mainNetwork } = params
+        console.log({ params })
         let [currentId, token] = await Promise.all([
           await ethCall(
-            sourceBridge,
+            MuonNFTBridge[mainNetwork],
             'getTokenId',
             [mainTokenAddress],
             ABI_getTokenId,
@@ -67,12 +118,15 @@ module.exports = {
           await ethGetNftInfo(mainTokenAddress, mainNetwork)
         ])
 
+        let sourceChain = await findSourceChain(mainTokenAddress, mainNetwork)
+
         let result = {
           token: {
             symbol: token.symbol.replace('μ-', ''),
             name: token.name.replace('Muon ', '')
           },
-          tokenId: currentId == 0 ? mainTokenAddress : currentId
+          tokenId: currentId == 0 ? mainTokenAddress : currentId,
+          sourceChain
         }
         return result
       }
@@ -100,10 +154,11 @@ module.exports = {
         ])
       }
       case 'addBridgeToken': {
-        let { token, tokenId } = result
+        let { token, tokenId, sourceChain } = result
 
         return soliditySha3([
           { type: 'uint256', value: tokenId },
+          { type: 'uint256', value: sourceChain },
           { type: 'string', value: token.name },
           { type: 'string', value: token.symbol },
           { type: 'uint8', value: this.APP_ID }
