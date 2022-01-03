@@ -53,6 +53,31 @@ const ABI_sourceInfo = [
   }
 ]
 
+const findSourceChain = async (mainTokenAddress, mainNetwork) => {
+  try {
+    let sourceInfo = await ethCall(
+      mainTokenAddress,
+      'sourceInfo',
+      [],
+      ABI_sourceInfo,
+      mainNetwork
+    )
+    let tokenId = await ethCall(
+      MuonNFTBridge[sourceInfo._sourceChain],
+      'getTokenId',
+      [sourceInfo._sourceContract],
+      ABI_getTokenId,
+      Number(sourceInfo._sourceChain)
+    )
+    if (tokenId != 0) {
+      return sourceInfo._sourceChain
+    }
+    return mainNetwork
+  } catch (error) {
+    return mainNetwork
+  }
+}
+
 module.exports = {
   APP_NAME: 'nft_bridge',
   APP_ID: 4,
@@ -80,12 +105,11 @@ module.exports = {
         return result
       }
       case 'addBridgeToken': {
-        let { mainTokenAddress, mainNetwork, targetNetwork, sourceBridge } =
-          params
-
+        let { mainTokenAddress, mainNetwork } = params
+        console.log({ params })
         let [currentId, token] = await Promise.all([
           await ethCall(
-            sourceBridge,
+            MuonNFTBridge[mainNetwork],
             'getTokenId',
             [mainTokenAddress],
             ABI_getTokenId,
@@ -93,38 +117,9 @@ module.exports = {
           ),
           await ethGetNftInfo(mainTokenAddress, mainNetwork)
         ])
-        console.log({
-          currentId,
-          mainTokenAddress
-        })
 
-        let sourceChain = mainNetwork
-        if (currentId == 0) {
-          let mainContract = `0x${new BN(currentId).toString(16)}`
-          console.log(mainContract)
-          let sourceInfo = await ethCall(
-            mainTokenAddress,
-            'sourceInfo',
-            [],
-            ABI_sourceInfo,
-            mainNetwork
-          )
-          console.log({ sourceInfo })
-          if (
-            Web3.utils.toChecksumAddress(mainContract) ===
-            Web3.utils.toChecksumAddress(sourceContractToken)
-          ) {
-            sourceChain = sourceChainToken
-          }
-        }
-        console.log({
-          token: {
-            symbol: token.symbol.replace('μ-', ''),
-            name: token.name.replace('Muon ', '')
-          },
-          tokenId: currentId == 0 ? mainTokenAddress : currentId,
-          sourceChain
-        })
+        let sourceChain = await findSourceChain(mainTokenAddress, mainNetwork)
+
         let result = {
           token: {
             symbol: token.symbol.replace('μ-', ''),
