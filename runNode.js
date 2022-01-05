@@ -1,3 +1,5 @@
+const dotenv = require('dotenv')
+dotenv.config()
 const fs = require('fs')
 const emoji = require('node-emoji')
 const { spawn } = require('child_process')
