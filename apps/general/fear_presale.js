@@ -1955,11 +1955,9 @@ const MRC20Presale = {
 }
 
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1640785030
+const START_TIME = 1641288475
 
-// TODO change 59 min to 60 min after Mr.teimori change mongodb
-
-const PUBLIC_TIME = START_TIME * 1000 + 24 * 59 * 60 * 1000
+const PUBLIC_TIME = START_TIME * 1000 + 24 * 60 * 60 * 1000
 
 module.exports = {
   APP_NAME: 'fear_presale',
@@ -2027,8 +2025,7 @@ module.exports = {
             }
           }
         }
-        // TODO change 5 min to 6 min after Mr.teimori change mongodb
-        await this.writeNodeMem(memory, 5 * 60)
+        await this.writeNodeMem(memory, 6 * 60)
         return
 
       default:

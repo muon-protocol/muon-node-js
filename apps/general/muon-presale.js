@@ -90,7 +90,7 @@ module.exports = {
         if (currentTime - time > 20)
           throw {
             message:
-              'time diff is grater than 20 seconds. check your system time.'
+              'time diff is greater than 20 seconds. check your system time.'
           }
         if (!token) throw { message: 'Invalid token' }
         if (!amount) throw { message: 'Invalid deposit amount' }

@@ -32,8 +32,8 @@ const createEnv = async () => {
   PEER_PRIVATE_KEY = "${libP2PConfigsEnv1.privKey}"\n
   PEER_PORT = 4000\n
 
-  FINNHUB_API_KEY = c0v5f0v48v6pr2p75fmg\n
-  INFURA_PROJECT_ID=ece9c4a96f684e49a17747b64dd54684\n
+  FINNHUB_API_KEY = ${process.env.FINNHUB_API_KEY}\n
+  INFURA_PROJECT_ID=${process.env.INFURA_PROJECT_ID}\n
 
   PRICE_TOLERANCE=0.05\n
   NUM_SIGN_TO_CONFIRM = 2\n
@@ -41,9 +41,15 @@ const createEnv = async () => {
   FINNHUB_SUBSCRIBE_SYMBOLS="GME;TSLA"\n
 
   WEB3_PROVIDER_GANACHE = "http://localhost:8545"\n
-  WEB3_PROVIDER_ETH = "https://mainnet.infura.io/v3/ece9c4a96f684e49a17747b64dd54684"\n
-  WEB3_PROVIDER_ROPSTEN = "https://ropsten.infura.io/v3/ece9c4a96f684e49a17747b64dd54684"\n
-  WEB3_PROVIDER_RINKEBY = "https://rinkeby.infura.io/v3/ece9c4a96f684e49a17747b64dd54684"\n
+  WEB3_PROVIDER_ETH = https://mainnet.infura.io/v3/${
+    process.env.INFURA_PROJECT_ID
+  }"\n
+  WEB3_PROVIDER_ROPSTEN = "https://ropsten.infura.io/v3/${
+    process.env.INFURA_PROJECT_ID
+  }"\n
+  WEB3_PROVIDER_RINKEBY = "https://rinkeby.infura.io/v3/${
+    process.env.INFURA_PROJECT_ID
+  }"\n
   WEB3_PROVIDER_BSC = "https://bsc-dataseed1.binance.org"\n
   WEB3_PROVIDER_BSCTEST = "https://data-seed-prebsc-1-s2.binance.org:8545"\n
   WEB3_PROVIDER_FTM = "https://rpcapi.fantom.network/"\n
@@ -83,8 +89,8 @@ const createEnv = async () => {
     PEER_PORT = ${index + 4000}\n
     PEER_BOOTSTRAP_0= "/ip4/127.0.0.1/tcp/4000/p2p/${libP2PConfigsEnv1.id}"
 
-    FINNHUB_API_KEY = c0v5f0v48v6pr2p75fmg\n
-    INFURA_PROJECT_ID=ece9c4a96f684e49a17747b64dd54684\n
+    FINNHUB_API_KEY = ${process.env.FINNHUB_API_KEY}\n
+    INFURA_PROJECT_ID=${process.env.INFURA_PROJECT_ID}\n
   
     PRICE_TOLERANCE=0.05\n
     NUM_SIGN_TO_CONFIRM = 2\n
@@ -92,9 +98,15 @@ const createEnv = async () => {
     FINNHUB_SUBSCRIBE_SYMBOLS="GME;TSLA"\n
   
     WEB3_PROVIDER_GANACHE = "http://localhost:8545"\n
-    WEB3_PROVIDER_ETH = "https://mainnet.infura.io/v3/ece9c4a96f684e49a17747b64dd54684"\n
-    WEB3_PROVIDER_ROPSTEN = "https://ropsten.infura.io/v3/ece9c4a96f684e49a17747b64dd54684"\n
-    WEB3_PROVIDER_RINKEBY = "https://rinkeby.infura.io/v3/ece9c4a96f684e49a17747b64dd54684"\n
+    WEB3_PROVIDER_ETH = "https://mainnet.infura.io/v3/${
+      process.env.INFURA_PROJECT_ID
+    }"\n
+    WEB3_PROVIDER_ROPSTEN = "https://ropsten.infura.io/v3/${
+      process.env.INFURA_PROJECT_ID
+    }"\n
+    WEB3_PROVIDER_RINKEBY = "https://rinkeby.infura.io/v3/${
+      process.env.INFURA_PROJECT_ID
+    }"\n
     WEB3_PROVIDER_BSC = "https://bsc-dataseed1.binance.org"\n
     WEB3_PROVIDER_BSCTEST = "https://data-seed-prebsc-1-s2.binance.org:8545"\n
     WEB3_PROVIDER_FTM = "https://rpcapi.fantom.network/"\n
