@@ -1955,9 +1955,9 @@ const MRC20Presale = {
 }
 
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1641288475
+const START_TIME = 1641468853
 
-const PUBLIC_TIME = START_TIME * 1000 + 24 * 60 * 60 * 1000
+const PUBLIC_TIME = START_TIME * 1000 + 24 * 3600 * 1000
 
 module.exports = {
   APP_NAME: 'fear_presale',
