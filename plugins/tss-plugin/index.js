@@ -434,10 +434,10 @@ class TssPlugin extends CallablePlugin {
     return party;
   }
 
-  async keyGen(party) {
+  async keyGen(party, maxPartners) {
     let t0 = Date.now()
     // 1- create new key
-    let key = await this.createKey(party)
+    let key = await this.createKey(party, maxPartners)
     let t1 = Date.now()
     // 2- distribute key initialization
     await this.broadcastKey(key)
@@ -456,7 +456,7 @@ class TssPlugin extends CallablePlugin {
     return key;
   }
 
-  async createKey(party) {
+  async createKey(party, maxPartners) {
     // 1- create new key
     let key = new DKey(party, null, 15000)
     /**
@@ -468,6 +468,9 @@ class TssPlugin extends CallablePlugin {
     this.keys[key.id] = key;
 
     let partners = Object.values(party.onlinePartners)
+
+    if(maxPartners && maxPartners > 0)
+      partners = partners.slice(0, maxPartners);
 
     let callResult = await Promise.all(
       partners

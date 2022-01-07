@@ -28,7 +28,8 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     if(!party)
       throw {message: 'party not generated'}
 
-    let nonce = await tssPlugin.keyGen(party)
+    let nonceParticipantsCount = Math.ceil(party.t * 1.2)
+    let nonce = await tssPlugin.keyGen(party, nonceParticipantsCount)
 
     // let sign = tssPlugin.sign(null, party);
     return {
