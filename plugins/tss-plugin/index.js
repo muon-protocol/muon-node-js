@@ -2,6 +2,7 @@ const CallablePlugin = require('../base/callable-plugin')
 const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
 const Party = require('./party')
+const {shuffle} = require('lodash')
 const DKey = require('./distributed-key')
 const tssModule = require('../../utils/tss')
 const {toBN} = require('../../utils/tss/utils')
@@ -469,8 +470,18 @@ class TssPlugin extends CallablePlugin {
 
     let partners = Object.values(party.onlinePartners)
 
-    if(maxPartners && maxPartners > 0)
-      partners = partners.slice(0, maxPartners);
+    if(maxPartners && maxPartners > 0) {
+      /** exclude current node and add it later */
+      partners = partners.filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS))
+      partners = [
+        /** self */
+        party.partners[process.env.SIGN_WALLET_ADDRESS],
+        /** randomly select (maxPartners - 1) from others */
+        ...shuffle(partners).slice(0, maxPartners - 1)
+      ];
+      // console.log(partners)
+      // partners = partners.slice(0, maxPartners);
+    }
 
     let callResult = await Promise.all(
       partners
