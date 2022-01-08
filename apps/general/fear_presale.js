@@ -1954,8 +1954,12 @@ const MRC20Presale = {
   [chainMap.MATIC]: '0x3f8F21bcABE70230Db6cBC16624C3d6D9f772D2D'
 }
 
+const presaleToken = {
+  decimals: 18,
+  price: 0.1
+}
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1641468853
+const START_TIME = 1641632235
 
 const PUBLIC_TIME = START_TIME * 1000 + 24 * 3600 * 1000
 
@@ -2041,22 +2045,12 @@ module.exports = {
 
     switch (method) {
       case 'deposit':
-        let {
-          token,
-          forAddress,
-          amount,
-          sign,
-          presaleToken,
-          chainId,
-          hashTimestamp
-        } = params
+        let { token, forAddress, amount, sign, chainId, hashTimestamp } = params
         if (!token) throw { message: 'Invalid token' }
-        if (!presaleToken) throw { message: 'Invalid presale token' }
         if (!amount) throw { message: 'Invalid deposit amount' }
         if (!forAddress) throw { message: 'Invalid sender address' }
         if (!sign) throw { message: 'Request signature undefined' }
         if (!chainId) throw { message: 'Invalid chainId' }
-
         let allocationForAddress = allocation[forAddress]
         let currentTime = Date.now()
 
@@ -2134,8 +2128,8 @@ module.exports = {
           let usdAmount = new BN(amount).mul(tokenPrice).div(baseToken)
           let usdMaxCap = IDO_PARTICIPANT_TOKENS * 0.1
           if (
-            Web3.utils.fromWei(usdAmount, 'ether') +
-              Web3.utils.fromWei(sum, 'ether') >
+            Number(Web3.utils.fromWei(usdAmount, 'ether')) +
+              Number(Web3.utils.fromWei(sum, 'ether')) >
             usdMaxCap
           )
             throw { message: 'Amount is not valid' }
