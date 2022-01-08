@@ -1976,7 +1976,7 @@ module.exports = {
 
     if (!allocationForAddress && currentTime < PUBLIC_TIME) {
       return {
-        message: `This wallet is not in allocation list`,
+        message: `Allocation is 0 for your address.`,
         lock: true,
         lockTime: PUBLIC_TIME,
         expireAt: PUBLIC_TIME,
@@ -1991,7 +1991,7 @@ module.exports = {
 
     if (lock) {
       return {
-        message: `Address locked for for 6 minutes.`,
+        message: `Your address is locked. Please wait.`,
         lock: true,
         lockTime: 6 * 60,
         expireAt: lock.expireAt,
@@ -1999,7 +1999,7 @@ module.exports = {
       }
     }
     return {
-      message: `Address can swap`,
+      message: `Not locked.`,
       lock: false,
       PUBLIC_TIME
     }
@@ -2023,7 +2023,7 @@ module.exports = {
         if (lock) {
           throw {
             message: {
-              message: `Address locked for for 6 minutes.`,
+              message: `Your address is locked. Please wait.`,
               lockTime: 6 * 60,
               expireAt: lock.expireAt
             }
@@ -2049,21 +2049,21 @@ module.exports = {
         if (!token) throw { message: 'Invalid token' }
         if (!amount) throw { message: 'Invalid deposit amount' }
         if (!forAddress) throw { message: 'Invalid sender address' }
-        if (!sign) throw { message: 'Request signature undefined' }
+        if (!sign) throw { message: 'Invalid signature.' }
         if (!chainId) throw { message: 'Invalid chainId' }
         let allocationForAddress = allocation[forAddress]
         let currentTime = Date.now()
 
         if (allocationForAddress === undefined && currentTime < PUBLIC_TIME)
-          throw { message: 'address not allowed for deposit' }
+          throw { message: 'Allocation is 0 for your address.' }
 
         let tokenList = await getTokens()
         if (!Object.keys(tokenList).includes(token.toLowerCase()))
-          throw { message: 'Token not allowed for deposit' }
+          throw { message: 'Invalid token.' }
 
         token = tokenList[token.toLowerCase()]
         if (!token.chains.includes(chainId))
-          throw { message: 'Token and chain is not matched' }
+          throw { message: 'Token and chain is not matched.' }
 
         let typedData = {
           types: {
