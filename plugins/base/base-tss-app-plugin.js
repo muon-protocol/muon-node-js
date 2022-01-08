@@ -28,7 +28,8 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     if(!party)
       throw {message: 'party not generated'}
 
-    let nonce = await tssPlugin.keyGen(party)
+    let nonceParticipantsCount = Math.ceil(party.t * 1.2)
+    let nonce = await tssPlugin.keyGen(party, nonceParticipantsCount)
 
     // let sign = tssPlugin.sign(null, party);
     return {
@@ -75,6 +76,8 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let K = nonce.publicKey;
     let signature = tss.schnorrSign(tssKey.share, k_i, K, resultHash)
 
+    const currentNodeIndex = nonce.party.partners[process.env.SIGN_WALLET_ADDRESS].i
+
     return {
       request: request._id,
       // node stake wallet address
@@ -88,6 +91,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
   }
 
   recoverSignature(request, sign) {
+    let tt0 = Date.now();
     let {owner, pubKey: pubKeyStr} = sign;
     let pubKey = tss.keyFromPublic(pubKeyStr);
     // TODO: need to recheck

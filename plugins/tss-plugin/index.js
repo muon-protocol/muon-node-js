@@ -2,6 +2,7 @@ const CallablePlugin = require('../base/callable-plugin')
 const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
 const Party = require('./party')
+const {shuffle} = require('lodash')
 const DKey = require('./distributed-key')
 const tssModule = require('../../utils/tss')
 const {toBN} = require('../../utils/tss/utils')
@@ -434,10 +435,10 @@ class TssPlugin extends CallablePlugin {
     return party;
   }
 
-  async keyGen(party) {
+  async keyGen(party, maxPartners) {
     let t0 = Date.now()
     // 1- create new key
-    let key = await this.createKey(party)
+    let key = await this.createKey(party, maxPartners)
     let t1 = Date.now()
     // 2- distribute key initialization
     await this.broadcastKey(key)
@@ -456,7 +457,7 @@ class TssPlugin extends CallablePlugin {
     return key;
   }
 
-  async createKey(party) {
+  async createKey(party, maxPartners) {
     // 1- create new key
     let key = new DKey(party, null, 15000)
     /**
@@ -468,6 +469,19 @@ class TssPlugin extends CallablePlugin {
     this.keys[key.id] = key;
 
     let partners = Object.values(party.onlinePartners)
+
+    if(maxPartners && maxPartners > 0) {
+      /** exclude current node and add it later */
+      partners = partners.filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS))
+      partners = [
+        /** self */
+        party.partners[process.env.SIGN_WALLET_ADDRESS],
+        /** randomly select (maxPartners - 1) from others */
+        ...shuffle(partners).slice(0, maxPartners - 1)
+      ];
+      // console.log(partners)
+      // partners = partners.slice(0, maxPartners);
+    }
 
     let callResult = await Promise.all(
       partners
