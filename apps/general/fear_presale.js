@@ -2056,7 +2056,7 @@ module.exports = {
         if (!forAddress) throw { message: 'Invalid sender address' }
         if (!sign) throw { message: 'Request signature undefined' }
         if (!chainId) throw { message: 'Invalid chainId' }
-
+        console.log(amount)
         let allocationForAddress = allocation[forAddress]
         let currentTime = Date.now()
 
@@ -2134,8 +2134,8 @@ module.exports = {
           let usdAmount = new BN(amount).mul(tokenPrice).div(baseToken)
           let usdMaxCap = IDO_PARTICIPANT_TOKENS * 0.1
           if (
-            Web3.utils.fromWei(usdAmount, 'ether') +
-              Web3.utils.fromWei(sum, 'ether') >
+            Number(Web3.utils.fromWei(usdAmount, 'ether')) +
+              Number(Web3.utils.fromWei(sum, 'ether')) >
             usdMaxCap
           )
             throw { message: 'Amount is not valid' }
