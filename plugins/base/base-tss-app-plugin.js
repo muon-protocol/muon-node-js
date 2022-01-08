@@ -28,12 +28,14 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     if(!party)
       throw {message: 'party not generated'}
 
-    let nonce = await tssPlugin.keyGen(party)
+    let nonceParticipantsCount = Math.ceil(party.t * 1.2)
+    let nonce = await tssPlugin.keyGen(party, nonceParticipantsCount)
 
     // let sign = tssPlugin.sign(null, party);
     return {
       party: party.id,
       nonce: nonce.id,
+      // noncePub: nonce.publicKey.encode('hex'),
       nonceAddress: tss.pub2addr(nonce.publicKey),
     }
   }
@@ -153,6 +155,10 @@ class BaseTssAppPlugin extends BaseAppPlugin {
         result: newRequest.data.result,
         // signature: `0x${aggregatedSign.s.toString(16)},0x${aggregatedSign.e.toString(16)}`,
         signature: `0x${aggregatedSign.s.toString(16)}`,
+        // sign: {
+        //   s: `0x${aggregatedSign.s.toString(16)}`,
+        //   e: `0x${aggregatedSign.e.toString(16)}`
+        // },
         memWriteSignature: allSignatures[0]['memWriteSignature']
       }] : []
     ]
