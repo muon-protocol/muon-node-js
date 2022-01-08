@@ -1,4 +1,4 @@
-const {BN, toBN, randomHex, sha3, soliditySha3, range} = require('./utils')
+const {BN, toBN, keccak256, range} = require('./utils')
 const assert = require('assert')
 const elliptic = require('elliptic');
 // const BigNumber = require('bignumber.js')
@@ -301,8 +301,8 @@ function keyFromPrivate(prv) {
   return curve.keyFromPrivate(prv)
 }
 
-function keyFromPublic(pubKeyStr) {
-  return curve.keyFromPublic(pubKeyStr, 'hex').getPublic()
+function keyFromPublic(pubKeyStr, encoding='hex') {
+  return curve.keyFromPublic(pubKeyStr, encoding).getPublic()
 }
 
 function key2pub(privateKey) {
@@ -312,15 +312,14 @@ function key2pub(privateKey) {
 }
 
 function pub2addr(publicKey) {
-  let {x, y} = publicKey
-  let mix = x.shln(256).or(y)
-  let pub_hash = soliditySha3(mix.toBuffer())
+  let pubKeyHex = publicKey.encode('hex').substr(2);
+  let pub_hash = keccak256(Buffer.from(pubKeyHex, 'hex'))
   return toChecksumAddress('0x' + pub_hash.substr(-40));
 }
 
 function toChecksumAddress(address) {
   address = address.toLowerCase().replace(/^0x/i, '')
-  let hash = sha3(address).replace(/^0x/i, '');
+  let hash = keccak256(address).replace(/^0x/i, '');
   let ret = '0x'
   for (let i = 0; i < address.length; i++) {
     if (parseInt(hash[i], 16) >= 8) {
@@ -333,11 +332,11 @@ function toChecksumAddress(address) {
 }
 
 function schnorrHash(publicKey, msg) {
-  let address = toBN(pub2addr(publicKey))
-  let pubKeyBuff = address.toBuffer();
-  let msgBuff = toBN(msg).toBuffer()
-  let buffToHash = Buffer.concat([pubKeyBuff, msgBuff])
-  return soliditySha3(buffToHash)
+  let address = pub2addr(publicKey)
+  let addressBuff = Buffer.from(address.replace(/^0x/i, ''), 'hex');
+  let msgBuff = Buffer.from(msg.replace(/^0x/i, ''), 'hex');
+  let totalBuff = Buffer.concat([addressBuff, msgBuff])
+  return keccak256(totalBuff)
 }
 
 function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {

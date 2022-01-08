@@ -35,6 +35,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     return {
       party: party.id,
       nonce: nonce.id,
+      // noncePub: nonce.publicKey.encode('hex'),
       nonceAddress: tss.pub2addr(nonce.publicKey),
     }
   }
@@ -154,6 +155,10 @@ class BaseTssAppPlugin extends BaseAppPlugin {
         result: newRequest.data.result,
         // signature: `0x${aggregatedSign.s.toString(16)},0x${aggregatedSign.e.toString(16)}`,
         signature: `0x${aggregatedSign.s.toString(16)}`,
+        // sign: {
+        //   s: `0x${aggregatedSign.s.toString(16)}`,
+        //   e: `0x${aggregatedSign.e.toString(16)}`
+        // },
         memWriteSignature: allSignatures[0]['memWriteSignature']
       }] : []
     ]
