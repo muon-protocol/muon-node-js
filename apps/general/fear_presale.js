@@ -1959,7 +1959,8 @@ const presaleToken = {
   price: 0.1
 }
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1641707900
+// const START_TIME = 1641707900
+const START_TIME = 1631707900
 // TODO remove *2 in production
 const PUBLIC_TIME = START_TIME * 1000 + 2 * 24 * 3600 * 1000
 
@@ -2005,37 +2006,38 @@ module.exports = {
     }
   },
 
-  onArrive: async function (request) {
-    const {
-      method,
-      data: { params }
-    } = request
-    switch (method) {
-      case 'deposit':
-        const { forAddress } = params
-        let memory = [
-          { type: 'uint256', name: DEPOSIT_LOCK, value: forAddress }
-        ]
-        let lock = await this.readNodeMem({
-          'data.name': DEPOSIT_LOCK,
-          'data.value': forAddress
-        })
-        if (lock) {
-          throw {
-            message: {
-              message: `Your address is locked. Please wait.`,
-              lockTime: 6 * 60,
-              expireAt: lock.expireAt
-            }
-          }
-        }
-        await this.writeNodeMem(memory, 6 * 60)
-        return
-
-      default:
-        break
-    }
-  },
+  // TODO [sadegh]: uncomment after test done.
+  // onArrive: async function (request) {
+  //   const {
+  //     method,
+  //     data: { params }
+  //   } = request
+  //   switch (method) {
+  //     case 'deposit':
+  //       const { forAddress } = params
+  //       let memory = [
+  //         { type: 'uint256', name: DEPOSIT_LOCK, value: forAddress }
+  //       ]
+  //       let lock = await this.readNodeMem({
+  //         'data.name': DEPOSIT_LOCK,
+  //         'data.value': forAddress
+  //       })
+  //       if (lock) {
+  //         throw {
+  //           message: {
+  //             message: `Your address is locked. Please wait.`,
+  //             lockTime: 6 * 60,
+  //             expireAt: lock.expireAt
+  //           }
+  //         }
+  //       }
+  //       await this.writeNodeMem(memory, 6 * 60)
+  //       return
+  //
+  //     default:
+  //       break
+  //   }
+  // },
 
   onRequest: async function (request) {
     let {
@@ -2049,10 +2051,14 @@ module.exports = {
         if (!token) throw { message: 'Invalid token' }
         if (!amount) throw { message: 'Invalid deposit amount' }
         if (!forAddress) throw { message: 'Invalid sender address' }
-        if (!sign) throw { message: 'Invalid signature.' }
+        // TODO [sadegh]: uncomment after test done.
+        // if (!sign) throw { message: 'Invalid signature.' }
         if (!chainId) throw { message: 'Invalid chainId' }
         let allocationForAddress = allocation[forAddress]
         let currentTime = Date.now()
+
+        // TODO [sadegh]: remove after test done.
+        chainId = parseInt(chainId);
 
         if (allocationForAddress === undefined && currentTime < PUBLIC_TIME)
           throw { message: 'Allocation is 0 for your address.' }
@@ -2065,20 +2071,21 @@ module.exports = {
         if (!token.chains.includes(chainId))
           throw { message: 'Token and chain is not matched.' }
 
-        let typedData = {
-          types: {
-            EIP712Domain: [{ name: 'name', type: 'string' }],
-            Message: [{ type: 'address', name: 'forAddress' }]
-          },
-          domain: { name: 'MRC20 Presale' },
-          primaryType: 'Message',
-          message: { forAddress: forAddress }
-        }
-
-        let signer = recoverTypedMessage({ data: typedData, sig: sign }, 'v4')
-
-        if (signer.toLowerCase() !== forAddress.toLowerCase())
-          throw { message: 'Request signature mismatch' }
+        // TODO [sadegh]: uncomment after test done.
+        // let typedData = {
+        //   types: {
+        //     EIP712Domain: [{ name: 'name', type: 'string' }],
+        //     Message: [{ type: 'address', name: 'forAddress' }]
+        //   },
+        //   domain: { name: 'MRC20 Presale' },
+        //   primaryType: 'Message',
+        //   message: { forAddress: forAddress }
+        // }
+        //
+        // let signer = recoverTypedMessage({ data: typedData, sig: sign }, 'v4')
+        //
+        // if (signer.toLowerCase() !== forAddress.toLowerCase())
+        //   throw { message: 'Request signature mismatch' }
 
         let tokenPrice = toBaseUnit(token.price.toString(), 18)
         let presaleTokenPrice = toBaseUnit(
@@ -2129,7 +2136,7 @@ module.exports = {
           let usdMaxCap = IDO_PARTICIPANT_TOKENS * 0.1
           if (
             Number(Web3.utils.fromWei(usdAmount, 'ether')) +
-              Number(Web3.utils.fromWei(sum, 'ether')) >
+            Number(Web3.utils.fromWei(sum, 'ether')) >
             usdMaxCap
           )
             throw { message: 'Amount is not valid' }
@@ -2149,11 +2156,12 @@ module.exports = {
           ]
         }
 
-        let lock = await this.readNodeMem(
-          { 'data.name': DEPOSIT_LOCK, 'data.value': forAddress },
-          { distinct: 'owner' }
-        )
-        if (lock.length !== 1) throw { message: 'Atomic run failed.' }
+        // TODO [sadegh]: uncomment after test done.
+        // let lock = await this.readNodeMem(
+        //   { 'data.name': DEPOSIT_LOCK, 'data.value': forAddress },
+        //   { distinct: 'owner' }
+        // )
+        // if (lock.length !== 1) throw { message: 'Atomic run failed.' }
 
         return data
 
