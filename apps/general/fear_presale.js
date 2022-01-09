@@ -1959,7 +1959,8 @@ const presaleToken = {
   price: 0.1
 }
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1641707900
+// const START_TIME = 1641707900
+const START_TIME = 1631707900
 // TODO remove *2 in production
 const PUBLIC_TIME = START_TIME * 1000 + 2 * 24 * 3600 * 1000
 
@@ -2049,10 +2050,14 @@ module.exports = {
         if (!token) throw { message: 'Invalid token' }
         if (!amount) throw { message: 'Invalid deposit amount' }
         if (!forAddress) throw { message: 'Invalid sender address' }
-        if (!sign) throw { message: 'Invalid signature.' }
+        // TODO [sadegh]: uncomment after test done.
+        // if (!sign) throw { message: 'Invalid signature.' }
         if (!chainId) throw { message: 'Invalid chainId' }
         let allocationForAddress = allocation[forAddress]
         let currentTime = Date.now()
+
+        // TODO [sadegh]: remove after test done.
+        chainId = parseInt(chainId);
 
         if (allocationForAddress === undefined && currentTime < PUBLIC_TIME)
           throw { message: 'Allocation is 0 for your address.' }
@@ -2065,20 +2070,21 @@ module.exports = {
         if (!token.chains.includes(chainId))
           throw { message: 'Token and chain is not matched.' }
 
-        let typedData = {
-          types: {
-            EIP712Domain: [{ name: 'name', type: 'string' }],
-            Message: [{ type: 'address', name: 'forAddress' }]
-          },
-          domain: { name: 'MRC20 Presale' },
-          primaryType: 'Message',
-          message: { forAddress: forAddress }
-        }
-
-        let signer = recoverTypedMessage({ data: typedData, sig: sign }, 'v4')
-
-        if (signer.toLowerCase() !== forAddress.toLowerCase())
-          throw { message: 'Request signature mismatch' }
+        // TODO [sadegh]: uncomment after test done.
+        // let typedData = {
+        //   types: {
+        //     EIP712Domain: [{ name: 'name', type: 'string' }],
+        //     Message: [{ type: 'address', name: 'forAddress' }]
+        //   },
+        //   domain: { name: 'MRC20 Presale' },
+        //   primaryType: 'Message',
+        //   message: { forAddress: forAddress }
+        // }
+        //
+        // let signer = recoverTypedMessage({ data: typedData, sig: sign }, 'v4')
+        //
+        // if (signer.toLowerCase() !== forAddress.toLowerCase())
+        //   throw { message: 'Request signature mismatch' }
 
         let tokenPrice = toBaseUnit(token.price.toString(), 18)
         let presaleTokenPrice = toBaseUnit(
