@@ -4,10 +4,10 @@ const TssApp = {
   useTss: true,
 
   onRequest: async function (request) {
-    let {method, data: {params}} = request;
+    let {method, data: {params={}}} = request;
     switch (method) {
       case 'test':
-        return 'done'
+        return params.message || 'done'
       default:
         throw {message: `invalid method ${method}`}
     }

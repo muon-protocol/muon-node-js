@@ -60,19 +60,17 @@ class RemoteCall extends BasePlugin {
   async handleIncomingMessage(signAndMessage, stream, peerId){
     let collateralPlugin = this.muon.getPlugin('collateral');
     try {
-      let [sign, message] = signAndMessage.toString().split('|')
-      let sigOwner = crypto.recover(message, sign)
-      let data = JSON.parse(message)
-
-      // TODO: filter out unrecognized wallets message.
-      let validWallets = collateralPlugin.getWallets()
-      if(!validWallets.includes(sigOwner)){
-        throw {message: `Unrecognized request owner ${sigOwner}`}
+      let message = signAndMessage.toString()
+      let peerWallet = collateralPlugin.getPeerWallet(peerId)
+      if(!peerWallet){
+        throw {message: `Unrecognized request owner`}
       }
+
+      let data = JSON.parse(message)
 
       if('method' in data) {
         let {callId, method, params={}} = data;
-        return await this.handleCall(callId, method, params, sigOwner, stream, peerId);
+        return await this.handleCall(callId, method, params, peerWallet, stream, peerId);
       }
       else{
         // TODO: what to do?
@@ -106,8 +104,9 @@ class RemoteCall extends BasePlugin {
 
   prepareSendData(data) {
     let strData = JSON.stringify(data)
-    let signature = crypto.sign(strData)
-    return Buffer.from(`${signature}|${strData}`);
+    // let signature = crypto.sign(strData)
+    // return Buffer.from(`${signature}|${strData}`);
+    return Buffer.from(strData);
   }
 
   async send (data, stream, peer) {
@@ -117,7 +116,7 @@ class RemoteCall extends BasePlugin {
         stream,
         async (source) => {
           for await (const message of source) {
-            await this.handleSendResponse(message)
+            await this.handleSendResponse(message, peer.id)
           }
         }
       )
@@ -130,21 +129,21 @@ class RemoteCall extends BasePlugin {
     }
   }
 
-  async handleSendResponse(signAndMessage){
+  async handleSendResponse(signAndMessage, peerId){
     let collateralPlugin = this.muon.getPlugin('collateral');
     try {
-      let [sign, message] = signAndMessage.toString().split('|')
-      let sigOwner = crypto.recover(message, sign)
-      let data = JSON.parse(message)
+      let message = signAndMessage.toString()
 
-      // TODO: filter out unrecognized wallets message.
-      let validWallets = collateralPlugin.getWallets()
-      if(!validWallets.includes(sigOwner)){
-        throw {message: `Unrecognized message owner ${sigOwner}`}
+      let peerWallet = collateralPlugin.getPeerWallet(peerId)
+      if(!peerWallet){
+        throw {message: `Unrecognized message owner`}
         // let {responseId} = data;
         // let remoteResult = this._calls[responseId]
-        // return remoteResult && remoteResult.reject({message: `Unrecognized request owner ${sigOwner}`})
+        // return remoteResult && remoteResult.reject({message: `Unrecognized request owner`})
       }
+
+      let data = JSON.parse(message)
+
       if('responseId' in data){
         let {responseId, response=undefined, error=undefined} = data;
         // let remoteResult = this._calls[responseId]
