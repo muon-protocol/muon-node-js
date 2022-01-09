@@ -1959,9 +1959,9 @@ const presaleToken = {
   price: 0.1
 }
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1641632235
-
-const PUBLIC_TIME = START_TIME * 1000 + 24 * 3600 * 1000
+const START_TIME = 1641707900
+// TODO remove *2 in production
+const PUBLIC_TIME = START_TIME * 1000 + 2 * 24 * 3600 * 1000
 
 module.exports = {
   APP_NAME: 'fear_presale',
