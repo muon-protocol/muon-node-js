@@ -87,10 +87,10 @@ module.exports = {
         if (!chainId || chainId != chainMap.POLYGON)
           throw { message: 'Invalid chainId' }
         if (!time) throw { message: 'invalid deposit time' }
-        if (currentTime - time > 20)
+        if (currentTime - time > 5*60)
           throw {
             message:
-              'time diff is greater than 20 seconds. check your system time.'
+              'time diff is greater than 5 min. check your system time.'
           }
         if (!token) throw { message: 'Invalid token' }
         if (!amount) throw { message: 'Invalid deposit amount' }

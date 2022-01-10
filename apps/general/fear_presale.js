@@ -2129,7 +2129,7 @@ module.exports = {
           let usdMaxCap = IDO_PARTICIPANT_TOKENS * 0.1
           if (
             Number(Web3.utils.fromWei(usdAmount, 'ether')) +
-              Number(Web3.utils.fromWei(sum, 'ether')) >
+            Number(Web3.utils.fromWei(sum, 'ether')) >
             usdMaxCap
           )
             throw { message: 'Amount is not valid' }
