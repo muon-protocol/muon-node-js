@@ -64,7 +64,7 @@ const createEnv = async () => {
   `
   fs.writeFileSync('./dev-chain/dev-node-1.env', env1)
   console.log(emoji.get('o'), 'Node-1 Ethereum Address: ', accountEnv1.address)
-  collateralWallets.push(`"${accountEnv1.address}"`)
+  collateralWallets.push(`"${accountEnv1.address}@${libP2PConfigsEnv1.id}"`)
   /***** Create Other Envs ******/
 
   for (let index = 1; index < node_n; index++) {
@@ -125,7 +125,7 @@ const createEnv = async () => {
       `Node-${index + 1} Ethereum Address: `,
       account.address
     )
-    collateralWallets.push(`"${account.address}"`)
+    collateralWallets.push(`"${account.address}@${libP2PConfigs.id}"`)
   }
 
   /***** Create Other net.conf.json ******/
