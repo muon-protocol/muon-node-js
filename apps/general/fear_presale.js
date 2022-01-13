@@ -1959,8 +1959,8 @@ const presaleToken = {
   price: 0.1
 }
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1641707900
-// TODO remove *2 in production
+const START_TIME = 1642057986
+const HOLDER_PUBLIC_TIME = START_TIME * 1000 + 24 * 3600 * 1000
 const PUBLIC_TIME = START_TIME * 1000 + 2 * 24 * 3600 * 1000
 
 module.exports = {
@@ -1980,7 +1980,8 @@ module.exports = {
         lock: true,
         lockTime: PUBLIC_TIME,
         expireAt: PUBLIC_TIME,
-        PUBLIC_TIME
+        PUBLIC_TIME,
+        HOLDER_PUBLIC_TIME
       }
     }
 
@@ -1995,13 +1996,15 @@ module.exports = {
         lock: true,
         lockTime: 6 * 60,
         expireAt: lock.expireAt,
-        PUBLIC_TIME
+        PUBLIC_TIME,
+        HOLDER_PUBLIC_TIME
       }
     }
     return {
       message: `Not locked.`,
       lock: false,
-      PUBLIC_TIME
+      PUBLIC_TIME,
+      HOLDER_PUBLIC_TIME
     }
   },
 
@@ -2129,7 +2132,7 @@ module.exports = {
           let usdMaxCap = IDO_PARTICIPANT_TOKENS * 0.1
           if (
             Number(Web3.utils.fromWei(usdAmount, 'ether')) +
-            Number(Web3.utils.fromWei(sum, 'ether')) >
+              Number(Web3.utils.fromWei(sum, 'ether')) >
             usdMaxCap
           )
             throw { message: 'Amount is not valid' }
