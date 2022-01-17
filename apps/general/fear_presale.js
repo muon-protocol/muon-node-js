@@ -1943,7 +1943,7 @@ const LockType = {
   COOL_DOWN: 'COOL_DOWN'
 }
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1642334089
+const START_TIME = 1642412718
 const HOLDER_PUBLIC_TIME = START_TIME * 1000 + 24 * 3600 * 1000
 const PUBLIC_TIME = START_TIME * 1000 + 2 * 24 * 3600 * 1000
 
