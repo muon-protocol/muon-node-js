@@ -10,24 +10,6 @@ const {
 
 function getTokens() {
   return {
-    eth: {
-      decimals: 18,
-      address: '0x0000000000000000000000000000000000000000',
-      price: 4010.92,
-      chains: [4]
-    },
-    bnb: {
-      decimals: 18,
-      address: '0x0000000000000000000000000000000000000000',
-      price: 554.7,
-      chains: [97]
-    },
-    ert: {
-      decimals: 18,
-      address: '0xb9B5FFC3e1404E3Bb7352e656316D6C5ce6940A1',
-      price: 10,
-      chains: [4]
-    },
     ert_d6: {
       decimals: 6,
       address: '0xfBB0Aa52B82dD2173D8ce97065b2f421216A312A',
@@ -35,16 +17,13 @@ function getTokens() {
       chains: [97, 4]
     },
 
-    ertmumbai: {
+    ert: {
       decimals: 18,
       address: '0x701048911b1f1121E33834d3633227A954978d53',
       price: 1,
       chains: [80001]
     }
   }
-  // return axios
-  //   .get('https://app.deus.finance/prices.json')
-  //   .then(({ data }) => data)
 }
 
 // TODO: remove my Wallet
@@ -1958,9 +1937,14 @@ const presaleToken = {
   decimals: 18,
   price: 0.1
 }
+
+const LockType = {
+  ALLOCATION: 'ALLOCATION',
+  COOL_DOWN: 'COOL_DOWN'
+}
 const DEPOSIT_LOCK = 'mrc20-deposit-lock'
-const START_TIME = 1641707900
-// TODO remove *2 in production
+const START_TIME = 1642412718
+const HOLDER_PUBLIC_TIME = START_TIME * 1000 + 24 * 3600 * 1000
 const PUBLIC_TIME = START_TIME * 1000 + 2 * 24 * 3600 * 1000
 
 module.exports = {
@@ -1977,10 +1961,12 @@ module.exports = {
     if (!allocationForAddress && currentTime < PUBLIC_TIME) {
       return {
         message: `Allocation is 0 for your address.`,
+        lockType: LockType.ALLOCATION,
         lock: true,
         lockTime: PUBLIC_TIME,
         expireAt: PUBLIC_TIME,
-        PUBLIC_TIME
+        PUBLIC_TIME,
+        HOLDER_PUBLIC_TIME
       }
     }
 
@@ -1993,15 +1979,18 @@ module.exports = {
       return {
         message: `Your address is locked. Please wait.`,
         lock: true,
+        lockType: LockType.COOL_DOWN,
         lockTime: 6 * 60,
         expireAt: lock.expireAt,
-        PUBLIC_TIME
+        PUBLIC_TIME,
+        HOLDER_PUBLIC_TIME
       }
     }
     return {
       message: `Not locked.`,
       lock: false,
-      PUBLIC_TIME
+      PUBLIC_TIME,
+      HOLDER_PUBLIC_TIME
     }
   },
 
@@ -2129,7 +2118,7 @@ module.exports = {
           let usdMaxCap = IDO_PARTICIPANT_TOKENS * 0.1
           if (
             Number(Web3.utils.fromWei(usdAmount, 'ether')) +
-            Number(Web3.utils.fromWei(sum, 'ether')) >
+              Number(Web3.utils.fromWei(sum, 'ether')) >
             usdMaxCap
           )
             throw { message: 'Amount is not valid' }
