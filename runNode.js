@@ -18,6 +18,10 @@ function runMuonNode(node_n) {
         console.log(data.toString())
       })
     }
+    process.on('uncaughtException', function (err) {
+      // Handle the error safely
+      console.log('Error happend in run nodes:', err)
+    })
   } catch (error) {
     console.log('Error happend in run nodes:', error)
   }
