@@ -15,6 +15,8 @@ RUN npm install
 COPY . .
 #
 ## generate nodes env variables
+ARG INFURA_PROJECT_ID
+ENV INFURA_PROJECT_ID=${INFURA_PROJECT_ID}
 ENV MONGO_HOST="muon_mongo"
 ENV REDIS_HOST="muon_redis"
 ENV DOCKER_MODE=1
