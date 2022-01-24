@@ -9,6 +9,13 @@ const createEnv = async () => {
   let params = parseArgv()
   let node_n = params['n'] ? params['n'] : 2
 
+  let REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1'
+  let REDIS_PORT = process.env.REDIS_PORT || 6379
+
+  let MONGO_HOST = process.env.MONGO_HOST || '127.0.0.1'
+  let MONGO_PORT = process.env.MONGO_PORT || 27017
+  let MONGO_DB = process.env.MONGO_DB || 'muon_dev'
+
   let collateralWallets = []
 
   /***** Create Env1 ******/
@@ -16,14 +23,15 @@ const createEnv = async () => {
   let libP2PConfigsEnv1 = await PeerId.create({ bits: 1024, keyType: 'RSA' })
   libP2PConfigsEnv1 = libP2PConfigsEnv1.toJSON()
   let env1 = `
-  REDIS_HOST = localhost\n
+  REDIS_HOST = ${REDIS_HOST}\n
+  REDIS_PORT = ${REDIS_PORT}\n
   REDIS_QUEUE = muon_queue_1\n
   REDIS_GATEWAY_CHANNEL = dev_node\n
   GATEWAY_HOST = 0.0.0.0\n
   GATEWAY_PORT = ${params['p'] ? params['p'] : 8080}\n
   CONFIG_BASE_PATH = node-1\n
 
-  MONGODB_CS = mongodb://localhost:27017/muon_dev\n
+  MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
   # ============ LibP2P Configs ==============
   SIGN_WALLET_ADDRESS = ${accountEnv1.address}\n
   SIGN_WALLET_PRIVATE_KEY = ${accountEnv1.privateKey.substr(2)}
@@ -60,11 +68,14 @@ const createEnv = async () => {
   watch_muon_on_ftmtest="0x5D91EA00E414BB113C8ECe6674F84C906BD8b5D4"\n
 
   MUON_PLUGINS = ''\n
-  MUON_CUSTOM_APPS = "tss-test|sample|stock"
+  MUON_CUSTOM_APPS = "tss-test|sample"
   `
+  if(!fs.existsSync('./dev-chain/')) {
+    fs.mkdirSync('./dev-chain/');
+  }
   fs.writeFileSync('./dev-chain/dev-node-1.env', env1)
   console.log(emoji.get('o'), 'Node-1 Ethereum Address: ', accountEnv1.address)
-  collateralWallets.push(`"${accountEnv1.address}@${libP2PConfigsEnv1.id}"`)
+  collateralWallets.push(`${accountEnv1.address}@${libP2PConfigsEnv1.id}`)
   /***** Create Other Envs ******/
 
   for (let index = 1; index < node_n; index++) {
@@ -72,14 +83,15 @@ const createEnv = async () => {
     libP2PConfigs = libP2PConfigs.toJSON()
     let account = web3.eth.accounts.create()
     let env2 = `
-    REDIS_HOST = localhost\n
+    REDIS_HOST = ${REDIS_HOST}\n
+    REDIS_PORT = ${REDIS_PORT}\n
     REDIS_QUEUE = muon_queue_${index + 1}\n
     REDIS_GATEWAY_CHANNEL = dev_node\n
     GATEWAY_HOST = 0.0.0.0\n
     GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8080 + index}\n
     CONFIG_BASE_PATH = node-${index + 1}\n
 
-    MONGODB_CS = mongodb://localhost:27017/muon_dev\n
+    MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
     # ============ LibP2P Configs ==============
     SIGN_WALLET_ADDRESS = ${account.address}\n
     SIGN_WALLET_PRIVATE_KEY = ${account.privateKey.substr(2)}
@@ -117,7 +129,7 @@ const createEnv = async () => {
     watch_muon_on_ftmtest="0x5D91EA00E414BB113C8ECe6674F84C906BD8b5D4"\n
   
     MUON_PLUGINS = ''\n
-    MUON_CUSTOM_APPS = "tss-test|sample|stock"
+    MUON_CUSTOM_APPS = "tss-test|sample"
     `
     fs.writeFileSync(`./dev-chain/dev-node-${index + 1}.env`, env2)
     console.log(
@@ -125,19 +137,18 @@ const createEnv = async () => {
       `Node-${index + 1} Ethereum Address: `,
       account.address
     )
-    collateralWallets.push(`"${account.address}@${libP2PConfigs.id}"`)
+    collateralWallets.push(`${account.address}@${libP2PConfigs.id}`)
   }
 
   /***** Create Other net.conf.json ******/
 
-  let netConf = `{
-    "tss": {
-      "threshold": ${node_n},
-      "max": 20
+  let netConf = JSON.stringify({
+    tss: {
+      threshold: node_n,
+      max: 20
     },
-    "collateralWallets": [${collateralWallets}]
-  }
-  `
+    collateralWallets
+  }, null, 2)
 
   fs.writeFileSync(`./config/global/net.conf.json`, netConf)
   console.log(emoji.get('o'), `net.conf.json is created`)

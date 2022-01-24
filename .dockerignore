@@ -1,0 +1,9 @@
+node_modules
+dev-chain
+npm-debug.log
+.idea
+**/.env
+
+config/*
+!config/global/
+config/global/net.conf.json

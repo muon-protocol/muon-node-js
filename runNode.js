@@ -17,6 +17,9 @@ function runMuonNode(node_n) {
       result.stdout.on('data', (data) => {
         console.log(data.toString())
       })
+      result.stderr.on('data', (data) => {
+        console.error(`stderr: ${data}`);
+      });
     }
   } catch (error) {
     console.log('Error happend in run nodes:', error)
@@ -57,7 +60,7 @@ async function runNodes() {
       for (let index = 1; index <= node_n; index++) {
         let data = fs.readFileSync(`./dev-chain/dev-node-${index}.env`, 'utf8')
         let lines = data.split('\n')
-        let address = lines[17].split('=')
+        let address = lines[18].split('=')
         console.log(
           emoji.get('o'),
           `Node-${index} Ethereum Address: `,
