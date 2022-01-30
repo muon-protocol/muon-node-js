@@ -33,29 +33,29 @@ module.exports = {
 
         switch (method) {
             case 'signature':
-                let { tokenId, action, chain, multiplier } = params
+                let { tokenId, action, chain, useMultiplier } = params
 
                 const tokens = await axios
                     .get(`${SYNCHRONIZER_SERVER}/${chain}/signatures.json`)
                     .then(({ data }) => data)
 
-                if (!Object.keys(tokens).includes(tokenId)) {
+                if (!(tokenId in tokens)) {
                     throw { message: 'Unknown token address' }
                 }
 
                 const token = tokens[tokenId]
 
-                const result = {
+                let multiplier = 0;
+
+                return {
                     multiplier: multiplier,
                     price: token.price,
                     fee: token.fee,
                     address: tokenId,
-                    blockNumber: token.blockNo,
+                    expireBlock: token.blockNo,
                     action: action,
                     chain: chain
                 }
-
-                return result
 
             default:
                 throw { message: `Unknown method ${params}` }
@@ -69,13 +69,13 @@ module.exports = {
         } = request
         switch (method) {
             case 'signature': {
-                let { multiplier, price, fee, address, blockNumber, action, chain } = result
+                let { multiplier, price, fee, address, expireBlock, action, chain } = result
                 const abi = [
                     // { type: 'uint256', value: String(multiplier) },
                     { type: 'address', value: String(address) },
                     { type: 'uint256', value: String(price) },
                     { type: 'uint256', value: String(fee) },
-                    { type: 'uint256', value: String(blockNumber) },
+                    { type: 'uint256', value: String(expireBlock) },
                     { type: 'uint256', value: String(ACTIONS[action]) },
                     { type: 'uint256', value: String(CHAINS[chain]) },
                     { type: 'uint8', value: this.APP_ID }
