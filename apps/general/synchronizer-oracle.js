@@ -45,9 +45,10 @@ module.exports = {
 
                 const token = tokens[tokenId]
 
-                let multiplier = 0;
+                let multiplier = useMultiplier ? 4 : 0;
 
                 return {
+                    useMultiplier: useMultiplier,
                     multiplier: multiplier,
                     price: token.price,
                     fee: token.fee,
@@ -69,9 +70,15 @@ module.exports = {
         } = request
         switch (method) {
             case 'signature': {
-                let { multiplier, price, fee, address, expireBlock, action, chain } = result
-                const abi = [
-                    // { type: 'uint256', value: String(multiplier) },
+                let { useMultiplier, multiplier, price, fee, address, expireBlock, action, chain } = result
+
+                let abi = []
+
+                if (useMultiplier) {
+                    abi.push({ type: 'uint256', value: String(multiplier) })
+                }
+
+                abi.push(...[
                     { type: 'address', value: String(address) },
                     { type: 'uint256', value: String(price) },
                     { type: 'uint256', value: String(fee) },
@@ -79,7 +86,10 @@ module.exports = {
                     { type: 'uint256', value: String(ACTIONS[action]) },
                     { type: 'uint256', value: String(CHAINS[chain]) },
                     { type: 'uint8', value: this.APP_ID }
-                ]
+                ])
+
+                console.log(abi);
+
                 return soliditySha3(abi)
             }
             default:
