@@ -1,5 +1,5 @@
-const BigNumber = require('bignumber.js');
 const { axios, soliditySha3, ethCall } = MuonAppUtils
+const web3 = require('web3');
 
 const SYNCHRONIZER_SERVER = 'https://oracle1.deus.finance'
 
@@ -51,7 +51,7 @@ module.exports = {
                     multiplier: multiplier,
                     price: token.price,
                     fee: token.fee,
-                    address: tokenId,
+                    address: web3.utils.toChecksumAddress(tokenId),
                     expireBlock: token.blockNo,
                     action: action,
                     chain: chain
