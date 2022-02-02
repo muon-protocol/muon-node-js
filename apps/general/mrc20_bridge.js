@@ -31,7 +31,7 @@ module.exports = {
       case 'claim':
         let { depositAddress, depositTxId, depositNetwork = 'eth' } = params
         if (!depositAddress) throw { message: 'Invalid contarct address' }
-        if (!depositTxId) throw { message: 'Invalid depositTxId' }
+        if (!depositTxId) throw { message: 'Invalid deposit TxId' }
 
         let result = await ethCall(
           depositAddress,
