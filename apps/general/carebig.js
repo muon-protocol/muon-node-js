@@ -53,7 +53,7 @@ module.exports = {
       case 'claim':
         let { address } = result
         return soliditySha3([
-          { type: 'uint256', value: APP_ID },
+          { type: 'uint8', value: APP_ID },
           { type: 'address', value: address },
           { type: 'uint256', value: request.data.result.rewards}
         ])
