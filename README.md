@@ -15,3 +15,12 @@ By enabling auto update any commit to the repository will trigger the update and
         login <USERNAME>
         password <PASSWORD>
     EOF
+#### Local devnet
+You can run local devnet on port 8080
+
+    docker-compose build --build-arg INFURA_PROJECT_ID=< your infura project id >
+    docker-compose up
+
+To check local devnet open http://localhost:8080/v1/?app=tss&method=test in your browser.
+
+After any changes, you will need to build again.
