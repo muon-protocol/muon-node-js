@@ -33,7 +33,6 @@ module.exports = {
         if (!depositAddress) throw { message: 'Invalid contarct address' }
         if (!depositTxId) throw { message: 'Invalid deposit Tx Id' }
         if (!depositNetwork) throw { message: 'Invalid deposit Network' }
-
         let result = await ethCall(
           depositAddress,
           'getTx',
