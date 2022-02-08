@@ -6,19 +6,23 @@ const { spawn } = require('child_process')
 const parseArgv = require('./utils/parseArgv')
 
 function runMuonNode(node_n) {
-  for (let i = 1; i <= node_n; i++) {
-    const result = spawn('./node_modules/.bin/env-cmd', [
-      '-f',
-      `./dev-chain/dev-node-${i}.env`,
-      'babel-node',
-      'index.js'
-    ])
-    result.stdout.on('data', (data) => {
-      console.log(data.toString())
-    })
-    result.stderr.on('data', (data) => {
-      console.error(`stderr: ${data}`);
-    });
+  try {
+    for (let i = 1; i <= node_n; i++) {
+      const result = spawn('./node_modules/.bin/env-cmd', [
+        '-f',
+        `./dev-chain/dev-node-${i}.env`,
+        'babel-node',
+        'index.js'
+      ])
+      result.stdout.on('data', (data) => {
+        console.log(data.toString())
+      })
+      result.stderr.on('data', (data) => {
+        console.error(`stderr: ${data}`);
+      });
+    }
+  } catch (error) {
+    console.log('Error happend in run nodes:', error)
   }
 }
 
