@@ -24,7 +24,7 @@ const _networksWeb3 = {
   4002: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTMTEST)),
   100: new Web3(new HttpProvider('https://rpc.xdaichain.com/')),
   77: new Web3(new HttpProvider('https://sokol.poa.network')),
-  137: new Web3(new HttpProvider('https://rpc-mainnet.maticvigil.com/')),
+  137: new Web3(new HttpProvider('https://polygon-rpc.com/')),
   80001: new Web3(new HttpProvider('https://rpc-mumbai.maticvigil.com/')),
   43113: new Web3(
     new HttpProvider('https://api.avax-test.network/ext/bc/C/rpc')
