@@ -9,6 +9,18 @@ const {toBN} = require('../../utils/tss/utils')
 const path = require('path')
 const {timeout} = require('../../utils/helpers');
 const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
+const NodeCache = require('node-cache');
+
+const keysCache = new NodeCache({
+  stdTTL: 6*60, // Keep distributed keys in memory for 6 minutes
+  // /**
+  //  * (default: 600)
+  //  * The period in seconds, as a number, used for the automatic delete check interval.
+  //  * 0 = no periodic check.
+  //  */
+  checkperiod: 60,
+  useClones: false,
+});
 
 const MSG_TYPE_NEED_GROUP = 'MSG_TYPE_NEED_GROUP';
 const MSG_TYPE_JOINED_TO_GROUP = 'MSG_TYPE_JOINED_TO_GROUP';
@@ -42,7 +54,6 @@ class TssPlugin extends CallablePlugin {
   joiningTssGroup = null
   isReady = false
   parties = {}
-  keys = {}
   tssKey = null;
   tssParty = null;
 
@@ -62,6 +73,7 @@ class TssPlugin extends CallablePlugin {
     // TODO: peer finding fail if immediately try to join group
     // setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
     this.muon.once('peer', () => {
+      console.log('first node connected ...')
       this.joinToGroup();
     })
   }
@@ -144,7 +156,7 @@ class TssPlugin extends CallablePlugin {
       publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
     }
     let key = DKey.load(party, _key)
-    this.keys[key.id] = key;
+    keysCache.set(key.id, key, 0);
     // let party = new Party(_party.t, _party.max, _party.id)
     // load distributed key
     // console.dir({tssConfig}, {depth: null})
@@ -363,7 +375,7 @@ class TssPlugin extends CallablePlugin {
       this.saveTssConfig(party, key)
 
       this.parties[party.id] = party
-      this.keys[key.id] = key
+      keysCache.set(key.id, key, 0) // keep for ever
       this.tssKey = key;
       this.isReady = true;
       this.informJoinedToGroup()
@@ -466,7 +478,7 @@ class TssPlugin extends CallablePlugin {
      */
     key.timeoutPromise.promise.catch(console.error)
 
-    this.keys[key.id] = key;
+    keysCache.set(key.id, key);
 
     let partners = Object.values(party.onlinePartners)
 
@@ -571,7 +583,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   getSharedKey(id) {
-    return this.keys[id];
+    return keysCache.get(id);
   }
 
   async hash(msg, party) {
@@ -764,7 +776,7 @@ class TssPlugin extends CallablePlugin {
     if (!!tssKey && nonceId === tssKey.id)
       return null;
 
-    let nonce = this.keys[nonceId]
+    let nonce = keysCache.get(nonceId);
     let keyPart = tssModule.addKeys(nonce.share, tssKey.share);
     return {
       id: tssKey.id,
@@ -779,45 +791,47 @@ class TssPlugin extends CallablePlugin {
   @remoteMethod(RemoteMethods.createKey)
   async __createKey(data = {}) {
     // console.log('TssPlugin.__createKey', data)
-    let {parties, keys} = this
-    let {party, key} = data
+    let {parties} = this
+    let {party, key: keyId} = data
     if (!parties[party]) {
       console.log('TssPlugin.__createKey>> party not fount on this node id: ' + party);
       throw {message: 'party not found'}
     }
-    if (!!keys[key]) {
-      console.log(`TssPlugin.__createKey>> key already exist [${key}]`);
-      throw {message: `key already exist [${key}]`}
+    if (keysCache.has(keyId)) {
+      console.log(`TssPlugin.__createKey>> key already exist [${keyId}]`);
+      throw {message: `key already exist [${keyId}]`}
     }
-    keys[key] = new DKey(parties[party], key);
+    keysCache.set(keyId, new DKey(parties[party], keyId));
     return true;
   }
 
   @remoteMethod(RemoteMethods.distributeKey)
   async __distributeKey(data = {}) {
     // console.log('TssPlugin.__distributeKey', data)
-    let {parties, keys} = this
-    let {from, commitment, party, key, partners, pubKeys, f, h} = data
+    let {parties} = this
+    let {from, commitment, party, key: keyId, partners, pubKeys, f, h} = data
     if (!parties[party]) {
       console.log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party);
       throw {message: 'party not found'}
     }
-    if (!keys[key]) {
-      console.log('TssPlugin.__distributeKey>> key not fount on this node id: ' + key);
+    if (!keysCache.has(keyId)) {
+      console.log('TssPlugin.__distributeKey>> key not fount on this node id: ' + keyId);
       throw {message: 'key not found'}
     }
-    keys[key].partners = partners
+
+    let key = keysCache.get(keyId);
+    key.partners = partners
 
     // let fromIndex = this.muon.getNodesWalletIndex()[from]
     let fromIndex = parties[party].walletIndexes[from]
-    keys[key].setFH(fromIndex, f, h)
-    keys[key].setParticipantCommitment(fromIndex, commitment)
+    key.setFH(fromIndex, f, h)
+    key.setParticipantCommitment(fromIndex, commitment)
 
     pubKeys = pubKeys.map(pub => tssModule.curve.keyFromPublic(pub, 'hex').getPublic())
-    keys[key].setParticipantPubKeys(fromIndex, pubKeys)
+    key.setParticipantPubKeys(fromIndex, pubKeys)
 
-    if (!keys[key].keyDistributed) {
-      this.broadcastKey(keys[key]).catch(console.error);
+    if (!key.keyDistributed) {
+      this.broadcastKey(key).catch(console.error);
     }
     return true;
   }
@@ -825,20 +839,22 @@ class TssPlugin extends CallablePlugin {
   @remoteMethod(RemoteMethods.distributePubKey)
   async __distributePubKey(data = {}) {
     // console.log('__distributePubKey', data.from)
-    let {parties, keys} = this
-    let {from, party, key, pubKeys} = data
+    let {parties} = this
+    let {from, party, key: keyId, pubKeys} = data
     if (!parties[party]) {
       console.error('TssPlugin.__distributePubKey>> party not fount on this node id: ' + party);
       throw {message: 'party not found'}
     }
-    if (!keys[key]) {
+    if (!keysCache.has(keyId)) {
       console.error('TssPlugin.__distributePubKey>> distributed key not found')
       throw {message: 'distributed key not found'}
     }
     // let fromIndex = this.getNodesWalletIndex(parties[party])[from]
     let fromIndex = parties[party].walletIndexes[from]
     pubKeys = pubKeys.map(pub => tssModule.curve.keyFromPublic(pub, 'hex').getPublic())
-    keys[key].setParticipantPubKeys(fromIndex, pubKeys)
+
+    let key = keysCache.get(keyId)
+    key.setParticipantPubKeys(fromIndex, pubKeys)
   }
 
   @remoteMethod(RemoteMethods.storeTssKey)
