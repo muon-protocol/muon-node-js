@@ -18,7 +18,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     return tss.pub2addr(tssPlugin.tssKey.publicKey)
   }
 
-  async _onArrive(request){
+  async onFirstNodeRequestSucceed(request){
     let tssPlugin = this.muon.getPlugin(`tss-plugin`)
     if(!tssPlugin.isReady){
       throw {message: 'Tss not initialized'};
