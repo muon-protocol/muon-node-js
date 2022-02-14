@@ -29,7 +29,7 @@ module.exports = {
     switch (method) {
       case 'claim':
         let { depositAddress, depositTxId, depositNetwork } = params
-
+	//TODO: check chain
         if (!depositAddress) throw { message: 'Invalid contarct address' }
         if (!depositTxId) throw { message: 'Invalid deposit Tx Id' }
         if (!depositNetwork) throw { message: 'Invalid deposit Network' }
