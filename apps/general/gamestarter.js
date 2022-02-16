@@ -34,7 +34,7 @@ module.exports = {
         return {
           appId: APP_ID,
           address,
-          balance: floatToBN(result.balance, 18).toString(10)
+          balance: floatToBN(result.balance, 8).toString(10)
         }
 
       default:
