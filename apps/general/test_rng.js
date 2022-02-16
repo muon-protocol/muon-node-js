@@ -20,9 +20,9 @@ Math.seed = function(s) {
     }
 }
 
-function getRandomNumber(seed){
+function getRandomNumber(seed, min, max){
   var rngFunction = Math.seed(seed);
-  return rngFunction();
+  return rngFunction() * (max-min) + min;
 }
 
 module.exports = {
@@ -49,7 +49,7 @@ module.exports = {
         
         // all nodes will use the same seed and the random
         // number will be the same on all nodes
-        let randomNumber = getRandomNumber(seed);
+        let randomNumber = getRandomNumber(seed, min, max);
 
         return {
           appId: APP_ID,
