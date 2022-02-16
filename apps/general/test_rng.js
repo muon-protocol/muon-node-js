@@ -22,7 +22,7 @@ Math.seed = function(s) {
 
 function getRandomNumber(seed, min, max){
   var rngFunction = Math.seed(seed);
-  return rngFunction() * (max-min) + min;
+  return Math.floor(rngFunction() * (max-min)) + min;
 }
 
 module.exports = {
@@ -64,17 +64,13 @@ module.exports = {
 
   hashRequestResult: (request, result) => {
     let { method } = request;
-    var number = result.number;
-    if(request.data.result && request.data.result.number){
-      number = request.data.result.number;
-    }
     switch (method) {
       case 'randint':
         let { address } = result;
         return soliditySha3([
           { type: 'uint32', value: APP_ID },
           { type: 'address', value: address },
-          { type: 'uint256', value: number}
+          { type: 'uint256', value: result.number}
         ])
 
       default:
