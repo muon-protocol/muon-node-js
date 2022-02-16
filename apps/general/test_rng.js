@@ -20,7 +20,7 @@ Math.seed = function(s) {
     }
 }
 
-getRandomNumber = function(seed){
+function getRandomNumber(seed){
   var rngFunction = Math.seed(seed);
   return rngFunction();
 }
