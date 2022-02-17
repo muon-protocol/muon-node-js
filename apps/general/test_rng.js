@@ -49,7 +49,9 @@ module.exports = {
         
         // all nodes will use the same seed and the random
         // number will be the same on all nodes
-        let randomNumber = getRandomNumber(seed, min, max);
+        let randomNumber = getRandomNumber(seed, 
+          parseInt(min), parseInt(max)
+        );
 
         return {
           appId: APP_ID,
