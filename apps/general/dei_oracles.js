@@ -120,7 +120,7 @@ module.exports = {
 
     switch (method) {
       case 'lp_price': {
-        let {token} = params;
+        let {token, hashTimestamp} = params;
         let currentTime = getTimestamp();
 
         if(!LP_TOKENS[token] && !TOKENS[token]){
