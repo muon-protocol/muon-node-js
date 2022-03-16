@@ -29,7 +29,7 @@ module.exports = {
     switch (method) {
       case 'claim':
         let { depositAddress, depositTxId, depositNetwork } = params
-
+	//TODO: check chain
         if (!depositAddress) throw { message: 'Invalid contarct address' }
         if (!depositTxId) throw { message: 'Invalid deposit Tx Id' }
         if (!depositNetwork) throw { message: 'Invalid deposit Network' }
@@ -60,13 +60,12 @@ module.exports = {
         let { txId, tokenId, fromChain, toChain, user, nftId } = result
 
         return soliditySha3([
-          { type: 'address', value: depositAddress },
+          { type: 'uint32', value: this.APP_ID },
           { type: 'uint256', value: txId },
           { type: 'uint256', value: tokenId },
           { type: 'uint256', value: fromChain },
           { type: 'uint256', value: toChain },
           { type: 'address', value: user },
-          { type: 'uint8', value: this.APP_ID },
           { type: 'uint256[]', value: nftId }
         ])
 
