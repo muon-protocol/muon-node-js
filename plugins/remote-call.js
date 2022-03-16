@@ -109,11 +109,11 @@ class RemoteCall extends BasePlugin {
     return Buffer.from(strData);
   }
 
-  async send (data, stream, peer) {
+  async send (data, connection, peer) {
     try {
       await pipe(
         [this.prepareSendData(data)],
-        stream,
+        connection.stream,
         async (source) => {
           for await (const message of source) {
             await this.handleSendResponse(message, peer.id)
@@ -125,7 +125,7 @@ class RemoteCall extends BasePlugin {
     }
     finally {
       // Replies are done on new streams, so let's close this stream so we don't leak it
-      await pipe([], stream);
+      await pipe([], connection.stream);
     }
   }
 
@@ -168,16 +168,16 @@ class RemoteCall extends BasePlugin {
     }
   }
 
-  getPeerCallStream(peer){
+  getPeerConnection(peer){
     return this.muon.libp2p.dialProtocol(peer.id, [PROTOCOL])
   }
 
   call(peer, method, params, options){
-    return this.getPeerCallStream(peer)
-      .then(({stream}) => {
-        if(!stream)
+    return this.getPeerConnection(peer)
+      .then(connection => {
+        if(!connection?.stream)
           console.log('no stream call ... ')
-        return this.callStream(stream, peer, method, params, options)
+        return this.callConnection(connection, peer, method, params, options)
       })
       .catch(e => {
         console.error(`RemoteCall.call(peer, '${method}', params)`, e)
@@ -185,7 +185,7 @@ class RemoteCall extends BasePlugin {
       })
   }
 
-  callStream(stream, peer, method, params, options){
+  callConnection(connection, peer, method, params, options){
     options = {
       timeout: 5000,
       timeoutMessage: "remoteCall timeout!",
@@ -193,7 +193,7 @@ class RemoteCall extends BasePlugin {
     };
 
     let callId = newCallId();
-    this.send({callId, method, params}, stream, peer)
+    this.send({callId, method, params}, connection, peer)
     let resultPromise = new TimeoutPromise(options.timeout, options.timeoutMessage)
     // this._calls[callId] = remoteResult;
     callCache.set(callId, {
