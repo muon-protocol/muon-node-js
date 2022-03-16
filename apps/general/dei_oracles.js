@@ -159,6 +159,7 @@ module.exports = {
       data: { params }
     } = request;
     console.log(result, request);
+    let { hashTimestamp } = params;
     switch (method) {
       case 'lp_price': {
         if(!this.isPriceToleranceOk(result.tokenPrice, 
@@ -171,9 +172,9 @@ module.exports = {
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
           { type: 'uint256', value: request.data.result.tokenPrice },
-          // ...(hashTimestamp
-          //   ? [{ type: 'uint256', value: request.data.timestamp }]
-          //   : [])
+          ...(hashTimestamp
+            ? [{ type: 'uint256', value: request.data.timestamp }]
+            : [])
         ])
       }
       default:
