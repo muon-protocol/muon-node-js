@@ -24,6 +24,19 @@ const LP_TOKENS = {
   }
 }
 
+const TOKENS = {
+	DEUS: {
+		pool: {
+			pair: "",//TODO: fixme
+			index: 0,// TODO: fixme
+			pairToken: DEI
+		}
+	},
+	DEI: {
+
+	}
+}
+
 const PRICE_TOLERANCE = 0.05;
 const FANTOM_ID = 250;
 const SCALE = new BN('1000000000000000000');
@@ -43,6 +56,15 @@ async function tokenPrice(token){
     console.log(ret, "ret");
     return (new BN(ret[1])).mul(new BN("1000000000000"));
   }
+  // TODO: handle DEUS/LQDR/SCREAM
+
+  // if(token exists on TOKENS){
+  // pool = TOKENS[token].pool;
+  // 	tokenPrice(pool.pairToken) * 
+  // 	tvwap(token, pool.index, pool.pair) // 1 DEUS = ? DEI
+  // }
+
+  // {pair, token, index}
 }
 
 async function LPTokenPrice(token){
@@ -50,6 +72,7 @@ async function LPTokenPrice(token){
   let reserves = await ethCall(
     BASE_ROUTER_CONTRACT,
     'getReserves',
+    //TODO: add true/false to LP_TOKENS
     [tokenParams.tokenA.address, tokenParams.tokenB.address, true],
     BASE_ROUTER_ABI,
     FANTOM_ID
@@ -100,11 +123,16 @@ module.exports = {
         let {token} = params;
         let currentTime = getTimestamp();
 
-        if(!LP_TOKENS[token]){
+        if(!LP_TOKENS[token] && !TOKENS[token]){
           throw "Invalid token";
         }
 
-        let tokenPrice = await LPTokenPrice(token);
+        var tokenPrice = 0;
+        if(LP_TOKENS[token]){
+        	tokenPrice = await LPTokenPrice(token);
+        }else{
+        	tokenPrice = await tokenPrice(token);
+        }
 
         return {
           token: token,
