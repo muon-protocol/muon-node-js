@@ -136,7 +136,8 @@ module.exports = {
 
         return {
           token: token,
-          tokenPrice: tokenPrice
+          tokenPrice: tokenPrice,
+          ...(hashTimestamp ? {timestamp: request.data.timestamp} : {})
         }
       }
       
