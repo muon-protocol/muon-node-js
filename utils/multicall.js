@@ -3,7 +3,8 @@ const {
   ContractCallResults,
   ContractCallContext
 } = require('ethereum-multicall')
-const { getWeb3 } = require('./node-utils/eth')
+
+const { getWeb3, call } = require('./node-utils/eth')
 
 async function multiCall(chainId, contractCallContext) {
   const web3 = await getWeb3(chainId)
@@ -12,7 +13,14 @@ async function multiCall(chainId, contractCallContext) {
   results = contractCallContext.map((item) => ({
     reference: item.reference,
     contractAddress: item.contractAddress,
-    callsReturnContext: results[item.reference]['callsReturnContext']
+    callsReturnContext: results[item.reference]['callsReturnContext'].map(
+      (callReturn) => ({
+        ...callReturn,
+        returnValues: callReturn['returnValues'].map((value) =>
+          web3.utils.hexToNumberString(value.hex)
+        )
+      })
+    )
   }))
   return results
 }

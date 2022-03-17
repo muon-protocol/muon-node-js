@@ -1,15 +1,14 @@
-const {
-  axios,
-  toBaseUnit,
-  soliditySha3,
-  BN,
-  recoverTypedMessage,
-  ethCall,
-  multiCall
-} = MuonAppUtils
+const { soliditySha3, BN, multiCall } = MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
+
+const SOLIDEX_DEPOSIT_ZAP = 'SolidexDepositZap'
+const ERC20 = 'ERC20'
+const SPIRIT_ROUTER = 'SpiritRouter'
+
 const BASE_ROUTER_CONTRACT = '0x46AC9383D3e23167be2e4E728a11A49643514eD3'
+const SPIRIT_SWAP_CONTRACT = '0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52'
+
 const SPIRIT_SWAP_ABI = [
   {
     inputs: [
@@ -24,7 +23,7 @@ const SPIRIT_SWAP_ABI = [
     type: 'function'
   }
 ]
-const SPIRIT_SWAP_CONTRACT = '0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52'
+
 const GET_RESERVES_ABI = [
   {
     inputs: [
@@ -41,6 +40,7 @@ const GET_RESERVES_ABI = [
     type: 'function'
   }
 ]
+
 const TOTAL_SUPPLY_ABI = [
   {
     constant: true,
@@ -52,6 +52,7 @@ const TOTAL_SUPPLY_ABI = [
     type: 'function'
   }
 ]
+
 const USDC = '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75'
 const DEI = '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3'
 const LP_TOKENS = {
@@ -70,20 +71,11 @@ const LP_TOKENS = {
 const PRICE_TOLERANCE = 0.05
 const FANTOM_ID = 250
 const SCALE = new BN('1000000000000000000')
-
-async function tokenPrice(token) {
+async function tokenPrice(token, ret) {
   if (token == USDC) {
     return SCALE
   }
   if (token == DEI) {
-    let ret = await ethCall(
-      SPIRIT_SWAP_CONTRACT,
-      'getAmountsOut',
-      [SCALE, [DEI, USDC]],
-      SPIRIT_SWAP_ABI,
-      FANTOM_ID
-    )
-    console.log(ret, 'ret')
     return new BN(ret[1]).mul(new BN('1000000000000'))
   }
 }
@@ -92,12 +84,24 @@ async function LPTokenPrice(token) {
   let tokenParams = LP_TOKENS[token]
   const contractCallContext = [
     {
-      reference: 'SolidexDepositZap',
+      reference: SPIRIT_ROUTER,
+      contractAddress: SPIRIT_SWAP_CONTRACT,
+      abi: SPIRIT_SWAP_ABI,
+      calls: [
+        {
+          reference: SPIRIT_ROUTER,
+          methodName: 'getAmountsOut',
+          methodParameters: [SCALE.toString(), [DEI, USDC]]
+        }
+      ]
+    },
+    {
+      reference: SOLIDEX_DEPOSIT_ZAP,
       contractAddress: BASE_ROUTER_CONTRACT,
       abi: GET_RESERVES_ABI,
       calls: [
         {
-          reference: 'SolidexDepositZap',
+          reference: SOLIDEX_DEPOSIT_ZAP,
           methodName: 'getReserves',
           methodParameters: [
             tokenParams.tokenA.address,
@@ -108,41 +112,41 @@ async function LPTokenPrice(token) {
       ]
     },
     {
-      reference: 'ERC20',
+      reference: ERC20,
       contractAddress: token,
       abi: TOTAL_SUPPLY_ABI,
       calls: [
         {
-          reference: 'ERC20',
+          reference: ERC20,
           methodName: 'totalSupply'
         }
       ]
     }
   ]
-  // TODO use this result instead of ethcall
 
-  let result = multiCall(FANTOM_ID, contractCallContext)
-  let reserves = await ethCall(
-    BASE_ROUTER_CONTRACT,
-    'getReserves',
-    [tokenParams.tokenA.address, tokenParams.tokenB.address, true],
-    BASE_ROUTER_ABI,
-    FANTOM_ID
-  )
+  let result = await multiCall(FANTOM_ID, contractCallContext)
+
+  let reserves = result.find((item) => item.reference === SOLIDEX_DEPOSIT_ZAP)
+    .callsReturnContext[0].returnValues
+
   let totalSupply = new BN(
-    await ethCall(token, 'totalSupply', [], ERC20_ABI, FANTOM_ID)
+    result.find(
+      (item) => item.reference === ERC20
+    ).callsReturnContext[0].returnValues[0]
   )
 
-  let reserveA = new BN(reserves.reserveA).mul(tokenParams.tokenA.scale)
-  let reserveB = new BN(reserves.reserveB).mul(tokenParams.tokenB.scale)
-  console.log(reserveA.toString(), reserveB.toString())
+  const ret = result.find((item) => item.reference === SPIRIT_ROUTER)
+    .callsReturnContext[0].returnValues
+
+  let reserveA = new BN(reserves[0]).mul(tokenParams.tokenA.scale)
+  let reserveB = new BN(reserves[1]).mul(tokenParams.tokenB.scale)
 
   let totalUSDA = reserveA
-    .mul(await tokenPrice(tokenParams.tokenA.address))
+    .mul(await tokenPrice(tokenParams.tokenA.address, ret))
     .div(SCALE)
 
   let totalUSDB = reserveB
-    .mul(await tokenPrice(tokenParams.tokenB.address))
+    .mul(await tokenPrice(tokenParams.tokenB.address, ret))
     .div(SCALE)
 
   let totalUSD = totalUSDA.add(totalUSDB)
@@ -196,7 +200,6 @@ module.exports = {
       method,
       data: { params }
     } = request
-    console.log(result, request)
     switch (method) {
       case 'lp_price': {
         if (
