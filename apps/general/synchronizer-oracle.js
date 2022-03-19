@@ -37,9 +37,16 @@ module.exports = {
 
                 const address = web3.utils.toChecksumAddress(tokenId);
 
+                const currentTimestamp = Date.now() / 1000
+
                 const tokens = await axios
-                    .get(`${SYNCHRONIZER_SERVER}/${chain}/signatures.json?timestamp=${Date.now()}`)
+                    .get(`${SYNCHRONIZER_SERVER}/${chain}/signatures.json?timestamp=${currentTimestamp}`)
                     .then(({ data }) => data)
+
+                const timestamp = tokens['timestamp']
+                if (currentTimestamp - timestamp > 7 * 60) {
+                    throw { message: 'Price is outdated' }
+                }
 
                 if (!(address in tokens)) {
                     throw { message: 'Unknown token address' }
