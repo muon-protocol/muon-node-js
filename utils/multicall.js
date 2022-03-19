@@ -1,28 +1,27 @@
-const {
-  Multicall,
-  ContractCallResults,
-  ContractCallContext
-} = require('ethereum-multicall')
-
-const { getWeb3, call } = require('./node-utils/eth')
+const { Multicall } = require('ethereum-multicall')
+const { getWeb3 } = require('./node-utils/eth')
 
 async function multiCall(chainId, contractCallContext) {
-  const web3 = await getWeb3(chainId)
-  const multicall = new Multicall({ web3Instance: web3, tryAggregate: true })
-  let { results } = await multicall.call(contractCallContext)
-  results = contractCallContext.map((item) => ({
-    reference: item.reference,
-    contractAddress: item.contractAddress,
-    callsReturnContext: results[item.reference]['callsReturnContext'].map(
-      (callReturn) => ({
-        ...callReturn,
-        returnValues: callReturn['returnValues'].map((value) =>
-          web3.utils.hexToNumberString(value.hex)
-        )
-      })
-    )
-  }))
-  return results
+  try {
+    const web3 = await getWeb3(chainId)
+    const multicall = new Multicall({ web3Instance: web3, tryAggregate: true })
+    let { results } = await multicall.call(contractCallContext)
+    results = contractCallContext.map((item) => ({
+      reference: item.reference,
+      contractAddress: item.contractAddress,
+      callsReturnContext: results[item.reference]['callsReturnContext'].map(
+        (callReturn) => ({
+          ...callReturn,
+          returnValues: callReturn['returnValues'].map((value) =>
+            web3.utils.hexToNumberString(value.hex)
+          )
+        })
+      )
+    }))
+    return results
+  } catch (error) {
+    console.log('error happend in Multicall', error)
+  }
 }
 
 module.exports = { multiCall }
