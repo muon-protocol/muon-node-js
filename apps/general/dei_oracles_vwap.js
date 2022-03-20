@@ -88,6 +88,7 @@ const TOKENS = {
 			pairToken: DEI
 		}
   }
+  //TODO: add more tokens
 }
 
 const PRICE_TOLERANCE = 0.05;
