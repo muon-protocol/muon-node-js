@@ -19,7 +19,7 @@ const ABI_getTx = [
   }
 ]
 
-ABI_encodeParams = [{
+const ABI_encodeParams = [{
       inputs: [
         {
           "internalType": "uint256[]",
