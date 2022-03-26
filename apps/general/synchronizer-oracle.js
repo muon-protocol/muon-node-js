@@ -44,7 +44,7 @@ module.exports = {
                     .then(({ data }) => data)
 
                 const timestamp = tokens['timestamp']
-                if (currentTimestamp - timestamp > 7 * 60) {
+                if (currentTimestamp - timestamp > 2.5 * 60) {
                     throw { message: 'Price is outdated' }
                 }
 
