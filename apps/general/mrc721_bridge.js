@@ -70,7 +70,7 @@ module.exports = {
             ABI_encodeParams,
             depositNetwork
           )
-        ): '0x0';
+        ): "";
         return result
 
       default:
