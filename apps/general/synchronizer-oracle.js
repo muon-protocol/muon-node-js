@@ -33,7 +33,7 @@ module.exports = {
 
         switch (method) {
             case 'signature':
-                let { tokenId, action, chain, useMultiplier, hashTimestamp} = params
+                let { tokenId, action, chain, useMultiplier} = params
 
                 const address = web3.utils.toChecksumAddress(tokenId);
 
@@ -54,16 +54,11 @@ module.exports = {
 
                 const token = tokens[tokenId]
 
-                let multiplier = useMultiplier ? 4 : 0;
-
                 return {
-                    useMultiplier: useMultiplier,
-                    multiplier: multiplier,
                     price: token.price,
                     address: address,
                     action: action,
                     chain: chain,
-                    ...(hashTimestamp ? {timestamp: request.data.timestamp} : {})
                 }
 
             default:
@@ -78,24 +73,17 @@ module.exports = {
         } = request
         switch (method) {
             case 'signature': {
-                let { useMultiplier, multiplier, price, address, action, chain , hashTimestamp} = result
+                let {price, address, action, chain} = result
 
-                let abi = []
-
-                if (useMultiplier) {
-                    abi.push({ type: 'uint256', value: String(multiplier) })
-                }
-
-                abi.push(...[
+                return soliditySha3([
                     { type: 'address', value: String(address) },
                     { type: 'uint256', value: String(price) },
                     { type: 'uint256', value: String(ACTIONS[action]) },
                     { type: 'uint256', value: String(CHAINS[chain]) },
                     { type: 'uint8', value: this.APP_ID },
-                    [(hashTimestamp ? { type: 'uint256', value: request.data.timestamp } : {})]
+                    { type: 'uint256', value: request.data.timestamp }
                 ])
 
-                return soliditySha3(abi)
             }
             default:
                 return null
