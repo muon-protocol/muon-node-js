@@ -12,7 +12,7 @@ router.use('/', (req, res, next) => {
       res.json({success: true, result})
     })
     .catch(error => {
-      res.json({success: false, error})
+      res.json({success: false, ...error})
     })
 })
 

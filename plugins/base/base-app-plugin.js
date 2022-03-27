@@ -411,8 +411,20 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async __onRemoteSignRequest(data = {}) {
+  async __onRemoteSignRequest(data = {}, error) {
     // console.log('BaseAppPlugin.__onRemoteSignRequest', data)
+    if(error){
+      let collateralPlugin = this.muon.getPlugin('collateral');
+      let {peerId, request: requestId, ...otherParts} = error;
+      let request = this.requestManager.getRequest(requestId);
+      if(request) {
+        const owner = collateralPlugin.getPeerWallet(peerId);
+        if(owner) {
+          this.requestManager.addError(requestId, owner, otherParts);
+        }
+      }
+      return;
+    }
     try {
       let {sign, memWrite} = data;
       // let request = await Request.findOne({_id: sign.request})
