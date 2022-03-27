@@ -76,7 +76,7 @@ module.exports = {
                 let {price, address, action, chain} = result
 
                 return soliditySha3([
-                    { type: 'uint8', value: this.APP_ID },
+                    { type: 'uint32', value: this.APP_ID },
                     { type: 'address', value: String(address) },
                     { type: 'uint256', value: String(price) },
                     { type: 'uint256', value: String(ACTIONS[action]) },
