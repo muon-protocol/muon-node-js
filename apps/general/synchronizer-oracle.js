@@ -44,7 +44,7 @@ module.exports = {
                     .then(({ data }) => data)
 
                 const timestamp = tokens['timestamp']
-                if (currentTimestamp - timestamp > 7 * 60) {
+                if (currentTimestamp - timestamp > 2.5 * 60) {
                     throw { message: 'Price is outdated' }
                 }
 
@@ -76,11 +76,11 @@ module.exports = {
                 let {price, address, action, chain} = result
 
                 return soliditySha3([
+                    { type: 'uint8', value: this.APP_ID },
                     { type: 'address', value: String(address) },
                     { type: 'uint256', value: String(price) },
                     { type: 'uint256', value: String(ACTIONS[action]) },
                     { type: 'uint256', value: String(CHAINS[chain]) },
-                    { type: 'uint8', value: this.APP_ID },
                     { type: 'uint256', value: request.data.timestamp }
                 ])
 
