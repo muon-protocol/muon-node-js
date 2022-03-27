@@ -38,6 +38,7 @@ class AppRequestManager{
       requestCache.set(req._id.toString(), {
         request: req,
         signatures: {},
+        errors: {},
         promise: null,
       });
     }
@@ -58,10 +59,35 @@ class AppRequestManager{
     }
   }
 
+  addError(reqId, owner, error) {
+    console.log('request error', reqId, owner, error);
+    let item = this.getItem(reqId);
+    if(item.errors[owner] === undefined){
+      item.errors[owner] = error
+      if(this.isRequestFailed(reqId)){
+        if(item.promise)
+          item.promise.reject({
+            message: "Request failed because of 2 nodes failure.",
+            data: {
+              responses: item.signatures,
+              errors: item.errors
+            }
+          })
+      }
+    }
+  }
+
   isRequestFullFilled(_id){
     let item = this.getItem(_id);
     let {request: {nSign}, signatures: sigs} = item
     return !!sigs && Object.keys(sigs).length >= nSign;
+  }
+
+  isRequestFailed(_id){
+    let item = this.getItem(_id);
+    let {request: {nSign}, errors} = item
+    // TODO: calculate amount of error
+    return !!errors && Object.keys(errors).length >= 2;
   }
 
   onRequestSignFullFilled(_id){

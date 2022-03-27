@@ -59,6 +59,11 @@ class BaseTssAppPlugin extends BaseAppPlugin {
           .then(this.__onRemoteSignRequest.bind(this))
           .catch(e => {
             // console.log('base-tss-app-plugin: on broadcast request error', e)
+            return this.__onRemoteSignRequest(null, {
+              request: request._id.toString(),
+              peerId: peer.id,
+              ...e
+            });
           })
       })
   }
