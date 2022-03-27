@@ -4,6 +4,7 @@ const { getWeb3 } = require('./node-utils/eth')
 async function multiCall(chainId, contractCallContext) {
   try {
     const web3 = await getWeb3(chainId)
+    console.log(web3)
     const multicall = new Multicall({ web3Instance: web3, tryAggregate: true })
     let { results } = await multicall.call(contractCallContext)
     results = contractCallContext.map((item) => ({
