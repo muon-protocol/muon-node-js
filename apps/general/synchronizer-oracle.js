@@ -33,13 +33,20 @@ module.exports = {
 
         switch (method) {
             case 'signature':
-                let { tokenId, action, chain, useMultiplier } = params
+                let { tokenId, action, chain, useMultiplier} = params
 
                 const address = web3.utils.toChecksumAddress(tokenId);
 
+                const currentTimestamp = Date.now() / 1000
+
                 const tokens = await axios
-                    .get(`${SYNCHRONIZER_SERVER}/${chain}/signatures.json?timestamp=${Date.now()}`)
+                    .get(`${SYNCHRONIZER_SERVER}/${chain}/signatures.json?timestamp=${currentTimestamp}`)
                     .then(({ data }) => data)
+
+                const timestamp = tokens['timestamp']
+                if (currentTimestamp - timestamp > 2.5 * 60) {
+                    throw { message: 'Price is outdated' }
+                }
 
                 if (!(address in tokens)) {
                     throw { message: 'Unknown token address' }
@@ -47,16 +54,11 @@ module.exports = {
 
                 const token = tokens[tokenId]
 
-                let multiplier = useMultiplier ? 4 : 0;
-
                 return {
-                    useMultiplier: useMultiplier,
-                    multiplier: multiplier,
                     price: token.price,
                     address: address,
-                    expireBlock: token.blockNo,
                     action: action,
-                    chain: chain
+                    chain: chain,
                 }
 
             default:
@@ -71,24 +73,17 @@ module.exports = {
         } = request
         switch (method) {
             case 'signature': {
-                let { useMultiplier, multiplier, price, address, expireBlock, action, chain } = result
+                let {price, address, action, chain} = result
 
-                let abi = []
-
-                if (useMultiplier) {
-                    abi.push({ type: 'uint256', value: String(multiplier) })
-                }
-
-                abi.push(...[
+                return soliditySha3([
+                    { type: 'uint32', value: this.APP_ID },
                     { type: 'address', value: String(address) },
                     { type: 'uint256', value: String(price) },
-                    { type: 'uint256', value: String(expireBlock) },
                     { type: 'uint256', value: String(ACTIONS[action]) },
                     { type: 'uint256', value: String(CHAINS[chain]) },
-                    { type: 'uint8', value: this.APP_ID }
+                    { type: 'uint256', value: request.data.timestamp }
                 ])
 
-                return soliditySha3(abi)
             }
             default:
                 return null
