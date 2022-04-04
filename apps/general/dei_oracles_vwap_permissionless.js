@@ -168,12 +168,16 @@ async function LPTokenPrice(token, pairs0, pairs1){
 
   let totalUSDA = reserveA;
   if(pairs0.length){
-    totalUSDA = await tokenVWAP(metadata.t0, pairs0);
+    totalUSDA = reserveA.mul(
+      await tokenVWAP(metadata.t0, pairs0)
+    ).div(SCALE);
   }
 
   let totalUSDB = reserveB;
   if(pairs1.length){
-    totalUSDB = await tokenVWAP(metadata.t1, pairs1);
+    totalUSDB = reserveB.mul(
+      await tokenVWAP(metadata.t1, pairs1)
+    ).div(SCALE);
   }  
 
   let totalUSD = totalUSDA.add(totalUSDB);
