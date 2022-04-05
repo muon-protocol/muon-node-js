@@ -70,9 +70,11 @@ class GatewayInterface extends BasePlugin{
       }
       catch (e) {
         console.error('gateway-interface error', e)
+        let {message, data: errorData} = e;
         responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
           responseId: data ? data.callId : undefined,
-          error: e.message || "GatewayInterface: Unknown error occurred",
+          error: message || "GatewayInterface: Unknown error occurred",
+          data: errorData,
         }))
       }
     }

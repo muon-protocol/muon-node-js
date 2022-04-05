@@ -48,25 +48,20 @@ module.exports = {
   },
 
   hashRequestResult: function (request, result) {
-    let {
-      method,
-      data: { params }
-    } = request
+    let { method } = request
 
     switch (method) {
       case 'claim':
-        let { depositAddress } = params
         let { txId, tokenId, amount, fromChain, toChain, user } = result
 
         return soliditySha3([
-          { type: 'address', value: depositAddress },
+          { type: 'uint32', value: this.APP_ID },
           { type: 'uint256', value: txId },
           { type: 'uint256', value: tokenId },
           { type: 'uint256', value: amount },
           { type: 'uint256', value: fromChain },
           { type: 'uint256', value: toChain },
-          { type: 'address', value: user },
-          { type: 'uint8', value: this.APP_ID }
+          { type: 'address', value: user }
         ])
 
       default:
