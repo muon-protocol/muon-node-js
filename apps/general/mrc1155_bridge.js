@@ -21,7 +21,7 @@ const ABI_getTx = [
 
 module.exports = {
   APP_NAME: 'mrc1155_bridge',
-  APP_ID: 16,
+  APP_ID: 17,
 
   onRequest: async function (request) {
     let {
