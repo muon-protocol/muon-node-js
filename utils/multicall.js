@@ -4,7 +4,6 @@ const { getWeb3 } = require('./node-utils/eth')
 async function multiCall(chainId, contractCallContext) {
   try {
     const web3 = await getWeb3(chainId)
-    console.log(web3)
     const multicall = new Multicall({ web3Instance: web3, tryAggregate: true })
     let { results } = await multicall.call(contractCallContext)
     results = contractCallContext.map((item) => ({
@@ -13,9 +12,11 @@ async function multiCall(chainId, contractCallContext) {
       callsReturnContext: results[item.reference]['callsReturnContext'].map(
         (callReturn) => ({
           ...callReturn,
-          returnValues: callReturn['returnValues'].map((value) =>
-            web3.utils.hexToNumberString(value.hex)
-          )
+          returnValues: callReturn['returnValues'].map((value) => {
+            if (typeof value === 'object' && 'hex' in value)
+              return web3.utils.hexToNumberString(value.hex)
+            else return value
+          })
         })
       )
     }))
