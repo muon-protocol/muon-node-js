@@ -27,6 +27,7 @@ function getMilestoneReached(address, signature, message, amount, chain) {
 
 module.exports = {
   APP_NAME: 'fear_game',
+  REMOTE_CALL_TIMEOUT: 30000,
 
   onRequest: async (request) => {
     let {
