@@ -1,6 +1,6 @@
 var mongoose = require('mongoose');
 const {MODEL_CONTENT} = require('./constants')
-const {strToCID} = require('../../utils/node-utils/common')
+const {strToCID, cid2str} = require('../../utils/node-utils/common')
 
 var modelSchema = mongoose.Schema({
   cid: {type: String, required: true},
@@ -16,7 +16,7 @@ module.exports.create = async data => {
   let cid = await strToCID(content)
 
   return new Model({
-    cid: cid.toString(),
+    cid: cid2str(cid),
     content,
     data
   })

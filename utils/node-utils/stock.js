@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const CID = require('cids')
-const multihashing = require('multihashing-async')
+const {strToCID} = require('./common')
 const Request = require('../../gateway/models/Request')
 const Signature = require('../../gateway/models/Signature')
 const {getTimestamp} = require('../helpers')
@@ -37,11 +36,7 @@ function recoverSignature(request, signature){
 }
 
 async function createCID(request) {
-  const bytes = new TextEncoder('utf8').encode(`${process.env.PEER_ID}${request._id}`)
-
-  const hash = await multihashing(bytes, 'sha2-256')
-  const cid = new CID(0, 'dag-pb', hash)
-  return cid.toString()
+  return strToCID(JSON.stringify(request));
 }
 
 module.exports = {
