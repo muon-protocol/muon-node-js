@@ -302,7 +302,7 @@ class BaseAppPlugin extends CallablePlugin {
     try {
       // let data = JSON.parse(uint8ArrayToString(msg.data))
       if (data && data.type === 'new_request') {
-        let peerId = PeerId.createFromCID(data.peerId)
+        let peerId = PeerId.createFromB58String(data.peerId)
         let peer = await this.findPeer(peerId)
         let request = await remoteCall.call(
           peer,
