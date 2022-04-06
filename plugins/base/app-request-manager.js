@@ -65,10 +65,16 @@ class AppRequestManager{
     if(item.errors[owner] === undefined){
       item.errors[owner] = error
       if(this.isRequestFailed(reqId)){
+        const req = this.getRequest(reqId);
         if(item.promise)
           item.promise.reject({
             message: "Request failed because of 2 nodes failure.",
             data: {
+              app: {
+                name: req.app,
+                method: req.method,
+                params: req.data.params,
+              },
               responses: item.signatures,
               errors: item.errors
             }
