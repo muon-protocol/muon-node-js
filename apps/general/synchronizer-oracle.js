@@ -2,9 +2,10 @@ const { axios, soliditySha3, ethCall } = MuonAppUtils
 const web3 = require('web3');
 
 const OLD_SYNCHRONIZER_SERVER = 'https://oracle1.deus.finance'
-const SYNCHRONIZER_SERVER = 'http://159.65.88.246'
+const SYNCHRONIZER_SERVER = 'https://oracle1.deus.finance'
 
-const SHORT_BUY_MAX_RATIO = 85;
+const MIN_RATIO = 10;
+const MIN_BUY_RATIO = 15;
 
 const ACTIONS = {
     close: 0,
@@ -75,7 +76,7 @@ module.exports = {
                 const currentTimestamp = Date.now() / 1000
 
                 const priceInfo = await axios
-                    .get(`${SYNCHRONIZER_SERVER}/price?address=${address}&network=${chain}&id=${id}&timestamp=${currentTimestamp}`)
+                    .get(`${SYNCHRONIZER_SERVER}/v2/price?address=${address}&network=${chain}&id=${id}&timestamp=${currentTimestamp}`)
                     .then(({ data }) => data)
 
                 if ('error' in priceInfo) {
@@ -90,7 +91,10 @@ module.exports = {
                 } else if (marketStatus == 'frozen') {
                     throw { message: "token is frozen" }
                 } else if (marketStatus == 'open') {
-                    if (action == ACTIONS['buy'] && priceInfo.ratio > SHORT_BUY_MAX_RATIO) {
+                    if (priceInfo.ratio <= MIN_RATIO) {
+                        throw { message: "invalid price range" }
+                    }
+                    if (action == ACTIONS['buy'] && priceInfo.ratio <= MIN_BUY_RATIO) {
                         throw { message: "invalid price range for buying" }
                     }
 
