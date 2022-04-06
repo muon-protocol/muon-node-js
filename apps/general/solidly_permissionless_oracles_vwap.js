@@ -267,7 +267,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     }))
     totalUSDA = (await tokenVWAP(metadata.t0, pairs0, pairs0Metadata)).mul(
       reserveA
-    );
+    ).div(SCALE);
   }
 
   let totalUSDB = reserveB
@@ -286,7 +286,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     }))
     totalUSDB = (await tokenVWAP(metadata.t1, pairs1, pairs1Metadata)).mul(
       reserveB
-    );
+    ).div(SCALE);
   }
 
   let totalUSD = totalUSDA.add(totalUSDB)
