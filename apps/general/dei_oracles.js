@@ -1,7 +1,5 @@
 const { soliditySha3, BN, multiCall } = MuonAppUtils
 
-const getTimestamp = () => Math.floor(Date.now() / 1000)
-
 const SOLIDEX_DEPOSIT_ZAP = 'SolidexDepositZap'
 const ERC20 = 'ERC20'
 const SPIRIT_ROUTER = 'SpiritRouter'
@@ -69,25 +67,23 @@ const LP_TOKENS = {
 }
 
 const TOKENS = {
-	DEUS: {
-		pool: {
-			pair: "",//TODO: fixme
-			index: 0,// TODO: fixme
-			pairToken: DEI
-		}
-	},
-	DEI: {
-
-	}
+  DEUS: {
+    pool: {
+      pair: '', //TODO: fixme
+      index: 0, // TODO: fixme
+      pairToken: DEI
+    }
+  },
+  DEI: {}
 }
 
-const PRICE_TOLERANCE = 0.05;
-const FANTOM_ID = 250;
-const SCALE = new BN('1000000000000000000');
+const PRICE_TOLERANCE = 0.05
+const FANTOM_ID = 250
+const SCALE = new BN('1000000000000000000')
 
-async function tokenPrice(token){
-  if(token==USDC){
-    return SCALE;
+async function tokenPrice(token, ret) {
+  if (token == USDC) {
+    return SCALE
   }
   if (token == DEI) {
     return new BN(ret[1]).mul(new BN('1000000000000'))
@@ -96,51 +92,86 @@ async function tokenPrice(token){
 
   // if(token exists on TOKENS){
   // pool = TOKENS[token].pool;
-  // 	tokenPrice(pool.pairToken) * 
+  // 	tokenPrice(pool.pairToken) *
   // 	tvwap(token, pool.index, pool.pair) // 1 DEUS = ? DEI
   // }
 
   // {pair, token, index}
 }
 
-async function LPTokenPrice(token){
-  let tokenParams = LP_TOKENS[token];
-  let reserves = await ethCall(
-    BASE_ROUTER_CONTRACT,
-    'getReserves',
-    //TODO: add true/false to LP_TOKENS
-    [tokenParams.tokenA.address, tokenParams.tokenB.address, true],
-    BASE_ROUTER_ABI,
-    FANTOM_ID
-  );
+async function LPTokenPrice(token) {
+  let tokenParams = LP_TOKENS[token]
 
-  let totalSupply = new BN(await ethCall(
-    token,
-    'totalSupply',
-    [],
-    ERC20_ABI,
-    FANTOM_ID
-  ));
+  const contractCallContext = [
+    {
+      reference: SPIRIT_ROUTER,
+      contractAddress: SPIRIT_SWAP_CONTRACT,
+      abi: SPIRIT_SWAP_ABI,
+      calls: [
+        {
+          reference: SPIRIT_ROUTER,
+          methodName: 'getAmountsOut',
+          methodParameters: [SCALE.toString(), [DEI, USDC]]
+        }
+      ]
+    },
+    {
+      reference: SOLIDEX_DEPOSIT_ZAP,
+      contractAddress: BASE_ROUTER_CONTRACT,
+      abi: GET_RESERVES_ABI,
+      calls: [
+        {
+          reference: SOLIDEX_DEPOSIT_ZAP,
+          methodName: 'getReserves',
+          methodParameters: [
+            tokenParams.tokenA.address,
+            tokenParams.tokenB.address,
+            true
+          ]
+        }
+      ]
+    },
+    {
+      reference: ERC20,
+      contractAddress: token,
+      abi: TOTAL_SUPPLY_ABI,
+      calls: [
+        {
+          reference: ERC20,
+          methodName: 'totalSupply'
+        }
+      ]
+    }
+  ]
 
-  let reserveA = (new BN(reserves.reserveA)).mul(
-    tokenParams.tokenA.scale
-  );
-  let reserveB = (new BN(reserves.reserveB)).mul(
-    tokenParams.tokenB.scale
-  );
-  console.log(reserveA.toString(), reserveB.toString());
+  let result = await multiCall(FANTOM_ID, contractCallContext)
 
-  let totalUSDA = reserveA.mul(await tokenPrice(
-    tokenParams.tokenA.address
-  )).div(SCALE);
+  let reserves = result.find((item) => item.reference === SOLIDEX_DEPOSIT_ZAP)
+    .callsReturnContext[0].returnValues
 
-  let totalUSDB = reserveB.mul(await tokenPrice(
-    tokenParams.tokenB.address
-  )).div(SCALE);
+  let totalSupply = new BN(
+    result.find(
+      (item) => item.reference === ERC20
+    ).callsReturnContext[0].returnValues[0]
+  )
 
-  let totalUSD = totalUSDA.add(totalUSDB);
+  const ret = result.find((item) => item.reference === SPIRIT_ROUTER)
+    .callsReturnContext[0].returnValues
 
-  return totalUSD.mul(SCALE).div(totalSupply).toString();
+  let reserveA = new BN(reserves[0]).mul(tokenParams.tokenA.scale)
+  let reserveB = new BN(reserves[1]).mul(tokenParams.tokenB.scale)
+
+  let totalUSDA = reserveA
+    .mul(await tokenPrice(tokenParams.tokenA.address, ret))
+    .div(SCALE)
+
+  let totalUSDB = reserveB
+    .mul(await tokenPrice(tokenParams.tokenB.address, ret))
+    .div(SCALE)
+
+  let totalUSD = totalUSDA.add(totalUSDB)
+
+  return totalUSD.mul(SCALE).div(totalSupply).toString()
 }
 
 module.exports = {
@@ -156,24 +187,23 @@ module.exports = {
 
     switch (method) {
       case 'lp_price': {
-        let {token, hashTimestamp} = params;
-        let currentTime = getTimestamp();
+        let { token, hashTimestamp } = params
 
-        if(!LP_TOKENS[token] && !TOKENS[token]){
-          throw "Invalid token";
+        if (!LP_TOKENS[token] && !TOKENS[token]) {
+          throw 'Invalid token'
         }
 
-        var tokenPrice = 0;
-        if(LP_TOKENS[token]){
-        	tokenPrice = await LPTokenPrice(token);
-        }else{
-        	tokenPrice = await tokenPrice(token);
+        var tokenPrice = 0
+        if (LP_TOKENS[token]) {
+          tokenPrice = await LPTokenPrice(token)
+        } else {
+          tokenPrice = await tokenPrice(token)
         }
 
         return {
           token: token,
           tokenPrice: tokenPrice,
-          ...(hashTimestamp ? {timestamp: request.data.timestamp} : {})
+          ...(hashTimestamp ? { timestamp: request.data.timestamp } : {})
         }
       }
 
@@ -194,9 +224,8 @@ module.exports = {
     let {
       method,
       data: { params }
-    } = request;
-    console.log(result, request);
-    let { hashTimestamp } = params;
+    } = request
+    let { hashTimestamp } = params
     switch (method) {
       case 'lp_price': {
         if (
