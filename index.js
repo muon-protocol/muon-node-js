@@ -7,7 +7,7 @@ const BaseService = require('./plugins/base/base-service-plugin')
 const BaseTssApp = require('./plugins/base/base-tss-app-plugin')
 const Gateway = require('./gateway/index')
 require('./core/global')
-const bootstrap = require('./core/bootstrap');
+const bootstrap = require('./core/bootstrap')
 
 function getEnvBootstraps() {
   return Object.keys(process.env)
