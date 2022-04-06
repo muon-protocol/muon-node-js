@@ -1,12 +1,4 @@
-const {
-  axios,
-  toBaseUnit,
-  soliditySha3,
-  BN,
-  recoverTypedMessage,
-  ethCall,
-  multiCall
-} = MuonAppUtils
+const { axios, toBaseUnit, soliditySha3, BN, multiCall } = MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 const BASE_PAIR_METADATA = [
@@ -83,7 +75,6 @@ async function getTokenTxs(pairAddr) {
 async function tokenVWAP(token, pairs) {
   var pairPrices = []
   var inputToken = token
-
   const contractCallContext = pairs.map((pair) => ({
     reference: pair,
     contractAddress: pair,
@@ -96,7 +87,7 @@ async function tokenVWAP(token, pairs) {
     ]
   }))
   let result = await multiCall(FANTOM_ID, contractCallContext)
-  let metadata=   result.map((item) => ({
+  let metadata = result.map((item) => ({
     dec0: item.callsReturnContext[0].returnValues[0],
     dec1: item.callsReturnContext[0].returnValues[1],
     r0: item.callsReturnContext[0].returnValues[2],
@@ -105,10 +96,8 @@ async function tokenVWAP(token, pairs) {
     t0: item.callsReturnContext[0].returnValues[5],
     t1: item.callsReturnContext[0].returnValues[6]
   }))
-  console.log({ result: JSON.stringify(metadata, undefined, 2) })
 
   for (var i = 0; i < pairs.length; i++) {
-
     var index = inputToken.toLowerCase() == metadata[i].t0.toLowerCase() ? 0 : 1
 
     if (inputToken.toLowerCase() == metadata[i].t0.toLowerCase()) {
@@ -171,7 +160,7 @@ async function pairVWAP(pair, index) {
     }
     if (sumVolume > new BN('0')) {
       let tokenPrice = sumWeightedPrice.div(sumVolume)
-      console.log('Pair', pair, 'VWAP:', tokenPrice.toString())
+      // console.log('Pair', pair, 'VWAP:', tokenPrice.toString())
       return tokenPrice
     }
   }
@@ -179,23 +168,47 @@ async function pairVWAP(pair, index) {
 }
 
 async function LPTokenPrice(token, pairs0, pairs1) {
-  //TODO: use multicall
-  let metadata = await ethCall(
-    token,
-    'metadata',
-    [],
-    BASE_PAIR_METADATA,
-    FANTOM_ID
-  )
-  let totalSupply = new BN(
-    await ethCall(token, 'totalSupply', [], ERC20_ABI, FANTOM_ID)
-  )
+  const contractCallContext = [
+    {
+      reference: 'metaData',
+      contractAddress: token,
+      abi: BASE_PAIR_METADATA,
+      calls: [
+        {
+          reference: token,
+          methodName: 'metadata'
+        }
+      ]
+    },
+    {
+      reference: 'totalSupply',
+      contractAddress: token,
+      abi: ERC20_ABI,
+      calls: [
+        {
+          reference: token,
+          methodName: 'totalSupply'
+        }
+      ]
+    }
+  ]
+  let result = await multiCall(FANTOM_ID, contractCallContext)
+  let metadata = {
+    dec0: result[0].callsReturnContext[0].returnValues[0],
+    dec1: result[0].callsReturnContext[0].returnValues[1],
+    r0: result[0].callsReturnContext[0].returnValues[2],
+    r1: result[0].callsReturnContext[0].returnValues[3],
+    st: result[0].callsReturnContext[0].returnValues[4],
+    t0: result[0].callsReturnContext[0].returnValues[5],
+    t1: result[0].callsReturnContext[0].returnValues[6]
+  }
+  let totalSupply = new BN(result[1].callsReturnContext[0].returnValues[0])
 
   let reserveA = new BN(metadata.r0).mul(SCALE).div(new BN(metadata.dec0))
 
   let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
 
-  console.log('reserves', reserveA.toString(), reserveB.toString())
+  // console.log('reserves', reserveA.toString(), reserveB.toString())
 
   let totalUSDA = reserveA
   if (pairs0.length) {
