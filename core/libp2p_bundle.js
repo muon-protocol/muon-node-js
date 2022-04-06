@@ -6,7 +6,7 @@ const Multiplex = require('libp2p-mplex')
 const SECIO = require('libp2p-secio')
 const { NOISE } = require('libp2p-noise')
 const Gossipsub = require('libp2p-gossipsub')
-const KadDHT = require('libp2p-kad-dht')
+const KadDHT = require('libp2p-kad-dht');
 
 const DEFAULT_OPTS = {
   modules: {
