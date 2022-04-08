@@ -7,13 +7,14 @@ const SECIO = require('libp2p-secio')
 const { NOISE } = require('libp2p-noise')
 const Gossipsub = require('libp2p-gossipsub')
 const KadDHT = require('libp2p-kad-dht');
+const MulticastDNS = require('libp2p-mdns')
 
 const DEFAULT_OPTS = {
   modules: {
     transport: [
       TCP,
     ],
-    peerDiscovery: [Bootstrap],
+    peerDiscovery: [Bootstrap, MulticastDNS],
     connEncryption: [
       // SECIO,
       NOISE,
