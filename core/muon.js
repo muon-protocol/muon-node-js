@@ -125,7 +125,7 @@ class Muon extends Events {
     // // wait for first peer connect;
     // await this.firstPeerConnect.waitToFulfill();
 
-    console.log(`muon started (node-js version ${process.versions.node}).`)
+    console.log(`muon started at ${new Date()} (node-js version ${process.versions.node}).`)
     for (let pluginName in this._plugins) {
       this._plugins[pluginName].onStart()
     }
