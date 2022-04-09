@@ -244,6 +244,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     t0: tokenMetaData.callsReturnContext[0].returnValues[5],
     t1: tokenMetaData.callsReturnContext[0].returnValues[6]
   }
+  console.log(JSON.stringify(metadata, undefined, 2))
   let totalSupply = result.find((item) => item.reference === TOTAL_SUPPLY)
   totalSupply = new BN(totalSupply.callsReturnContext[0].returnValues[0])
 
@@ -265,9 +266,9 @@ async function LPTokenPrice(token, pairs0, pairs1) {
       t0: item.callsReturnContext[0].returnValues[5],
       t1: item.callsReturnContext[0].returnValues[6]
     }))
-    totalUSDA = (await tokenVWAP(metadata.t0, pairs0, pairs0Metadata)).mul(
-      reserveA
-    ).div(SCALE);
+    totalUSDA = (await tokenVWAP(metadata.t0, pairs0, pairs0Metadata))
+      .mul(reserveA)
+      .div(SCALE)
   }
 
   let totalUSDB = reserveB
@@ -284,9 +285,9 @@ async function LPTokenPrice(token, pairs0, pairs1) {
       t0: item.callsReturnContext[0].returnValues[5],
       t1: item.callsReturnContext[0].returnValues[6]
     }))
-    totalUSDB = (await tokenVWAP(metadata.t1, pairs1, pairs1Metadata)).mul(
-      reserveB
-    ).div(SCALE);
+    totalUSDB = (await tokenVWAP(metadata.t1, pairs1, pairs1Metadata))
+      .mul(reserveB)
+      .div(SCALE)
   }
 
   let totalUSD = totalUSDA.add(totalUSDB)
