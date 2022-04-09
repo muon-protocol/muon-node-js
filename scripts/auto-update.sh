@@ -55,7 +55,7 @@ done
 if [[ "$action" == "setup" ]]
 then
     log `setup`;
-    exit 1;
+    exit 0;
 elif [[ "$action" == "update" ]]
 then
     check_for_update;
