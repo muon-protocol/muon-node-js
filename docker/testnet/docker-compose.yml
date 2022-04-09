@@ -22,7 +22,7 @@ services:
   muon_mongo:
     container_name: mongo
     image: mongo
-    command: --quiet
+    command: --quiet --logpath /dev/null
   muon_redis:
     container_name: redis
     image: redis:6
