@@ -72,11 +72,8 @@ class TssPlugin extends CallablePlugin {
 
     // TODO: peer finding fail if immediately try to join group
     // setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
-    this.muon.once('peer', async () => {
+    this.muon.once('peer', () => {
       console.log('first node connected ...')
-
-      /** wait for propagation */
-      await timeout(5000);
       this.joinToGroup();
     })
   }
