@@ -60,7 +60,7 @@ const PRICE_TOLERANCE = 0.05
 const FANTOM_ID = 250
 const SCALE = new BN('1000000000000000000')
 const GRAPH_URL =
-  'https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap'
+  'https://api.thegraph.com/subgraphs/name/shayanshiravani/spookyswap'
 
 async function getTokenTxs(pairAddr) {
   try {
@@ -361,8 +361,8 @@ async function LPTokenPrice(token, pairs0, pairs1) {
 }
 
 module.exports = {
-  APP_NAME: 'spirit_permissionless_oracles_vwap',
-  APP_ID: 17,
+  APP_NAME: 'spooky_permissionless_oracles_vwap',
+  APP_ID: 18,
 
   onRequest: async function (request) {
     let {
