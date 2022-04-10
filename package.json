@@ -43,7 +43,7 @@
     "libp2p-kad-dht": "0.28.6",
     "libp2p-mdns": "0.18.0",
     "libp2p-mplex": "0.10.7",
-    "libp2p-noise": "4.0.0",
+    "libp2p-noise": "3.1.0",
     "libp2p-secio": "0.13.1",
     "libp2p-tcp": "0.17.2",
     "libp2p-webrtc-star": "0.25.0",
@@ -64,8 +64,9 @@
     "ws": "^7.4.5"
   },
   "devDependencies": {
-    "@babel/core": "^7.14.0",
-    "@babel/node": "^7.13.13",
+    "@babel/core": "^7.17.9",
+    "@babel/helper-compilation-targets": "^7.17.7",
+    "@babel/node": "^7.16.8",
     "@babel/plugin-proposal-decorators": "^7.13.15",
     "@babel/preset-env": "^7.14.1",
     "chalk": "^4.1.0",
