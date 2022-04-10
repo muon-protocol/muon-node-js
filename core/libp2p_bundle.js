@@ -16,8 +16,8 @@ const DEFAULT_OPTS = {
     ],
     peerDiscovery: [Bootstrap, MulticastDNS],
     connEncryption: [
-      // SECIO,
-      NOISE,
+      SECIO,
+      // NOISE,
     ],
     streamMuxer: [
       Multiplex
