@@ -26,4 +26,4 @@ COPY config/* ./config/
 RUN apt-get update && apt-get -y install cron
 RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-devnet'
 
-CMD [ "pm2-runtime", "start", "ecosystem.config.js" ]
+CMD cron & pm2-runtime start ecosystem.config.js
