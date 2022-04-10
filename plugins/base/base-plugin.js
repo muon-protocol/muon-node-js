@@ -1,8 +1,8 @@
 const Events = require('events-async')
 const PeerId = require('peer-id')
 const crypto = require('../../utils/crypto')
-const uint8ArrayFromString = require('uint8arrays/from-string').fromString
-const uint8ArrayToString = require('uint8arrays/to-string').toString
+const uint8ArrayFromString = require('uint8arrays/from-string')
+const uint8ArrayToString = require('uint8arrays/to-string')
 
 module.exports = class BasePlugin extends Events{
   muon = null;
@@ -31,7 +31,7 @@ module.exports = class BasePlugin extends Events{
 
   async findPeer(peerId){
     if(!PeerId.isPeerId(peerId))
-      peerId = PeerId.createFromB58String(peerId)
+      peerId = PeerId.createFromCID(peerId)
     try {
       return await this.muon.libp2p.peerRouting.findPeer(peerId)
     }

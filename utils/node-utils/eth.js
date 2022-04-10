@@ -2,7 +2,8 @@ const Web3 = require('web3')
 const EventEmbitter = require('events')
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
-const {strToCID} = require('./common')
+const CID = require('cids')
+const multihashing = require('multihashing-async')
 const { flattenObject, sortObject, getTimestamp } = require('../helpers')
 const crypto = require('../crypto')
 const ERC20_ABI = require('../../data/ERC20-ABI')
@@ -253,7 +254,11 @@ function recoverSignature(request, sign) {
 }
 
 async function createCID(request) {
-  return strToCID(JSON.stringify(request));
+  const bytes = new TextEncoder('utf8').encode(JSON.stringify(request))
+
+  const hash = await multihashing(bytes, 'sha2-256')
+  const cid = new CID(0, 'dag-pb', hash)
+  return cid.toString()
 }
 
 const subscribeLogEvent = (

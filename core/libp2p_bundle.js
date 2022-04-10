@@ -6,18 +6,17 @@ const Multiplex = require('libp2p-mplex')
 const SECIO = require('libp2p-secio')
 const { NOISE } = require('libp2p-noise')
 const Gossipsub = require('libp2p-gossipsub')
-const KadDHT = require('libp2p-kad-dht');
-const MulticastDNS = require('libp2p-mdns')
+const KadDHT = require('libp2p-kad-dht')
 
 const DEFAULT_OPTS = {
   modules: {
     transport: [
       TCP,
     ],
-    peerDiscovery: [Bootstrap, MulticastDNS],
+    peerDiscovery: [Bootstrap],
     connEncryption: [
-      SECIO,
-      // NOISE,
+      // SECIO,
+      NOISE,
     ],
     streamMuxer: [
       Multiplex

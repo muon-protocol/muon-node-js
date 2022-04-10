@@ -37,10 +37,6 @@ class Muon extends Events {
       },
       config: {
         peerDiscovery: {
-          mdns: {
-            interval: 20e3,
-            enabled: true
-          },
           [Node.Bootstrap.tag]: {
             list: [...configs.bootstrap],
             interval: 5000, // default is 10 ms,

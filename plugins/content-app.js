@@ -1,9 +1,8 @@
 const BaseApp = require('./base/base-app-plugin')
 const Content = require('../gateway/models/Content')
+const CID = require('cids')
 const all = require('it-all')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
-const {loadCID} = require('../utils/node-utils/common')
-const {timeout} = require('../utils/helpers')
 
 @remoteApp
 class ContentApp extends BaseApp {
@@ -18,23 +17,10 @@ class ContentApp extends BaseApp {
   async onStart() {
     this.muon.getPlugin('gateway-interface').on('confirmed', this.onGatewayConfirmed.bind(this))
 
-    this.muon.once('peer', () => {
-      this.provideContents();
-    })
-  }
-
-  async provideContents() {
-    /** wait to DHT load peer info */
-    await timeout(2000);
-
-    try {
-      let contents = await Content.find({});
-      for (let i in contents) {
-        let {cid} = contents[i]
-        await this.muon.libp2p.contentRouting.provide(loadCID(cid));
-      }
-    }catch (e) {
-      console.error("ERROR: ContentApp.provideContents", e)
+    let contents = await Content.find({});
+    for(let i in contents) {
+      let {cid} = contents[i]
+      await this.muon.libp2p.contentRouting.provide(new CID(cid))
     }
   }
 
@@ -77,7 +63,7 @@ class ContentApp extends BaseApp {
     if(content){
       return this.prepareOutput(content.content, format);
     }else{
-      let cid = loadCID(data.cid);
+      let cid = new CID(data.cid);
       let providers = await all(this.muon.libp2p.contentRouting.findProviders(cid, {timeout: 5000}))
       for(let provider of providers){
         if(provider.id.toB58String() !== process.env.PEER_ID){
