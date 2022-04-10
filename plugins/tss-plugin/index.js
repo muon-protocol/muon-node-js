@@ -380,7 +380,7 @@ class TssPlugin extends CallablePlugin {
       keysCache.set(key.id, key, 0) // keep for ever
       this.tssKey = key;
       this.isReady = true;
-      this.informJoinedToGroup()
+      this.informJoinedToGroup();
       console.log('tss ready.')
     } catch (e) {
       console.error('TssPlugin.tryToCreateTssParty', e, e.stack);
