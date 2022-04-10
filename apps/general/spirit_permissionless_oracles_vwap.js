@@ -5,6 +5,7 @@ const TOKEN_INFO = 'tokenInfo'
 const TOTAL_SUPPLY = 'totalSupply'
 const PAIRS0_INFO = 'pairs0INFO'
 const PAIRS1_INFO = 'pairs1INFO'
+const PAIRS_INFO = 'pairsINFO'
 
 const SPIRIT_ABI = [
   {
@@ -104,83 +105,111 @@ function getInfoContract(multiCallInfo, filterBy) {
   return multiCallInfo.filter((item) => item.reference.startsWith(filterBy))
 }
 
+function getMetadata(multiCallInfo, filterBy) {
+  const info = getInfoContract(multiCallInfo, filterBy)
+  let metadata = info.map((item) => {
+    const reserves = getReturnValue(item.callsReturnContext, 'getReserves')
+
+    return {
+      r0: reserves[0],
+      r1: reserves[1],
+
+      t0: getReturnValue(item.callsReturnContext, 'token0')[0],
+      t1: getReturnValue(item.callsReturnContext, 'token1')[0]
+    }
+  })
+  return metadata
+}
+
+function makeCallContextInfo(info, prefix) {
+  const contractCallContext = info.map((item) => ({
+    reference: prefix + ':' + item,
+    contractAddress: item,
+    abi: SPIRIT_ABI,
+    calls: [
+      {
+        reference: prefix + ':' + item,
+        methodName: 'getReserves'
+      },
+      {
+        reference: prefix + ':' + item,
+        methodName: 'token0'
+      },
+      {
+        reference: prefix + ':' + item,
+        methodName: 'token1'
+      }
+    ]
+  }))
+
+  return contractCallContext
+}
+
+function makeCallContextDecimal(metadata, prefix) {
+  let callContext = metadata.map((item) => [
+    {
+      reference: prefix + ':' + 't0' + ':' + item.t0,
+      contractAddress: item.t0,
+      abi: ERC20_DECIMALS_ABI,
+      calls: [
+        {
+          reference: 't0' + ':' + item.t0,
+          methodName: 'decimals'
+        }
+      ]
+    },
+    {
+      reference: prefix + ':' + 't1' + ':' + item.t1,
+      contractAddress: item.t1,
+      abi: ERC20_DECIMALS_ABI,
+      calls: [
+        {
+          reference: 't1' + ':' + item.t1,
+          methodName: 'decimals'
+        }
+      ]
+    }
+  ])
+
+  callContext = [].concat.apply([], callContext)
+  return callContext
+}
+
+function getFinalMetaData(resultDecimals, prevMetaData, prefix) {
+  let metadata = prevMetaData.map((item) => {
+    let t0 = getInfoContract(
+      resultDecimals,
+      prefix + ':' + 't0' + ':' + item.t0
+    )
+    let t1 = getInfoContract(
+      resultDecimals,
+      prefix + ':' + 't1' + ':' + item.t1
+    )
+    return {
+      ...item,
+      dec0: new BN(10)
+        .pow(new BN(getReturnValue(t0[0].callsReturnContext, 'decimals')[0]))
+        .toString(),
+      dec1: new BN(10)
+        .pow(new BN(getReturnValue(t1[0].callsReturnContext, 'decimals')[0]))
+        .toString()
+    }
+  })
+  return metadata
+}
+
 async function tokenVWAP(token, pairs, metadata) {
   var pairPrices = []
   var inputToken = token
   if (!metadata) {
-    const contractCallContext = pairs.map((pair) => ({
-      reference: pair,
-      contractAddress: pair,
-      abi: SPIRIT_ABI,
-      calls: [
-        {
-          reference: pair,
-          methodName: 'getReserves'
-        },
-        {
-          reference: pair,
-          methodName: 'token0'
-        },
-        {
-          reference: pair,
-          methodName: 'token1'
-        }
-      ]
-    }))
+    const contractCallContext = makeCallContextInfo(pairs, PAIRS_INFO)
     let result = await multiCall(FANTOM_ID, contractCallContext)
 
-    let pairMetadata = result.map((item) => {
-      const reserves = getReturnValue(item.callsReturnContext, 'getReserves')
+    metadata = getMetadata(result, PAIRS_INFO)
 
-      return {
-        r0: reserves[0],
-        r1: reserves[1],
-
-        t0: getReturnValue(item.callsReturnContext, 'token0')[0],
-        t1: getReturnValue(item.callsReturnContext, 'token1')[0]
-      }
-    })
-
-    let callContextPairs = pairMetadata.map((pair) => [
-      {
-        reference: 't0' + ':' + pair.t0,
-        contractAddress: pair.t0,
-        abi: ERC20_DECIMALS_ABI,
-        calls: [
-          {
-            reference: 't0' + ':' + pair.t0,
-            methodName: 'decimals'
-          }
-        ]
-      },
-      {
-        reference: 't1' + ':' + pair.t1,
-        contractAddress: pair.t1,
-        abi: ERC20_DECIMALS_ABI,
-        calls: [
-          {
-            reference: 't1' + ':' + pair.t1,
-            methodName: 'decimals'
-          }
-        ]
-      }
-    ])
-
-    callContextPairs = [].concat.apply([], callContextPairs)
+    let callContextPairs = makeCallContextDecimal(metadata, PAIRS_INFO)
     let resultDecimals = await multiCall(FANTOM_ID, callContextPairs)
-    metadata = pairMetadata.map((item) => {
-      let t0 = getInfoContract(resultDecimals, 't0' + ':' + item.t0)
-      let t1 = getInfoContract(resultDecimals, 't1' + ':' + item.t1)
-      return {
-        ...item,
-        dec0: new BN(10)
-          .pow(new BN(getReturnValue(t0[0].callsReturnContext, 'decimals')[0]))
-          .toString(),
-        dec1: new BN(10)
-          .pow(new BN(getReturnValue(t1[0].callsReturnContext, 'decimals')[0]))
-          .toString()
-      }
-    })
+    metadata = getFinalMetaData(resultDecimals, metadata, PAIRS_INFO)
   }
 
   for (var i = 0; i < pairs.length; i++) {
@@ -253,26 +282,8 @@ async function pairVWAP(pair, index) {
 }
 
 async function LPTokenPrice(token, pairs0, pairs1) {
-  const contractCallContextToken = [
-    {
-      reference: TOKEN_INFO + ':' + token,
-      contractAddress: token,
-      abi: SPIRIT_ABI,
-      calls: [
-        {
-          reference: TOKEN_INFO + ':' + token,
-          methodName: 'getReserves'
-        },
-        {
-          reference: TOKEN_INFO + ':' + token,
-          methodName: 'token0'
-        },
-        {
-          reference: TOKEN_INFO + ':' + token,
-          methodName: 'token1'
-        }
-      ]
-    },
+  const contractCallContextToken = makeCallContextInfo([token], TOKEN_INFO)
+  const contractCallContextSupply = [
     {
       reference: TOTAL_SUPPLY,
       contractAddress: token,
@@ -285,172 +296,31 @@ async function LPTokenPrice(token, pairs0, pairs1) {
       ]
     }
   ]
-  const contractCallContextPairs0 = pairs0.map((pair) => ({
-    reference: PAIRS0_INFO + ':' + pair,
-    contractAddress: pair,
-    abi: SPIRIT_ABI,
-    calls: [
-      {
-        reference: PAIRS0_INFO + ':' + pair,
-        methodName: 'getReserves'
-      },
-      {
-        reference: PAIRS0_INFO + ':' + pair,
-        methodName: 'token0'
-      },
-      {
-        reference: PAIRS0_INFO + ':' + pair,
-        methodName: 'token1'
-      }
-    ]
-  }))
 
-  const contractCallContextPairs1 = pairs1.map((pair) => {
-    return {
-      reference: PAIRS1_INFO + ':' + pair,
-      contractAddress: pair,
-      abi: SPIRIT_ABI,
-      calls: [
-        {
-          reference: PAIRS1_INFO + ':' + pair,
-          methodName: 'getReserves'
-        },
-        {
-          reference: PAIRS1_INFO + ':' + pair,
-          methodName: 'token0'
-        },
-        {
-          reference: PAIRS1_INFO + ':' + pair,
-          methodName: 'token1'
-        }
-      ]
-    }
-  })
+  const contractCallContextPairs0 = makeCallContextInfo(pairs0, PAIRS0_INFO)
+
+  const contractCallContextPairs1 = makeCallContextInfo(pairs1, PAIRS1_INFO)
 
   const contractCallContext = [
     ...contractCallContextToken,
+    ...contractCallContextSupply,
     ...contractCallContextPairs0,
     ...contractCallContextPairs1
   ]
 
   let result = await multiCall(FANTOM_ID, contractCallContext)
 
-  let tokenInfo = getInfoContract(result, TOKEN_INFO)[0].callsReturnContext
+  let metadata = getMetadata(result, TOKEN_INFO)
 
-  const reserves = getReturnValue(tokenInfo, 'getReserves')
-  let metadata = {
-    r0: reserves[0],
-    r1: reserves[1],
-    // st: tokenMetaData.callsReturnContext[0].returnValues[4],
-    t0: getReturnValue(tokenInfo, 'token0')[0],
-    t1: getReturnValue(tokenInfo, 'token1')[0]
-  }
-  const pairs0Info = getInfoContract(result, PAIRS0_INFO)
+  let pairs0Metadata = getMetadata(result, PAIRS0_INFO)
 
-  let pairs0Metadata = pairs0Info.map((item) => {
-    const reserves = getReturnValue(item.callsReturnContext, 'getReserves')
+  let pairs1Metadata = getMetadata(result, PAIRS1_INFO)
 
-    return {
-      r0: reserves[0],
-      r1: reserves[1],
+  const callContextDecimalToken = makeCallContextDecimal(metadata, TOKEN_INFO)
 
-      t0: getReturnValue(item.callsReturnContext, 'token0')[0],
-      t1: getReturnValue(item.callsReturnContext, 'token1')[0]
-    }
-  })
+  let callContextPairs0 = makeCallContextDecimal(pairs0Metadata, PAIRS0_INFO)
 
-  const pairs1Info = getInfoContract(result, PAIRS1_INFO)
-
-  let pairs1Metadata = pairs1Info.map((item) => {
-    const reserves = getReturnValue(item.callsReturnContext, 'getReserves')
-    return {
-      r0: reserves[0],
-      r1: reserves[1],
-      t0: getReturnValue(item.callsReturnContext, 'token0')[0],
-      t1: getReturnValue(item.callsReturnContext, 'token1')[0]
-    }
-  })
-
-  const callContextDecimalToken = [
-    {
-      reference: TOKEN_INFO + ':' + metadata.t0,
-      contractAddress: metadata.t0,
-      abi: ERC20_DECIMALS_ABI,
-      calls: [
-        {
-          reference: 't0' + ':' + metadata.t0,
-          methodName: 'decimals'
-        }
-      ]
-    },
-    {
-      reference: TOKEN_INFO + ':' + metadata.t1,
-      contractAddress: metadata.t1,
-      abi: ERC20_DECIMALS_ABI,
-      calls: [
-        {
-          reference: 't1' + ':' + metadata.t1,
-          methodName: 'decimals'
-        }
-      ]
-    }
-  ]
-
-  let callContextPairs0 = pairs0Metadata.map((pair) => [
-    {
-      reference: PAIRS0_INFO + ':' + 't0' + ':' + pair.t0,
-      contractAddress: pair.t0,
-      abi: ERC20_DECIMALS_ABI,
-      calls: [
-        {
-          reference: 't0' + ':' + pair.t0,
-          methodName: 'decimals'
-        }
-      ]
-    },
-    {
-      reference: PAIRS0_INFO + ':' + 't1' + ':' + pair.t1,
-      contractAddress: pair.t1,
-      abi: ERC20_DECIMALS_ABI,
-      calls: [
-        {
-          reference: 't1' + ':' + pair.t1,
-          methodName: 'decimals'
-        }
-      ]
-    }
-  ])
-
-  callContextPairs0 = [].concat.apply([], callContextPairs0)
-
-  let callContextPairs1 = pairs1Metadata.map((pair) => {
-    return [
-      {
-        reference: PAIRS1_INFO + ':' + 't0' + ':' + pair.t0,
-        contractAddress: pair.t0,
-        abi: ERC20_DECIMALS_ABI,
-        calls: [
-          {
-            reference: 't0' + ':' + pair.t0,
-            methodName: 'decimals'
-          }
-        ]
-      },
-      {
-        reference: PAIRS1_INFO + ':' + 't1' + ':' + pair.t1,
-        contractAddress: pair.t1,
-        abi: ERC20_DECIMALS_ABI,
-        calls: [
-          {
-            reference: 't1' + ':' + pair.t1,
-            methodName: 'decimals'
-          }
-        ]
-      }
-    ]
-  })
-
-  callContextPairs1 = [].concat.apply([], callContextPairs1)
+  let callContextPairs1 = makeCallContextDecimal(pairs1Metadata, PAIRS1_INFO)
 
   const contractCallContextDecimal = [
     ...callContextDecimalToken,
@@ -459,57 +329,10 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   ]
 
   let resultDecimals = await multiCall(FANTOM_ID, contractCallContextDecimal)
-  let t0 = getInfoContract(resultDecimals, TOKEN_INFO + ':' + metadata.t0)
-  let t1 = getInfoContract(resultDecimals, TOKEN_INFO + ':' + metadata.t1)
-  metadata = {
-    ...metadata,
-    dec0: new BN(10)
-      .pow(new BN(getReturnValue(t0[0].callsReturnContext, 'decimals')[0]))
-      .toString(),
-    dec1: new BN(10)
-      .pow(new BN(getReturnValue(t1[0].callsReturnContext, 'decimals')[0]))
-      .toString()
-  }
 
-  let p0Metadata = pairs0Metadata.map((item) => {
-    let t0 = getInfoContract(
-      resultDecimals,
-      PAIRS0_INFO + ':' + 't0' + ':' + item.t0
-    )
-    let t1 = getInfoContract(
-      resultDecimals,
-      PAIRS0_INFO + ':' + 't1' + ':' + item.t1
-    )
-    return {
-      ...item,
-      dec0: new BN(10)
-        .pow(new BN(getReturnValue(t0[0].callsReturnContext, 'decimals')[0]))
-        .toString(),
-      dec1: new BN(10)
-        .pow(new BN(getReturnValue(t1[0].callsReturnContext, 'decimals')[0]))
-        .toString()
-    }
-  })
-
-  let p1Metadata = pairs1Metadata.map((item) => {
-    let t0 = getInfoContract(
-      resultDecimals,
-      PAIRS1_INFO + ':' + 't0' + ':' + item.t0
-    )
-    let t1 = getInfoContract(
-      resultDecimals,
-      PAIRS1_INFO + ':' + 't1' + ':' + item.t1
-    )
-    return {
-      ...item,
-      dec0: new BN(10)
-        .pow(new BN(getReturnValue(t0[0].callsReturnContext, 'decimals')[0]))
-        .toString(),
-      dec1: new BN(10)
-        .pow(new BN(getReturnValue(t1[0].callsReturnContext, 'decimals')[0]))
-        .toString()
-    }
-  })
+  metadata = getFinalMetaData(resultDecimals, metadata, TOKEN_INFO)[0]
+  pairs0Metadata = getFinalMetaData(resultDecimals, pairs0Metadata, PAIRS0_INFO)
+  pairs1Metadata = getFinalMetaData(resultDecimals, pairs1Metadata, PAIRS1_INFO)
 
   let totalSupply = getInfoContract(result, TOTAL_SUPPLY)[0].callsReturnContext
   totalSupply = new BN(totalSupply[0].returnValues[0])
@@ -520,14 +343,14 @@ async function LPTokenPrice(token, pairs0, pairs1) {
 
   let totalUSDA = reserveA
   if (pairs0.length) {
-    totalUSDA = (await tokenVWAP(metadata.t0, pairs0, p0Metadata))
+    totalUSDA = (await tokenVWAP(metadata.t0, pairs0, pairs0Metadata))
       .mul(reserveA)
       .div(SCALE)
   }
 
   let totalUSDB = reserveB
   if (pairs1.length) {
-    totalUSDB = (await tokenVWAP(metadata.t1, pairs1, p1Metadata))
+    totalUSDB = (await tokenVWAP(metadata.t1, pairs1, pairs1Metadata))
       .mul(reserveB)
       .div(SCALE)
   }
