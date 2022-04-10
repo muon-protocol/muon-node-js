@@ -339,8 +339,10 @@ class TssPlugin extends CallablePlugin {
     /**
      * needs at least TSS_THRESHOLD number of nodes.
      */
-    if(Object.keys(nodesNeedGroup).length < TSS_THRESHOLD-1)
+    if(Object.keys(nodesNeedGroup).length < TSS_THRESHOLD-1) {
+      console.log(`No enough node to create tss group. already exist [${1+Object.keys(nodesNeedGroup).length}/${TSS_THRESHOLD}]`)
       return;
+    }
     let selfWallet = process.env.SIGN_WALLET_ADDRESS
     let wallets = Object.keys(nodesNeedGroup);
     /**
