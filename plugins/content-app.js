@@ -18,7 +18,7 @@ class ContentApp extends BaseApp {
     this.muon.getPlugin('gateway-interface').on('confirmed', this.onGatewayConfirmed.bind(this))
 
     let contents = await Content.find({});
-    for(let i in contents){
+    for(let i in contents) {
       let {cid} = contents[i]
       await this.muon.libp2p.contentRouting.provide(new CID(cid))
     }
