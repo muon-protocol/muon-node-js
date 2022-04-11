@@ -1,5 +1,6 @@
 const Libp2p = require('libp2p')
 const TCP = require('libp2p-tcp')
+const WS = require('libp2p-websockets');
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const Bootstrap = require('libp2p-bootstrap')
 const Multiplex = require('libp2p-mplex')
@@ -12,6 +13,7 @@ const DEFAULT_OPTS = {
   modules: {
     transport: [
       TCP,
+      WS,
     ],
     peerDiscovery: [Bootstrap],
     connEncryption: [

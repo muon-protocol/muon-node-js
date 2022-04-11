@@ -33,7 +33,10 @@ class Muon extends Events {
     let libp2p = await Node.create({
       peerId,
       addresses: {
-        listen: [`/ip4/0.0.0.0/tcp/${configs.port}`]
+        listen: [
+          `/ip4/0.0.0.0/tcp/${configs.port}`,
+          `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
+        ]
       },
       config: {
         peerDiscovery: {
