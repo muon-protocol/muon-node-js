@@ -76,9 +76,45 @@ async function getTokenTxs(pairAddr) {
   }
   return false
 }
+function makeCallContext(info, prefix) {
+  const contractCallContext = info.map((item) => ({
+    reference: prefix + ':' + item,
+    contractAddress: item,
+    abi: BASE_PAIR_METADATA,
+    calls: [
+      {
+        reference: prefix + ':' + item,
+        methodName: 'metadata'
+      }
+    ]
+  }))
+
+  return contractCallContext
+}
+
+function getInfoContract(multiCallInfo, filterBy) {
+  return multiCallInfo.filter((item) => item.reference.startsWith(filterBy))
+}
+
+function getMetadata(multiCallInfo, filterBy) {
+  const info = getInfoContract(multiCallInfo, filterBy)
+  let metadata = info.map((item) => {
+    return {
+      dec0: item.callsReturnContext[0].returnValues[0],
+      dec1: item.callsReturnContext[0].returnValues[1],
+      r0: item.callsReturnContext[0].returnValues[2],
+      r1: item.callsReturnContext[0].returnValues[3],
+      st: item.callsReturnContext[0].returnValues[4],
+      t0: item.callsReturnContext[0].returnValues[5],
+      t1: item.callsReturnContext[0].returnValues[6]
+    }
+  })
+  return metadata
+}
 
 async function tokenVWAP(token, pairs, metadata) {
   var pairPrices = []
+  let pairVolume = []
   var inputToken = token
   if (!metadata) {
     const contractCallContext = pairs.map((pair) => ({
@@ -114,13 +150,18 @@ async function tokenVWAP(token, pairs, metadata) {
     } else {
       throw 'INVALID_PAIRS'
     }
-    pairPrices.push(await pairVWAP(pairs[i], index))
+    const { tokenPrice, sumVolume } = await pairVWAP(pairs[i], index)
+    pairPrices.push(tokenPrice)
+    pairVolume.push(sumVolume)
   }
   var price = new BN(SCALE)
+  let volume = pairVolume.reduce(function (previousValue, currentValue) {
+    return previousValue.add(currentValue)
+  })
   pairPrices.map((x) => {
     price = price.mul(x).div(SCALE)
   })
-  return price
+  return { price, volume }
 }
 
 async function pairVWAP(pair, index) {
@@ -167,25 +208,15 @@ async function pairVWAP(pair, index) {
     }
     if (sumVolume > new BN('0')) {
       let tokenPrice = sumWeightedPrice.div(sumVolume)
-      return tokenPrice
+      return { tokenPrice, sumVolume }
     }
   }
-  return new BN('0')
+  return { tokenPrice: new BN('0'), sumVolume }
 }
 
 async function LPTokenPrice(token, pairs0, pairs1) {
-  const contractCallContextToken = [
-    {
-      reference: TOKEN_META_DATA + ':' + token,
-      contractAddress: token,
-      abi: BASE_PAIR_METADATA,
-      calls: [
-        {
-          reference: TOKEN_META_DATA + ':' + token,
-          methodName: 'metadata'
-        }
-      ]
-    },
+  const contractCallContextToken = makeCallContext([token], TOKEN_META_DATA)
+  const contractCallContextSupply = [
     {
       reference: TOTAL_SUPPLY,
       contractAddress: token,
@@ -198,52 +229,20 @@ async function LPTokenPrice(token, pairs0, pairs1) {
       ]
     }
   ]
-  const contractCallContextPairs0 = pairs0.map((pair) => ({
-    reference: PAIRS0_META_DATA + ':' + pair,
-    contractAddress: pair,
-    abi: BASE_PAIR_METADATA,
-    calls: [
-      {
-        reference: PAIRS0_META_DATA + ':' + pair,
-        methodName: 'metadata'
-      }
-    ]
-  }))
+  const contractCallContextPairs0 = makeCallContext(pairs0, PAIRS0_META_DATA)
 
-  const contractCallContextPairs1 = pairs1.map((pair) => {
-    return {
-      reference: PAIRS1_META_DATA + ':' + pair,
-      contractAddress: pair,
-      abi: BASE_PAIR_METADATA,
-      calls: [
-        {
-          reference: PAIRS1_META_DATA + ':' + pair,
-          methodName: 'metadata'
-        }
-      ]
-    }
-  })
-
+  const contractCallContextPairs1 = makeCallContext(pairs1, PAIRS1_META_DATA)
   const contractCallContext = [
     ...contractCallContextToken,
+    ...contractCallContextSupply,
     ...contractCallContextPairs0,
     ...contractCallContextPairs1
   ]
 
   let result = await multiCall(FANTOM_ID, contractCallContext)
 
-  const tokenMetaData = result.find((item) =>
-    item.reference.startsWith(TOKEN_META_DATA)
-  )
-  let metadata = {
-    dec0: tokenMetaData.callsReturnContext[0].returnValues[0],
-    dec1: tokenMetaData.callsReturnContext[0].returnValues[1],
-    r0: tokenMetaData.callsReturnContext[0].returnValues[2],
-    r1: tokenMetaData.callsReturnContext[0].returnValues[3],
-    st: tokenMetaData.callsReturnContext[0].returnValues[4],
-    t0: tokenMetaData.callsReturnContext[0].returnValues[5],
-    t1: tokenMetaData.callsReturnContext[0].returnValues[6]
-  }
+  let metadata = getMetadata(result, TOKEN_META_DATA)[0]
+
   let totalSupply = result.find((item) => item.reference === TOTAL_SUPPLY)
   totalSupply = new BN(totalSupply.callsReturnContext[0].returnValues[0])
 
@@ -252,46 +251,33 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
 
   let totalUSDA = reserveA
+  let sumVolume = new BN('0')
   if (pairs0.length) {
-    let resultPairs0 = result.filter((item) =>
-      item.reference.startsWith(PAIRS0_META_DATA)
+    let pairs0Metadata = getMetadata(result, PAIRS0_META_DATA)
+    const { price, volume } = await tokenVWAP(
+      metadata.t0,
+      pairs0,
+      pairs0Metadata
     )
-    let pairs0Metadata = resultPairs0.map((item) => ({
-      dec0: item.callsReturnContext[0].returnValues[0],
-      dec1: item.callsReturnContext[0].returnValues[1],
-      r0: item.callsReturnContext[0].returnValues[2],
-      r1: item.callsReturnContext[0].returnValues[3],
-      st: item.callsReturnContext[0].returnValues[4],
-      t0: item.callsReturnContext[0].returnValues[5],
-      t1: item.callsReturnContext[0].returnValues[6]
-    }))
-    totalUSDA = (await tokenVWAP(metadata.t0, pairs0, pairs0Metadata)).mul(
-      reserveA
-    ).div(SCALE);
+    totalUSDA = price.mul(reserveA).div(SCALE)
+    sumVolume = volume
   }
 
   let totalUSDB = reserveB
   if (pairs1.length) {
-    let resultPairs1 = result.filter((item) =>
-      item.reference.startsWith(PAIRS1_META_DATA)
+    let pairs1Metadata = getMetadata(result, PAIRS1_META_DATA)
+    const { price, volume } = await tokenVWAP(
+      metadata.t1,
+      pairs1,
+      pairs1Metadata
     )
-    let pairs1Metadata = resultPairs1.map((item) => ({
-      dec0: item.callsReturnContext[0].returnValues[0],
-      dec1: item.callsReturnContext[0].returnValues[1],
-      r0: item.callsReturnContext[0].returnValues[2],
-      r1: item.callsReturnContext[0].returnValues[3],
-      st: item.callsReturnContext[0].returnValues[4],
-      t0: item.callsReturnContext[0].returnValues[5],
-      t1: item.callsReturnContext[0].returnValues[6]
-    }))
-    totalUSDB = (await tokenVWAP(metadata.t1, pairs1, pairs1Metadata)).mul(
-      reserveB
-    ).div(SCALE);
+    totalUSDB = price.mul(reserveB).div(SCALE)
+    sumVolume = volume
   }
 
   let totalUSD = totalUSDA.add(totalUSDB)
 
-  return totalUSD.mul(SCALE).div(totalSupply).toString()
+  return { price: totalUSD.mul(SCALE).div(totalSupply).toString(), sumVolume }
 }
 
 module.exports = {
@@ -311,11 +297,12 @@ module.exports = {
         if (typeof pairs === 'string' || pairs instanceof String) {
           pairs = pairs.split(',')
         }
-        let tokenPrice = await tokenVWAP(token, pairs)
+        let { price, volume } = await tokenVWAP(token, pairs)
         return {
           token: token,
-          tokenPrice: tokenPrice.toString(),
+          tokenPrice: price.toString(),
           pairs: pairs,
+          volume: volume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {})
         }
       case 'lp_price': {
@@ -327,13 +314,14 @@ module.exports = {
           pairs1 = pairs1.split(',').filter((x) => x)
         }
 
-        let tokenPrice = await LPTokenPrice(token, pairs0, pairs1)
+        let { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1)
 
         return {
           token: token,
-          tokenPrice: tokenPrice,
+          tokenPrice: price,
           pairs0: pairs0,
           pairs1: pairs1,
+          volume: sumVolume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {})
         }
       }
@@ -374,6 +362,7 @@ module.exports = {
           { type: 'address', value: token },
           { type: 'address[]', value: pairs },
           { type: 'uint256', value: request.data.result.tokenPrice },
+          { type: 'uint256', value: request.data.result.volume },
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
@@ -388,14 +377,15 @@ module.exports = {
         ) {
           throw { message: 'Price threshold exceeded' }
         }
-        let { token, tokenPrice, pairs0, pairs1 } = result
-
+        let { token, pairs0, pairs1 } = result
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
           { type: 'address[]', value: pairs0 },
           { type: 'address[]', value: pairs1 },
           { type: 'uint256', value: request.data.result.tokenPrice },
+          { type: 'uint256', value: request.data.result.volume },
+
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
