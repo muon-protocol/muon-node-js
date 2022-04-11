@@ -13,7 +13,7 @@ const DEFAULT_OPTS = {
   modules: {
     transport: [
       TCP,
-      WS,
+      // WS,
     ],
     peerDiscovery: [Bootstrap],
     connEncryption: [
