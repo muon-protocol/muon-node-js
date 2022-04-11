@@ -180,7 +180,9 @@ class RemoteCall extends BasePlugin {
         return this.callConnection(connection, peer, method, params, options)
       })
       .catch(e => {
+        console.log("================================================")
         console.log(peer);
+        console.log("================================================")
         console.error(`RemoteCall.call(peer, '${method}', params)`, e)
         throw e;
       })
