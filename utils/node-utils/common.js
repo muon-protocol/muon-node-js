@@ -19,5 +19,5 @@ function hex2cid(hex){
 module.exports = {
   strToCID,
   cid2hex,
-  hex2cid
+  hex2cid,
 }

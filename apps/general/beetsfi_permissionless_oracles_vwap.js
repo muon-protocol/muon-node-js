@@ -404,13 +404,13 @@ module.exports = {
         ) {
           throw { message: 'Price threshold exceeded' }
         }
-        let { token, poolId, tokenPrice, volume } = result
+        let { token, poolId, volume } = result
 
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
           { type: 'uint256', value: poolId },
-          { type: 'uint256', value: tokenPrice },
+          { type: 'uint256', value: request.data.result.tokenPrice },
           { type: 'uint256', value: volume },
 
           ...(hashTimestamp

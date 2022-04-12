@@ -36,8 +36,8 @@ check_for_update (){
     else
         # restart services
         log "========== updating detected ===========";
-        log "Installing dependencies ...";
-        log `$_NPM install`
+        # log "Installing dependencies ...";
+        # log `$_NPM install`
         log "Restarting PM2 ...";
         log `$_PM2 restart "$_PM2_APP"`
         log "============ updating done =============";
@@ -55,7 +55,7 @@ done
 if [[ "$action" == "setup" ]]
 then
     log `setup`;
-    exit 1;
+    exit 0;
 elif [[ "$action" == "update" ]]
 then
     check_for_update;
