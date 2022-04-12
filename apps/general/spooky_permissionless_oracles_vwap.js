@@ -201,6 +201,7 @@ function getFinalMetaData(resultDecimals, prevMetaData, prefix) {
 async function tokenVWAP(token, pairs, metadata) {
   var pairPrices = []
   var inputToken = token
+  let pairVolume = []
   if (!metadata) {
     const contractCallContext = makeCallContextInfo(pairs, PAIRS_INFO)
     let result = await multiCall(FANTOM_ID, contractCallContext)
@@ -222,13 +223,18 @@ async function tokenVWAP(token, pairs, metadata) {
     } else {
       throw 'INVALID_PAIRS'
     }
-    pairPrices.push(await pairVWAP(pairs[i], index))
+    const { tokenPrice, sumVolume } = await pairVWAP(pairs[i], index)
+    pairPrices.push(tokenPrice)
+    pairVolume.push(sumVolume)
   }
   var price = new BN(SCALE)
+  let volume = pairVolume.reduce(function (previousValue, currentValue) {
+    return previousValue.add(currentValue)
+  })
   pairPrices.map((x) => {
     price = price.mul(x).div(SCALE)
   })
-  return price
+  return { price, volume }
 }
 
 async function pairVWAP(pair, index) {
@@ -275,10 +281,10 @@ async function pairVWAP(pair, index) {
     }
     if (sumVolume > new BN('0')) {
       let tokenPrice = sumWeightedPrice.div(sumVolume)
-      return tokenPrice
+      return { tokenPrice, sumVolume }
     }
   }
-  return new BN('0')
+  return { tokenPrice: new BN('0'), sumVolume }
 }
 
 async function LPTokenPrice(token, pairs0, pairs1) {
@@ -342,22 +348,32 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
 
   let totalUSDA = reserveA
+  let sumVolume = new BN('0')
+
   if (pairs0.length) {
-    totalUSDA = (await tokenVWAP(metadata.t0, pairs0, pairs0Metadata))
-      .mul(reserveA)
-      .div(SCALE)
+    const { price, volume } = await tokenVWAP(
+      metadata.t0,
+      pairs0,
+      pairs0Metadata
+    )
+    totalUSDA = price.mul(reserveA).div(SCALE)
+    sumVolume = volume
   }
 
   let totalUSDB = reserveB
   if (pairs1.length) {
-    totalUSDB = (await tokenVWAP(metadata.t1, pairs1, pairs1Metadata))
-      .mul(reserveB)
-      .div(SCALE)
+    const { price, volume } = await tokenVWAP(
+      metadata.t1,
+      pairs1,
+      pairs1Metadata
+    )
+    totalUSDB = price.mul(reserveB).div(SCALE)
+    sumVolume = volume
   }
 
   let totalUSD = totalUSDA.add(totalUSDB)
 
-  return totalUSD.mul(SCALE).div(totalSupply).toString()
+  return { price: totalUSD.mul(SCALE).div(totalSupply).toString(), sumVolume }
 }
 
 module.exports = {
@@ -376,11 +392,12 @@ module.exports = {
         if (typeof pairs === 'string' || pairs instanceof String) {
           pairs = pairs.split(',')
         }
-        let tokenPrice = await tokenVWAP(token, pairs)
+        let { price, volume } = await tokenVWAP(token, pairs)
         return {
           token: token,
-          tokenPrice: tokenPrice.toString(),
+          tokenPrice: price.toString(),
           pairs: pairs,
+          volume: volume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {})
         }
       case 'lp_price': {
@@ -392,13 +409,14 @@ module.exports = {
           pairs1 = pairs1.split(',').filter((x) => x)
         }
 
-        let tokenPrice = await LPTokenPrice(token, pairs0, pairs1)
+        let { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1)
 
         return {
           token: token,
-          tokenPrice: tokenPrice,
+          tokenPrice: price,
           pairs0: pairs0,
           pairs1: pairs1,
+          volume: sumVolume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {})
         }
       }
@@ -439,6 +457,8 @@ module.exports = {
           { type: 'address', value: token },
           { type: 'address[]', value: pairs },
           { type: 'uint256', value: request.data.result.tokenPrice },
+          { type: 'uint256', value: request.data.result.volume },
+
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
@@ -453,7 +473,7 @@ module.exports = {
         ) {
           throw { message: 'Price threshold exceeded' }
         }
-        let { token, tokenPrice, pairs0, pairs1 } = result
+        let { token, pairs0, pairs1 } = result
 
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
@@ -461,6 +481,8 @@ module.exports = {
           { type: 'address[]', value: pairs0 },
           { type: 'address[]', value: pairs1 },
           { type: 'uint256', value: request.data.result.tokenPrice },
+          { type: 'uint256', value: request.data.result.volume },
+
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
