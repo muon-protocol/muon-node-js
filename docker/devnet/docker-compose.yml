@@ -9,7 +9,7 @@ services:
 #      dockerfile: ./docker/devnet/Dockerfile
 
     network_mode: host
-    ports:
+#    ports:
 #      - '9000:9000'
 #      - '9001:9001'
     external_links:
