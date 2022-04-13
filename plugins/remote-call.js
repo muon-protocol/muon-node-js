@@ -96,10 +96,11 @@ class RemoteCall extends BasePlugin {
       }
     } catch (err) {
       console.error("RemoteCall.handler", err)
-    } finally {
-      // Replies are done on new streams, so let's close this stream so we don't leak it
-      await pipe([], stream)
     }
+    // finally {
+    //   // Replies are done on new streams, so let's close this stream so we don't leak it
+    //   await pipe([], stream)
+    // }
   }
 
   prepareSendData(data) {
@@ -123,10 +124,10 @@ class RemoteCall extends BasePlugin {
     } catch (err) {
       console.error("RemoteCall.send", err)
     }
-    finally {
-      // Replies are done on new streams, so let's close this stream so we don't leak it
-      await pipe([], connection.stream);
-    }
+    // finally {
+    //   // Replies are done on new streams, so let's close this stream so we don't leak it
+    //   await pipe([], connection.stream);
+    // }
   }
 
   async handleSendResponse(signAndMessage, peerId){
