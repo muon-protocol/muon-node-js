@@ -122,6 +122,9 @@ class RemoteCall extends BasePlugin {
         }
       )
     } catch (err) {
+      console.log('=============================');
+      console.log(peer)
+      console.log('=============================');
       console.error("RemoteCall.send", err)
     }
     // finally {
