@@ -27,12 +27,6 @@ const DEFAULT_OPTS = {
     ],
     pubsub: Gossipsub,
     dht: KadDHT,
-    relay: {
-      enabled: true, // enable relay dialer/listener (STOP)
-      hop: {
-        enabled: true // make this node a relay (HOP)
-      }
-    },
   },
   config: {
     peerDiscovery: {
