@@ -5,6 +5,7 @@ const TOKEN_META_DATA = 'tokenMetaData'
 const TOTAL_SUPPLY = 'totalSupply'
 const PAIRS0_META_DATA = 'pairs0MetaData'
 const PAIRS1_META_DATA = 'pairs1MetaData'
+const PAIRS_META_DATA = 'pairsMetaData'
 
 const BASE_PAIR_METADATA = [
   {
@@ -41,7 +42,7 @@ const FANTOM_ID = 250
 const SCALE = new BN('1000000000000000000')
 const GRAPH_URL =
   'https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly'
-const GRAPH_DEPLOYMENT_ID = "QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58"
+const GRAPH_DEPLOYMENT_ID = 'QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58'
 
 async function getTokenTxs(pairAddr) {
   const currentTimestamp = getTimestamp()
@@ -71,14 +72,8 @@ async function getTokenTxs(pairAddr) {
     query: query
   })
   let data = response?.data
-  if (
-    response?.status == 200 &&
-    data.data?.hasOwnProperty('swaps')
-  ) {
-    if( 
-      data.data._meta.deployment != GRAPH_DEPLOYMENT_ID
-    )
-    {
+  if (response?.status == 200 && data.data?.hasOwnProperty('swaps')) {
+    if (data.data._meta.deployment != GRAPH_DEPLOYMENT_ID) {
       throw { message: 'SUBGRAPH_IS_UPDATED' }
     }
     return data.data.swaps
@@ -122,35 +117,16 @@ function getMetadata(multiCallInfo, filterBy) {
 }
 
 async function tokenVWAP(token, pairs, metadata) {
-  var pairPrices = []
+  let pairPrices = []
   let pairVolume = []
-  var inputToken = token
+  let inputToken = token
   if (!metadata) {
-    const contractCallContext = pairs.map((pair) => ({
-      reference: pair,
-      contractAddress: pair,
-      abi: BASE_PAIR_METADATA,
-      calls: [
-        {
-          reference: pair,
-          methodName: 'metadata'
-        }
-      ]
-    }))
+    const contractCallContext = makeCallContext(pairs, PAIRS_META_DATA)
     let result = await multiCall(FANTOM_ID, contractCallContext)
-    metadata = result.map((item) => ({
-      dec0: item.callsReturnContext[0].returnValues[0],
-      dec1: item.callsReturnContext[0].returnValues[1],
-      r0: item.callsReturnContext[0].returnValues[2],
-      r1: item.callsReturnContext[0].returnValues[3],
-      st: item.callsReturnContext[0].returnValues[4],
-      t0: item.callsReturnContext[0].returnValues[5],
-      t1: item.callsReturnContext[0].returnValues[6]
-    }))
+    metadata = getMetadata(result, PAIRS_META_DATA)
   }
-
-  for (var i = 0; i < pairs.length; i++) {
-    var index = inputToken.toLowerCase() == metadata[i].t0.toLowerCase() ? 0 : 1
+  for (let i = 0; i < pairs.length; i++) {
+    let index = inputToken.toLowerCase() == metadata[i].t0.toLowerCase() ? 0 : 1
 
     if (inputToken.toLowerCase() == metadata[i].t0.toLowerCase()) {
       inputToken = metadata[i].t1
@@ -163,7 +139,7 @@ async function tokenVWAP(token, pairs, metadata) {
     pairPrices.push(tokenPrice)
     pairVolume.push(sumVolume)
   }
-  var price = new BN(SCALE)
+  let price = new BN(SCALE)
   let volume = pairVolume.reduce(function (previousValue, currentValue) {
     return previousValue.add(currentValue)
   })
@@ -178,7 +154,7 @@ async function pairVWAP(pair, index) {
   if (tokenTxs) {
     let sumWeightedPrice = new BN('0')
     let sumVolume = new BN('0')
-    for (var i = 0; i < tokenTxs.length; i++) {
+    for (let i = 0; i < tokenTxs.length; i++) {
       let swap = tokenTxs[i]
       let price = new BN('0')
       let volume = new BN('0')
