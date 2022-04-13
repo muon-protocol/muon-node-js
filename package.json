@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "help": "node help.js",
-    "start": "./node_modules/.bin/env-cmd babel-node ./index.js",
-    "start.debug": "./node_modules/.bin/env-cmd --use-shell 'DEBUG=libp2p:noise babel-node ./index.js' ",
-    "dev": "./node_modules/.bin/env-cmd nodemon --exec babel-node ./index.js",
+    "start": "env-cmd babel-node ./index.js",
+    "start.debug": "env-cmd --use-shell 'DEBUG=libp2p:noise babel-node ./index.js' ",
+    "dev": "env-cmd nodemon --exec babel-node ./index.js",
     "dev-chain": "node generateEnvs.js",
     "node": "node runNode.js",
     "test": "jest --verbose"
