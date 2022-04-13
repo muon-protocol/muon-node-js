@@ -41,40 +41,49 @@ const FANTOM_ID = 250
 const SCALE = new BN('1000000000000000000')
 const GRAPH_URL =
   'https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly'
+const GRAPH_DEPLOYMENT_ID = "QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58"
 
 async function getTokenTxs(pairAddr) {
-  try {
-    const currentTimestamp = getTimestamp()
-    const last30Min = currentTimestamp - 1800
-    const query = `
-      {
-        swaps(
-          where: {
-            pair: "${pairAddr.toLowerCase()}"
-            timestamp_gt: ${last30Min}
-          }, 
-          orderBy: timestamp, 
-          orderDirection: desc
-        ) {
-          amount0In
-          amount1In
-          amount0Out
-          amount1Out
-        }
+  const currentTimestamp = getTimestamp()
+  const last30Min = currentTimestamp - 1800
+  const query = `
+    {
+      swaps(
+        where: {
+          pair: "${pairAddr.toLowerCase()}"
+          timestamp_gt: ${last30Min}
+        }, 
+        orderBy: timestamp, 
+        orderDirection: desc
+      ) {
+        amount0In
+        amount1In
+        amount0Out
+        amount1Out
       }
-    `
-
-    let response = await axios.post(GRAPH_URL, {
-      query: query
-    })
-    let data = response?.data
-    if (response?.status == 200 && data.data?.swaps.length > 0) {
-      return data.data.swaps
+      _meta {
+        deployment
+      }
     }
-  } catch (error) {
-    console.log(error)
+  `
+
+  let response = await axios.post(GRAPH_URL, {
+    query: query
+  })
+  let data = response?.data
+  if (
+    response?.status == 200 &&
+    data.data?.hasOwnProperty('swaps')
+  ) {
+    if( 
+      data.data._meta.deployment != GRAPH_DEPLOYMENT_ID
+    )
+    {
+      throw { message: 'SUBGRAPH_IS_UPDATED' }
+    }
+    return data.data.swaps
   }
-  return false
+  throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
 }
 function makeCallContext(info, prefix) {
   const contractCallContext = info.map((item) => ({
@@ -211,7 +220,7 @@ async function pairVWAP(pair, index) {
       return { tokenPrice, sumVolume }
     }
   }
-  return { tokenPrice: new BN('0'), sumVolume }
+  return { tokenPrice: new BN('0'), sumVolume: new BN('0') }
 }
 
 async function LPTokenPrice(token, pairs0, pairs1) {
