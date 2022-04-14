@@ -34,7 +34,7 @@ class Muon extends Events {
       peerId,
       addresses: {
         listen: [
-          `/ip4/0.0.0.0/tcp/${configs.port}`,
+          `/ip4/${configs.host}/tcp/${configs.port}`,
           // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
         ]
       },
