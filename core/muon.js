@@ -81,10 +81,20 @@ class Muon extends Events {
     this.emit('peer', connection.remotePeer)
   }
 
-  onPeerDiscovery(peerId){
+  async onPeerDiscovery(peerId){
     this.emit('peer', peerId)
     this.firstPeerConnect.resolve(true)
-    console.log('found peer: ', peerId.toB58String())
+    console.log('found peer');
+    try {
+      const peerInfo = await this.libp2p.peerRouting.findPeer(peerId)
+      console.log({
+        peerId: peerId.toB58String(),
+        multiaddrs: peerInfo.multiaddrs,
+        // peerInfo,
+      })
+    }catch (e) {
+      console.log('Error Muon.onPeerDiscovery', e)
+    }
   }
 
   getAppByName(appName) {
@@ -121,7 +131,7 @@ class Muon extends Events {
     }
 
     if (this.libp2p.isStarted()) {
-      this._onceStarted()
+      this._onceStarted();
     } else {
       this.libp2p.once('start', this._onceStarted.bind(this))
     }
