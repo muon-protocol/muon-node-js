@@ -111,6 +111,15 @@ class Muon extends Events {
       chalk.blue(` Listening on: ${this.configs.libp2p.port}`)
     )
 
+    if(process.env.VERBOSE) {
+      console.log("====================== Bindings ====================")
+      this.libp2p.multiaddrs.forEach((ma) => {
+        console.log(ma.toString())
+        // console.log(`${ma.toString()}/p2p/${this.libp2p.peerId.toB58String()}`)
+      })
+      console.log("====================================================")
+    }
+
     if (this.libp2p.isStarted()) {
       this._onceStarted()
     } else {
