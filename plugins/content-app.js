@@ -25,7 +25,7 @@ class ContentApp extends BaseApp {
 
   async provideContents() {
     /** wait to DHT load peer info */
-    await timeout(2000);
+    await timeout(50000);
 
     try {
       let contents = await Content.find({});

@@ -3,7 +3,7 @@ import { sha256 } from 'multiformats/hashes/sha2'
 import * as dagPB from '@ipld/dag-pb'
 import { base16 } from "multiformats/bases/base16"
 
-async function strToCID(str) {
+async function createCIDFromString(str) {
   const bytes = dagPB.encode({
     Data: new TextEncoder('utf8').encode(`${str}`),
     Links: []
@@ -27,7 +27,7 @@ function loadCID(strCID) {
 }
 
 module.exports = {
-  strToCID,
+  createCIDFromString,
   cid2hex,
   hex2cid,
   cid2str,

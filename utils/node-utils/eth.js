@@ -2,7 +2,7 @@ const Web3 = require('web3')
 const EventEmbitter = require('events')
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
-const {strToCID} = require('./common')
+const {createCIDFromString} = require('./common')
 const { flattenObject, sortObject, getTimestamp } = require('../helpers')
 const crypto = require('../crypto')
 const ERC20_ABI = require('../../data/ERC20-ABI')
@@ -140,50 +140,6 @@ function read(contractAddress, property, params, abi, network) {
   })
 }
 
-function isEqualObject(obj1, obj2) {
-  return objectToStr(obj1) === objectToStr(obj2)
-}
-
-function isEqualResult(request, result) {
-  switch (request.method) {
-    case 'call': {
-      let { address, method, abi, outputs } = request.data.callInfo
-      let hash1 = hashCallOutput(
-        address,
-        method,
-        abi,
-        request.data.result,
-        outputs
-      )
-      let hash2 = hashCallOutput(address, method, abi, result, outputs)
-      return hash1 == hash2
-    }
-    case 'addBridgeToken': {
-      let { token: t1, tokenId: id1 } = request.data.result
-      let { token: t2, tokenId: id2 } = result
-      let hash1 = soliditySha3([
-        { type: 'uint256', value: id1 },
-        { type: 'string', value: t1.name },
-        { type: 'string', value: t1.symbol },
-        { type: 'uint8', value: t1.decimals }
-      ])
-      let hash2 = soliditySha3([
-        { type: 'uint256', value: id2 },
-        { type: 'string', value: t2.name },
-        { type: 'string', value: t2.symbol },
-        { type: 'uint8', value: t2.decimals }
-      ])
-      return hash1 == hash2
-    }
-  }
-}
-
-function objectToStr(obj) {
-  let flatData = flattenObject(obj)
-  flatData = sortObject(flatData)
-  return JSON.stringify(flatData)
-}
-
 async function signRequest(request, result) {
   let signature = null
   let signTimestamp = getTimestamp()
@@ -250,10 +206,6 @@ function recoverSignature(request, sign) {
   }
 
   return signer
-}
-
-async function createCID(request) {
-  return strToCID(JSON.stringify(request));
 }
 
 const subscribeLogEvent = (
@@ -342,11 +294,8 @@ module.exports = {
   getTransactionReceipt,
   call,
   read,
-  isEqualObject,
-  isEqualResult,
   signRequest,
   recoverSignature,
-  createCID,
   subscribeLogEvent,
   getTokenInfo,
   getNftInfo

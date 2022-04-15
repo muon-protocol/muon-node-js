@@ -74,7 +74,7 @@ class ContentVerifyPlugin extends BasePlugin {
       verified = false,
       expectedResult,
       actualResult
-    let actualCid = (await NodeUtils.common.strToCID(content)).toString()
+    let actualCid = (await NodeUtils.common.createCIDFromString(content)).toString()
     if (cid.toLowerCase() === actualCid.toLowerCase()) {
       request = JSON.parse(content)
       let app = this.muon.getAppByName(request.app)

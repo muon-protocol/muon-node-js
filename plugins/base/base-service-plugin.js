@@ -23,7 +23,7 @@ class BaseServicePlugin extends BaseAppPlugin {
   }
 
   async initializeService() {
-    let serviceCID = await NodeUtils.common.strToCID(this.getBroadcastChannel())
+    let serviceCID = await NodeUtils.common.createCIDFromString(this.getBroadcastChannel())
     await this.muon.libp2p.contentRouting.provide(serviceCID)
     this.serviceId = serviceCID
     // console.log({app: this.APP_NAME, serviceCID: serviceCID.toString()})
