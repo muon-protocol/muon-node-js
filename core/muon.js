@@ -8,7 +8,7 @@ const emoji = require('node-emoji')
 const tss = require('../utils/tss')
 const fs = require('fs')
 const TimeoutPromise = require('./timeout-promise')
-const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
+// const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
 
 
 class Muon extends Events {
