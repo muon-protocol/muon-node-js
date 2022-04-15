@@ -8,6 +8,7 @@ const emoji = require('node-emoji')
 const tss = require('../utils/tss')
 const fs = require('fs')
 const TimeoutPromise = require('./timeout-promise')
+const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
 
 
 class Muon extends Events {
@@ -34,9 +35,10 @@ class Muon extends Events {
       peerId,
       addresses: {
         listen: [
-          `/ip4/${configs.host}/tcp/${configs.port}`,
+          `/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`,
           // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
-        ]
+        ],
+        // announceFilter: (multiaddrs) => multiaddrs.filter(m => !isPrivate(m))
       },
       config: {
         peerDiscovery: {
@@ -121,14 +123,14 @@ class Muon extends Events {
       chalk.blue(` Listening on: ${this.configs.libp2p.port}`)
     )
 
-    if(process.env.VERBOSE) {
+    // if(process.env.VERBOSE) {
       console.log("====================== Bindings ====================")
       this.libp2p.multiaddrs.forEach((ma) => {
         console.log(ma.toString())
         // console.log(`${ma.toString()}/p2p/${this.libp2p.peerId.toB58String()}`)
       })
       console.log("====================================================")
-    }
+    // }
 
     if (this.libp2p.isStarted()) {
       this._onceStarted();
