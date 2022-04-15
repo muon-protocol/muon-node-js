@@ -9,6 +9,7 @@ const Multiplex = require('libp2p-mplex')
 const { NOISE } = require('libp2p-noise')
 const Gossipsub = require('libp2p-gossipsub')
 const KadDHT = require('libp2p-kad-dht')
+const PubsubPeerDiscovery = require('libp2p-pubsub-peer-discovery')
 
 const DEFAULT_OPTS = {
   modules: {
@@ -17,7 +18,8 @@ const DEFAULT_OPTS = {
       WS,
     ],
     peerDiscovery: [
-      Bootstrap
+      Bootstrap,
+      PubsubPeerDiscovery,
     ],
     connEncryption: [
       NOISE,
@@ -33,7 +35,10 @@ const DEFAULT_OPTS = {
     },
     dht: {
       enabled: true
-    }
+    },
+    // pubsub: {
+    //   emitSelf: false
+    // }
   }
 }
 
