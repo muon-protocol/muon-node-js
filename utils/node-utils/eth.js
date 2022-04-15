@@ -3,7 +3,7 @@ const EventEmbitter = require('events')
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
 const {createCIDFromString} = require('./common')
-const { flattenObject, sortObject, getTimestamp } = require('../helpers')
+const { sortObject, getTimestamp } = require('../helpers')
 const crypto = require('../crypto')
 const ERC20_ABI = require('../../data/ERC20-ABI')
 const ERC721_ABI = require('../../data/ERC721-ABI')
@@ -140,74 +140,6 @@ function read(contractAddress, property, params, abi, network) {
   })
 }
 
-async function signRequest(request, result) {
-  let signature = null
-  let signTimestamp = getTimestamp()
-
-  switch (request.method) {
-    case 'call': {
-      let { abi, address, method, outputs } = request.data.callInfo
-      signature = crypto.signCallOutput(address, method, abi, result, outputs)
-      break
-    }
-    case 'addBridgeToken': {
-      let { token, tokenId } = result
-      let dataToSign = [
-        { type: 'uint256', value: tokenId },
-        { type: 'string', value: token.name },
-        { type: 'string', value: token.symbol },
-        { type: 'uint8', value: token.decimals }
-      ]
-      signature = crypto.sign(soliditySha3(dataToSign))
-      break
-    }
-    default:
-      throw { message: `Unknown eth app method: ${request.method}` }
-  }
-
-  return {
-    request: request._id,
-    owner: process.env.SIGN_WALLET_ADDRESS,
-    timestamp: signTimestamp,
-    data: result,
-    signature
-  }
-}
-
-function recoverSignature(request, sign) {
-  let signer = null
-  let { data: result, signature } = sign
-  switch (request.method) {
-    case 'call': {
-      let { address, method, abi, outputs } = request.data.callInfo
-      signer = crypto.recoverCallOutputSignature(
-        address,
-        method,
-        abi,
-        result,
-        outputs,
-        signature
-      )
-      break
-    }
-    case 'addBridgeToken': {
-      let { token, tokenId } = result
-      let dataToSign = [
-        { type: 'uint256', value: tokenId },
-        { type: 'string', value: token.name },
-        { type: 'string', value: token.symbol },
-        { type: 'uint8', value: token.decimals }
-      ]
-      signer = crypto.recover(soliditySha3(dataToSign), signature)
-      break
-    }
-    default:
-      throw { message: `Unknown eth app method: ${request.method}` }
-  }
-
-  return signer
-}
-
 const subscribeLogEvent = (
   network,
   contractAddress,
@@ -294,8 +226,6 @@ module.exports = {
   getTransactionReceipt,
   call,
   read,
-  signRequest,
-  recoverSignature,
   subscribeLogEvent,
   getTokenInfo,
   getNftInfo
