@@ -1,6 +1,6 @@
 const ethers = require('ethers')
 const Web3 = require('web3')
-const {hashCallOutput} = require('./node-utils/eth')
+const {hashCallOutput} = require('./eth')
 const BN = Web3.utils.BN
 const web3 = new Web3();
 const PRIVATE_KEY = process.env.SIGN_WALLET_PRIVATE_KEY

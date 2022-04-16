@@ -1,6 +1,6 @@
 const BaseApp = require('./base/base-app-plugin')
 const BaseTssApp = require('./base/base-tss-app-plugin')
-const NodeUtils = require('../utils/node-utils')
+const ethUtils = require('../utils/eth')
 
 class EthAppPlugin extends BaseTssApp {
   APP_NAME = 'eth'
@@ -28,14 +28,14 @@ class EthAppPlugin extends BaseTssApp {
         if(!Array.isArray(outputs))
           throw {message: 'Outputs should be an array'}
 
-        let result = await NodeUtils.eth.call(contractAddress, contractMethod, contractParams, abi, network)
+        let result = await ethUtils.call(contractAddress, contractMethod, contractParams, abi, network)
         return result;
       }
       case 'addBridgeToken':{
         let {mainTokenAddress, mainNetwork, targetNetwork} = params;
 
         let result = {
-          token: await NodeUtils.eth.getTokenInfo(mainTokenAddress, mainNetwork),
+          token: await ethUtils.getTokenInfo(mainTokenAddress, mainNetwork),
           tokenId: mainTokenAddress,
         }
         return result;
@@ -49,11 +49,11 @@ class EthAppPlugin extends BaseTssApp {
     switch (request.method) {
       case 'call': {
         let {address, method, abi, outputs} = request.data.params;
-        return NodeUtils.eth.hashCallOutput(address, method, abi, result, outputs)
+        return ethUtils.hashCallOutput(address, method, abi, result, outputs)
       }
       case 'addBridgeToken': {
         let {token, tokenId} = result;
-        return NodeUtils.eth.soliditySha3([
+        return ethUtils.soliditySha3([
           {type: 'uint256', value: tokenId},
           {type: 'string', value: token.name},
           {type: 'string', value: token.symbol},

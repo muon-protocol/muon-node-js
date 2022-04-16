@@ -2,10 +2,10 @@ const Web3 = require('web3')
 const EventEmbitter = require('events')
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
-const { sortObject, getTimestamp } = require('../helpers')
-const crypto = require('../crypto')
-const ERC20_ABI = require('../../data/ERC20-ABI')
-const ERC721_ABI = require('../../data/ERC721-ABI')
+const { sortObject, getTimestamp } = require('./helpers')
+const crypto = require('./crypto')
+const ERC20_ABI = require('../data/ERC20-ABI')
+const ERC721_ABI = require('../data/ERC721-ABI')
 
 const _generalWeb3Instance = new Web3()
 const soliditySha3 = _generalWeb3Instance.utils.soliditySha3
