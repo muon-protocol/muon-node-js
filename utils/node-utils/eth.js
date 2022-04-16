@@ -2,7 +2,6 @@ const Web3 = require('web3')
 const EventEmbitter = require('events')
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
-const {createCIDFromString} = require('./common')
 const { sortObject, getTimestamp } = require('../helpers')
 const crypto = require('../crypto')
 const ERC20_ABI = require('../../data/ERC20-ABI')

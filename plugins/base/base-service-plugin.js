@@ -1,5 +1,5 @@
 const BaseAppPlugin = require('./base-app-plugin')
-const NodeUtils = require('../../utils/node-utils')
+const {createCIDFromString} = require('../../utils/cid')
 const all = require('it-all')
 
 class BaseServicePlugin extends BaseAppPlugin {
@@ -23,7 +23,7 @@ class BaseServicePlugin extends BaseAppPlugin {
   }
 
   async initializeService() {
-    let serviceCID = await NodeUtils.common.createCIDFromString(this.getBroadcastChannel())
+    let serviceCID = await createCIDFromString(this.getBroadcastChannel())
     await this.muon.libp2p.contentRouting.provide(serviceCID)
     this.serviceId = serviceCID
     // console.log({app: this.APP_NAME, serviceCID: serviceCID.toString()})

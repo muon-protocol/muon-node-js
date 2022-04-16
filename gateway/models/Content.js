@@ -1,6 +1,6 @@
 var mongoose = require('mongoose');
 const {MODEL_CONTENT} = require('./constants')
-const {createCIDFromString, cid2str} = require('../../utils/node-utils/common')
+const {createCIDFromString, cid2str} = require('../../utils/cid')
 
 var modelSchema = mongoose.Schema({
   cid: {type: String, required: true},

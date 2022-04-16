@@ -1,5 +1,5 @@
 const BasePlugin = require('./base/base-plugin')
-const NodeUtils = require('../utils/node-utils')
+const {createCIDFromString} = require('../utils/cid')
 const Violation = require('../gateway/models/Violation')
 const { subscribeLogEvent } = require('../utils/node-utils/eth')
 const muonAbi = require('../utils/muon-abi')
@@ -74,7 +74,7 @@ class ContentVerifyPlugin extends BasePlugin {
       verified = false,
       expectedResult,
       actualResult
-    let actualCid = (await NodeUtils.common.createCIDFromString(content)).toString()
+    let actualCid = (await createCIDFromString(content)).toString()
     if (cid.toLowerCase() === actualCid.toLowerCase()) {
       request = JSON.parse(content)
       let app = this.muon.getAppByName(request.app)
