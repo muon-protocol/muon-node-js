@@ -49,7 +49,7 @@ class Muon extends Events {
           }
         }
       }
-    })
+    });
 
     libp2p.connectionManager.on('peer:connect', this.onPeerConnect.bind(this))
     libp2p.on('peer:discovery', this.onPeerDiscovery.bind(this))
