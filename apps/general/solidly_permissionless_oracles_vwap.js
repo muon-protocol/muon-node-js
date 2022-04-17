@@ -146,6 +146,7 @@ async function tokenVWAP(token, pairs, metadata) {
     let result = await multiCall(FANTOM_ID, contractCallContext)
     metadata = getMetadata(result, PAIRS_META_DATA)
   }
+  let pairVWAPPromises = []
   for (let i = 0; i < pairs.length; i++) {
     let index = inputToken.toLowerCase() == metadata[i].t0.toLowerCase() ? 0 : 1
 
@@ -156,10 +157,13 @@ async function tokenVWAP(token, pairs, metadata) {
     } else {
       throw 'INVALID_PAIRS'
     }
-    const { tokenPrice, sumVolume } = await pairVWAP(pairs[i], index)
-    pairPrices.push(tokenPrice)
-    pairVolume.push(sumVolume)
+    pairVWAPPromises.push(pairVWAP(pairs[i], index))
   }
+  let pairVWAPs = await Promise.all(pairVWAPPromises)
+  pairVWAPs.map(pairVWAP => {
+    pairPrices.push(pairVWAP.tokenPrice)
+    pairVolume.push(pairVWAP.sumVolume)
+  })
   let price = new BN(SCALE)
   let volume = pairVolume.reduce(function (previousValue, currentValue) {
     return previousValue.add(currentValue)
