@@ -45,40 +45,61 @@ const GRAPH_URL =
 const GRAPH_DEPLOYMENT_ID = 'QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58'
 
 async function getTokenTxs(pairAddr) {
-  const currentTimestamp = getTimestamp()
+  let currentTimestamp = getTimestamp()
   const last30Min = currentTimestamp - 1800
-  const query = `
+  let skip = 0
+  let tokenTxs = []
+  while (true) {
+    const query = `
+      {
+        swaps(
+          first: 1000,
+          skip: ${skip},
+          where: {
+            pair: "${pairAddr.toLowerCase()}"
+            timestamp_gt: ${last30Min}
+            timestamp_lt: ${currentTimestamp}
+          },
+          orderBy: timestamp,
+          orderDirection: desc
+        ) {
+          amount0In
+          amount1In
+          amount0Out
+          amount1Out
+          timestamp
+        }
+        _meta {
+          deployment
+        }
+      }
+    `
+    skip += 1000
+    let response = await axios.post(GRAPH_URL, {
+      query: query
+    })
+    let data = response?.data
+    if (response?.status == 200 && data.data?.hasOwnProperty('swaps')) {
+      if (data.data._meta.deployment != GRAPH_DEPLOYMENT_ID) {
+        throw { message: 'SUBGRAPH_IS_UPDATED' }
+      }
+      const swaps = data.data.swaps
+      if(!swaps.length)
+      {
+        break
+      }
+      tokenTxs = tokenTxs.concat(swaps)
+      if(skip > 5000)
+      {
+        currentTimestamp = swaps[swaps.length-1]['timestamp']
+        skip = 0
+      }
+    }else
     {
-      swaps(
-        where: {
-          pair: "${pairAddr.toLowerCase()}"
-          timestamp_gt: ${last30Min}
-        }, 
-        orderBy: timestamp, 
-        orderDirection: desc
-      ) {
-        amount0In
-        amount1In
-        amount0Out
-        amount1Out
-      }
-      _meta {
-        deployment
-      }
+      throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
     }
-  `
-
-  let response = await axios.post(GRAPH_URL, {
-    query: query
-  })
-  let data = response?.data
-  if (response?.status == 200 && data.data?.hasOwnProperty('swaps')) {
-    if (data.data._meta.deployment != GRAPH_DEPLOYMENT_ID) {
-      throw { message: 'SUBGRAPH_IS_UPDATED' }
-    }
-    return data.data.swaps
   }
-  throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
+  return tokenTxs
 }
 function makeCallContext(info, prefix) {
   const contractCallContext = info.map((item) => ({
@@ -237,25 +258,28 @@ async function LPTokenPrice(token, pairs0, pairs1) {
 
   let totalUSDA = reserveA
   let sumVolume = new BN('0')
-  if (pairs0.length) {
-    let pairs0Metadata = getMetadata(result, PAIRS0_META_DATA)
-    const { price, volume } = await tokenVWAP(
+
+  let _tokenVWAPResults = await Promise.all([
+    pairs0.length ? tokenVWAP(
       metadata.t0,
       pairs0,
-      pairs0Metadata
-    )
+      getMetadata(result, PAIRS0_META_DATA)
+    ) : null
+    ,pairs1.length ? tokenVWAP(
+      metadata.t1,
+      pairs1,
+      getMetadata(result, PAIRS1_META_DATA)
+    ) : null
+  ])
+  if (pairs0.length) {
+    const { price, volume } = _tokenVWAPResults[0]
     totalUSDA = price.mul(reserveA).div(SCALE)
     sumVolume = volume
   }
 
   let totalUSDB = reserveB
   if (pairs1.length) {
-    let pairs1Metadata = getMetadata(result, PAIRS1_META_DATA)
-    const { price, volume } = await tokenVWAP(
-      metadata.t1,
-      pairs1,
-      pairs1Metadata
-    )
+    const { price, volume } = _tokenVWAPResults[1]
     totalUSDB = price.mul(reserveB).div(SCALE)
     sumVolume = volume
   }
