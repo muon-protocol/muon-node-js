@@ -175,8 +175,7 @@ async function tokenVWAP(token, pairs, metadata) {
 }
 
 async function pairVWAP(pair, index) {
-  let tokenTxs = await getTokenTxs(pair)
-  if (tokenTxs) {
+  return getTokenTxs(pair).then(tokenTxs => {
     let sumWeightedPrice = new BN('0')
     let sumVolume = new BN('0')
     for (let i = 0; i < tokenTxs.length; i++) {
@@ -220,8 +219,8 @@ async function pairVWAP(pair, index) {
       let tokenPrice = sumWeightedPrice.div(sumVolume)
       return { tokenPrice, sumVolume }
     }
-  }
-  return { tokenPrice: new BN('0'), sumVolume: new BN('0') }
+    return { tokenPrice: new BN('0'), sumVolume: new BN('0') }
+  })
 }
 
 async function LPTokenPrice(token, pairs0, pairs1) {
