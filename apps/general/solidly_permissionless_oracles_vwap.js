@@ -172,6 +172,9 @@ async function tokenVWAP(token, pairs, metadata) {
   pairPrices.map((x) => {
     price = price.mul(x).div(SCALE)
   })
+  if(volume.toString() == "0" || price.toString() == "0"){
+    throw "INVALID_PRICE";
+  }
   return { price, volume }
 }
 
