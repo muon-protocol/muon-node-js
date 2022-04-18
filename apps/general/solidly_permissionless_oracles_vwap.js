@@ -101,6 +101,7 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
   }
   return tokenTxs
 }
+
 function makeCallContext(info, prefix) {
   const contractCallContext = info.map((item) => ({
     reference: prefix + ':' + item,
@@ -155,7 +156,7 @@ async function tokenVWAP(token, pairs, metadata) {
     } else if (inputToken.toLowerCase() == metadata[i].t1.toLowerCase()) {
       inputToken = metadata[i].t0
     } else {
-      throw 'INVALID_PAIRS'
+      throw { message: 'INVALID_PAIRS' }
     }
     pairVWAPPromises.push(pairVWAP(pairs[i], index))
   }
