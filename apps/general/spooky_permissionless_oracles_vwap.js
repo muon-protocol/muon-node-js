@@ -64,43 +64,63 @@ const GRAPH_DEPLOYMENT_ID = 'QmQnteZnJmshPHuUbYNxSCVTEyKunncwCUgYiyqEFQeDV7'
 const GRAPH_URL =
   'https://api.thegraph.com/subgraphs/name/shayanshiravani/spookyswap'
 
-async function getTokenTxs(pairAddr) {
-  try {
-    const currentTimestamp = getTimestamp()
+  async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
+    let currentTimestamp = getTimestamp()
     const last30Min = currentTimestamp - 1800
-    const query = `
+    let skip = 0
+    let tokenTxs = []
+    while (true) {
+      const query = `
         {
           swaps(
+            first: 1000,
+            skip: ${skip},
             where: {
               pair: "${pairAddr.toLowerCase()}"
               timestamp_gt: ${last30Min}
-            }, 
-            orderBy: timestamp, 
+              timestamp_lt: ${currentTimestamp}
+            },
+            orderBy: timestamp,
             orderDirection: desc
           ) {
             amount0In
             amount1In
             amount0Out
             amount1Out
+            timestamp
           }
-          _meta{
+          _meta {
             deployment
           }
         }
       `
-
-    let { data, status } = await axios.post(GRAPH_URL, {
-      query: query
-    })
-    if (status == 200 && data.data?.hasOwnProperty('swaps')) {
-      if (data.data._meta.deployment !== GRAPH_DEPLOYMENT_ID)
-        throw { message: 'SUBGRAPH_IS_UPDATED' }
-      return data.data.swaps
+      skip += 1000
+      let response = await axios.post(graphUrl, {
+        query: query
+      })
+      let data = response?.data
+      if (response?.status == 200 && data.data?.hasOwnProperty('swaps')) {
+        if (data.data._meta.deployment != deploymentID) {
+          throw { message: 'SUBGRAPH_IS_UPDATED' }
+        }
+        const swaps = data.data.swaps
+        if(!swaps.length)
+        {
+          break
+        }
+        tokenTxs = tokenTxs.concat(swaps)
+        if(skip > 5000)
+        {
+          currentTimestamp = swaps[swaps.length-1]['timestamp']
+          skip = 0
+        }
+      }else
+      {
+        throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
+      }
     }
-  } catch (error) {
-    console.log('Error happend in fetch query subgraph', error)
+    return tokenTxs
   }
-}
 
 function getReturnValue(info, methodName) {
   return info.find((item) => item.methodName === methodName).returnValues
@@ -205,8 +225,8 @@ function getFinalMetaData(resultDecimals, prevMetaData, prefix) {
 
 async function tokenVWAP(token, pairs, metadata) {
   let pairPrices = []
-  let inputToken = token
   let pairVolume = []
+  let inputToken = token
   if (!metadata) {
     const contractCallContext = makeCallContextInfo(pairs, PAIRS_INFO)
     let result = await multiCall(FANTOM_ID, contractCallContext)
@@ -217,7 +237,7 @@ async function tokenVWAP(token, pairs, metadata) {
     let resultDecimals = await multiCall(FANTOM_ID, callContextPairs)
     metadata = getFinalMetaData(resultDecimals, metadata, PAIRS_INFO)
   }
-
+  let pairVWAPPromises = []
   for (let i = 0; i < pairs.length; i++) {
     let index = inputToken.toLowerCase() == metadata[i].t0.toLowerCase() ? 0 : 1
 
@@ -226,12 +246,15 @@ async function tokenVWAP(token, pairs, metadata) {
     } else if (inputToken.toLowerCase() == metadata[i].t1.toLowerCase()) {
       inputToken = metadata[i].t0
     } else {
-      throw 'INVALID_PAIRS'
+      throw { message: 'INVALID_PAIRS' }
     }
-    const { tokenPrice, sumVolume } = await pairVWAP(pairs[i], index)
-    pairPrices.push(tokenPrice)
-    pairVolume.push(sumVolume)
+    pairVWAPPromises.push(pairVWAP(pairs[i], index))
   }
+  let pairVWAPs = await Promise.all(pairVWAPPromises)
+  pairVWAPs.map(pairVWAP => {
+    pairPrices.push(pairVWAP.tokenPrice)
+    pairVolume.push(pairVWAP.sumVolume)
+  })
   let price = new BN(SCALE)
   let volume = pairVolume.reduce(function (previousValue, currentValue) {
     return previousValue.add(currentValue)
@@ -243,10 +266,13 @@ async function tokenVWAP(token, pairs, metadata) {
 }
 
 async function pairVWAP(pair, index) {
-  let tokenTxs = await getTokenTxs(pair)
-  let sumVolume = new BN('0')
-  if (tokenTxs) {
+  return getTokenTxs(
+    pair,
+    GRAPH_URL,
+    GRAPH_DEPLOYMENT_ID
+    ).then(tokenTxs => {
     let sumWeightedPrice = new BN('0')
+    let sumVolume = new BN('0')
     for (let i = 0; i < tokenTxs.length; i++) {
       let swap = tokenTxs[i]
       let price = new BN('0')
@@ -288,8 +314,8 @@ async function pairVWAP(pair, index) {
       let tokenPrice = sumWeightedPrice.div(sumVolume)
       return { tokenPrice, sumVolume }
     }
-  }
-  return { tokenPrice: new BN('0'), sumVolume }
+    return { tokenPrice: new BN('0'), sumVolume: new BN('0') }
+  })
 }
 
 async function LPTokenPrice(token, pairs0, pairs1) {
@@ -355,23 +381,28 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   let totalUSDA = reserveA
   let sumVolume = new BN('0')
 
-  if (pairs0.length) {
-    const { price, volume } = await tokenVWAP(
+  let _tokenVWAPResults = await Promise.all([
+    pairs0.length ? tokenVWAP(
       metadata.t0,
       pairs0,
       pairs0Metadata
-    )
+    ) : null
+    ,pairs1.length ? tokenVWAP(
+      metadata.t1,
+      pairs1,
+      pairs1Metadata
+    ) : null
+  ])
+
+  if (pairs0.length) {
+    const { price, volume } = _tokenVWAPResults[0]
     totalUSDA = price.mul(reserveA).div(SCALE)
     sumVolume = volume
   }
 
   let totalUSDB = reserveB
   if (pairs1.length) {
-    const { price, volume } = await tokenVWAP(
-      metadata.t1,
-      pairs1,
-      pairs1Metadata
-    )
+    const { price, volume } = _tokenVWAPResults[1]
     totalUSDB = price.mul(reserveB).div(SCALE)
     sumVolume = volume
   }
