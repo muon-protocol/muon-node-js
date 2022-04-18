@@ -44,7 +44,7 @@ const GRAPH_URL =
   'https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly'
 const GRAPH_DEPLOYMENT_ID = 'QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58'
 
-async function getTokenTxs(pairAddr) {
+async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
   let currentTimestamp = getTimestamp()
   const last30Min = currentTimestamp - 1800
   let skip = 0
@@ -75,12 +75,12 @@ async function getTokenTxs(pairAddr) {
       }
     `
     skip += 1000
-    let response = await axios.post(GRAPH_URL, {
+    let response = await axios.post(graphUrl, {
       query: query
     })
     let data = response?.data
     if (response?.status == 200 && data.data?.hasOwnProperty('swaps')) {
-      if (data.data._meta.deployment != GRAPH_DEPLOYMENT_ID) {
+      if (data.data._meta.deployment != deploymentID) {
         throw { message: 'SUBGRAPH_IS_UPDATED' }
       }
       const swaps = data.data.swaps
@@ -175,7 +175,11 @@ async function tokenVWAP(token, pairs, metadata) {
 }
 
 async function pairVWAP(pair, index) {
-  return getTokenTxs(pair).then(tokenTxs => {
+  return getTokenTxs(
+    pair,
+    GRAPH_URL,
+    GRAPH_DEPLOYMENT_ID
+    ).then(tokenTxs => {
     let sumWeightedPrice = new BN('0')
     let sumVolume = new BN('0')
     for (let i = 0; i < tokenTxs.length; i++) {
