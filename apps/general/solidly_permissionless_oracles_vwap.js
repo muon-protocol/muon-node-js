@@ -168,7 +168,7 @@ async function tokenVWAP(token, pairs, metadata) {
   let price = new BN(SCALE)
   let volume = pairVolume.reduce(function (previousValue, currentValue) {
     return previousValue.add(currentValue)
-  })
+  }, new BN(0))
   pairPrices.map((x) => {
     price = price.mul(x).div(SCALE)
   })
