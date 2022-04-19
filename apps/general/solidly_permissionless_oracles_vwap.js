@@ -94,18 +94,18 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
       }
     `
     skip += 1000
-    let { data, status } = await axios.post(graphUrl, {
+    const { data:{ data }, status } = await axios.post(graphUrl, {
       query: query
     })
-    if (status == 200 && data.data?.hasOwnProperty('swaps')) {
-      if (data.data._meta.deployment != deploymentID) {
+    const { swaps, _meta:{ deployment } } = data
+    if (status == 200 && swaps && deployment) {
+      if (deployment != deploymentID) {
         throw { message: 'SUBGRAPH_IS_UPDATED' }
       }
-      const swaps = data.data.swaps
       if(!swaps.length)
       {
         if(queryIndex == 1){
-          tokenTxs = tokenTxs.concat(data.data.swaps_last_rows)
+          tokenTxs = tokenTxs.concat(data.swaps_last_rows)
         }
         break
       }
