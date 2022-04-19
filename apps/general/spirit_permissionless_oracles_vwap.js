@@ -104,18 +104,15 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
         throw { message: 'SUBGRAPH_IS_UPDATED' }
       }
       const swaps = data.data.swaps
-      if(!swaps.length)
-      {
+      if (!swaps.length) {
         break
       }
       tokenTxs = tokenTxs.concat(swaps)
-      if(skip > 5000)
-      {
-        currentTimestamp = swaps[swaps.length-1]['timestamp']
+      if (skip > 5000) {
+        currentTimestamp = swaps[swaps.length - 1]['timestamp']
         skip = 0
       }
-    }else
-    {
+    } else {
       throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
     }
   }
@@ -251,14 +248,15 @@ async function tokenVWAP(token, pairs, metadata) {
     pairVWAPPromises.push(pairVWAP(pairs[i], index))
   }
   let pairVWAPs = await Promise.all(pairVWAPPromises)
-  pairVWAPs.map(pairVWAP => {
+  pairVWAPs.map((pairVWAP) => {
     pairPrices.push(pairVWAP.tokenPrice)
     pairVolume.push(pairVWAP.sumVolume)
   })
   let price = new BN(SCALE)
-  let volume = pairVolume.reduce(function (previousValue, currentValue) {
-    return previousValue.add(currentValue)
-  })
+  let volume = pairVolume.reduce(
+    (previousValue, currentValue) => previousValue.add(currentValue),
+    new BN(0)
+  )
   pairPrices.map((x) => {
     price = price.mul(x).div(SCALE)
   })
@@ -266,11 +264,7 @@ async function tokenVWAP(token, pairs, metadata) {
 }
 
 async function pairVWAP(pair, index) {
-  return getTokenTxs(
-    pair,
-    GRAPH_URL,
-    GRAPH_DEPLOYMENT_ID
-    ).then(tokenTxs => {
+  return getTokenTxs(pair, GRAPH_URL, GRAPH_DEPLOYMENT_ID).then((tokenTxs) => {
     let sumWeightedPrice = new BN('0')
     let sumVolume = new BN('0')
     for (let i = 0; i < tokenTxs.length; i++) {
@@ -382,16 +376,8 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   let sumVolume = new BN('0')
 
   let _tokenVWAPResults = await Promise.all([
-    pairs0.length ? tokenVWAP(
-      metadata.t0,
-      pairs0,
-      pairs0Metadata
-    ) : null
-    ,pairs1.length ? tokenVWAP(
-      metadata.t1,
-      pairs1,
-      pairs1Metadata
-    ) : null
+    pairs0.length ? tokenVWAP(metadata.t0, pairs0, pairs0Metadata) : null,
+    pairs1.length ? tokenVWAP(metadata.t1, pairs1, pairs1Metadata) : null
   ])
 
   if (pairs0.length) {

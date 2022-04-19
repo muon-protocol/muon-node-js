@@ -49,10 +49,12 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
   const last30Min = currentTimestamp - 1800
   let skip = 0
   let tokenTxs = []
-  let queryIndex = 0;
+  let queryIndex = 0
   while (true) {
-    queryIndex += 1;
-    let lastRowQuery = queryIndex === 1 ?  `
+    queryIndex += 1
+    let lastRowQuery =
+      queryIndex === 1
+        ? `
       swaps_last_rows:swaps(
         first: 1,
         where: {
@@ -67,7 +69,8 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
         amount1Out
         timestamp
       }
-    `: "";
+    `
+        : ''
     const query = `
       {
         swaps(
@@ -94,17 +97,22 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
       }
     `
     skip += 1000
-    const { data:{ data }, status } = await axios.post(graphUrl, {
+    const {
+      data: { data },
+      status
+    } = await axios.post(graphUrl, {
       query: query
     })
     if (status == 200 && data) {
-      const { swaps, _meta:{ deployment } } = data
+      const {
+        swaps,
+        _meta: { deployment }
+      } = data
       if (deployment != deploymentID) {
         throw { message: 'SUBGRAPH_IS_UPDATED' }
       }
-      if(!swaps.length)
-      {
-        if(queryIndex == 1){
+      if (!swaps.length) {
+        if (queryIndex == 1) {
           tokenTxs = tokenTxs.concat(data.swaps_last_rows)
         }
         break
@@ -185,9 +193,10 @@ async function tokenVWAP(token, pairs, metadata) {
     pairVolume.push(pairVWAP.sumVolume)
   })
   let price = new BN(SCALE)
-  let volume = pairVolume.reduce(function (previousValue, currentValue) {
-    return previousValue.add(currentValue)
-  }, new BN(0))
+  let volume = pairVolume.reduce(
+    (previousValue, currentValue) => previousValue.add(currentValue),
+    new BN(0)
+  )
   pairPrices.map((x) => {
     price = price.mul(x).div(SCALE)
   })
