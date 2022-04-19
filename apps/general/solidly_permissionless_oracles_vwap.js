@@ -49,7 +49,25 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
   const last30Min = currentTimestamp - 1800
   let skip = 0
   let tokenTxs = []
+  let queryIndex = 0;
   while (true) {
+    queryIndex += 1;
+    let lastRowQuery = queryIndex === 1 ?  `
+      swaps_last_rows:swaps(
+        first: 1,
+        where: {
+          pair: "${pairAddr.toLowerCase()}"
+        },
+        orderBy: timestamp,
+        orderDirection: desc
+      ) {
+        amount0In
+        amount1In
+        amount0Out
+        amount1Out
+        timestamp
+      }
+    `: "";
     const query = `
       {
         swaps(
@@ -69,22 +87,26 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
           amount1Out
           timestamp
         }
+        ${lastRowQuery}
         _meta {
           deployment
         }
       }
     `
     skip += 1000
-    let response = await axios.post(graphUrl, {
+    const { data:{ data }, status } = await axios.post(graphUrl, {
       query: query
     })
-    let data = response?.data
-    if (response?.status == 200 && data.data?.hasOwnProperty('swaps')) {
-      if (data.data._meta.deployment != deploymentID) {
+    if (status == 200 && data) {
+      const { swaps, _meta:{ deployment } } = data
+      if (deployment != deploymentID) {
         throw { message: 'SUBGRAPH_IS_UPDATED' }
       }
-      const swaps = data.data.swaps
-      if (!swaps.length) {
+      if(!swaps.length)
+      {
+        if(queryIndex == 1){
+          tokenTxs = tokenTxs.concat(data.swaps_last_rows)
+        }
         break
       }
       tokenTxs = tokenTxs.concat(swaps)
@@ -170,7 +192,7 @@ async function tokenVWAP(token, pairs, metadata) {
     price = price.mul(x).div(SCALE)
   })
   if (volume.toString() == '0' || price.toString() == '0') {
-    throw 'INVALID_PRICE'
+    throw { message: 'INVALID_PRICE' }
   }
   return { price, volume }
 }
