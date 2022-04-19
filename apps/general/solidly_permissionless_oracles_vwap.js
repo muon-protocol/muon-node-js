@@ -84,18 +84,15 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
         throw { message: 'SUBGRAPH_IS_UPDATED' }
       }
       const swaps = data.data.swaps
-      if(!swaps.length)
-      {
+      if (!swaps.length) {
         break
       }
       tokenTxs = tokenTxs.concat(swaps)
-      if(skip > 5000)
-      {
-        currentTimestamp = swaps[swaps.length-1]['timestamp']
+      if (skip > 5000) {
+        currentTimestamp = swaps[swaps.length - 1]['timestamp']
         skip = 0
       }
-    }else
-    {
+    } else {
       throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
     }
   }
@@ -161,7 +158,7 @@ async function tokenVWAP(token, pairs, metadata) {
     pairVWAPPromises.push(pairVWAP(pairs[i], index))
   }
   let pairVWAPs = await Promise.all(pairVWAPPromises)
-  pairVWAPs.map(pairVWAP => {
+  pairVWAPs.map((pairVWAP) => {
     pairPrices.push(pairVWAP.tokenPrice)
     pairVolume.push(pairVWAP.sumVolume)
   })
@@ -172,18 +169,14 @@ async function tokenVWAP(token, pairs, metadata) {
   pairPrices.map((x) => {
     price = price.mul(x).div(SCALE)
   })
-  if(volume.toString() == "0" || price.toString() == "0"){
-    throw "INVALID_PRICE";
+  if (volume.toString() == '0' || price.toString() == '0') {
+    throw 'INVALID_PRICE'
   }
   return { price, volume }
 }
 
 async function pairVWAP(pair, index) {
-  return getTokenTxs(
-    pair,
-    GRAPH_URL,
-    GRAPH_DEPLOYMENT_ID
-    ).then(tokenTxs => {
+  return getTokenTxs(pair, GRAPH_URL, GRAPH_DEPLOYMENT_ID).then((tokenTxs) => {
     let sumWeightedPrice = new BN('0')
     let sumVolume = new BN('0')
     for (let i = 0; i < tokenTxs.length; i++) {
@@ -256,7 +249,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     ...contractCallContextPairs1
   ]
 
-  return multiCall(FANTOM_ID, contractCallContext).then(async result => {
+  return multiCall(FANTOM_ID, contractCallContext).then(async (result) => {
     let metadata = getMetadata(result, TOKEN_META_DATA)[0]
 
     let totalSupply = result.find((item) => item.reference === TOTAL_SUPPLY)
@@ -270,16 +263,12 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     let sumVolume = new BN('0')
 
     let _tokenVWAPResults = await Promise.all([
-      pairs0.length ? tokenVWAP(
-        metadata.t0,
-        pairs0,
-        getMetadata(result, PAIRS0_META_DATA)
-      ) : null
-      ,pairs1.length ? tokenVWAP(
-        metadata.t1,
-        pairs1,
-        getMetadata(result, PAIRS1_META_DATA)
-      ) : null
+      pairs0.length
+        ? tokenVWAP(metadata.t0, pairs0, getMetadata(result, PAIRS0_META_DATA))
+        : null,
+      pairs1.length
+        ? tokenVWAP(metadata.t1, pairs1, getMetadata(result, PAIRS1_META_DATA))
+        : null
     ])
     if (pairs0.length) {
       const { price, volume } = _tokenVWAPResults[0]
