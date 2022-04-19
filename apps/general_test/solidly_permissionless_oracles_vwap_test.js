@@ -4,7 +4,7 @@ const { onRequest } = require('../general/solidly_permissionless_oracles_vwap')
 
 const testLP = async () => {
   let method = 'lp_price'
-  const { tokenPrice, volume } = await onRequest({
+  return onRequest({
     method,
     data: {
       params: {
@@ -15,13 +15,16 @@ const testLP = async () => {
       }
     }
   })
-  console.log('\n \nResult for LP_PRICE:')
-  console.log({ tokenPrice, volume })
+    .then(({ tokenPrice, volume }) => {
+      console.log('\n \nResult for LP_PRICE:')
+      console.log({ tokenPrice, volume })
+    })
+    .catch((error) => console.log(error))
 }
 
 const testPrice = async () => {
   let method = 'price'
-  const { tokenPrice, volume } = await onRequest({
+  return onRequest({
     method,
     data: {
       params: {
@@ -31,8 +34,11 @@ const testPrice = async () => {
       }
     }
   })
-  console.log('\n \nResult for PRICE:')
-  console.log({ tokenPrice, volume })
+    .then(({ tokenPrice, volume }) => {
+      console.log('\n \nResult for PRICE:')
+      console.log({ tokenPrice, volume })
+    })
+    .catch((error) => console.log(error))
 }
 
 testLP()

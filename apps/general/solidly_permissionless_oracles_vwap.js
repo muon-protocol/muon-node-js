@@ -250,42 +250,57 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   ]
 
   return multiCall(FANTOM_ID, contractCallContext).then(async (result) => {
-    let metadata = getMetadata(result, TOKEN_META_DATA)[0]
+    try {
+      let metadata = getMetadata(result, TOKEN_META_DATA)[0]
 
-    let totalSupply = result.find((item) => item.reference === TOTAL_SUPPLY)
-    totalSupply = new BN(totalSupply.callsReturnContext[0].returnValues[0])
+      let totalSupply = result.find((item) => item.reference === TOTAL_SUPPLY)
+      totalSupply = new BN(totalSupply.callsReturnContext[0].returnValues[0])
 
-    let reserveA = new BN(metadata.r0).mul(SCALE).div(new BN(metadata.dec0))
+      let reserveA = new BN(metadata.r0).mul(SCALE).div(new BN(metadata.dec0))
 
-    let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
+      let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
 
-    let totalUSDA = reserveA
-    let sumVolume = new BN('0')
+      let totalUSDA = reserveA
+      let sumVolume = new BN('0')
 
-    let _tokenVWAPResults = await Promise.all([
-      pairs0.length
-        ? tokenVWAP(metadata.t0, pairs0, getMetadata(result, PAIRS0_META_DATA))
-        : null,
-      pairs1.length
-        ? tokenVWAP(metadata.t1, pairs1, getMetadata(result, PAIRS1_META_DATA))
-        : null
-    ])
-    if (pairs0.length) {
-      const { price, volume } = _tokenVWAPResults[0]
-      totalUSDA = price.mul(reserveA).div(SCALE)
-      sumVolume = volume
+      let _tokenVWAPResults = await Promise.all([
+        pairs0.length
+          ? tokenVWAP(
+              metadata.t0,
+              pairs0,
+              getMetadata(result, PAIRS0_META_DATA)
+            )
+          : null,
+        pairs1.length
+          ? tokenVWAP(
+              metadata.t1,
+              pairs1,
+              getMetadata(result, PAIRS1_META_DATA)
+            )
+          : null
+      ])
+      if (pairs0.length) {
+        const { price, volume } = _tokenVWAPResults[0]
+        totalUSDA = price.mul(reserveA).div(SCALE)
+        sumVolume = volume
+      }
+
+      let totalUSDB = reserveB
+      if (pairs1.length) {
+        const { price, volume } = _tokenVWAPResults[1]
+        totalUSDB = price.mul(reserveB).div(SCALE)
+        sumVolume = volume
+      }
+
+      let totalUSD = totalUSDA.add(totalUSDB)
+
+      return {
+        price: totalUSD.mul(SCALE).div(totalSupply).toString(),
+        sumVolume
+      }
+    } catch (error) {
+      console.log('Error happend in LPToken Price', error)
     }
-
-    let totalUSDB = reserveB
-    if (pairs1.length) {
-      const { price, volume } = _tokenVWAPResults[1]
-      totalUSDB = price.mul(reserveB).div(SCALE)
-      sumVolume = volume
-    }
-
-    let totalUSD = totalUSDA.add(totalUSDB)
-
-    return { price: totalUSD.mul(SCALE).div(totalSupply).toString(), sumVolume }
   })
 }
 
@@ -296,7 +311,6 @@ module.exports = {
   onRequest: async function (request) {
     let {
       method,
-      nSign,
       data: { params }
     } = request
 
@@ -322,9 +336,7 @@ module.exports = {
         if (typeof pairs1 === 'string' || pairs1 instanceof String) {
           pairs1 = pairs1.split(',').filter((x) => x)
         }
-
-        let { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1)
-
+        const { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1)
         return {
           token: token,
           tokenPrice: price,
