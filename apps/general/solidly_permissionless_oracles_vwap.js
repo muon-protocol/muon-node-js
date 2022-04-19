@@ -97,8 +97,8 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
     const { data:{ data }, status } = await axios.post(graphUrl, {
       query: query
     })
-    const { swaps, _meta:{ deployment } } = data
-    if (status == 200 && swaps && deployment) {
+    if (status == 200 && data) {
+      const { swaps, _meta:{ deployment } } = data
       if (deployment != deploymentID) {
         throw { message: 'SUBGRAPH_IS_UPDATED' }
       }
@@ -192,7 +192,7 @@ async function tokenVWAP(token, pairs, metadata) {
     price = price.mul(x).div(SCALE)
   })
   if (volume.toString() == '0' || price.toString() == '0') {
-    throw 'INVALID_PRICE'
+    throw { message: 'INVALID_PRICE' }
   }
   return { price, volume }
 }
