@@ -151,15 +151,15 @@ function getInfoContract(multiCallInfo, filterBy) {
 
 function getMetadata(multiCallInfo, filterBy) {
   const info = getInfoContract(multiCallInfo, filterBy)
-  let metadata = info.map((item) => {
+  let metadata = info.map(({ callsReturnContext }) => {
     return {
-      dec0: item.callsReturnContext[0].returnValues[0],
-      dec1: item.callsReturnContext[0].returnValues[1],
-      r0: item.callsReturnContext[0].returnValues[2],
-      r1: item.callsReturnContext[0].returnValues[3],
-      st: item.callsReturnContext[0].returnValues[4],
-      t0: item.callsReturnContext[0].returnValues[5],
-      t1: item.callsReturnContext[0].returnValues[6]
+      dec0: callsReturnContext[0].returnValues[0],
+      dec1: callsReturnContext[0].returnValues[1],
+      r0: callsReturnContext[0].returnValues[2],
+      r1: callsReturnContext[0].returnValues[3],
+      st: callsReturnContext[0].returnValues[4],
+      t0: callsReturnContext[0].returnValues[5],
+      t1: callsReturnContext[0].returnValues[6]
     }
   })
   return metadata
@@ -187,19 +187,26 @@ async function tokenVWAP(token, pairs, metadata) {
     }
     pairVWAPPromises.push(pairVWAP(pairs[i], index))
   }
+
   let pairVWAPs = await Promise.all(pairVWAPPromises)
+
   pairVWAPs.map((pairVWAP) => {
     pairPrices.push(pairVWAP.tokenPrice)
     pairVolume.push(pairVWAP.sumVolume)
   })
-  let price = new BN(SCALE)
+  // let price = new BN(SCALE)
   let volume = pairVolume.reduce(
     (previousValue, currentValue) => previousValue.add(currentValue),
     new BN(0)
   )
-  pairPrices.map((x) => {
-    price = price.mul(x).div(SCALE)
-  })
+  let price = pairPrices.reduce(
+    (price, x) => price.mul(x).div(SCALE),
+    new BN(SCALE)
+  )
+  // pairPrices.map((x) => {
+  //   price = price.mul(x).div(SCALE)
+  // })
+
   if (volume.toString() == '0' || price.toString() == '0') {
     throw { message: 'INVALID_PRICE' }
   }
@@ -281,56 +288,44 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   ]
 
   return multiCall(FANTOM_ID, contractCallContext).then(async (result) => {
-    try {
-      let metadata = getMetadata(result, TOKEN_META_DATA)[0]
+    let metadata = getMetadata(result, TOKEN_META_DATA)[0]
 
-      let totalSupply = result.find((item) => item.reference === TOTAL_SUPPLY)
-      totalSupply = new BN(totalSupply.callsReturnContext[0].returnValues[0])
+    let totalSupply = result.find((item) => item.reference === TOTAL_SUPPLY)
+    totalSupply = new BN(totalSupply.callsReturnContext[0].returnValues[0])
 
-      let reserveA = new BN(metadata.r0).mul(SCALE).div(new BN(metadata.dec0))
+    let reserveA = new BN(metadata.r0).mul(SCALE).div(new BN(metadata.dec0))
 
-      let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
+    let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
 
-      let totalUSDA = reserveA
-      let sumVolume = new BN('0')
+    let totalUSDA = reserveA
+    let sumVolume = new BN('0')
 
-      let _tokenVWAPResults = await Promise.all([
-        pairs0.length
-          ? tokenVWAP(
-              metadata.t0,
-              pairs0,
-              getMetadata(result, PAIRS0_META_DATA)
-            )
-          : null,
-        pairs1.length
-          ? tokenVWAP(
-              metadata.t1,
-              pairs1,
-              getMetadata(result, PAIRS1_META_DATA)
-            )
-          : null
-      ])
-      if (pairs0.length) {
-        const { price, volume } = _tokenVWAPResults[0]
-        totalUSDA = price.mul(reserveA).div(SCALE)
-        sumVolume = volume
-      }
+    let _tokenVWAPResults = await Promise.all([
+      pairs0.length
+        ? tokenVWAP(metadata.t0, pairs0, getMetadata(result, PAIRS0_META_DATA))
+        : null,
+      pairs1.length
+        ? tokenVWAP(metadata.t1, pairs1, getMetadata(result, PAIRS1_META_DATA))
+        : null
+    ])
+    if (pairs0.length) {
+      const { price, volume } = _tokenVWAPResults[0]
+      totalUSDA = price.mul(reserveA).div(SCALE)
+      sumVolume = volume
+    }
 
-      let totalUSDB = reserveB
-      if (pairs1.length) {
-        const { price, volume } = _tokenVWAPResults[1]
-        totalUSDB = price.mul(reserveB).div(SCALE)
-        sumVolume = volume
-      }
+    let totalUSDB = reserveB
+    if (pairs1.length) {
+      const { price, volume } = _tokenVWAPResults[1]
+      totalUSDB = price.mul(reserveB).div(SCALE)
+      sumVolume = volume
+    }
 
-      let totalUSD = totalUSDA.add(totalUSDB)
+    let totalUSD = totalUSDA.add(totalUSDB)
 
-      return {
-        price: totalUSD.mul(SCALE).div(totalSupply).toString(),
-        sumVolume
-      }
-    } catch (error) {
-      console.log('Error happend in LPToken Price', error)
+    return {
+      price: totalUSD.mul(SCALE).div(totalSupply).toString(),
+      sumVolume
     }
   })
 }
