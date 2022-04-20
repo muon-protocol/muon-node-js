@@ -69,42 +69,72 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
   const last30Min = currentTimestamp - 1800
   let skip = 0
   let tokenTxs = []
+  let queryIndex = 0
   while (true) {
+    queryIndex += 1
+    let lastRowQuery =
+      queryIndex === 1
+        ? `
+          swaps_last_rows:swaps(
+            first: 1,
+            where: {
+              pair: "${pairAddr.toLowerCase()}"
+            },
+            orderBy: timestamp,
+            orderDirection: desc
+          ) {
+            amount0In
+            amount1In
+            amount0Out
+            amount1Out
+            timestamp
+          }
+        `
+        : ''
     const query = `
-      {
-        swaps(
-          first: 1000,
-          skip: ${skip},
-          where: {
-            pair: "${pairAddr.toLowerCase()}"
-            timestamp_gt: ${last30Min}
-            timestamp_lt: ${currentTimestamp}
-          },
-          orderBy: timestamp,
-          orderDirection: desc
-        ) {
-          amount0In
-          amount1In
-          amount0Out
-          amount1Out
-          timestamp
-        }
-        _meta {
-          deployment
-        }
-      }
-    `
+          {
+            swaps(
+              first: 1000,
+              skip: ${skip},
+              where: {
+                pair: "${pairAddr.toLowerCase()}"
+                timestamp_gt: ${last30Min}
+                timestamp_lt: ${currentTimestamp}
+              },
+              orderBy: timestamp,
+              orderDirection: desc
+            ) {
+              amount0In
+              amount1In
+              amount0Out
+              amount1Out
+              timestamp
+            }
+            ${lastRowQuery}
+            _meta {
+              deployment
+            }
+          }
+        `
     skip += 1000
-    let response = await axios.post(graphUrl, {
+    const {
+      data: { data },
+      status
+    } = await axios.post(graphUrl, {
       query: query
     })
-    let data = response?.data
-    if (response?.status == 200 && data.data?.hasOwnProperty('swaps')) {
-      if (data.data._meta.deployment != deploymentID) {
+    if (status == 200 && data) {
+      const {
+        swaps,
+        _meta: { deployment }
+      } = data
+      if (deployment != deploymentID) {
         throw { message: 'SUBGRAPH_IS_UPDATED' }
       }
-      const swaps = data.data.swaps
       if (!swaps.length) {
+        if (queryIndex == 1) {
+          tokenTxs = tokenTxs.concat(data.swaps_last_rows)
+        }
         break
       }
       tokenTxs = tokenTxs.concat(swaps)
@@ -247,19 +277,25 @@ async function tokenVWAP(token, pairs, metadata) {
     }
     pairVWAPPromises.push(pairVWAP(pairs[i], index))
   }
+
   let pairVWAPs = await Promise.all(pairVWAPPromises)
+
   pairVWAPs.map((pairVWAP) => {
     pairPrices.push(pairVWAP.tokenPrice)
     pairVolume.push(pairVWAP.sumVolume)
   })
-  let price = new BN(SCALE)
   let volume = pairVolume.reduce(
     (previousValue, currentValue) => previousValue.add(currentValue),
     new BN(0)
   )
-  pairPrices.map((x) => {
-    price = price.mul(x).div(SCALE)
-  })
+  let price = pairPrices.reduce(
+    (price, x) => price.mul(x).div(SCALE),
+    new BN(SCALE)
+  )
+
+  if (volume.toString() == '0' || price.toString() == '0') {
+    throw { message: 'INVALID_PRICE' }
+  }
   return { price, volume }
 }
 
@@ -431,7 +467,7 @@ module.exports = {
           pairs1 = pairs1.split(',').filter((x) => x)
         }
 
-        let { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1)
+        const { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1)
 
         return {
           token: token,
@@ -449,8 +485,10 @@ module.exports = {
   },
 
   isPriceToleranceOk: function (price, expectedPrice) {
-    let priceDiff = Math.abs(price - expectedPrice)
-    if (priceDiff / expectedPrice > PRICE_TOLERANCE) {
+    let priceDiff = new BN(price).sub(new BN(expectedPrice)).abs()
+    if (
+      new BN(priceDiff).div(new BN(expectedPrice)).gt(new BN(PRICE_TOLERANCE))
+    ) {
       return false
     }
     return true
