@@ -389,7 +389,7 @@ module.exports = {
       method,
       data: { params }
     } = request
-    let { hashTimestamp } = params
+    let { hashTimestamp, hashVolume } = params
     switch (method) {
       case 'price': {
         if (
@@ -407,7 +407,11 @@ module.exports = {
           { type: 'address', value: token },
           { type: 'address[]', value: pairs },
           { type: 'uint256', value: request.data.result.tokenPrice },
-          { type: 'uint256', value: request.data.result.volume },
+          
+          ...(hashVolume ?
+            [{ type: 'uint256', value: request.data.result.volume }]
+            : []),
+          
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
