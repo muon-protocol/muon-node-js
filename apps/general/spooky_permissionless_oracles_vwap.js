@@ -436,7 +436,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
 
 module.exports = {
   APP_NAME: 'spooky_permissionless_oracles_vwap',
-  APP_ID: 18,
+  APP_ID: 17,
 
   onRequest: async function (request) {
     let {
