@@ -379,8 +379,10 @@ module.exports = {
   },
 
   isPriceToleranceOk: function (price, expectedPrice) {
-    let priceDiff = Math.abs(price - expectedPrice)
-    if (priceDiff / expectedPrice > PRICE_TOLERANCE) {
+    let priceDiff = new BN(price).sub(new BN(expectedPrice)).abs()
+    if (
+      new BN(priceDiff).div(new BN(expectedPrice)).gt(new BN(PRICE_TOLERANCE))
+    ) {
       return false
     }
     return true
