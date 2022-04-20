@@ -3,7 +3,7 @@ const { times } = require('lodash');
 const web3 = require('web3');
 
 const ORACLE_ADDRESS = '0x1Bc270B2bE5c361784044ccE3f55c896fB5Fdf5A'
-const DEI_POOL_ADDRESS = '0x7E57229883428386647CE21475EDe21E48F368eF'
+const DEI_POOL_ADDRESS = '0x478Ef5cc76507E8C8E263923660A06d2e7498863'
 const TOKEN_ADDRESS = '0xDE5ed76E7c05eC5e4572CfC88d1ACEA165109E44'
 const AMOUNT = BigInt(1e18);
 const DURATION = 8 * 60 * 60; // 8 hours
@@ -25,16 +25,21 @@ module.exports = {
             case 'signature':
                 const { userAddress, redeemId, chainId } = params
 
-                const { amount, timestamp } = await ethCall(
-                    DEI_POOL_ADDRESS,
-                    'redeemPositions',
-                    [
-                        userAddress,
-                        redeemId
-                    ],
-                    DEI_POOL_ABI,
-                    'ftm'
-                )
+                let timestamp;
+                try {
+                    timestamp = (await ethCall(
+                        DEI_POOL_ADDRESS,
+                        'redeemPositions',
+                        [
+                            userAddress,
+                            redeemId
+                        ],
+                        DEI_POOL_ABI,
+                        'ftm'
+                    ))['timestamp']
+                } catch {
+                    throw { message: 'Error on pool contract' }
+                }
 
                 let price;
                 try {
