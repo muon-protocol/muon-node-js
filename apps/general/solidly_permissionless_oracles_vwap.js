@@ -194,7 +194,6 @@ async function tokenVWAP(token, pairs, metadata) {
     pairPrices.push(pairVWAP.tokenPrice)
     pairVolume.push(pairVWAP.sumVolume)
   })
-  // let price = new BN(SCALE)
   let volume = pairVolume.reduce(
     (previousValue, currentValue) => previousValue.add(currentValue),
     new BN(0)
@@ -203,9 +202,6 @@ async function tokenVWAP(token, pairs, metadata) {
     (price, x) => price.mul(x).div(SCALE),
     new BN(SCALE)
   )
-  // pairPrices.map((x) => {
-  //   price = price.mul(x).div(SCALE)
-  // })
 
   if (volume.toString() == '0' || price.toString() == '0') {
     throw { message: 'INVALID_PRICE' }
