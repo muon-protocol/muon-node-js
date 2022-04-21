@@ -23,8 +23,8 @@ async function multiCall(chainId, contractCallContext) {
     return results
   } catch (error) {
     throw {
-      message: `MULTICALL_ERROR. ${error.reason}`,
-      error: error.reason
+      message: `MULTICALL_ERROR. ${error.message}`,
+      error: error.message
     }
   }
 }
