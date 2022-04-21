@@ -18,8 +18,8 @@ function runMuonNode(node_n) {
         console.log(data.toString())
       })
       result.stderr.on('data', (data) => {
-        console.error(`stderr: ${data}`);
-      });
+        console.error(`stderr: ${data}`)
+      })
     }
   } catch (error) {
     console.log('Error happend in run nodes:', error)
@@ -49,10 +49,11 @@ async function runNodes() {
       `-p=${port}`
     ])
     result.stdout.on('data', (data) => {
-      runMuonNode(node_n)
       console.log(data.toString())
     })
-
+    result.on('exit', () => {
+      runMuonNode(node_n)
+    })
     // await exec(`node generateEnvs.js -n=${node_n} -p=${port}`)
   } else {
     if (fs.existsSync(`./dev-chain/dev-node-${node_n}.env`)) {
@@ -80,8 +81,10 @@ async function runNodes() {
         `-p=${port}`
       ])
       result.stdout.on('data', (data) => {
-        runMuonNode(node_n)
         console.log(data.toString())
+      })
+      result.on('exit', () => {
+        runMuonNode(node_n)
       })
     }
   }
