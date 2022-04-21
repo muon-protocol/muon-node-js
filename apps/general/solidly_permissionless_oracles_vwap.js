@@ -37,7 +37,7 @@ const ERC20_ABI = [
   }
 ]
 
-const PRICE_TOLERANCE = 0.05
+const PRICE_TOLERANCE = '0.05'
 const FANTOM_ID = 250
 const SCALE = new BN('1000000000000000000')
 const GRAPH_URL =
@@ -377,8 +377,11 @@ module.exports = {
 
   isPriceToleranceOk: function (price, expectedPrice) {
     let priceDiff = new BN(price).sub(new BN(expectedPrice)).abs()
+
     if (
-      new BN(priceDiff).div(new BN(expectedPrice)).gt(new BN(PRICE_TOLERANCE))
+      new BN(priceDiff)
+        .div(new BN(expectedPrice))
+        .gt(toBaseUnit(PRICE_TOLERANCE, '18'))
     ) {
       return false
     }
@@ -409,8 +412,8 @@ module.exports = {
           { type: 'address[]', value: pairs },
           { type: 'uint256', value: request.data.result.tokenPrice },
 
-          ...(hashVolume ?
-            [{ type: 'uint256', value: request.data.result.volume }]
+          ...(hashVolume
+            ? [{ type: 'uint256', value: request.data.result.volume }]
             : []),
 
           ...(hashTimestamp
@@ -434,7 +437,10 @@ module.exports = {
           { type: 'address[]', value: pairs0 },
           { type: 'address[]', value: pairs1 },
           { type: 'uint256', value: request.data.result.tokenPrice },
-          { type: 'uint256', value: request.data.result.volume },
+
+          ...(hashVolume
+            ? [{ type: 'uint256', value: request.data.result.volume }]
+            : []),
 
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
