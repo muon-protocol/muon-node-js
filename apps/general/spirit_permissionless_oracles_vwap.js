@@ -1,31 +1,41 @@
 const { axios, toBaseUnit, soliditySha3, BN, multiCall } = MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
-const TOKEN_META_DATA = 'tokenMetaData'
+const TOKEN_INFO = 'tokenInfo'
 const TOTAL_SUPPLY = 'totalSupply'
-const PAIRS0_META_DATA = 'pairs0MetaData'
-const PAIRS1_META_DATA = 'pairs1MetaData'
-const PAIRS_META_DATA = 'pairsMetaData'
+const PAIRS0_INFO = 'pairs0INFO'
+const PAIRS1_INFO = 'pairs1INFO'
+const PAIRS_INFO = 'pairsINFO'
 
-const BASE_PAIR_METADATA = [
+const Info_ABI = [
   {
     inputs: [],
-    name: 'metadata',
+    name: 'getReserves',
     outputs: [
-      { internalType: 'uint256', name: 'dec0', type: 'uint256' },
-      { internalType: 'uint256', name: 'dec1', type: 'uint256' },
-      { internalType: 'uint256', name: 'r0', type: 'uint256' },
-      { internalType: 'uint256', name: 'r1', type: 'uint256' },
-      { internalType: 'bool', name: 'st', type: 'bool' },
-      { internalType: '', name: 't0', type: 'address' },
-      { internalType: 'address', name: 't1', type: 'address' }
+      { internalType: 'uint112', name: '_reserve0', type: 'uint112' },
+      { internalType: 'uint112', name: '_reserve1', type: 'uint112' },
+      { internalType: 'uint32', name: '_blockTimestampLast', type: 'uint32' }
     ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'token0',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'token1',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
     stateMutability: 'view',
     type: 'function'
   }
 ]
 
-const ERC20_ABI = [
+const ERC20_TOTAL_SUPPLY_ABI = [
   {
     constant: true,
     inputs: [],
@@ -36,13 +46,23 @@ const ERC20_ABI = [
     type: 'function'
   }
 ]
+const ERC20_DECIMALS_ABI = [
+  {
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ internalType: 'uint8', name: '', type: 'uint8' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]
 
 const PRICE_TOLERANCE = 0.05
 const FANTOM_ID = 250
 const SCALE = new BN('1000000000000000000')
+const GRAPH_DEPLOYMENT_ID = 'QmUptbhTmAVCUTNeK2afecQJ3DFLgk9m4dBerfpqkTEJvi'
+
 const GRAPH_URL =
-  'https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly'
-const GRAPH_DEPLOYMENT_ID = 'QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58'
+  'https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap'
 
 async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
   let currentTimestamp = getTimestamp()
@@ -55,47 +75,47 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
     let lastRowQuery =
       queryIndex === 1
         ? `
-      swaps_last_rows:swaps(
-        first: 1,
-        where: {
-          pair: "${pairAddr.toLowerCase()}"
-        },
-        orderBy: timestamp,
-        orderDirection: desc
-      ) {
-        amount0In
-        amount1In
-        amount0Out
-        amount1Out
-        timestamp
-      }
-    `
+          swaps_last_rows:swaps(
+            first: 1,
+            where: {
+              pair: "${pairAddr.toLowerCase()}"
+            },
+            orderBy: timestamp,
+            orderDirection: desc
+          ) {
+            amount0In
+            amount1In
+            amount0Out
+            amount1Out
+            timestamp
+          }
+        `
         : ''
     const query = `
-      {
-        swaps(
-          first: 1000,
-          skip: ${skip},
-          where: {
-            pair: "${pairAddr.toLowerCase()}"
-            timestamp_gt: ${last30Min}
-            timestamp_lt: ${currentTimestamp}
-          },
-          orderBy: timestamp,
-          orderDirection: desc
-        ) {
-          amount0In
-          amount1In
-          amount0Out
-          amount1Out
-          timestamp
-        }
-        ${lastRowQuery}
-        _meta {
-          deployment
-        }
-      }
-    `
+          {
+            swaps(
+              first: 1000,
+              skip: ${skip},
+              where: {
+                pair: "${pairAddr.toLowerCase()}"
+                timestamp_gt: ${last30Min}
+                timestamp_lt: ${currentTimestamp}
+              },
+              orderBy: timestamp,
+              orderDirection: desc
+            ) {
+              amount0In
+              amount1In
+              amount0Out
+              amount1Out
+              timestamp
+            }
+            ${lastRowQuery}
+            _meta {
+              deployment
+            }
+          }
+        `
     skip += 1000
     const {
       data: { data },
@@ -129,20 +149,8 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
   return tokenTxs
 }
 
-function makeCallContext(info, prefix) {
-  const contractCallContext = info.map((item) => ({
-    reference: prefix + ':' + item,
-    contractAddress: item,
-    abi: BASE_PAIR_METADATA,
-    calls: [
-      {
-        reference: prefix + ':' + item,
-        methodName: 'metadata'
-      }
-    ]
-  }))
-
-  return contractCallContext
+function getReturnValue(info, methodName) {
+  return info.find((item) => item.methodName === methodName).returnValues
 }
 
 function getInfoContract(multiCallInfo, filterBy) {
@@ -151,15 +159,92 @@ function getInfoContract(multiCallInfo, filterBy) {
 
 function getMetadata(multiCallInfo, filterBy) {
   const info = getInfoContract(multiCallInfo, filterBy)
-  let metadata = info.map(({ callsReturnContext }) => {
+  let metadata = info.map((item) => {
+    const reserves = getReturnValue(item.callsReturnContext, 'getReserves')
+
     return {
-      dec0: callsReturnContext[0].returnValues[0],
-      dec1: callsReturnContext[0].returnValues[1],
-      r0: callsReturnContext[0].returnValues[2],
-      r1: callsReturnContext[0].returnValues[3],
-      st: callsReturnContext[0].returnValues[4],
-      t0: callsReturnContext[0].returnValues[5],
-      t1: callsReturnContext[0].returnValues[6]
+      r0: reserves[0],
+      r1: reserves[1],
+
+      t0: getReturnValue(item.callsReturnContext, 'token0')[0],
+      t1: getReturnValue(item.callsReturnContext, 'token1')[0]
+    }
+  })
+  return metadata
+}
+
+function makeCallContextInfo(info, prefix) {
+  const contractCallContext = info.map((item) => ({
+    reference: prefix + ':' + item,
+    contractAddress: item,
+    abi: Info_ABI,
+    calls: [
+      {
+        reference: prefix + ':' + item,
+        methodName: 'getReserves'
+      },
+      {
+        reference: prefix + ':' + item,
+        methodName: 'token0'
+      },
+      {
+        reference: prefix + ':' + item,
+        methodName: 'token1'
+      }
+    ]
+  }))
+
+  return contractCallContext
+}
+
+function makeCallContextDecimal(metadata, prefix) {
+  let callContext = metadata.map((item) => [
+    {
+      reference: prefix + ':' + 't0' + ':' + item.t0,
+      contractAddress: item.t0,
+      abi: ERC20_DECIMALS_ABI,
+      calls: [
+        {
+          reference: 't0' + ':' + item.t0,
+          methodName: 'decimals'
+        }
+      ]
+    },
+    {
+      reference: prefix + ':' + 't1' + ':' + item.t1,
+      contractAddress: item.t1,
+      abi: ERC20_DECIMALS_ABI,
+      calls: [
+        {
+          reference: 't1' + ':' + item.t1,
+          methodName: 'decimals'
+        }
+      ]
+    }
+  ])
+
+  callContext = [].concat.apply([], callContext)
+  return callContext
+}
+
+function getFinalMetaData(resultDecimals, prevMetaData, prefix) {
+  let metadata = prevMetaData.map((item) => {
+    let t0 = getInfoContract(
+      resultDecimals,
+      prefix + ':' + 't0' + ':' + item.t0
+    )
+    let t1 = getInfoContract(
+      resultDecimals,
+      prefix + ':' + 't1' + ':' + item.t1
+    )
+    return {
+      ...item,
+      dec0: new BN(10)
+        .pow(new BN(getReturnValue(t0[0].callsReturnContext, 'decimals')[0]))
+        .toString(),
+      dec1: new BN(10)
+        .pow(new BN(getReturnValue(t1[0].callsReturnContext, 'decimals')[0]))
+        .toString()
     }
   })
   return metadata
@@ -170,9 +255,14 @@ async function tokenVWAP(token, pairs, metadata) {
   let pairVolume = []
   let inputToken = token
   if (!metadata) {
-    const contractCallContext = makeCallContext(pairs, PAIRS_META_DATA)
+    const contractCallContext = makeCallContextInfo(pairs, PAIRS_INFO)
     let result = await multiCall(FANTOM_ID, contractCallContext)
-    metadata = getMetadata(result, PAIRS_META_DATA)
+
+    metadata = getMetadata(result, PAIRS_INFO)
+
+    let callContextPairs = makeCallContextDecimal(metadata, PAIRS_INFO)
+    let resultDecimals = await multiCall(FANTOM_ID, callContextPairs)
+    metadata = getFinalMetaData(resultDecimals, metadata, PAIRS_INFO)
   }
   let pairVWAPPromises = []
   for (let i = 0; i < pairs.length; i++) {
@@ -259,12 +349,12 @@ async function pairVWAP(pair, index) {
 }
 
 async function LPTokenPrice(token, pairs0, pairs1) {
-  const contractCallContextToken = makeCallContext([token], TOKEN_META_DATA)
+  const contractCallContextToken = makeCallContextInfo([token], TOKEN_INFO)
   const contractCallContextSupply = [
     {
       reference: TOTAL_SUPPLY,
       contractAddress: token,
-      abi: ERC20_ABI,
+      abi: ERC20_TOTAL_SUPPLY_ABI,
       calls: [
         {
           reference: TOTAL_SUPPLY,
@@ -273,9 +363,11 @@ async function LPTokenPrice(token, pairs0, pairs1) {
       ]
     }
   ]
-  const contractCallContextPairs0 = makeCallContext(pairs0, PAIRS0_META_DATA)
 
-  const contractCallContextPairs1 = makeCallContext(pairs1, PAIRS1_META_DATA)
+  const contractCallContextPairs0 = makeCallContextInfo(pairs0, PAIRS0_INFO)
+
+  const contractCallContextPairs1 = makeCallContextInfo(pairs1, PAIRS1_INFO)
+
   const contractCallContext = [
     ...contractCallContextToken,
     ...contractCallContextSupply,
@@ -283,52 +375,68 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     ...contractCallContextPairs1
   ]
 
-  return multiCall(FANTOM_ID, contractCallContext).then(async (result) => {
-    let metadata = getMetadata(result, TOKEN_META_DATA)[0]
+  let result = await multiCall(FANTOM_ID, contractCallContext)
 
-    let totalSupply = result.find((item) => item.reference === TOTAL_SUPPLY)
-    totalSupply = new BN(totalSupply.callsReturnContext[0].returnValues[0])
+  let metadata = getMetadata(result, TOKEN_INFO)
 
-    let reserveA = new BN(metadata.r0).mul(SCALE).div(new BN(metadata.dec0))
+  let pairs0Metadata = getMetadata(result, PAIRS0_INFO)
 
-    let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
+  let pairs1Metadata = getMetadata(result, PAIRS1_INFO)
 
-    let totalUSDA = reserveA
-    let sumVolume = new BN('0')
+  const callContextDecimalToken = makeCallContextDecimal(metadata, TOKEN_INFO)
 
-    let _tokenVWAPResults = await Promise.all([
-      pairs0.length
-        ? tokenVWAP(metadata.t0, pairs0, getMetadata(result, PAIRS0_META_DATA))
-        : null,
-      pairs1.length
-        ? tokenVWAP(metadata.t1, pairs1, getMetadata(result, PAIRS1_META_DATA))
-        : null
-    ])
-    if (pairs0.length) {
-      const { price, volume } = _tokenVWAPResults[0]
-      totalUSDA = price.mul(reserveA).div(SCALE)
-      sumVolume = volume
-    }
+  let callContextPairs0 = makeCallContextDecimal(pairs0Metadata, PAIRS0_INFO)
 
-    let totalUSDB = reserveB
-    if (pairs1.length) {
-      const { price, volume } = _tokenVWAPResults[1]
-      totalUSDB = price.mul(reserveB).div(SCALE)
-      sumVolume = volume
-    }
+  let callContextPairs1 = makeCallContextDecimal(pairs1Metadata, PAIRS1_INFO)
 
-    let totalUSD = totalUSDA.add(totalUSDB)
+  const contractCallContextDecimal = [
+    ...callContextDecimalToken,
+    ...callContextPairs0,
+    ...callContextPairs1
+  ]
 
-    return {
-      price: totalUSD.mul(SCALE).div(totalSupply).toString(),
-      sumVolume
-    }
-  })
+  let resultDecimals = await multiCall(FANTOM_ID, contractCallContextDecimal)
+
+  metadata = getFinalMetaData(resultDecimals, metadata, TOKEN_INFO)[0]
+  pairs0Metadata = getFinalMetaData(resultDecimals, pairs0Metadata, PAIRS0_INFO)
+  pairs1Metadata = getFinalMetaData(resultDecimals, pairs1Metadata, PAIRS1_INFO)
+
+  let totalSupply = getInfoContract(result, TOTAL_SUPPLY)[0].callsReturnContext
+  totalSupply = new BN(totalSupply[0].returnValues[0])
+
+  let reserveA = new BN(metadata.r0).mul(SCALE).div(new BN(metadata.dec0))
+
+  let reserveB = new BN(metadata.r1).mul(SCALE).div(new BN(metadata.dec1))
+
+  let totalUSDA = reserveA
+  let sumVolume = new BN('0')
+
+  let _tokenVWAPResults = await Promise.all([
+    pairs0.length ? tokenVWAP(metadata.t0, pairs0, pairs0Metadata) : null,
+    pairs1.length ? tokenVWAP(metadata.t1, pairs1, pairs1Metadata) : null
+  ])
+
+  if (pairs0.length) {
+    const { price, volume } = _tokenVWAPResults[0]
+    totalUSDA = price.mul(reserveA).div(SCALE)
+    sumVolume = volume
+  }
+
+  let totalUSDB = reserveB
+  if (pairs1.length) {
+    const { price, volume } = _tokenVWAPResults[1]
+    totalUSDB = price.mul(reserveB).div(SCALE)
+    sumVolume = volume
+  }
+
+  let totalUSD = totalUSDA.add(totalUSDB)
+
+  return { price: totalUSD.mul(SCALE).div(totalSupply).toString(), sumVolume }
 }
 
 module.exports = {
-  APP_NAME: 'solidly_permissionless_oracles_vwap',
-  APP_ID: 15,
+  APP_NAME: 'spirit_permissionless_oracles_vwap',
+  APP_ID: 16,
 
   onRequest: async function (request) {
     let {
@@ -358,7 +466,9 @@ module.exports = {
         if (typeof pairs1 === 'string' || pairs1 instanceof String) {
           pairs1 = pairs1.split(',').filter((x) => x)
         }
+
         const { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1)
+
         return {
           token: token,
           tokenPrice: price,
@@ -389,7 +499,7 @@ module.exports = {
       method,
       data: { params }
     } = request
-    let { hashTimestamp, hashVolume } = params
+    let { hashTimestamp } = params
     switch (method) {
       case 'price': {
         if (
@@ -407,11 +517,7 @@ module.exports = {
           { type: 'address', value: token },
           { type: 'address[]', value: pairs },
           { type: 'uint256', value: request.data.result.tokenPrice },
-          
-          ...(hashVolume ?
-            [{ type: 'uint256', value: request.data.result.volume }]
-            : []),
-          
+          { type: 'uint256', value: request.data.result.volume },
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
@@ -427,6 +533,7 @@ module.exports = {
           throw { message: 'Price threshold exceeded' }
         }
         let { token, pairs0, pairs1 } = result
+
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
@@ -434,7 +541,6 @@ module.exports = {
           { type: 'address[]', value: pairs1 },
           { type: 'uint256', value: request.data.result.tokenPrice },
           { type: 'uint256', value: request.data.result.volume },
-
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
