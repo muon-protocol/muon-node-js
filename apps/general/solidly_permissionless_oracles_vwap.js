@@ -97,33 +97,37 @@ async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
       }
     `
     skip += 1000
-    const {
-      data: { data },
-      status
-    } = await axios.post(graphUrl, {
-      query: query
-    })
-    if (status == 200 && data) {
+    try {
       const {
-        swaps,
-        _meta: { deployment }
-      } = data
-      if (deployment != deploymentID) {
-        throw { message: 'SUBGRAPH_IS_UPDATED' }
-      }
-      if (!swaps.length) {
-        if (queryIndex == 1) {
-          tokenTxs = tokenTxs.concat(data.swaps_last_rows)
+        data: { data },
+        status
+      } = await axios.post(graphUrl, {
+        query: query
+      })
+      if (status == 200 && data) {
+        const {
+          swaps,
+          _meta: { deployment }
+        } = data
+        if (deployment != deploymentID) {
+          throw { message: 'SUBGRAPH_IS_UPDATED' }
         }
-        break
+        if (!swaps.length) {
+          if (queryIndex == 1) {
+            tokenTxs = tokenTxs.concat(data.swaps_last_rows)
+          }
+          break
+        }
+        tokenTxs = tokenTxs.concat(swaps)
+        if (skip > 5000) {
+          currentTimestamp = swaps[swaps.length - 1]['timestamp']
+          skip = 0
+        }
+      } else {
+        throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
       }
-      tokenTxs = tokenTxs.concat(swaps)
-      if (skip > 5000) {
-        currentTimestamp = swaps[swaps.length - 1]['timestamp']
-        skip = 0
-      }
-    } else {
-      throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
+    } catch (error) {
+      throw { message: 'SUBGRAPH_QUERY_FAILED' }
     }
   }
   return tokenTxs

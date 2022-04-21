@@ -56,11 +56,10 @@ const ERC20_DECIMALS_ABI = [
   }
 ]
 
-const PRICE_TOLERANCE = 0.05
+const PRICE_TOLERANCE = '0.05'
 const MAINNET_ID = 1
 const SCALE = new BN('1000000000000000000')
-const GRAPH_URL =
-  'https://api.thegraph.com/subgraphs/name/ianlapham/uniswapv2'
+const GRAPH_URL = 'https://api.thegraph.com/subgraphs/name/ianlapham/uniswapv2'
 const GRAPH_DEPLOYMENT_ID = 'Qmc7K8dKoadu1VcHfAV45pN4sPnwZcU2okV6cuU4B7qQp1'
 
 async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
@@ -438,7 +437,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
 
 module.exports = {
   APP_NAME: 'uniswapv2_permissionless_oracles_vwap',
-  APP_ID: 21,
+  APP_ID: 18,
 
   onRequest: async function (request) {
     let {
@@ -487,7 +486,9 @@ module.exports = {
   isPriceToleranceOk: function (price, expectedPrice) {
     let priceDiff = new BN(price).sub(new BN(expectedPrice)).abs()
     if (
-      new BN(priceDiff).div(new BN(expectedPrice)).gt(new BN(PRICE_TOLERANCE))
+      new BN(priceDiff)
+        .div(new BN(expectedPrice))
+        .gt(toBaseUnit(PRICE_TOLERANCE, '18'))
     ) {
       return false
     }
@@ -499,7 +500,7 @@ module.exports = {
       method,
       data: { params }
     } = request
-    let { hashTimestamp } = params
+    let { hashTimestamp, hashVolume } = params
     switch (method) {
       case 'price': {
         if (
@@ -517,7 +518,9 @@ module.exports = {
           { type: 'address', value: token },
           { type: 'address[]', value: pairs },
           { type: 'uint256', value: request.data.result.tokenPrice },
-          { type: 'uint256', value: request.data.result.volume },
+          ...(hashVolume
+            ? [{ type: 'uint256', value: request.data.result.volume }]
+            : []),
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
@@ -539,7 +542,9 @@ module.exports = {
           { type: 'address[]', value: pairs0 },
           { type: 'address[]', value: pairs1 },
           { type: 'uint256', value: request.data.result.tokenPrice },
-          { type: 'uint256', value: request.data.result.volume },
+          ...(hashVolume
+            ? [{ type: 'uint256', value: request.data.result.volume }]
+            : []),
 
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
