@@ -26,54 +26,100 @@ const POOL_TOKENS_ABI = [
   }
 ]
 const VAULT_CONTRACT = '0x20dd72ed959b6147912c2e529f0a0c651c33c9ce'
-const PRICE_TOLERANCE = 0.05
+const PRICE_TOLERANCE = '0.05'
 const FANTOM_ID = 250
 const SCALE = new BN('1000000000000000000')
 const GRAPH_DEPLOYMENT_ID = 'QmedPFoUR8iCji2r4BRBjpLvaHyGag6c3irb4REF8cJVVE'
 const GRAPH_URL =
   'https://api.thegraph.com/subgraphs/name/shayanshiravani/beetsfi'
 
-async function getTokenTxs(poolId) {
-  try {
-    const currentTimestamp = getTimestamp()
-    const last30Min = currentTimestamp - 1800
+async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
+  let currentTimestamp = getTimestamp()
+  const last30Min = currentTimestamp - 1800
+  let skip = 0
+  let tokenTxs = []
+  let queryIndex = 0
+  while (true) {
+    queryIndex += 1
+    let lastRowQuery =
+      queryIndex === 1
+        ? `
+            swaps_last_rows:swaps(
+              first: 1,
+              where: {
+                pair: "${pairAddr.toLowerCase()}"
+              },
+              orderBy: timestamp,
+              orderDirection: desc
+            ) {
+              amount0In
+              amount1In
+              amount0Out
+              amount1Out
+              timestamp
+            }
+          `
+        : ''
     const query = `
-      {
-        swaps(
-          where: {
-            poolId: "${poolId.toLowerCase()}"
-            timestamp_gt: ${last30Min}
-          }, 
-          orderBy: timestamp, 
-          orderDirection: desc
-        ) {
-          poolId
-          from
-          tokenIn {
-            id
-          }
-          tokenOut {
-            id
-          }
-          tokenAmountIn
-          tokenAmountOut
+            {
+              swaps(
+                first: 1000,
+                skip: ${skip},
+                where: {
+                  pair: "${pairAddr.toLowerCase()}"
+                  timestamp_gt: ${last30Min}
+                  timestamp_lt: ${currentTimestamp}
+                },
+                orderBy: timestamp,
+                orderDirection: desc
+              ) {
+                amount0In
+                amount1In
+                amount0Out
+                amount1Out
+                timestamp
+              }
+              ${lastRowQuery}
+              _meta {
+                deployment
+              }
+            }
+          `
+    skip += 1000
+    try {
+      const {
+        data: { data },
+        status
+      } = await axios.post(graphUrl, {
+        query: query
+      })
+      if (status == 200 && data) {
+        const {
+          swaps,
+          _meta: { deployment }
+        } = data
+        if (deployment != deploymentID) {
+          throw { message: 'SUBGRAPH_IS_UPDATED' }
         }
-        _meta{
-          deployment
+        if (!swaps.length) {
+          if (queryIndex == 1) {
+            tokenTxs = tokenTxs.concat(data.swaps_last_rows)
+          }
+          break
         }
+        tokenTxs = tokenTxs.concat(swaps)
+        if (skip > 5000) {
+          currentTimestamp = swaps[swaps.length - 1]['timestamp']
+          skip = 0
+        }
+      } else {
+        throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
       }
-    `
-    let { data, status } = await axios.post(GRAPH_URL, {
-      query: query
-    })
-    if (status == 200 && data.data?.hasOwnProperty('swaps')) {
-      if (data.data._meta.deployment !== GRAPH_DEPLOYMENT_ID)
-        throw { message: 'SUBGRAPH_IS_UPDATED' }
-      return data.data.swaps
+    } catch (error) {
+      throw { message: 'SUBGRAPH_QUERY_FAILED' }
     }
-  } catch (error) {
-    console.log('Error happend in fetch query subgraph', error)
   }
+  return tokenTxs
 }
 
 async function tokenVWAP(token, poolId) {
@@ -183,8 +229,12 @@ module.exports = {
   },
 
   isPriceToleranceOk: function (price, expectedPrice) {
-    let priceDiff = Math.abs(price - expectedPrice)
-    if (priceDiff / expectedPrice > PRICE_TOLERANCE) {
+    let priceDiff = new BN(price).sub(new BN(expectedPrice)).abs()
+    if (
+      new BN(priceDiff)
+        .div(new BN(expectedPrice))
+        .gt(toBaseUnit(PRICE_TOLERANCE, '18'))
+    ) {
       return false
     }
     return true
@@ -195,7 +245,7 @@ module.exports = {
       method,
       data: { params }
     } = request
-    let { hashTimestamp } = params
+    let { hashTimestamp, hashVolume } = params
     switch (method) {
       // case 'price': {
       //   if (
@@ -213,7 +263,7 @@ module.exports = {
       //     { type: 'address', value: token },
       //     { type: 'uint256', value: poolId },
       //     { type: 'uint256', value: request.data.result.tokenPrice },
-      //     { type: 'uint256', value: request.data.result.volume },
+      //      ...(hashVolume ? [{ type: 'uint256', value: request.data.result.volume }]: []),
 
       //     ...(hashTimestamp
       //       ? [{ type: 'uint256', value: request.data.timestamp }]
@@ -229,12 +279,15 @@ module.exports = {
         ) {
           throw { message: 'Price threshold exceeded' }
         }
-        let { token, tokenPrice, pairs0, pairs1 } = result
+        let { token } = result
 
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
           { type: 'uint256', value: request.data.result.tokenPrice },
+          ...(hashVolume
+            ? [{ type: 'uint256', value: request.data.result.volume }]
+            : []),
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
