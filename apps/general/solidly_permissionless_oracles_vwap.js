@@ -434,7 +434,10 @@ module.exports = {
           { type: 'address[]', value: pairs0 },
           { type: 'address[]', value: pairs1 },
           { type: 'uint256', value: request.data.result.tokenPrice },
-          { type: 'uint256', value: request.data.result.volume },
+
+          ...(hashVolume ?
+            [{ type: 'uint256', value: request.data.result.volume }]
+            : []),
 
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
