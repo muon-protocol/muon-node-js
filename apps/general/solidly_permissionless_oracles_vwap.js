@@ -329,6 +329,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
 module.exports = {
   APP_NAME: 'solidly_permissionless_oracles_vwap',
   APP_ID: 15,
+  REMOTE_CALL_TIMEOUT: 30000,
 
   onRequest: async function (request) {
     let {
@@ -407,11 +408,11 @@ module.exports = {
           { type: 'address', value: token },
           { type: 'address[]', value: pairs },
           { type: 'uint256', value: request.data.result.tokenPrice },
-          
+
           ...(hashVolume ?
             [{ type: 'uint256', value: request.data.result.volume }]
             : []),
-          
+
           ...(hashTimestamp
             ? [{ type: 'uint256', value: request.data.timestamp }]
             : [])
