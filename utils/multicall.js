@@ -6,7 +6,6 @@ async function multiCall(chainId, contractCallContext) {
     const web3 = await getWeb3(chainId)
     const multicall = new Multicall({ web3Instance: web3, tryAggregate: true })
     let { results } = await multicall.call(contractCallContext)
-
     results = contractCallContext.map((item) => ({
       reference: item.reference,
       contractAddress: item.contractAddress,
@@ -23,7 +22,10 @@ async function multiCall(chainId, contractCallContext) {
     }))
     return results
   } catch (error) {
-    console.log('error happend in Multicall', error)
+    throw {
+      message: `MULTICALL_ERROR. ${error.reason}`,
+      error: error.reason
+    }
   }
 }
 
