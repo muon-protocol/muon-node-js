@@ -21,7 +21,6 @@ class Muon extends Events {
   constructor(configs) {
     super()
     this.configs = configs
-    this.firstPeerConnect = new TimeoutPromise();
   }
 
   async initialize() {
@@ -54,8 +53,8 @@ class Muon extends Events {
     });
 
     libp2p.connectionManager.on('peer:connect', this.onPeerConnect.bind(this))
+    libp2p.connectionManager.on('peer:disconnect', this.onPeerDisconnect.bind(this))
     libp2p.on('peer:discovery', this.onPeerDiscovery.bind(this))
-    // libp2p._dht.on('peer', () => this.firstPeerConnect.resolve(true));
 
     this.peerId = peerId
     this.libp2p = libp2p
@@ -81,13 +80,21 @@ class Muon extends Events {
       emoji.get('large_blue_circle'),
       chalk.blue(` ${connection.remotePeer.toB58String()}`)
     )
-    this.firstPeerConnect.resolve(true)
     this.emit('peer', connection.remotePeer)
+  }
+
+  onPeerDisconnect(connection){
+    console.log(
+      emoji.get('moon'),
+      chalk.red(' Node disconnected'),
+      emoji.get('large_blue_circle'),
+      chalk.red(` ${connection.remotePeer.toB58String()}`)
+    );
+    this.emit('peer:disconnect', connection.remotePeer)
   }
 
   async onPeerDiscovery(peerId){
     this.emit('peer', peerId)
-    this.firstPeerConnect.resolve(true)
     console.log('found peer');
     try {
       const peerInfo = await this.libp2p.peerRouting.findPeer(peerId)
@@ -142,11 +149,6 @@ class Muon extends Events {
   }
 
   async _onceStarted() {
-    // TODO:
-    // console.log('waiting for first peer connect ...');
-    // // wait for first peer connect;
-    // await this.firstPeerConnect.waitToFulfill();
-
     console.log(`muon started at ${new Date()} (node-js version ${process.versions.node}).`)
     for (let pluginName in this._plugins) {
       this._plugins[pluginName].onStart()
