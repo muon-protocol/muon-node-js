@@ -16,6 +16,7 @@ class Muon extends Events {
   peerId = null
   libp2p = null
   _plugins = {}
+  _apps = {}
 
   constructor(configs) {
     super()

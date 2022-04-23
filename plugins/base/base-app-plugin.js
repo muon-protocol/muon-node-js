@@ -31,6 +31,8 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
+    this.muon._apps[this.APP_NAME] = this;
+
     if(this.dependencies){
       this.initializeDependencies();
     }
@@ -78,6 +80,11 @@ class BaseAppPlugin extends CallablePlugin {
         gateway.registerAppCall(this.APP_NAME, method, this[method].bind(this))
       })
     }
+  }
+
+  async invoke(appName, method, params) {
+    let result = await this.muon._apps[appName][method](params);
+    return result;
   }
 
   /**

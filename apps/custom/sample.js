@@ -19,7 +19,8 @@ module.exports = {
    * returned value will return to client.
    */
   readOnlyMethods: [
-    'myReadOnlyMethod'
+    'myReadOnlyMethod',
+    'invokeTestMethod',
   ],
 
   myReadOnlyMethod: async function(params){
@@ -29,6 +30,26 @@ module.exports = {
         "value 0",
         "value 1"
       ]
+    }
+  },
+
+  invokeTestMethod: async function(params) {
+    let request = {
+      method: 'call',
+      data: {
+        params:{
+          address: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          method: "name",
+          params: [],
+          abi: [{"constant": true, "inputs": [], "name": "name", "outputs": [{"name": "", "type": "string"}], "payable": false, "stateMutability": "view", "type": "function"}],
+          network: 'eth',
+        }
+      }
+    };
+    let invokeResult = await this.invoke("eth", "onRequest", request);
+    return {
+      params,
+      result: invokeResult
     }
   },
 

@@ -1,6 +1,6 @@
 {
   "tss": {
-    "threshold": 2,
+    "threshold": 4,
     "max": 20
   },
   "collateralWallets": [
