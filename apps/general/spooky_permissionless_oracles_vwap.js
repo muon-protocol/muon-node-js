@@ -423,14 +423,14 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   if (pairs0.length) {
     const { price, volume } = _tokenVWAPResults[0]
     totalUSDA = price.mul(reserveA).div(SCALE)
-    sumVolume = volume
+    sumVolume = sumVolume.add(volume)
   }
 
   let totalUSDB = reserveB
   if (pairs1.length) {
     const { price, volume } = _tokenVWAPResults[1]
     totalUSDB = price.mul(reserveB).div(SCALE)
-    sumVolume = volume
+    sumVolume = sumVolume.add(volume)
   }
 
   let totalUSD = totalUSDA.add(totalUSDB)
