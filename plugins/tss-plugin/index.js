@@ -76,6 +76,21 @@ class TssPlugin extends CallablePlugin {
       console.log('first node connected ...')
       this.joinToGroup();
     })
+
+    this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+  }
+
+  onPeerDisconnect(peer) {
+    if(this.isReady){
+      for(let wallet in this.tssParty.partners){
+        let {peerId} = this.tssParty.partners[wallet]
+        if(peerId === peer._idB58String){
+          console.log(`Peer Disconnected. peerId: ${peerId}, wallet: ${wallet}`)
+          this.tssParty.setWalletPeer(wallet, null);
+          return
+        }
+      }
+    }
   }
 
   get TSS_THRESHOLD() {
