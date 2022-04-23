@@ -1,0 +1,29 @@
+version: '3'
+services:
+  muon_devnet:
+    container_name: muon_devnet
+    hostname: muon
+    restart: always
+    build:
+      context: .
+#      dockerfile: ./docker/devnet/Dockerfile
+
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    external_links:
+      - muon_mongo
+      - muon_redis
+    depends_on:
+      - muon_mongo
+      - muon_redis
+    environment:
+        - MONGO_HOST=muon_mongo
+        - REDIS_HOST=muon_redis
+  muon_mongo:
+    container_name: mongo
+    image: mongo
+    command: --quiet --logpath /dev/null
+  muon_redis:
+    container_name: redis
+    image: redis:6

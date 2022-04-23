@@ -339,8 +339,10 @@ class TssPlugin extends CallablePlugin {
     /**
      * needs at least TSS_THRESHOLD number of nodes.
      */
-    if(Object.keys(nodesNeedGroup).length < TSS_THRESHOLD-1)
+    if(Object.keys(nodesNeedGroup).length < TSS_THRESHOLD-1) {
+      console.log(`No enough node to create tss group. already exist [${1+Object.keys(nodesNeedGroup).length}/${TSS_THRESHOLD}]`)
       return;
+    }
     let selfWallet = process.env.SIGN_WALLET_ADDRESS
     let wallets = Object.keys(nodesNeedGroup);
     /**
@@ -378,7 +380,7 @@ class TssPlugin extends CallablePlugin {
       keysCache.set(key.id, key, 0) // keep for ever
       this.tssKey = key;
       this.isReady = true;
-      this.informJoinedToGroup()
+      this.informJoinedToGroup();
       console.log('tss ready.')
     } catch (e) {
       console.error('TssPlugin.tryToCreateTssParty', e, e.stack);

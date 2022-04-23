@@ -1,6 +1,6 @@
 var mongoose = require('mongoose');
 const {MODEL_CONTENT} = require('./constants')
-const {strToCID} = require('../../utils/node-utils/common')
+const {createCIDFromString, cid2str} = require('../../utils/cid')
 
 var modelSchema = mongoose.Schema({
   cid: {type: String, required: true},
@@ -13,10 +13,10 @@ const Model = module.exports = mongoose.model(MODEL_CONTENT, modelSchema);
 
 module.exports.create = async data => {
   let content = typeof data === 'string' ? data : JSON.stringify(data);
-  let cid = await strToCID(content)
+  let cid = await createCIDFromString(content)
 
   return new Model({
-    cid: cid.toString(),
+    cid: cid2str(cid),
     content,
     data
   })

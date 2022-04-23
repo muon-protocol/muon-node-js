@@ -12,7 +12,7 @@ const {
   getTokenInfo: ethGetTokenInfo,
   getNftInfo: ethGetNftInfo,
   hashCallOutput: ethHashCallOutput
-} = require('../utils/node-utils/eth')
+} = require('../utils/eth')
 
 const { multiCall } = require('../utils/multicall')
 function soliditySha3(params) {

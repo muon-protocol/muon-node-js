@@ -105,6 +105,7 @@ var muon;
           pubKey: process.env.PEER_PUBLIC_KEY,
           privKey: process.env.PEER_PRIVATE_KEY
         },
+        host: process.env.PEER_HOST || "0.0.0.0",
         port: process.env.PEER_PORT,
         bootstrap: getEnvBootstraps()
       },

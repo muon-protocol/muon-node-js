@@ -2,9 +2,9 @@ const CallablePlugin = require('./callable-plugin')
 const Request = require('../../gateway/models/Request')
 const Signature = require('../../gateway/models/Signature')
 const PeerId = require('peer-id')
-const uint8ArrayFromString = require('uint8arrays/from-string')
+const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
+const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const {makeAppDependency} = require('./app-dependencies')
-const uint8ArrayToString = require('uint8arrays/to-string')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
 const { omit } = require('lodash')
@@ -31,6 +31,8 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
+    this.muon._apps[this.APP_NAME] = this;
+
     if(this.dependencies){
       this.initializeDependencies();
     }
@@ -78,6 +80,11 @@ class BaseAppPlugin extends CallablePlugin {
         gateway.registerAppCall(this.APP_NAME, method, this[method].bind(this))
       })
     }
+  }
+
+  async invoke(appName, method, params) {
+    let result = await this.muon._apps[appName][method](params);
+    return result;
   }
 
   /**
@@ -302,7 +309,7 @@ class BaseAppPlugin extends CallablePlugin {
     try {
       // let data = JSON.parse(uint8ArrayToString(msg.data))
       if (data && data.type === 'new_request') {
-        let peerId = PeerId.createFromCID(data.peerId)
+        let peerId = PeerId.createFromB58String(data.peerId)
         let peer = await this.findPeer(peerId)
         let request = await remoteCall.call(
           peer,
