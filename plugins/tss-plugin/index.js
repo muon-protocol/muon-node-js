@@ -85,7 +85,6 @@ class TssPlugin extends CallablePlugin {
       for(let wallet in this.tssParty.partners){
         let {peerId} = this.tssParty.partners[wallet]
         if(peerId === peer._idB58String){
-          console.log(`Peer Disconnected. peerId: ${peerId}, wallet: ${wallet}`)
           this.tssParty.setWalletPeer(wallet, null);
           return
         }
