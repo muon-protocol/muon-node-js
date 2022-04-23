@@ -15,6 +15,7 @@ By enabling auto update any commit to the repository will trigger the update and
         login <USERNAME>
         password <PASSWORD>
     EOF
+
 #### Local devnet
 You can run local devnet on port 8080
 
