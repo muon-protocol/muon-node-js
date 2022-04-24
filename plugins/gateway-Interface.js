@@ -69,7 +69,8 @@ class GatewayInterface extends BasePlugin{
         await this.__handleCallResponse(data, response)
       }
       catch (e) {
-        console.error('gateway-interface error', e)
+        console.error('gateway-interface error')
+        console.dir(e, {depth: null})
         let {message, data: errorData} = e;
         responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
           responseId: data ? data.callId : undefined,
