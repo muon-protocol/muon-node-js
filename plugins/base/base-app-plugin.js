@@ -139,7 +139,13 @@ class BaseAppPlugin extends CallablePlugin {
       newRequest.data.memWrite = memWrite
     }
 
-    this.requestManager.addRequest(newRequest);
+    /**
+     * A request need's (2 * REMOTE_CALL_TIMEOUT + 5000) millisecond to be confirmed.
+     * One REMOTE_CALL_TIMEOUT for first node
+     * One REMOTE_CALL_TIMEOUT for other nodes (all other nodes proceed parallel).
+     * 5000 for networking
+     */
+    this.requestManager.addRequest(newRequest, {requestTimeout: this.REMOTE_CALL_TIMEOUT * 2 + 5000});
 
     // await newRequest.save()
 

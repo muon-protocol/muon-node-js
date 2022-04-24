@@ -33,14 +33,24 @@ class AppRequestManager{
     return requestCache.get(reqId.toString());
   }
 
-  addRequest(req, partnerCount=Infinity){
+  /**
+   * @param req
+   * @param options.partnerCount
+   * @param options.requestTimeout
+   */
+  addRequest(req, options={}){
     if(!requestCache.has(req._id)){
       requestCache.set(req._id.toString(), {
+        /** options can override items above "...options" */
+        partnerCount: Infinity,
+        requestTimeout: 40000,
+
+        ...options,
+
         request: req,
         signatures: {},
         errors: {},
         promise: null,
-        partnerCount
       });
     }
   }
@@ -117,7 +127,7 @@ class AppRequestManager{
     }
     else{
       if(item.promise === null)
-        item.promise = new TimeoutPromise(30000, 'Request timed out');
+        item.promise = new TimeoutPromise(item.requestTimeout, 'Request timed out');
       return item.promise.promise;
     }
   }
