@@ -48,11 +48,13 @@ class RemoteCall extends BasePlugin {
       .catch(error => {
         console.error("RemoteCall.handleCall", error)
         if(typeof error === "string")
-          error = {message: error}
+          error = {message: error};
+        const {message: ___, ...otherErrorParts} = error;
         let response = {
           responseId: callId,
           error: {
-            message: error.message || 'Somethings went wrong'
+            message: error.message || 'Somethings went wrong',
+            ...otherErrorParts
           }
         };
         return response

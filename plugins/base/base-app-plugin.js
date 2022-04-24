@@ -210,8 +210,10 @@ class BaseAppPlugin extends CallablePlugin {
       let memWrite = this.getMemWrite(request, result)
       return [this.makeSignature(request, result, hash2), memWrite]
     } else {
-      console.log({hash1, hash2})
-      throw { message: 'Request not confirmed' }
+      throw {
+        message: `Request result is not the same as the first node's result.`,
+        result
+      }
     }
   }
 
