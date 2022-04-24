@@ -47,6 +47,8 @@ class RemoteCall extends BasePlugin {
       })
       .catch(error => {
         console.error("RemoteCall.handleCall", error)
+        if(typeof error === "string")
+          error = {message: error}
         let response = {
           responseId: callId,
           error: {
