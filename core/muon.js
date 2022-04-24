@@ -8,7 +8,7 @@ const emoji = require('node-emoji')
 const tss = require('../utils/tss')
 const fs = require('fs')
 const TimeoutPromise = require('./timeout-promise')
-// const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
+const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
 
 
 class Muon extends Events {
@@ -30,16 +30,19 @@ class Muon extends Events {
 
   async _initializeNetwork(configs) {
     let peerId = await PeerId.createFromJSON(configs.nodeId)
+    let announceFilter = mas => mas
+    if(process.env.ANNOUNCE_FILTER)
+      announceFilter = (multiaddrs) => multiaddrs.filter(m => !isPrivate(m));
 
     let libp2p = await Node.create({
       peerId,
       addresses: {
         listen: [
-          // `/ip4/${configs.host}/tcp/${configs.port}`,
-          `/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`,
+          `/ip4/${configs.host}/tcp/${configs.port}`,
+          // `/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`,
           // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
         ],
-        // announceFilter: (multiaddrs) => multiaddrs.filter(m => !isPrivate(m))
+        announceFilter
       },
       config: {
         peerDiscovery: {
