@@ -92,7 +92,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
       // tss shared public key
       pubKey: tss.keyFromPrivate(tssKey.share).getPublic().encode('hex'),
       timestamp: signTimestamp,
-      data: result,
+      result,
       signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`
     }
   }

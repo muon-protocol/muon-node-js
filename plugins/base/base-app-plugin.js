@@ -365,7 +365,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   recoverSignature(request, sign) {
-    let hash = this.hashRequestResult(request, sign.data)
+    let hash = this.hashRequestResult(request, sign.result)
     return crypto.recover(hash, sign.signature)
   }
 
@@ -405,7 +405,7 @@ class BaseAppPlugin extends CallablePlugin {
       request: request._id,
       owner: process.env.SIGN_WALLET_ADDRESS,
       timestamp: signTimestamp,
-      data: result,
+      result,
       signature
     }
   }
