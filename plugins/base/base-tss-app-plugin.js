@@ -50,22 +50,23 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let party = tssPlugin.getParty(partyId)
     let nonce = tssPlugin.getSharedKey(nonceId)
 
-    Object.values(party.partners)
-      .filter(({wallet}) => nonce.partners.includes(wallet))
-      .map(async ({peer, wallet}) => {
-        if(wallet === process.env.SIGN_WALLET_ADDRESS)
-          return true;
-        return this.remoteCall(peer, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT})
-          .then(this.__onRemoteSignRequest.bind(this))
-          .catch(e => {
-            // console.log('base-tss-app-plugin: on broadcast request error', e)
-            return this.__onRemoteSignRequest(null, {
-              request: request._id.toString(),
-              peerId: peer.id,
-              ...e
-            });
-          })
-      })
+    let partners = Object.values(party.partners)
+      .filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(wallet)))
+
+    this.requestManager.setPartnerCount(request._id, partners.length + 1);
+
+    partners.map(async ({peer, wallet}) => {
+      return this.remoteCall(peer, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT})
+        .then(this.__onRemoteSignRequest.bind(this))
+        .catch(e => {
+          // console.log('base-tss-app-plugin: on broadcast request error', e)
+          return this.__onRemoteSignRequest(null, {
+            request: request._id.toString(),
+            peerId: peer.id,
+            ...e
+          });
+        })
+    })
   }
 
   makeSignature(request, result, resultHash) {

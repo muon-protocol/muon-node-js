@@ -33,15 +33,21 @@ class AppRequestManager{
     return requestCache.get(reqId.toString());
   }
 
-  addRequest(req){
+  addRequest(req, partnerCount=Infinity){
     if(!requestCache.has(req._id)){
       requestCache.set(req._id.toString(), {
         request: req,
         signatures: {},
         errors: {},
         promise: null,
+        partnerCount
       });
     }
+  }
+
+  setPartnerCount(reqId, partnerCount) {
+    let item = this.getItem(reqId);
+    item.partnerCount = partnerCount
   }
 
   getRequest(_id){
@@ -68,7 +74,7 @@ class AppRequestManager{
         const req = this.getRequest(reqId);
         if(item.promise)
           item.promise.reject({
-            message: "Request failed because of 2 nodes failure.",
+            message: "Request failed to confirm.",
             data: {
               app: {
                 name: req.app,
@@ -91,9 +97,13 @@ class AppRequestManager{
 
   isRequestFailed(_id){
     let item = this.getItem(_id);
-    let {request: {nSign}, errors} = item
-    // TODO: calculate amount of error
-    return !!errors && Object.keys(errors).length >= 2;
+    let {request: {nSign}, errors, signatures} = item
+    const signCount = Object.keys(signatures).length
+    const needMoreSignature = nSign - signCount;
+    const failedCount = !!errors ? Object.keys(errors).length : 0;
+    const remainingPartners = item.partnerCount - signCount - failedCount;
+    // TODO: customize number 2
+    return remainingPartners < needMoreSignature || failedCount >= 2;
   }
 
   onRequestSignFullFilled(_id){
