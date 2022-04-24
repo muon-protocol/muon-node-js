@@ -196,13 +196,13 @@ class TssPlugin extends CallablePlugin {
     // } catch (e) {
     //   console.error('TssPlugin.informEntrance', e, e.stack)
     // }
-    for(let i=0 ; i<10 ; i++) {
-      await timeout(15000)
+    for(let i=0 ; i<15 ; i++) {
       this.broadcast({
         type: MSG_TYPE_INFORM_ENTRANCE,
         peerId: process.env.PEER_ID,
         wallet: process.env.SIGN_WALLET_ADDRESS,
       })
+      await timeout(15000)
     }
   }
 
