@@ -50,14 +50,17 @@ class GatewayInterface extends BasePlugin{
     if(channel === GATEWAY_CALL_REQUEST){
       try {
         data = JSON.parse(message);
-        let {callId, app, method, params, nSign} = data
+        let {callId, app, method, params, nSign, mode} = data
+        if(!['sign', 'view'].includes(mode)){
+          throw {message: `Invalid call mode: ${mode}`}
+        }
         let response
         if(app){
           if(this.listenerCount(`call/${app}/${method}`) > 0){
-            response = await this.emit(`call/${app}/${method}`, params, nSign)
+            response = await this.emit(`call/${app}/${method}`, params, nSign, mode)
           }
           else if(this.listenerCount(`call/${app}/request`) > 0){
-            response = await this.emit(`call/${app}/request`, method, params, nSign)
+            response = await this.emit(`call/${app}/request`, method, params, nSign, mode)
           }
           else{
             throw {message: `app:[${app}] method:[${method}] handler not defined`}

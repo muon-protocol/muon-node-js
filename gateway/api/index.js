@@ -6,8 +6,8 @@ router.use('/', (req, res, next) => {
     ...req.query,
     ...req.body,
   }
-  let {app, method, params, nSign} = mixed
-  NodeCaller.appCall(app, method, params, nSign)
+  let {app, method, params, nSign, mode="sign"} = mixed
+  NodeCaller.appCall(app, method, params, nSign, mode)
     .then(result => {
       res.json({success: true, result})
     })
