@@ -3,7 +3,6 @@ const { getWeb3 } = require('./node-utils/eth')
 
 async function multiCall(chainId, contractCallContext) {
   try {
-    let allSuccess = true
     const web3 = await getWeb3(chainId)
     const multicall = new Multicall({ web3Instance: web3, tryAggregate: true })
     let { results } = await multicall.call(contractCallContext)
@@ -11,20 +10,17 @@ async function multiCall(chainId, contractCallContext) {
       reference: item.reference,
       contractAddress: item.contractAddress,
       callsReturnContext: results[item.reference]['callsReturnContext'].map(
-        (callReturn) => {
-          allSuccess = callReturn.success && allSuccess
-          return {
-            ...callReturn,
-            returnValues: callReturn['returnValues'].map((value) => {
-              if (typeof value === 'object' && 'hex' in value)
-                return web3.utils.hexToNumberString(value.hex)
-              else return value
-            })
-          }
-        }
+        (callReturn) => ({
+          ...callReturn,
+          returnValues: callReturn['returnValues'].map((value) => {
+            if (typeof value === 'object' && 'hex' in value)
+              return web3.utils.hexToNumberString(value.hex)
+            else return value
+          })
+        })
       )
     }))
-    return { results, allSuccess }
+    return results
   } catch (error) {
     throw {
       message: `MULTICALL_ERROR. ${error.message}`,
