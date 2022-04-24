@@ -669,7 +669,11 @@ class TssPlugin extends CallablePlugin {
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
         // TODO: is this message from 'wallet'
         let peer = await this.findPeer(peerId);
-        if (this.isReady) {
+        if(!peer){
+          console.log("TssPlugin.handleBroadcastMessage(MSG_TYPE_INFORM_ENTRANCE): peer not found.", {peerId})
+          // TODO: is need to return?
+        }
+        if (peer && this.isReady) {
           this.tssParty.setWalletPeer(wallet, peer);
           this.remoteCall(
             peer,
