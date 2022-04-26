@@ -57,16 +57,12 @@ const ERC20_DECIMALS_ABI = [
 ]
 
 const PRICE_TOLERANCE = '0.05'
-const FANTOM_ID = 250
 const SCALE = new BN('1000000000000000000')
-const GRAPH_DEPLOYMENT_ID = 'QmUptbhTmAVCUTNeK2afecQJ3DFLgk9m4dBerfpqkTEJvi'
-
-const GRAPH_URL =
-  'https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap'
 
 async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
+  console.log({graphUrl, deploymentID})
   let currentTimestamp = getTimestamp()
-  const last30Min = currentTimestamp - 1800
+  const last30Min = currentTimestamp - 1800;
   let skip = 0
   let tokenTxs = []
   let queryIndex = 0
@@ -254,18 +250,18 @@ function getFinalMetaData(resultDecimals, prevMetaData, prefix) {
   return metadata
 }
 
-async function tokenVWAP(token, pairs, metadata) {
+async function tokenVWAP(token, pairs, metadata, config) {
   let pairPrices = []
   let pairVolume = []
   let inputToken = token
   if (!metadata) {
     const contractCallContext = makeCallContextInfo(pairs, PAIRS_INFO)
-    let result = await multiCall(FANTOM_ID, contractCallContext)
+    let result = await multiCall(config.chainId, contractCallContext)
 
     metadata = getMetadata(result, PAIRS_INFO)
 
     let callContextPairs = makeCallContextDecimal(metadata, PAIRS_INFO)
-    let resultDecimals = await multiCall(FANTOM_ID, callContextPairs)
+    let resultDecimals = await multiCall(config.chainId, callContextPairs)
     metadata = getFinalMetaData(resultDecimals, metadata, PAIRS_INFO)
   }
   let pairVWAPPromises = []
@@ -279,7 +275,7 @@ async function tokenVWAP(token, pairs, metadata) {
     } else {
       throw { message: 'INVALID_PAIRS' }
     }
-    pairVWAPPromises.push(pairVWAP(pairs[i], index))
+    pairVWAPPromises.push(pairVWAP(pairs[i], index, config))
   }
 
   let pairVWAPs = await Promise.all(pairVWAPPromises)
@@ -303,8 +299,8 @@ async function tokenVWAP(token, pairs, metadata) {
   return { price, volume }
 }
 
-async function pairVWAP(pair, index) {
-  return getTokenTxs(pair, GRAPH_URL, GRAPH_DEPLOYMENT_ID).then((tokenTxs) => {
+async function pairVWAP(pair, index, config) {
+  return getTokenTxs(pair, config.graphUrl, config.graphDeploymentId).then((tokenTxs) => {
     let sumWeightedPrice = new BN('0')
     let sumVolume = new BN('0')
     for (let i = 0; i < tokenTxs.length; i++) {
@@ -352,7 +348,7 @@ async function pairVWAP(pair, index) {
   })
 }
 
-async function LPTokenPrice(token, pairs0, pairs1) {
+async function LPTokenPrice(token, pairs0, pairs1, config) {
   const contractCallContextToken = makeCallContextInfo([token], TOKEN_INFO)
   const contractCallContextSupply = [
     {
@@ -379,7 +375,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     ...contractCallContextPairs1
   ]
 
-  let result = await multiCall(FANTOM_ID, contractCallContext)
+  let result = await multiCall(config.chainId, contractCallContext)
 
   let metadata = getMetadata(result, TOKEN_INFO)
 
@@ -399,7 +395,7 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     ...callContextPairs1
   ]
 
-  let resultDecimals = await multiCall(FANTOM_ID, contractCallContextDecimal)
+  let resultDecimals = await multiCall(config.chainId, contractCallContextDecimal)
 
   metadata = getFinalMetaData(resultDecimals, metadata, TOKEN_INFO)[0]
   pairs0Metadata = getFinalMetaData(resultDecimals, pairs0Metadata, PAIRS0_INFO)
@@ -416,8 +412,8 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   let sumVolume = new BN('0')
 
   let _tokenVWAPResults = await Promise.all([
-    pairs0.length ? tokenVWAP(metadata.t0, pairs0, pairs0Metadata) : null,
-    pairs1.length ? tokenVWAP(metadata.t1, pairs1, pairs1Metadata) : null
+    pairs0.length ? tokenVWAP(metadata.t0, pairs0, pairs0Metadata, config) : null,
+    pairs1.length ? tokenVWAP(metadata.t1, pairs1, pairs1Metadata, config) : null
   ])
 
   if (pairs0.length) {
@@ -438,9 +434,16 @@ async function LPTokenPrice(token, pairs0, pairs1) {
   return { price: totalUSD.mul(SCALE).div(totalSupply).toString(), sumVolume }
 }
 
+const APP_CONFIG = {
+  chainId: 250,
+  graphUrl: "https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap",
+  graphDeploymentId: "QmUptbhTmAVCUTNeK2afecQJ3DFLgk9m4dBerfpqkTEJvi"
+};
+
 module.exports = {
   APP_NAME: 'spirit_permissionless_oracles_vwap',
   APP_ID: 16,
+  config: APP_CONFIG,
 
   onRequest: async function (request) {
     let {
@@ -454,7 +457,7 @@ module.exports = {
         if (typeof pairs === 'string' || pairs instanceof String) {
           pairs = pairs.split(',')
         }
-        let { price, volume } = await tokenVWAP(token, pairs)
+        let { price, volume } = await tokenVWAP(token, pairs, null, this.config)
         return {
           token: token,
           tokenPrice: price.toString(),
@@ -471,7 +474,8 @@ module.exports = {
           pairs1 = pairs1.split(',').filter((x) => x)
         }
 
-        const { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1)
+        console.log(this.config)
+        const { price, sumVolume } = await LPTokenPrice(token, pairs0, pairs1, this.config)
 
         return {
           token: token,

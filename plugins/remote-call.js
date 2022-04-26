@@ -181,6 +181,10 @@ class RemoteCall extends BasePlugin {
   }
 
   call(peer, method, params, options){
+    // TODO: need more check
+    if(!peer){
+      return Promise.reject({message: `RemoteCall.call: peer is null for method ${method}`})
+    }
     return this.getPeerConnection(peer)
       .then(connection => {
         if(!connection?.stream)

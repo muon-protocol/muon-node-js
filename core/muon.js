@@ -30,9 +30,9 @@ class Muon extends Events {
 
   async _initializeNetwork(configs) {
     let peerId = await PeerId.createFromJSON(configs.nodeId)
-    let announceFilter = mas => mas
-    if(process.env.ANNOUNCE_FILTER)
-      announceFilter = (multiaddrs) => multiaddrs.filter(m => !isPrivate(m));
+    let announceFilter = (multiaddrs) => multiaddrs.filter(m => !isPrivate(m));
+    if(process.env.DISABLE_ANNOUNCE_FILTER)
+      announceFilter = mas => mas
 
     let libp2p = await Node.create({
       peerId,
@@ -127,6 +127,11 @@ class Muon extends Events {
       chalk.green(` peer [${this.peerId.toB58String()}] starting ...`)
     )
     await this.libp2p.start()
+
+    if(this.configs.libp2p.natIp) {
+      let {port, natIp} = this.configs.libp2p
+      this.libp2p.addressManager.addObservedAddr(`/ip4/${natIp}/tcp/${port}/p2p/${this.peerId.toB58String()}`);
+    }
 
     console.log(
       emoji.get('moon'),
