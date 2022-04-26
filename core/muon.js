@@ -30,9 +30,9 @@ class Muon extends Events {
 
   async _initializeNetwork(configs) {
     let peerId = await PeerId.createFromJSON(configs.nodeId)
-    let announceFilter = mas => mas
-    if(process.env.ANNOUNCE_FILTER)
-      announceFilter = (multiaddrs) => multiaddrs.filter(m => !isPrivate(m));
+    let announceFilter = (multiaddrs) => multiaddrs.filter(m => !isPrivate(m));
+    if(process.env.DISABLE_ANNOUNCE_FILTER)
+      announceFilter = mas => mas
 
     let libp2p = await Node.create({
       peerId,
