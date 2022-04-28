@@ -6,6 +6,15 @@ let api = require('./api')
 
 let app = express()
 
+const logUserIP = (req, res, next) => {
+  var ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  console.log(`API request received from ip ${ip}`, {
+    'x-forwarded-for': req.headers['x-forwarded-for'],
+    'remoteAddress': req.socket.remoteAddress,
+  });
+  next()
+}
+
 function start(options) {
   var port = options.port || 8080
   var host = options.host || '127.0.0.1'
@@ -27,7 +36,7 @@ function start(options) {
 
   if (!db) console.log('Error connecting db')
   // console.log("Db connected successfully")
-  else app.use('/v1/', api)
+  else app.use('/v1/', logUserIP, api)
 
   app.listen(port, host, function () {
     console.log(`Running gateway on port ${port} at ${host}`)
