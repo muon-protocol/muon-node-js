@@ -218,6 +218,13 @@ async function pairVWAP(pair, index) {
     let sumWeightedPrice = new BN('0')
     let sumVolume = new BN('0')
     for (let i = 0; i < tokenTxs.length; i++) {
+      if(
+        (swap.amount0In != 0 && swap.amount1In != 0) || 
+        (swap.amount0Out != 0 && swap.amount1Out != 0)
+      )
+      {
+        continue
+      }
       let swap = tokenTxs[i]
       let price = new BN('0')
       let volume = new BN('0')
