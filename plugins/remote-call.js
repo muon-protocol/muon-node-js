@@ -180,7 +180,7 @@ class RemoteCall extends BasePlugin {
     return this.muon.libp2p.dialProtocol(peer.id, [PROTOCOL])
   }
 
-  call(peer, method, params, options){
+  call(peer, method, params, options={}){
     // TODO: need more check
     if(!peer){
       return Promise.reject({message: `RemoteCall.call: peer is null for method ${method}`})
@@ -192,13 +192,20 @@ class RemoteCall extends BasePlugin {
         return this.callConnection(connection, peer, method, params, options)
       })
       .catch(e => {
-        console.error(`RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
+        if(!options?.silent) {
+          console.error(`RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
+        }
+        this.emit("error", {peerId: peer.id, method})
+          .catch(e => {
+            console.log("RemoteCall.call.error handler failed", e)
+          })
         throw e;
       })
   }
 
   callConnection(connection, peer, method, params, options){
     options = {
+      silent: false,
       timeout: 5000,
       timeoutMessage: "remoteCall timeout!",
       ...(!!options ? options : {})
