@@ -34,7 +34,7 @@ class HealthCheck extends CallablePlugin {
       // TODO: what to do ?
       return;
     }
-    for (let i = 0; i < 1; i++) {
+    for (let i = 0; i < 3; i++) {
       try {
         let response = await this.remoteCall(peer, RemoteMethods.CheckHealth, null, {silent: true})
         if (response === 'OK') {
