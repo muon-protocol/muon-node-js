@@ -221,7 +221,10 @@ async function pairVWAP(pair, index) {
       let swap = tokenTxs[i]
       if(
         (swap.amount0In != 0 && swap.amount1In != 0) || 
-        (swap.amount0Out != 0 && swap.amount1Out != 0)
+        (swap.amount0Out != 0 && swap.amount1Out != 0) ||
+
+        (swap.amount0In != 0 && swap.amount0Out != 0) ||
+        (swap.amount1In != 0 && swap.amount1Out != 0)
       )
       {
         continue
