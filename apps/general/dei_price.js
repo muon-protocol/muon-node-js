@@ -11,12 +11,12 @@ const CHAINS = {
     heco: 128
 }
 
-const ROUTER_API = 'https://router.firebird.finance/'
+const ROUTER_API = 'https://router.firebird.finance'
 
 module.exports = {
     APP_NAME: 'dei_price',
     // TODO
-    APP_ID: 9,
+    APP_ID: 100,
     REMOTE_CALL_TIMEOUT: 30000,
 
     onRequest: async function (request) {
@@ -37,14 +37,14 @@ module.exports = {
                 }
                 const { data: { maxReturn } } = await axios.get(routerApi, {
                     headers: { 'Content-Type': 'application/json' },
-                    firebirdParams
+                    params: firebirdParams
                 })
-                const amountOut = maxReturn.totalTo.toBigInt()
-                const price = BigInt(amountIn) * BigInt(1e12) * BigInt(1e18) / amountOut
+                const amountOut = maxReturn.totalTo
+                const price = BigInt(amountIn) * BigInt(1e12) * BigInt(1e18) / BigInt(amountOut)
                 return {
                     chain: chain,
                     amountIn: amountIn,
-                    price: price
+                    price: String(price)
                 }
 
 
@@ -65,7 +65,7 @@ module.exports = {
                 return soliditySha3([
                     { type: 'uint32', value: this.APP_ID },
                     { type: 'uint256', value: String(amountIn) },
-                    { type: 'uint256', value: String(price) },
+                    { type: 'uint256', value: price },
                     { type: 'uint256', value: String(CHAINS[chain]) },
                     { type: 'uint256', value: request.data.timestamp }
                 ])
