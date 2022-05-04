@@ -23,12 +23,35 @@ module.exports = {
     solidly: 'https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly',
     spirit:
       'https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap',
-    uniswap: 'https://api.thegraph.com/subgraphs/name/ianlapham/uniswapv2'
+    uniswap: 'https://api.thegraph.com/subgraphs/name/ianlapham/uniswapv2',
+    spooky:
+      'https://api.thegraph.com/subgraphs/name/shayanshiravani/spookyswap',
+    traderjoe: 'https://api.thegraph.com/subgraphs/name/traderjoe-xyz/exchange',
+    sushi: {
+      1: 'https://api.thegraph.com/subgraphs/name/sushiswap/exchange',
+      137: 'https://api.thegraph.com/subgraphs/name/sushiswap/matic-exchange',
+      42161:
+        'https://api.thegraph.com/subgraphs/name/sushiswap/arbitrum-exchange',
+      43114:
+        'https://api.thegraph.com/subgraphs/name/sushiswap/avalanche-exchange',
+      250: 'https://api.thegraph.com/subgraphs/name/sushiswap/fantom-exchange',
+      56: 'https://api.thegraph.com/subgraphs/name/sushiswap/bsc-exchange'
+    }
   },
   graphDeploymentId: {
     solidly: 'QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58',
     spirit: 'QmUptbhTmAVCUTNeK2afecQJ3DFLgk9m4dBerfpqkTEJvi',
-    uniswap: 'Qmc7K8dKoadu1VcHfAV45pN4sPnwZcU2okV6cuU4B7qQp1'
+    uniswap: 'Qmc7K8dKoadu1VcHfAV45pN4sPnwZcU2okV6cuU4B7qQp1',
+    spooky: 'QmQnteZnJmshPHuUbYNxSCVTEyKunncwCUgYiyqEFQeDV7',
+    traderjoe: 'QmW62QDNJriA73HeyDAwnEaFyDNLZc7o8m5ewSALDRedoM',
+    sushi: {
+      1: 'QmbxC2AYMvnTq6UBAvkAch6KUsRy3VaGHgt6s6c8nfa1hm',
+      137: 'QmWANhcqU1Fn9UsGWCzNzcURPJM9f3egyz14GF7jxKFJQG',
+      42161: 'QmeBQRHngJLJ2r84Vvp3mgKbgYXHmAqc3dWkXoywU9ze3d',
+      43114: 'QmTbmXhUr67gAt5eLy5zUo7dRqATG8S8QgPEcdVhmenRNU',
+      250: 'QmSpAjYK1DxDvVhiSKK3M7wV1yaukSuV6UzKhrSsrKvf53',
+      56: 'QmeVMMA1rUfF5y93NmQuJDWbXCapNpw4kyUNretC62NRhA'
+    }
   },
 
   VALID_CHAINS: ['250'],
@@ -632,12 +655,12 @@ module.exports = {
       case 'price':
         let { token, pairs, hashTimestamp, chainId } = params
         // TODO do we need check valid chainId if yes whats the valid chain for aggregate
-        // if (chainId) {
-        //   if (!this.VALID_CHAINS.includes(chainId)) {
-        //     throw { message: 'INVALID_CHAIN' }
-        //   }
-        //   this.config = { ...this.config, chainId }
-        // }
+        if (chainId) {
+          // if (!this.VALID_CHAINS.includes(chainId)) {
+          //   throw { message: 'INVALID_CHAIN' }
+          // }
+          this.config = { ...this.config, chainId }
+        }
         let { price, volume } = await this.tokenVWAP(token, pairs)
         return {
           token: token,
@@ -650,12 +673,13 @@ module.exports = {
       case 'lp_price': {
         let { token, pairs0, pairs1, hashTimestamp, chainId } = params
 
-        // if (chainId) {
-        //   if (!this.VALID_CHAINS.includes(chainId)) {
-        //     throw { message: 'INVALID_CHAIN' }
-        //   }
-        //   this.config = { ...this.config, chainId }
-        // }
+        if (chainId) {
+          // if (!this.VALID_CHAINS.includes(chainId)) {
+          //   throw { message: 'INVALID_CHAIN' }
+          // }
+          this.config = { ...this.config, chainId }
+        }
+        // TODO how send pairs for sig
         const { price, sumVolume } = await this.LPTokenPrice(
           token,
           pairs0,
