@@ -9,6 +9,7 @@ async function multiCall(chainId, contractCallContext) {
     results = contractCallContext.map((item) => ({
       reference: item.reference,
       contractAddress: item.contractAddress,
+      context: item.context,
       callsReturnContext: results[item.reference]['callsReturnContext'].map(
         (callReturn) => ({
           ...callReturn,
