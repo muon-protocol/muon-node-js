@@ -4,18 +4,7 @@ const { axios, toBaseUnit, soliditySha3, BN, multiCall, groupBy, flatten } =
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
 const APP_CONFIG = {
-  chainId: 250,
-  graphUrl: {
-    solidly: 'https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly',
-    spirit:
-      'https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap',
-    uniswap: 'https://api.thegraph.com/subgraphs/name/ianlapham/uniswapv2'
-  },
-  graphDeploymentId: {
-    solidly: 'QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58',
-    spirit: 'QmUptbhTmAVCUTNeK2afecQJ3DFLgk9m4dBerfpqkTEJvi',
-    uniswap: 'Qmc7K8dKoadu1VcHfAV45pN4sPnwZcU2okV6cuU4B7qQp1'
-  }
+  chainId: 250
 }
 
 module.exports = {
@@ -28,9 +17,19 @@ module.exports = {
 
   TOKEN: 'token',
   TOTAL_SUPPLY: 'totalSupply',
-  PAIRS0_INFO: 'pairs0INFO',
-  PAIRS1_INFO: 'pairs1INFO',
   PAIRS: 'pairs',
+
+  graphUrl: {
+    solidly: 'https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly',
+    spirit:
+      'https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap',
+    uniswap: 'https://api.thegraph.com/subgraphs/name/ianlapham/uniswapv2'
+  },
+  graphDeploymentId: {
+    solidly: 'QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58',
+    spirit: 'QmUptbhTmAVCUTNeK2afecQJ3DFLgk9m4dBerfpqkTEJvi',
+    uniswap: 'Qmc7K8dKoadu1VcHfAV45pN4sPnwZcU2okV6cuU4B7qQp1'
+  },
 
   VALID_CHAINS: ['250'],
 
@@ -265,8 +264,8 @@ module.exports = {
   prepareTokenTx: async function (pair, exchange) {
     const tokenTxs = await this.getTokenTxs(
       pair,
-      this.config.graphUrl[exchange],
-      this.config.graphDeploymentId[exchange]
+      this.graphUrl[exchange],
+      this.graphDeploymentId[exchange]
     )
 
     return tokenTxs
@@ -368,7 +367,7 @@ module.exports = {
     return calls
   },
 
-  prepareCallContext: function (token, pairs0, pairs1) {
+  prepareCallContext: function (token, pairs0, pairs1, chainId) {
     const contractCallContextToken = [
       {
         reference: this.TOKEN + '_' + ':' + token,
@@ -389,7 +388,7 @@ module.exports = {
           }
         ],
         context: {
-          chainId: this.config.chainId
+          chainId: chainId
         }
       }
     ]
@@ -405,7 +404,7 @@ module.exports = {
           }
         ],
         context: {
-          chainId: this.config.chainId
+          chainId: chainId
         }
       }
     ]
@@ -520,7 +519,7 @@ module.exports = {
       return this.pairVWAP(pair.address, index, pair.exchange)
     })
   },
-  calculatePriceToken: function (pairVWAPs) {
+  calculatePriceToken: function (pairVWAPs, pairs) {
     let volume = pairVWAPs.reduce((previousValue, currentValue) => {
       return previousValue.add(currentValue.sumVolume)
     }, new BN(0))
@@ -534,9 +533,7 @@ module.exports = {
     return { price, volume }
   },
 
-  tokenVWAP: async function (token, pairs, metadata, config) {
-    let pairPrices = []
-    let pairVolume = []
+  tokenVWAP: async function (token, pairs, metadata) {
     if (!metadata) {
       metadata = await this.prepareMetadataForTokenVWAP(pairs)
     }
@@ -544,7 +541,7 @@ module.exports = {
 
     pairVWAPPromises = flatten(pairVWAPPromises)
     let pairVWAPs = await Promise.all(pairVWAPPromises)
-    let { price, volume } = this.calculatePriceToken(pairVWAPs)
+    let { price, volume } = this.calculatePriceToken(pairVWAPs, pairs)
 
     return { price, volume }
   },
@@ -578,8 +575,13 @@ module.exports = {
     return { price: totalUSD.mul(this.SCALE).div(totalSupply), sumVolume }
   },
 
-  LPTokenPrice: async function (token, pairs0, pairs1) {
-    const contractCallContext = this.prepareCallContext(token, pairs0, pairs1)
+  LPTokenPrice: async function (token, pairs0, pairs1, chainId) {
+    const contractCallContext = this.prepareCallContext(
+      token,
+      pairs0,
+      pairs1,
+      chainId
+    )
     let result = await this.runMultiCall(contractCallContext)
 
     if (result) {
@@ -630,21 +632,14 @@ module.exports = {
     switch (method) {
       case 'price':
         let { token, pairs, hashTimestamp, chainId } = params
-        if (typeof pairs === 'string' || pairs instanceof String) {
-          pairs = pairs.split(',')
-        }
-        if (chainId) {
-          if (!this.VALID_CHAINS.includes(chainId)) {
-            throw { message: 'INVALID_CHAIN' }
-          }
-          this.config = { ...this.config, chainId }
-        }
-        let { price, volume } = await this.tokenVWAP(
-          token,
-          pairs,
-          null,
-          this.config
-        )
+        // TODO do we need check valid chainId if yes whats the valid chain for aggregate
+        // if (chainId) {
+        //   if (!this.VALID_CHAINS.includes(chainId)) {
+        //     throw { message: 'INVALID_CHAIN' }
+        //   }
+        //   this.config = { ...this.config, chainId }
+        // }
+        let { price, volume } = await this.tokenVWAP(token, pairs)
         return {
           token: token,
           tokenPrice: price.toString(),
@@ -656,16 +651,17 @@ module.exports = {
       case 'lp_price': {
         let { token, pairs0, pairs1, hashTimestamp, chainId } = params
 
-        if (chainId) {
-          if (!this.VALID_CHAINS.includes(chainId)) {
-            throw { message: 'INVALID_CHAIN' }
-          }
-          this.config = { ...this.config, chainId }
-        }
+        // if (chainId) {
+        //   if (!this.VALID_CHAINS.includes(chainId)) {
+        //     throw { message: 'INVALID_CHAIN' }
+        //   }
+        //   this.config = { ...this.config, chainId }
+        // }
         const { price, sumVolume } = await this.LPTokenPrice(
           token,
           pairs0,
-          pairs1
+          pairs1,
+          chainId
         )
 
         return {

@@ -1,6 +1,10 @@
 require('dotenv').config({ path: './dev-chain/dev-node-1.env' })
 require('../../core/global')
-const { onRequest } = require('../general/aggregate_oracles')
+const { dynamicExtend } = require('../../core/utils')
+const AggregateOracles = dynamicExtend(
+  class {},
+  require('../general/aggregate_oracles')
+)
 
 // ————————- POLYGON——————————-
 // DEI-DEUS LP  0x2Bc3ce6D7cfc0B476E60aDaA1B27DE76DB95EE4e
@@ -12,15 +16,18 @@ const { onRequest } = require('../general/aggregate_oracles')
 // DEI-USDC LP  0x6870F9b4DD5d34C7FC53D0d85D9dBd1aAB339BF7
 // DEUS-ETH LP  0x367E2D443988E4b222FBFdAFDb35eeB7ddA9FBB7
 
+const app = new AggregateOracles()
+
 const testLP = async (params, token, tokenName) => {
   let method = 'lp_price'
 
-  return onRequest({
-    method,
-    data: {
-      params
-    }
-  })
+  return app
+    .onRequest({
+      method,
+      data: {
+        params
+      }
+    })
     .then(({ tokenPrice, volume }) => {
       console.log(`\n \nResult for LP_PRICE ${tokenName}: ${token}`)
       console.log({ tokenPrice, volume })
@@ -31,12 +38,13 @@ const testLP = async (params, token, tokenName) => {
 const testPrice = async (params, token, tokenName) => {
   let method = 'price'
 
-  return onRequest({
-    method,
-    data: {
-      params
-    }
-  })
+  return app
+    .onRequest({
+      method,
+      data: {
+        params
+      }
+    })
     .then(({ tokenPrice, volume }) => {
       console.log(`\n \nResult for PRICE ${tokenName}: ${token}`)
       console.log({ tokenPrice, volume })
@@ -126,9 +134,6 @@ const example_2 = {
     ]
   ]
 }
-
-testPrice(example_1, token, tokenName)
-testPrice(example_2, token2, tokenName2)
 
 const tokenNameLP = 'vAMM-DEI/DEUS'
 const tokenLP = '0xF42dBcf004a93ae6D5922282B304E2aEFDd50058' // vAMM-DEI/DEUS
@@ -246,3 +251,6 @@ const LP_Params2 = {
 }
 testLP(LP_Params, tokenLP, tokenNameLP)
 testLP(LP_Params2, tokenLP2, tokenNameLP2)
+
+testPrice(example_1, token, tokenName)
+testPrice(example_2, token2, tokenName2)
