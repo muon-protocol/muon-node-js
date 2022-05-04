@@ -653,6 +653,7 @@ module.exports = {
 
     switch (method) {
       case 'price':
+        // Input validation or constraint
         let { token, pairs, hashTimestamp, chainId } = params
         // TODO do we need check valid chainId if yes whats the valid chain for aggregate
         if (chainId) {
@@ -679,7 +680,7 @@ module.exports = {
           // }
           this.config = { ...this.config, chainId }
         }
-        // TODO how send pairs for sig
+        // TODO :which will be send for pairs in sig array of address or obj
         const { price, sumVolume } = await this.LPTokenPrice(
           token,
           pairs0,
@@ -722,6 +723,8 @@ module.exports = {
     } = request
     let { hashTimestamp, hashVolume } = params
     switch (method) {
+      // TODO set type of pairs based on sig
+
       case 'price': {
         if (
           !this.isPriceToleranceOk(
