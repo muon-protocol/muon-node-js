@@ -303,6 +303,31 @@ async function runMultiCall(contractCallContext) {
   return flatten(result)
 }
 
+function preparePromisePair(token, pairs, metadata) {
+  return pairs.map((info) => {
+    let inputToken = token
+    return makePromisePair(inputToken, info, metadata)
+  })
+}
+function makePromisePair(token, pairs, metadata) {
+  let inputToken = token
+  return pairs.map((pair) => {
+    let currentMetadata = metadata.find(
+      (item) =>
+        item.reference === PAIRS + '_' + pair.exchange + ':' + pair.address
+    )
+    let index =
+      inputToken.toLowerCase() == currentMetadata.t0.toLowerCase() ? 0 : 1
+    if (inputToken.toLowerCase() == currentMetadata.t0.toLowerCase()) {
+      inputToken = currentMetadata.t1
+    } else if (inputToken.toLowerCase() == currentMetadata.t1.toLowerCase()) {
+      inputToken = currentMetadata.t0
+    } else {
+      throw { message: 'INVALID_PAIRS' }
+    }
+    return pairVWAP(pair.address, index, pair.exchange)
+  })
+}
 async function tokenVWAP(token, pairs, metadata) {
   let inputToken = token
   if (!metadata) {
@@ -313,25 +338,7 @@ async function tokenVWAP(token, pairs, metadata) {
     let resultDecimals = await runMultiCall(callContextPairs)
     metadata = getFinalMetaData(resultDecimals, metadata, PAIRS)
   }
-  let pairVWAPPromises = pairs.map((info) => {
-    inputToken = token
-    return info.map((pair) => {
-      let currentMetadata = metadata.find(
-        (item) =>
-          item.reference === PAIRS + '_' + pair.exchange + ':' + pair.address
-      )
-      let index =
-        inputToken.toLowerCase() == currentMetadata.t0.toLowerCase() ? 0 : 1
-      if (inputToken.toLowerCase() == currentMetadata.t0.toLowerCase()) {
-        inputToken = currentMetadata.t1
-      } else if (inputToken.toLowerCase() == currentMetadata.t1.toLowerCase()) {
-        inputToken = currentMetadata.t0
-      } else {
-        throw { message: 'INVALID_PAIRS' }
-      }
-      return pairVWAP(pair.address, index, pair.exchange)
-    })
-  })
+  let pairVWAPPromises = preparePromisePair(token, pairs, metadata)
 
   pairVWAPPromises = flatten(pairVWAPPromises)
   let pairVWAPs = await Promise.all(pairVWAPPromises)
