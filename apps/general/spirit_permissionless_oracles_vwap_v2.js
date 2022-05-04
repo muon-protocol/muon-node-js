@@ -583,7 +583,6 @@ module.exports = {
       chainId
     )
     let result = await this.runMultiCall(contractCallContext)
-
     if (result) {
       const { metadata, pairsMetadata } = await this.prepareData(result)
 
