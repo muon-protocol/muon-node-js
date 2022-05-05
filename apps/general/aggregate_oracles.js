@@ -10,7 +10,7 @@ module.exports = {
   ...SpriteVWAP,
 
   APP_NAME: 'aggregate_oracles',
-  APP_ID: 25,
+  APP_ID: 30,
   config: APP_CONFIG,
 
   makeCallContextInfo: function (pairs, prefix) {
