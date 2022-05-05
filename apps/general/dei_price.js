@@ -13,11 +13,26 @@ const CHAINS = {
 
 const ROUTER_API = 'https://router.firebird.finance'
 
+const PRICE_TOLERANCE = '0.0005'
+
 module.exports = {
     APP_NAME: 'dei_price',
     // TODO
     APP_ID: 100,
     REMOTE_CALL_TIMEOUT: 30000,
+
+    isPriceToleranceOk: function (price, expectedPrice) {
+        let priceDiff = new BN(price).sub(new BN(expectedPrice)).abs()
+
+        if (
+            new BN(priceDiff)
+                .div(new BN(expectedPrice))
+                .gt(toBaseUnit(PRICE_TOLERANCE, '18'))
+        ) {
+            return false
+        }
+        return true
+    },
 
     onRequest: async function (request) {
         let {
@@ -61,6 +76,15 @@ module.exports = {
         switch (method) {
             case 'signature': {
                 let { price, chain, amountIn } = result
+
+                if (
+                    !this.isPriceToleranceOk(
+                        price,
+                        request.data.result.price
+                    )
+                ) {
+                    throw { message: 'Price threshold exceeded' }
+                }
 
                 return soliditySha3([
                     { type: 'uint32', value: this.APP_ID },
