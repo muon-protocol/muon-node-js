@@ -76,6 +76,21 @@ class TssPlugin extends CallablePlugin {
       console.log('first node connected ...')
       this.joinToGroup();
     })
+
+    this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+  }
+
+  onPeerDisconnect(peer) {
+    if(this.isReady){
+      for(let wallet in this.tssParty.partners){
+        let {peerId} = this.tssParty.partners[wallet]
+        if(peerId === peer._idB58String){
+          console.log(`TssPlugin: remove online peer ${peerId} #2`)
+          this.tssParty.setWalletPeer(wallet, null);
+          return
+        }
+      }
+    }
   }
 
   get TSS_THRESHOLD() {
@@ -182,13 +197,13 @@ class TssPlugin extends CallablePlugin {
     // } catch (e) {
     //   console.error('TssPlugin.informEntrance', e, e.stack)
     // }
-    for(let i=0 ; i<3 ; i++) {
-      await timeout(5000)
+    for(let i=0 ; i<15 ; i++) {
       this.broadcast({
         type: MSG_TYPE_INFORM_ENTRANCE,
         peerId: process.env.PEER_ID,
         wallet: process.env.SIGN_WALLET_ADDRESS,
       })
+      await timeout(15000)
     }
   }
 
@@ -339,8 +354,10 @@ class TssPlugin extends CallablePlugin {
     /**
      * needs at least TSS_THRESHOLD number of nodes.
      */
-    if(Object.keys(nodesNeedGroup).length < TSS_THRESHOLD-1)
+    if(Object.keys(nodesNeedGroup).length < TSS_THRESHOLD-1) {
+      console.log(`No enough node to create tss group. already exist [${1+Object.keys(nodesNeedGroup).length}/${TSS_THRESHOLD}]`)
       return;
+    }
     let selfWallet = process.env.SIGN_WALLET_ADDRESS
     let wallets = Object.keys(nodesNeedGroup);
     /**
@@ -378,7 +395,7 @@ class TssPlugin extends CallablePlugin {
       keysCache.set(key.id, key, 0) // keep for ever
       this.tssKey = key;
       this.isReady = true;
-      this.informJoinedToGroup()
+      this.informJoinedToGroup();
       console.log('tss ready.')
     } catch (e) {
       console.error('TssPlugin.tryToCreateTssParty', e, e.stack);
@@ -653,7 +670,11 @@ class TssPlugin extends CallablePlugin {
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
         // TODO: is this message from 'wallet'
         let peer = await this.findPeer(peerId);
-        if (this.isReady) {
+        if(!peer){
+          console.log("TssPlugin.handleBroadcastMessage(MSG_TYPE_INFORM_ENTRANCE): peer not found.", {peerId})
+          // TODO: is need to return?
+        }
+        if (peer && this.isReady) {
           this.tssParty.setWalletPeer(wallet, peer);
           this.remoteCall(
             peer,

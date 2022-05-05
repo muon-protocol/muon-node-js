@@ -47,10 +47,14 @@ class RemoteCall extends BasePlugin {
       })
       .catch(error => {
         console.error("RemoteCall.handleCall", error)
+        if(typeof error === "string")
+          error = {message: error};
+        const {message: ___, ...otherErrorParts} = error;
         let response = {
           responseId: callId,
           error: {
-            message: error.message || 'Somethings went wrong'
+            message: error.message || 'Somethings went wrong',
+            ...otherErrorParts
           }
         };
         return response
@@ -96,10 +100,11 @@ class RemoteCall extends BasePlugin {
       }
     } catch (err) {
       console.error("RemoteCall.handler", err)
-    } finally {
-      // Replies are done on new streams, so let's close this stream so we don't leak it
-      await pipe([], stream)
     }
+    // finally {
+    //   // Replies are done on new streams, so let's close this stream so we don't leak it
+    //   await pipe([], stream)
+    // }
   }
 
   prepareSendData(data) {
@@ -121,12 +126,15 @@ class RemoteCall extends BasePlugin {
         }
       )
     } catch (err) {
+      console.log('=============================');
+      console.log(peer)
+      console.log('=============================');
       console.error("RemoteCall.send", err)
     }
-    finally {
-      // Replies are done on new streams, so let's close this stream so we don't leak it
-      await pipe([], connection.stream);
-    }
+    // finally {
+    //   // Replies are done on new streams, so let's close this stream so we don't leak it
+    //   await pipe([], connection.stream);
+    // }
   }
 
   async handleSendResponse(signAndMessage, peerId){
@@ -172,7 +180,11 @@ class RemoteCall extends BasePlugin {
     return this.muon.libp2p.dialProtocol(peer.id, [PROTOCOL])
   }
 
-  call(peer, method, params, options){
+  call(peer, method, params, options={}){
+    // TODO: need more check
+    if(!peer){
+      return Promise.reject({message: `RemoteCall.call: peer is null for method ${method}`})
+    }
     return this.getPeerConnection(peer)
       .then(connection => {
         if(!connection?.stream)
@@ -180,13 +192,20 @@ class RemoteCall extends BasePlugin {
         return this.callConnection(connection, peer, method, params, options)
       })
       .catch(e => {
-        console.error(`RemoteCall.call(peer, '${method}', params)`, e)
+        if(!options?.silent) {
+          console.error(`RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
+        }
+        this.emit("error", {peerId: peer.id, method})
+          .catch(e => {
+            console.log("RemoteCall.call.error handler failed", e)
+          })
         throw e;
       })
   }
 
   callConnection(connection, peer, method, params, options){
     options = {
+      silent: false,
       timeout: 5000,
       timeoutMessage: "remoteCall timeout!",
       ...(!!options ? options : {})

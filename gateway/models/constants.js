@@ -4,4 +4,5 @@ module.exports = {
   MODEL_CONTENT: 'contents',
   MODEL_MEMORY: 'memories',
   MODEL_VIOLATION: 'violations',
+  MODEL_REQ_LOG: 'req_logs',
 }

@@ -33,15 +33,31 @@ class AppRequestManager{
     return requestCache.get(reqId.toString());
   }
 
-  addRequest(req){
+  /**
+   * @param req
+   * @param options.partnerCount
+   * @param options.requestTimeout
+   */
+  addRequest(req, options={}){
     if(!requestCache.has(req._id)){
       requestCache.set(req._id.toString(), {
+        /** options can override items above "...options" */
+        partnerCount: Infinity,
+        requestTimeout: 40000,
+
+        ...options,
+
         request: req,
         signatures: {},
         errors: {},
         promise: null,
       });
     }
+  }
+
+  setPartnerCount(reqId, partnerCount) {
+    let item = this.getItem(reqId);
+    item.partnerCount = partnerCount
   }
 
   getRequest(_id){
@@ -68,7 +84,7 @@ class AppRequestManager{
         const req = this.getRequest(reqId);
         if(item.promise)
           item.promise.reject({
-            message: "Request failed because of 2 nodes failure.",
+            message: "Request failed to confirm.",
             data: {
               app: {
                 name: req.app,
@@ -91,9 +107,13 @@ class AppRequestManager{
 
   isRequestFailed(_id){
     let item = this.getItem(_id);
-    let {request: {nSign}, errors} = item
-    // TODO: calculate amount of error
-    return !!errors && Object.keys(errors).length >= 2;
+    let {request: {nSign}, errors, signatures} = item
+    const signCount = Object.keys(signatures).length
+    const needMoreSignature = nSign - signCount;
+    const failedCount = !!errors ? Object.keys(errors).length : 0;
+    const remainingPartners = item.partnerCount - signCount - failedCount;
+    // TODO: customize number 2
+    return remainingPartners < needMoreSignature || failedCount >= 2;
   }
 
   onRequestSignFullFilled(_id){
@@ -107,7 +127,7 @@ class AppRequestManager{
     }
     else{
       if(item.promise === null)
-        item.promise = new TimeoutPromise(30000, 'Request timed out');
+        item.promise = new TimeoutPromise(item.requestTimeout, 'Request timed out');
       return item.promise.promise;
     }
   }

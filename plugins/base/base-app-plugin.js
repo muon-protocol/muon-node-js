@@ -2,9 +2,9 @@ const CallablePlugin = require('./callable-plugin')
 const Request = require('../../gateway/models/Request')
 const Signature = require('../../gateway/models/Signature')
 const PeerId = require('peer-id')
-const uint8ArrayFromString = require('uint8arrays/from-string')
+const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
+const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const {makeAppDependency} = require('./app-dependencies')
-const uint8ArrayToString = require('uint8arrays/to-string')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
 const { omit } = require('lodash')
@@ -31,6 +31,8 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
+    this.muon._apps[this.APP_NAME] = this;
+
     if(this.dependencies){
       this.initializeDependencies();
     }
@@ -80,6 +82,11 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
+  async invoke(appName, method, params) {
+    let result = await this.muon._apps[appName][method](params);
+    return result;
+  }
+
   /**
    * Override BasePlugin BROADCAST_CHANNEL
    */
@@ -88,7 +95,7 @@ class BaseAppPlugin extends CallablePlugin {
     return this.APP_NAME ? super.BROADCAST_CHANNEL : null
   }
 
-  async __onRequestArrived(method, params, nSign) {
+  async __onRequestArrived(method, params, nSign, mode) {
     let t0 = Date.now()
     let startedAt = getTimestamp()
     nSign = !!nSign
@@ -112,71 +119,86 @@ class BaseAppPlugin extends CallablePlugin {
     })
     let t1= Date.now()
 
-    if(this.onArrive){
-      newRequest.data.init = await this.onArrive(clone(newRequest))
+    /** view mode */
+    if(mode === "view"){
+      let result = await this.onRequest(clone(newRequest))
+      newRequest.data.result = result
+      return omit(newRequest._doc, ['__v'])
     }
-    let t2 = Date.now()
+    /** sign mode */
+    else{
+      if(this.onArrive){
+        newRequest.data.init = await this.onArrive(clone(newRequest))
+      }
+      let t2 = Date.now()
 
-    let result = await this.onRequest(clone(newRequest))
-    newRequest.data.result = result
-    let t3 = Date.now()
+      let result = await this.onRequest(clone(newRequest))
+      newRequest.data.result = result
+      let t3 = Date.now()
 
-    newRequest.data.init = {
-      ... newRequest.data.init,
-      ... await this.onFirstNodeRequestSucceed(clone(newRequest))
-    };
+      newRequest.data.init = {
+        ... newRequest.data.init,
+        ... await this.onFirstNodeRequestSucceed(clone(newRequest))
+      };
 
-    let resultHash = this.hashRequestResult(newRequest, result)
-    let memWrite = this.getMemWrite(newRequest, result)
-    if (!!memWrite) {
-      newRequest.data.memWrite = memWrite
+      let resultHash = this.hashRequestResult(newRequest, result)
+      let memWrite = this.getMemWrite(newRequest, result)
+      if (!!memWrite) {
+        newRequest.data.memWrite = memWrite
+      }
+
+      /**
+       * A request need's (2 * REMOTE_CALL_TIMEOUT + 5000) millisecond to be confirmed.
+       * One REMOTE_CALL_TIMEOUT for first node
+       * One REMOTE_CALL_TIMEOUT for other nodes (all other nodes proceed parallel).
+       * 5000 for networking
+       */
+      this.requestManager.addRequest(newRequest, {requestTimeout: this.REMOTE_CALL_TIMEOUT * 2 + 5000});
+
+      // await newRequest.save()
+
+      let sign = this.makeSignature(newRequest, result, resultHash)
+      if (!!memWrite) {
+        sign.memWriteSignature = memWrite.signature
+      }
+      this.requestManager.addSignature(newRequest._id, sign.owner, sign);
+      // new Signature(sign).save()
+
+      this.broadcastNewRequest(newRequest)
+      let t4 = Date.now()
+
+      let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
+      let t5 = Date.now()
+
+      // console.log('base-app-plugin.__onRequestArrived',{
+      //   t1: t1-t0,
+      //   t2: t2-t1,
+      //   t3: t3-t2,
+      //   t4: t4-t3,
+      //   t5: t5-t4,
+      //   '*': t5-t0
+      // })
+
+      if (confirmed) {
+        newRequest['confirmedAt'] = getTimestamp()
+      }
+
+      let requestData = {
+        confirmed,
+        ...omit(newRequest._doc, [
+          '__v'
+          // 'data.memWrite'
+        ]),
+        signatures: confirmed ? signatures : []
+      }
+
+      if (confirmed) {
+        newRequest.save()
+        this.muon.getPlugin('memory').writeAppMem(requestData)
+      }
+
+      return requestData
     }
-
-    this.requestManager.addRequest(newRequest);
-
-    // await newRequest.save()
-
-    let sign = this.makeSignature(newRequest, result, resultHash)
-    if (!!memWrite) {
-      sign.memWriteSignature = memWrite.signature
-    }
-    this.requestManager.addSignature(newRequest._id, sign.owner, sign);
-    // new Signature(sign).save()
-
-    this.broadcastNewRequest(newRequest)
-    let t4 = Date.now()
-
-    let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
-    let t5 = Date.now()
-
-    // console.log('base-app-plugin.__onRequestArrived',{
-    //   t1: t1-t0,
-    //   t2: t2-t1,
-    //   t3: t3-t2,
-    //   t4: t4-t3,
-    //   t5: t5-t4,
-    //   '*': t5-t0
-    // })
-
-    if (confirmed) {
-      newRequest['confirmedAt'] = getTimestamp()
-    }
-
-    let requestData = {
-      confirmed,
-      ...omit(newRequest._doc, [
-        '__v'
-        // 'data.memWrite'
-      ]),
-      signatures: confirmed ? signatures : []
-    }
-
-    if (confirmed) {
-      newRequest.save()
-      this.muon.getPlugin('memory').writeAppMem(requestData)
-    }
-
-    return requestData
   }
 
   async onFirstNodeRequestSucceed(request) {
@@ -197,8 +219,10 @@ class BaseAppPlugin extends CallablePlugin {
       let memWrite = this.getMemWrite(request, result)
       return [this.makeSignature(request, result, hash2), memWrite]
     } else {
-      console.log({hash1, hash2})
-      throw { message: 'Request not confirmed' }
+      throw {
+        message: `Request result is not the same as the first node's result.`,
+        result
+      }
     }
   }
 
@@ -302,7 +326,7 @@ class BaseAppPlugin extends CallablePlugin {
     try {
       // let data = JSON.parse(uint8ArrayToString(msg.data))
       if (data && data.type === 'new_request') {
-        let peerId = PeerId.createFromCID(data.peerId)
+        let peerId = PeerId.createFromB58String(data.peerId)
         let peer = await this.findPeer(peerId)
         let request = await remoteCall.call(
           peer,
@@ -350,7 +374,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   recoverSignature(request, sign) {
-    let hash = this.hashRequestResult(request, sign.data)
+    let hash = this.hashRequestResult(request, sign.result)
     return crypto.recover(hash, sign.signature)
   }
 
@@ -390,7 +414,7 @@ class BaseAppPlugin extends CallablePlugin {
       request: request._id,
       owner: process.env.SIGN_WALLET_ADDRESS,
       timestamp: signTimestamp,
-      data: result,
+      result,
       signature
     }
   }

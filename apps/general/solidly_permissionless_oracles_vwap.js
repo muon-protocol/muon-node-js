@@ -219,6 +219,16 @@ async function pairVWAP(pair, index) {
     let sumVolume = new BN('0')
     for (let i = 0; i < tokenTxs.length; i++) {
       let swap = tokenTxs[i]
+      if(
+        (swap.amount0In != 0 && swap.amount1In != 0) || 
+        (swap.amount0Out != 0 && swap.amount1Out != 0) ||
+
+        (swap.amount0In != 0 && swap.amount0Out != 0) ||
+        (swap.amount1In != 0 && swap.amount1Out != 0)
+      )
+      {
+        continue
+      }
       let price = new BN('0')
       let volume = new BN('0')
       switch (index) {
@@ -311,14 +321,14 @@ async function LPTokenPrice(token, pairs0, pairs1) {
     if (pairs0.length) {
       const { price, volume } = _tokenVWAPResults[0]
       totalUSDA = price.mul(reserveA).div(SCALE)
-      sumVolume = volume
+      sumVolume = sumVolume.add(volume)
     }
 
     let totalUSDB = reserveB
     if (pairs1.length) {
       const { price, volume } = _tokenVWAPResults[1]
       totalUSDB = price.mul(reserveB).div(SCALE)
-      sumVolume = volume
+      sumVolume = sumVolume.add(volume)
     }
 
     let totalUSD = totalUSDA.add(totalUSDB)

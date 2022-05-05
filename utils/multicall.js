@@ -1,5 +1,5 @@
 const { Multicall } = require('ethereum-multicall')
-const { getWeb3 } = require('./node-utils/eth')
+const { getWeb3 } = require('./eth')
 
 async function multiCall(chainId, contractCallContext) {
   try {

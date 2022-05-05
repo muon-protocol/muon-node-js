@@ -12,9 +12,11 @@ const {
   getTokenInfo: ethGetTokenInfo,
   getNftInfo: ethGetNftInfo,
   hashCallOutput: ethHashCallOutput
-} = require('../utils/node-utils/eth')
+} = require('../utils/eth')
 
 const { multiCall } = require('../utils/multicall')
+const { BNSqrt } = require('../utils/bn-sqrt')
+
 function soliditySha3(params) {
   return web3Instance.utils.soliditySha3(...params)
 }
@@ -37,5 +39,6 @@ global.MuonAppUtils = {
   soliditySha3,
   ecRecover: util.ecrecover,
   recoverTypedSignature: ethSigUtil.recoverTypedSignature,
-  recoverTypedMessage: ethSigUtil.recoverTypedMessage
+  recoverTypedMessage: ethSigUtil.recoverTypedMessage,
+  BNSqrt: BNSqrt
 }

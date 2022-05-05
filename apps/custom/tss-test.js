@@ -7,7 +7,9 @@ const TssApp = {
     let {method, data: {params={}}} = request;
     switch (method) {
       case 'test':
-        return params.message || 'done'
+        return params.message || 'done';
+      case 'data-change':
+        return Math.random()
       default:
         throw {message: `invalid method ${method}`}
     }
@@ -16,7 +18,8 @@ const TssApp = {
   hashRequestResult: function (request, result){
     switch (request.method) {
       case 'test':
-        return soliditySha3([{type: 'string', value: result}]);
+      case 'data-change':
+        return soliditySha3([{type: 'string', value: result.toString()}]);
       default:
         throw { message: `Unknown method: ${request.method}` }
     }

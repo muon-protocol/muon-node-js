@@ -4,6 +4,8 @@
  * @param timeoutMessage
  * @param {Object} options - options of promise
  * @param {Boolean} options.resolveOnTimeout - if true promise will resolve null after timeout, instead of reject.
+ * @param {function | undefined} options.onTimeoutResult - if promise timed out, output of this method will return instead of null.
+ * @param {any | undefined} options.data - if promise timed out, id will pass to onTimeoutResult.
  * @constructor
  */
 function TimeoutPromise(timeout, timeoutMessage, options={}) {
@@ -20,9 +22,12 @@ function TimeoutPromise(timeout, timeoutMessage, options={}) {
   }
   this.reject = function () {
     this.isFulfilled = true;
-    if(this.options.resolveOnTimeout)
-      this._resolve(null)
-    else
+    if(this.options.resolveOnTimeout) {
+      if(this.options.onTimeoutResult)
+        this._resolve(this.options.onTimeoutResult(this.options.data))
+      else
+        this._resolve(null)
+    } else
       this._reject(...arguments)
   }
 
