@@ -18,6 +18,7 @@ module.exports = {
   TOKEN: 'token',
   TOTAL_SUPPLY: 'totalSupply',
   PAIRS: 'pairs',
+  stableExchanges: ['solidly'],
 
   graphUrl: {
     solidly: 'https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly',
@@ -79,6 +80,13 @@ module.exports = {
       inputs: [],
       name: 'token1',
       outputs: [{ internalType: 'address', name: '', type: 'address' }],
+      stateMutability: 'view',
+      type: 'function'
+    },
+    {
+      inputs: [],
+      name: 'stable',
+      outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
       stateMutability: 'view',
       type: 'function'
     }
@@ -213,7 +221,7 @@ module.exports = {
   },
 
   getReturnValue: function (info, methodName) {
-    return info.find((item) => item.methodName === methodName).returnValues
+    return info.find((item) => item.methodName === methodName)?.returnValues
   },
 
   getInfoContract: function (multiCallInfo, filterBy) {
@@ -359,6 +367,14 @@ module.exports = {
     pair.forEach((item) => {
       if (!pairCache.includes(item.address)) {
         pairCache.push(item.address)
+        const stableCall = this.stableExchanges.includes(item.exchange)
+          ? [
+              {
+                reference: prefix + ':' + item.address,
+                methodName: 'stable'
+              }
+            ]
+          : []
         calls.push({
           reference: prefix + '_' + item.exchange + ':' + item.address,
           contractAddress: item.address,
@@ -375,7 +391,8 @@ module.exports = {
             {
               reference: prefix + ':' + item.address,
               methodName: 'token1'
-            }
+            },
+            ...stableCall
           ],
           // TODO if it's possible remove pairIndex we need it in aggregate
           context: {
@@ -387,6 +404,7 @@ module.exports = {
         })
       }
     })
+
     return calls
   },
 
@@ -462,6 +480,8 @@ module.exports = {
         'getReserves'
       )
 
+      const stable = this.getReturnValue(item.callsReturnContext, 'stable')
+
       return {
         reference: item.reference,
         pair: item.context.pair,
@@ -472,9 +492,11 @@ module.exports = {
         r1: reserves[1],
 
         t0: this.getReturnValue(item.callsReturnContext, 'token0')[0],
-        t1: this.getReturnValue(item.callsReturnContext, 'token1')[0]
+        t1: this.getReturnValue(item.callsReturnContext, 'token1')[0],
+        stable: stable ? stable[0] : false
       }
     })
+    // TODO double test to be sure stable is correct for different pairs
     return metadata
   },
 
@@ -608,7 +630,6 @@ module.exports = {
     let result = await this.runMultiCall(contractCallContext)
     if (result) {
       const { metadata, pairsMetadata } = await this.prepareData(result)
-
       let totalSupply = this.getInfoContract(result, this.TOTAL_SUPPLY)[0]
         .callsReturnContext
       totalSupply = new BN(totalSupply[0].returnValues[0])

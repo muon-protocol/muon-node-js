@@ -21,6 +21,14 @@ module.exports = {
       pair.forEach((item) => {
         if (!pairCache.includes(item.address)) {
           pairCache.push(item.address)
+          const stableCall = this.stableExchanges.includes(item.exchange)
+            ? [
+                {
+                  reference: prefix + ':' + item.address,
+                  methodName: 'stable'
+                }
+              ]
+            : []
           calls.push({
             reference: prefix + '_' + item.exchange + ':' + item.address,
             contractAddress: item.address,
@@ -37,7 +45,8 @@ module.exports = {
               {
                 reference: prefix + ':' + item.address,
                 methodName: 'token1'
-              }
+              },
+              ...stableCall
             ],
             context: {
               pairIndex: index,
