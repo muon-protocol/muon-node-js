@@ -72,6 +72,8 @@ class GatewayInterface extends BasePlugin{
         await this.__handleCallResponse(data, response)
       }
       catch (e) {
+        if(typeof e === 'string')
+          e = {message: e};
         console.error('gateway-interface error')
         console.dir(e, {depth: null})
         let {message, data: errorData} = e;
