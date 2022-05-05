@@ -1,5 +1,13 @@
-const { axios, toBaseUnit, soliditySha3, BN, multiCall, groupBy, flatten } =
-  MuonAppUtils
+const {
+  axios,
+  toBaseUnit,
+  soliditySha3,
+  BN,
+  BNSqrt,
+  multiCall,
+  groupBy,
+  flatten
+} = MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -601,23 +609,26 @@ module.exports = {
   ) {
     let sumVolume = new BN('0')
 
-    let totalUSDA = reserveA
-    let totalUSDB = reserveB
+    let priceA, priceB
+    priceA = priceB = new BN(this.SCALE)
 
     if (pairs0.length) {
       const { price, volume } = _tokenVWAPResults[0]
-      totalUSDA = price.mul(reserveA).div(this.SCALE)
       sumVolume = sumVolume.add(volume)
+      priceA = price
     }
 
     if (pairs1.length) {
       const { price, volume } = _tokenVWAPResults[1]
-      totalUSDB = price.mul(reserveB).div(this.SCALE)
       sumVolume = sumVolume.add(volume)
+      priceB = price
     }
 
-    let totalUSD = totalUSDA.add(totalUSDB)
-    return { price: totalUSD.mul(this.SCALE).div(totalSupply), sumVolume }
+    let sqrtK = BNSqrt(reserveA.mul(reserveB))
+    let sqrtP = BNSqrt(priceA.mul(priceB))
+    const fairPrice = sqrtK.mul(sqrtP).mul(new BN('2')).div(totalSupply)
+
+    return { price: fairPrice, sumVolume }
   },
 
   LPTokenPrice: async function (token, pairs0, pairs1, chainId) {
