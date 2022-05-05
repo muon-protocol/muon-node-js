@@ -1,4 +1,4 @@
-const { axios, soliditySha3, ethCall } = MuonAppUtils
+const { axios, soliditySha3, ethCall, BN, toBaseUnit } = MuonAppUtils
 const web3 = require('web3');
 
 const CHAINS = {
@@ -18,7 +18,7 @@ const PRICE_TOLERANCE = '0.0005'
 module.exports = {
     APP_NAME: 'dei_price',
     // TODO
-    APP_ID: 100,
+    APP_ID: 25,
     REMOTE_CALL_TIMEOUT: 30000,
 
     isPriceToleranceOk: function (price, expectedPrice) {
@@ -55,7 +55,9 @@ module.exports = {
                     params: firebirdParams
                 })
                 const amountOut = maxReturn.totalTo
-                const price = BigInt(amountIn) * BigInt(1e12) * BigInt(1e18) / BigInt(amountOut)
+                const firebirdPrice = (new BN(amountIn)).mul(new BN(toBaseUnit('1', '12'))).mul(new BN(toBaseUnit('1', '18'))).div(new BN(amountOut));
+                const price = BN.max(firebirdPrice, new BN(toBaseUnit('0.94', '18')));
+        
                 return {
                     chain: chain,
                     amountIn: amountIn,
