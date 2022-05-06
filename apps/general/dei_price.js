@@ -12,13 +12,44 @@ const CHAINS = {
 }
 
 const ROUTER_API = 'https://router.firebird.finance'
-
 const PRICE_TOLERANCE = '0.0005'
+const ABI_POOLGATEWAY = []
+const poolGatewayAddress = ''
 
 module.exports = {
     APP_NAME: 'dei_price',
     APP_ID: 25,
     REMOTE_CALL_TIMEOUT: 30000,
+
+    getMarketDeiPrice: function (routerApi) {
+        const amountIn = new BN(1e18)
+        const firebirdParams = {
+            from: '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3',
+            to: '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75',
+            amount: String(amountIn),
+            dexes: "beethovenx,solidly,spiritswap,spookyswap"
+        }
+        const { data: { maxReturn } } = await axios.get(routerApi, {
+            headers: { 'Content-Type': 'application/json' },
+            params: firebirdParams
+        })
+        const amountOut = maxReturn.totalTo
+        const marketPrice = (new BN(amountOut)).mul(new BN(toBaseUnit('1', '12')));
+        return marketPrice
+    },
+
+    getPoolGatewayDiscount: function (chainId) {
+        let {
+            discount
+        } = await ethCall(
+            poolGatewayAddress,
+            'discountRate',
+            [],
+            ABI_POOLGATEWAY,
+            chainId
+        )
+        return new BN(discount)
+    },
 
     isPriceToleranceOk: function (price, expectedPrice) {
         let priceDiff = new BN(price).sub(new BN(expectedPrice)).abs()
@@ -41,6 +72,8 @@ module.exports = {
         switch (method) {
             case 'signature':
                 let { chain, amountIn } = params
+                if (!chain) throw { message: 'Invalid chain' }
+                if (!amountIn) throw { message: 'Invalid amount_in' }
                 const routerApi = `${ROUTER_API}/${chain}/route`
                 const firebirdParams = {
                     from: '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75',
@@ -54,13 +87,14 @@ module.exports = {
                 })
                 const amountOut = maxReturn.totalTo
                 const firebirdPrice = (new BN(amountIn)).mul(new BN(toBaseUnit('1', '12'))).mul(new BN(toBaseUnit('1', '18'))).div(new BN(amountOut));
-                const price = BN.max(firebirdPrice, new BN(toBaseUnit('0.94', '18')));
-        
+                const marketPrice = this.getMarketDeiPrice(routerApi)
+
+                const price = BN.max(firebirdPrice, marketPrice.add(this.getPoolGatewayDiscount(CHAINS[chain])), new BN(toBaseUnit('0.94', '18')));
+
                 return {
                     chain: chain,
                     amountIn: amountIn,
                     price: String(price)
-
                 }
 
 
