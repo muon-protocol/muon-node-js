@@ -162,6 +162,8 @@ module.exports = {
               amount1In
               amount0Out
               amount1Out
+              reserve0
+              reserve1
               timestamp
             }
           `
@@ -172,8 +174,8 @@ module.exports = {
                 first: 1000,
                 skip: ${skip},
                 where: {
-                  pair: "${pairAddr.toLowerCase()}"
-                  timestamp_gt: ${last30Min}
+                  pair: "${pairAddr.toLowerCase()}",
+                  timestamp_gt: ${last30Min},
                   timestamp_lt: ${currentTimestamp}
                 },
                 orderBy: timestamp,
@@ -183,6 +185,8 @@ module.exports = {
                 amount1In
                 amount0Out
                 amount1Out
+                reserve0
+                reserve1
                 timestamp
               }
               ${lastRowQuery}
@@ -310,7 +314,71 @@ module.exports = {
     return tokenTxs
   },
 
-  pairVWAP: async function (pair, index, exchange) {
+  tokenPrice: function (isStable, index, reserve0, reserve1) {
+    let [ reserveA, reserveB ] = index == 0 
+      ? [ reserve0, reserve1 ]
+      : [ reserve1, reserve0 ]
+    if(isStable)
+    {
+      let xy = this._k(reserve0, reserve1)
+      let y = reserveB.sub(
+        this._get_y(reserveA.add(this.SCALE), xy, reserveB)
+      )
+      return y
+    } else 
+    {
+      return reserveB.mul(this.SCALE).div(reserveA);
+    }
+  },
+
+  _k: function (x, y) {
+    let _a = x.mul(y).div(this.SCALE) // xy
+    let _b = (x.mul(x).div(this.SCALE)).add(y.mul(y).div(this.SCALE)) // x^2 + y^2
+    return _a.mul(_b).div(this.SCALE) // xy(x^2 + y^2) = x^3(y) + y^3(x)
+  },
+
+  _get_y: function (x0, xy, y) {
+    for(let i = 0; i < 255; i++)
+    {
+      let y_prev = y
+      let k = this._f(x0, y)
+      if(k.lt(xy))
+      {
+        let dy = (xy.sub(k)).mul(this.SCALE).div(this._d(x0, y))
+        y = y.add(dy)
+      } else {
+        let dy = (k.sub(xy)).mul(this.SCALE).div(this._d(x0, y))
+        y = y.sub(dy)
+      }
+      if(y.gt(y_prev))
+      {
+        if((y.sub(y_prev)).lte(new BN('1')))
+        {
+          return y
+        }
+      } else {
+        if((y_prev.sub(y)).lte(new BN('1')))
+        {
+          return y
+        }
+      }
+    }
+  },
+
+  _f: function (x0, y) { 
+    let x0y3 = x0.mul((y.mul(y).div(this.SCALE)).mul(y).div(this.SCALE)).div(this.SCALE)
+    let x03y = x0.mul(x0).div(this.SCALE).mul(x0).div(this.SCALE).mul(y).div(this.SCALE)
+    return x0y3.add(x03y)
+  },
+  
+  _d: function (x0, y) {
+    let y2 = y.mul(y).div(this.SCALE)
+    let x03 = x0.mul(x0).div(this.SCALE).mul(x0).div(this.SCALE)
+  
+    return x0.mul(new BN('3')).mul(y2).div(this.SCALE).add(x03)
+  },
+
+  pairVWAP: async function (pair, index, exchange, isStable) {
     const tokenTxs = await this.prepareTokenTx(pair, exchange)
     if (tokenTxs) {
       let sumWeightedPrice = new BN('0')
@@ -325,33 +393,23 @@ module.exports = {
         ) {
           continue
         }
-        let price = new BN('0')
+        let reserve0 = toBaseUnit(swap.reserve0, '18')
+        let reserve1 = toBaseUnit(swap.reserve1, '18')
+        let price = this.tokenPrice(isStable, index, reserve0, reserve1)
         let volume = new BN('0')
         switch (index) {
           case 0:
             if (swap.amount0In != 0) {
-              let amount0In = toBaseUnit(swap.amount0In, '18')
-              let amount1Out = toBaseUnit(swap.amount1Out, '18')
-              price = amount1Out.mul(this.SCALE).div(amount0In)
-              volume = amount0In
+              volume = toBaseUnit(swap.amount0In, '18')
             } else {
-              let amount1In = toBaseUnit(swap.amount1In, '18')
-              let amount0Out = toBaseUnit(swap.amount0Out, '18')
-              price = amount1In.mul(this.SCALE).div(amount0Out)
-              volume = amount0Out
+              volume = toBaseUnit(swap.amount0Out, '18')
             }
             break
           case 1:
             if (swap.amount0In != 0) {
-              let amount0In = toBaseUnit(swap.amount0In, '18')
-              let amount1Out = toBaseUnit(swap.amount1Out, '18')
-              price = amount0In.mul(this.SCALE).div(amount1Out)
-              volume = amount1Out
+              volume = toBaseUnit(swap.amount1Out, '18')
             } else {
-              let amount1In = toBaseUnit(swap.amount1In, '18')
-              let amount0Out = toBaseUnit(swap.amount0Out, '18')
-              price = amount0Out.mul(this.SCALE).div(amount1In)
-              volume = amount1In
+              volume = toBaseUnit(swap.amount1In, '18')
             }
             break
           default:
@@ -569,7 +627,7 @@ module.exports = {
       } else {
         throw { message: 'INVALID_PAIRS' }
       }
-      return this.pairVWAP(pair.address, index, pair.exchange)
+      return this.pairVWAP(pair.address, index, pair.exchange, currentMetadata.stable)
     })
   },
   calculatePriceToken: function (pairVWAPs, pairs) {
