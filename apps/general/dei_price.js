@@ -1,4 +1,4 @@
-const { axios, soliditySha3, ethCall } = MuonAppUtils
+const { axios, soliditySha3, ethCall, BN, toBaseUnit } = MuonAppUtils
 const web3 = require('web3');
 
 const CHAINS = {
@@ -11,14 +11,27 @@ const CHAINS = {
     heco: 128
 }
 
-const ROUTER_API = 'https://router.firebird.finance/'
+const ROUTER_API = 'https://router.firebird.finance'
+
+const PRICE_TOLERANCE = '0.0005'
 
 module.exports = {
     APP_NAME: 'dei_price',
-    // TODO
-    APP_ID: 9,
+    APP_ID: 25,
     REMOTE_CALL_TIMEOUT: 30000,
 
+    isPriceToleranceOk: function (price, expectedPrice) {
+        let priceDiff = new BN(price).sub(new BN(expectedPrice)).abs()
+
+        if (
+            new BN(priceDiff)
+                .div(new BN(expectedPrice))
+                .gt(toBaseUnit(PRICE_TOLERANCE, '18'))
+        ) {
+            return false
+        }
+        return true
+    },
     onRequest: async function (request) {
         let {
             method,
@@ -37,14 +50,17 @@ module.exports = {
                 }
                 const { data: { maxReturn } } = await axios.get(routerApi, {
                     headers: { 'Content-Type': 'application/json' },
-                    firebirdParams
+                    params: firebirdParams
                 })
-                const amountOut = maxReturn.totalTo.toBigInt()
-                const price = BigInt(amountIn) * BigInt(1e12) * BigInt(1e18) / amountOut
+                const amountOut = maxReturn.totalTo
+                const firebirdPrice = (new BN(amountIn)).mul(new BN(toBaseUnit('1', '12'))).mul(new BN(toBaseUnit('1', '18'))).div(new BN(amountOut));
+                const price = BN.max(firebirdPrice, new BN(toBaseUnit('0.94', '18')));
+        
                 return {
                     chain: chain,
                     amountIn: amountIn,
-                    price: price
+                    price: String(price)
+
                 }
 
 
@@ -62,10 +78,19 @@ module.exports = {
             case 'signature': {
                 let { price, chain, amountIn } = result
 
+                if (
+                    !this.isPriceToleranceOk(
+                        price,
+                        request.data.result.price
+                    )
+                ) {
+                    throw { message: 'Price threshold exceeded' }
+                }
+
                 return soliditySha3([
                     { type: 'uint32', value: this.APP_ID },
                     { type: 'uint256', value: String(amountIn) },
-                    { type: 'uint256', value: String(price) },
+                    { type: 'uint256', value: price },
                     { type: 'uint256', value: String(CHAINS[chain]) },
                     { type: 'uint256', value: request.data.timestamp }
                 ])

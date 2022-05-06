@@ -342,7 +342,7 @@ function schnorrHash(publicKey, msg) {
 function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
   let _sharedPrivateKey = BN.isBN(sharedPrivateKey) ? sharedPrivateKey : toBN(sharedPrivateKey);
   let e = toBN(schnorrHash(kPub, msg))
-  let s = sharedK.sub(_sharedPrivateKey.mul(e));
+  let s = sharedK.sub(_sharedPrivateKey.mul(e)).umod(curve.n);
   return {s, e}
 }
 

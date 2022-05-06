@@ -26,6 +26,7 @@ const CHAINS = {
 module.exports = {
     APP_NAME: 'synchronizer',
     APP_ID: 9,
+    REMOTE_CALL_TIMEOUT: 30000,
 
     onRequest: async function (request) {
         let {

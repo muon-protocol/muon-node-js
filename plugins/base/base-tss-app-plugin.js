@@ -18,7 +18,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     return tss.pub2addr(tssPlugin.tssKey.publicKey)
   }
 
-  async _onArrive(request){
+  async onFirstNodeRequestSucceed(request){
     let tssPlugin = this.muon.getPlugin(`tss-plugin`)
     if(!tssPlugin.isReady){
       throw {message: 'Tss not initialized'};
@@ -59,6 +59,11 @@ class BaseTssAppPlugin extends BaseAppPlugin {
           .then(this.__onRemoteSignRequest.bind(this))
           .catch(e => {
             // console.log('base-tss-app-plugin: on broadcast request error', e)
+            return this.__onRemoteSignRequest(null, {
+              request: request._id.toString(),
+              peerId: peer.id,
+              ...e
+            });
           })
       })
   }

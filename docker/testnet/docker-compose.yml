@@ -1,0 +1,28 @@
+version: '3'
+services:
+  muon_testnet:
+    container_name: muon_testnet
+    hostname: muon
+    restart: always
+    build:
+      context: .
+#      dockerfile: ./docker/testnet/Dockerfile
+    ports:
+      - '8080:8080'
+      - '5000:5000'
+    external_links:
+      - muon_mongo
+      - muon_redis
+    depends_on:
+      - muon_mongo
+      - muon_redis
+    environment:
+        - MONGO_HOST=muon_mongo
+        - REDIS_HOST=muon_redis
+  muon_mongo:
+    container_name: mongo
+    image: mongo
+    command: --quiet --logpath /dev/null
+  muon_redis:
+    container_name: redis
+    image: redis:6

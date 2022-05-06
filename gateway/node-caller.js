@@ -26,11 +26,11 @@ responseRedis.subscribe(GATEWAY_CALL_RESPONSE)
 responseRedis.on('message', (channel, message) => {
   if(channel === GATEWAY_CALL_RESPONSE){
     try {
-      let {responseId, response, error} = JSON.parse(message);
+      let {responseId, response, error, ...other} = JSON.parse(message);
       let callResult = calls[responseId]
       if(callResult) {
         if(error)
-          callResult.reject(error)
+          callResult.reject({error, ...other})
         else
           callResult.resolve(response)
       }

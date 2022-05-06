@@ -112,22 +112,19 @@ class BaseAppPlugin extends CallablePlugin {
     })
     let t1= Date.now()
 
-    // user apps cannot override _onArrive method
-    if(this._onArrive){
-      newRequest.data.init = await this._onArrive(newRequest);
-    }
-    // user apps can override onArrive method
     if(this.onArrive){
-      newRequest.data.init = {
-        ... newRequest.data.init,
-        ... await this.onArrive(clone(newRequest))
-      };
+      newRequest.data.init = await this.onArrive(clone(newRequest))
     }
     let t2 = Date.now()
 
     let result = await this.onRequest(clone(newRequest))
     newRequest.data.result = result
     let t3 = Date.now()
+
+    newRequest.data.init = {
+      ... newRequest.data.init,
+      ... await this.onFirstNodeRequestSucceed(clone(newRequest))
+    };
 
     let resultHash = this.hashRequestResult(newRequest, result)
     let memWrite = this.getMemWrite(newRequest, result)
@@ -180,6 +177,9 @@ class BaseAppPlugin extends CallablePlugin {
     }
 
     return requestData
+  }
+
+  async onFirstNodeRequestSucceed(request) {
   }
 
   /**
@@ -411,8 +411,20 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async __onRemoteSignRequest(data = {}) {
+  async __onRemoteSignRequest(data = {}, error) {
     // console.log('BaseAppPlugin.__onRemoteSignRequest', data)
+    if(error){
+      let collateralPlugin = this.muon.getPlugin('collateral');
+      let {peerId, request: requestId, ...otherParts} = error;
+      let request = this.requestManager.getRequest(requestId);
+      if(request) {
+        const owner = collateralPlugin.getPeerWallet(peerId);
+        if(owner) {
+          this.requestManager.addError(requestId, owner, otherParts);
+        }
+      }
+      return;
+    }
     try {
       let {sign, memWrite} = data;
       // let request = await Request.findOne({_id: sign.request})
