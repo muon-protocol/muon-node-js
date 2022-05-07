@@ -21,7 +21,7 @@ module.exports = {
     APP_ID: 25,
     REMOTE_CALL_TIMEOUT: 30000,
 
-    getMarketDeiPrice: function (routerApi) {
+    getMarketDeiPrice: async function (routerApi) {
         const amountIn = new BN(toBaseUnit('1', '18'))
         const firebirdParams = {
             from: '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3',
@@ -38,7 +38,7 @@ module.exports = {
         return marketPrice
     },
 
-    getPoolGatewayDiscount: function (chainId) {
+    getPoolGatewayDiscount: async function (chainId) {
         let {
             discount
         } = await ethCall(
@@ -87,9 +87,9 @@ module.exports = {
                 })
                 const amountOut = maxReturn.totalTo
                 const firebirdPrice = (new BN(amountIn)).mul(new BN(toBaseUnit('1', '12'))).mul(new BN(toBaseUnit('1', '18'))).div(new BN(amountOut));
-                const marketPrice = this.getMarketDeiPrice(routerApi)
+                const marketPrice = await this.getMarketDeiPrice(routerApi);
 
-                const price = BN.max(firebirdPrice, marketPrice.add(this.getPoolGatewayDiscount(CHAINS[chain])), new BN(toBaseUnit('0.94', '18')));
+                const price = BN.max(firebirdPrice, marketPrice.add(await this.getPoolGatewayDiscount(CHAINS[chain])), new BN(toBaseUnit('0.94', '18')));
 
                 return {
                     chain: chain,
