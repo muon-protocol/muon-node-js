@@ -315,66 +315,64 @@ module.exports = {
   },
 
   tokenPrice: function (isStable, index, reserve0, reserve1) {
-    let [ reserveA, reserveB ] = index == 0 
-      ? [ reserve0, reserve1 ]
-      : [ reserve1, reserve0 ]
-    if(isStable)
-    {
+    let [reserveA, reserveB] =
+      index == 0 ? [reserve0, reserve1] : [reserve1, reserve0]
+    if (isStable) {
       let xy = this._k(reserve0, reserve1)
-      let y = reserveB.sub(
-        this._get_y(reserveA.add(this.SCALE), xy, reserveB)
-      )
+      let y = reserveB.sub(this._get_y(reserveA.add(this.SCALE), xy, reserveB))
       return y
-    } else 
-    {
-      return reserveB.mul(this.SCALE).div(reserveA);
+    } else {
+      return reserveB.mul(this.SCALE).div(reserveA)
     }
   },
 
   _k: function (x, y) {
     let _a = x.mul(y).div(this.SCALE) // xy
-    let _b = (x.mul(x).div(this.SCALE)).add(y.mul(y).div(this.SCALE)) // x^2 + y^2
+    let _b = x.mul(x).div(this.SCALE).add(y.mul(y).div(this.SCALE)) // x^2 + y^2
     return _a.mul(_b).div(this.SCALE) // xy(x^2 + y^2) = x^3(y) + y^3(x)
   },
 
   _get_y: function (x0, xy, y) {
-    for(let i = 0; i < 255; i++)
-    {
+    for (let i = 0; i < 255; i++) {
       let y_prev = y
       let k = this._f(x0, y)
-      if(k.lt(xy))
-      {
-        let dy = (xy.sub(k)).mul(this.SCALE).div(this._d(x0, y))
+      if (k.lt(xy)) {
+        let dy = xy.sub(k).mul(this.SCALE).div(this._d(x0, y))
         y = y.add(dy)
       } else {
-        let dy = (k.sub(xy)).mul(this.SCALE).div(this._d(x0, y))
+        let dy = k.sub(xy).mul(this.SCALE).div(this._d(x0, y))
         y = y.sub(dy)
       }
-      if(y.gt(y_prev))
-      {
-        if((y.sub(y_prev)).lte(new BN('1')))
-        {
+      if (y.gt(y_prev)) {
+        if (y.sub(y_prev).lte(new BN('1'))) {
           return y
         }
       } else {
-        if((y_prev.sub(y)).lte(new BN('1')))
-        {
+        if (y_prev.sub(y).lte(new BN('1'))) {
           return y
         }
       }
     }
   },
 
-  _f: function (x0, y) { 
-    let x0y3 = x0.mul((y.mul(y).div(this.SCALE)).mul(y).div(this.SCALE)).div(this.SCALE)
-    let x03y = x0.mul(x0).div(this.SCALE).mul(x0).div(this.SCALE).mul(y).div(this.SCALE)
+  _f: function (x0, y) {
+    let x0y3 = x0
+      .mul(y.mul(y).div(this.SCALE).mul(y).div(this.SCALE))
+      .div(this.SCALE)
+    let x03y = x0
+      .mul(x0)
+      .div(this.SCALE)
+      .mul(x0)
+      .div(this.SCALE)
+      .mul(y)
+      .div(this.SCALE)
     return x0y3.add(x03y)
   },
-  
+
   _d: function (x0, y) {
     let y2 = y.mul(y).div(this.SCALE)
     let x03 = x0.mul(x0).div(this.SCALE).mul(x0).div(this.SCALE)
-  
+
     return x0.mul(new BN('3')).mul(y2).div(this.SCALE).add(x03)
   },
 
@@ -462,7 +460,7 @@ module.exports = {
           ],
           // TODO if it's possible remove pairIndex we need it in aggregate
           context: {
-            pairIndex: 0,
+            // pairIndex: 0,
             pair: item.address,
             exchange: item.exchange,
             chainId: item.chainId
@@ -551,7 +549,7 @@ module.exports = {
       return {
         reference: item.reference,
         pair: item.context.pair,
-        pairIndex: item.context.pairIndex,
+        // pairIndex: item.context.pairIndex,
         exchange: item.context.exchange,
         chainId: item.context.chainId,
         r0: reserves[0],
@@ -562,7 +560,6 @@ module.exports = {
         stable: stable ? stable[0] : false
       }
     })
-    // TODO double test to be sure stable is correct for different pairs
     return metadata
   },
 
@@ -627,7 +624,12 @@ module.exports = {
       } else {
         throw { message: 'INVALID_PAIRS' }
       }
-      return this.pairVWAP(pair.address, index, pair.exchange, currentMetadata.stable)
+      return this.pairVWAP(
+        pair.address,
+        index,
+        pair.exchange,
+        currentMetadata.stable
+      )
     })
   },
   calculatePriceToken: function (pairVWAPs, pairs) {
@@ -756,7 +758,7 @@ module.exports = {
         return {
           token: token,
           tokenPrice: price.toString(),
-          pairs: pairs,
+          // pairs: pairs,
           volume: volume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {}),
           ...(chainId ? { chainId } : {})
@@ -781,8 +783,8 @@ module.exports = {
         return {
           token: token,
           tokenPrice: price,
-          pairs0: pairs0,
-          pairs1: pairs1,
+          // pairs0: pairs0,
+          // pairs1: pairs1,
           volume: sumVolume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {}),
           ...(chainId ? { chainId } : {})
@@ -824,12 +826,12 @@ module.exports = {
         ) {
           throw { message: 'Price threshold exceeded' }
         }
-        let { token, pairs, chainId } = result
+        let { token, chainId } = result
 
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
-          { type: 'address[]', value: pairs },
+          // { type: 'address[]', value: pairs },
           ...(chainId ? [{ type: 'string', value: chainId }] : []),
           { type: 'uint256', value: request.data.result.tokenPrice },
           ...(hashVolume
@@ -849,13 +851,12 @@ module.exports = {
         ) {
           throw { message: 'Price threshold exceeded' }
         }
-        let { token, pairs0, pairs1, chainId } = result
-
+        let { token, chainId } = result
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
-          { type: 'address[]', value: pairs0 },
-          { type: 'address[]', value: pairs1 },
+          // { type: 'address[]', value: pairs0 },
+          // { type: 'address[]', value: pairs1 },
           ...(chainId ? [{ type: 'string', value: chainId }] : []),
           { type: 'uint256', value: request.data.result.tokenPrice },
           ...(hashVolume

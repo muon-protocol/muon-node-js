@@ -49,7 +49,7 @@ module.exports = {
               ...stableCall
             ],
             context: {
-              pairIndex: index,
+              // pairIndex: index,
               pair: item.address,
               exchange: item.exchange,
               chainId: item.chainId
