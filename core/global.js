@@ -1,3 +1,7 @@
+/**
+ * Libraries for import inside user Apps
+ */
+
 const axios = require('axios')
 const Web3 = require('web3')
 const web3Instance = new Web3()
