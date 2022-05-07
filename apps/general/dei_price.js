@@ -13,8 +13,8 @@ const CHAINS = {
 
 const ROUTER_API = 'https://router.firebird.finance'
 const PRICE_TOLERANCE = '0.0005'
-const ABI_POOLGATEWAY = []
-const poolGatewayAddress = ''
+const ABI_POOLGATEWAY = [{ "inputs": [], "name": "discountRate", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" }]
+const poolGatewayAddress = '0x2a6121808A4a0a6Be6B9a81c1F5A353BD987f9fb'
 
 module.exports = {
     APP_NAME: 'dei_price',
@@ -22,7 +22,7 @@ module.exports = {
     REMOTE_CALL_TIMEOUT: 30000,
 
     getMarketDeiPrice: function (routerApi) {
-        const amountIn = new BN(1e18)
+        const amountIn = new BN(toBaseUnit('1', '18'))
         const firebirdParams = {
             from: '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3',
             to: '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75',
