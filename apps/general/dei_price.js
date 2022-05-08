@@ -22,7 +22,7 @@ module.exports = {
     APP_ID: 25,
     REMOTE_CALL_TIMEOUT: 30000,
 
-    getFirebirdDeiPrice: function (routerApi) {
+    getFirebirdDeiPrice: async function (routerApi) {
         const amountIn = new BN(toBaseUnit('1', '21'))
         const firebirdParams = {
             from: '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3',
@@ -39,7 +39,7 @@ module.exports = {
         return marketPrice
     },
 
-    getParaDeiPrice: function (routerApi, chain) {
+    getParaDeiPrice: async function (routerApi, chain) {
         const amountIn = new BN(toBaseUnit('1', '21'))
         const params = {
             srcToken: '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3',
