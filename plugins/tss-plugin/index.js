@@ -65,13 +65,6 @@ class TssPlugin extends CallablePlugin {
 
   async onStart() {
     super.onStart();
-
-    // let broadcastChannel = this.BROADCAST_CHANNEL
-    // await this.muon.libp2p.pubsub.subscribe(broadcastChannel)
-    // this.muon.libp2p.pubsub.on(broadcastChannel, this.__onBroadcastReceived.bind(this))
-
-    // TODO: peer finding fail if immediately try to join group
-    // setTimeout(this.joinToGroup.bind(this), Math.floor(1000 * (15 + Math.random() * 5)))
     this.muon.once('peer', () => {
       console.log('first node connected ...')
       this.joinToGroup();
@@ -153,17 +146,6 @@ class TssPlugin extends CallablePlugin {
     // load party
     let party = Party.load(tssConfig.party);
     this.parties[party.id] = party
-    // while (true) {
-    //   try {
-    //     let peers = await this.getPartyPeers(party);
-    //     party.setPeers(peers);
-    //     // if(peers.filter(p => !!p).length >= party.t)
-    //     break;
-    //   } catch (e) {
-    //     console.log('TssPlugin.loadSavedTss', e)
-    //   }
-    //   await timeout(5000);
-    // }
 
     let _key = {
       ...tssConfig.key,
@@ -172,9 +154,7 @@ class TssPlugin extends CallablePlugin {
     }
     let key = DKey.load(party, _key)
     keysCache.set(key.id, key, 0);
-    // let party = new Party(_party.t, _party.max, _party.id)
-    // load distributed key
-    // console.dir({tssConfig}, {depth: null})
+
     this.tssParty = party;
     this.tssKey = key;
     this.isReady = true
@@ -182,21 +162,6 @@ class TssPlugin extends CallablePlugin {
   }
 
   async informEntrance() {
-    let {tssKey, tssParty} = this
-    // try {
-    //   Object.values(tssParty.onlinePartners)
-    //     .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
-    //     .map(p => {
-    //       if(!!p.peer) {
-    //         this.remoteCall(
-    //           p.peer,
-    //           RemoteMethods.informEntrance
-    //         ).catch(e => {})
-    //       }
-    //     })
-    // } catch (e) {
-    //   console.error('TssPlugin.informEntrance', e, e.stack)
-    // }
     for(let i=0 ; i<15 ; i++) {
       this.broadcast({
         type: MSG_TYPE_INFORM_ENTRANCE,
