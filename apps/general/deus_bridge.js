@@ -20,17 +20,17 @@ const ABI_getTransaction = [
 ]
 
 const confirmationBlock = {
-  polygon: 256,
+  polygon: 300,
   mumbai: 256,
   eth: 24,
   ropsten: 24,
   rinkeby: 24,
-  bsc: 30,
+  bsc: 32,
   bsctest: 30,
-  Avax: 24,
-  ftm: 6,
+  Avax: 32,
+  ftm: 32,
   ftmtest: 6,
-  arbitrum: 6,
+  arbitrum: 30,
   metis: 35
 }
 
