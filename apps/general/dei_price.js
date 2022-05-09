@@ -15,7 +15,7 @@ const FIREBIRD_ROUTER_API = 'https://router.firebird.finance'
 const PARA_ROUTER_API = 'https://api.paraswap.io/prices'
 const PRICE_TOLERANCE = '0.0005'
 const ABI_POOLGATEWAY = [{ "inputs": [], "name": "discountRate", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" }]
-const poolGatewayAddress = '0x2a6121808A4a0a6Be6B9a81c1F5A353BD987f9fb'
+const poolGatewayAddress = '0xF4344b1DF7885BEc369F9E0002570093Be948E04'
 
 module.exports = {
     APP_NAME: 'dei_price',
