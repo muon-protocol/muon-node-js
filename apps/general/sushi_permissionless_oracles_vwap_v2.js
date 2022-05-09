@@ -9,11 +9,13 @@ module.exports = {
 
   VALID_CHAINS: ['1', '137', '42161', '43114', '250', '56'],
 
-  prepareTokenTx: async function (pair, exchange) {
+  prepareTokenTx: async function (pair, exchange, start, end) {
     const tokenTxs = await this.getTokenTxs(
       pair,
       this.graphUrl[exchange][this.config.chainId],
-      this.graphDeploymentId[exchange][this.config.chainId]
+      this.graphDeploymentId[exchange][this.config.chainId],
+      start,
+      end
     )
     return tokenTxs
   }

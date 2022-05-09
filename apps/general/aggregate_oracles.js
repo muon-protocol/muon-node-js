@@ -61,10 +61,10 @@ module.exports = {
     return calls
   },
 
-  preparePromisePair: function (token, pairs, metadata) {
+  preparePromisePair: function (token, pairs, metadata, start, end) {
     return pairs.map((info) => {
       let inputToken = token
-      return this.makePromisePair(inputToken, info, metadata)
+      return this.makePromisePair(inputToken, info, metadata, start, end)
     })
   },
 

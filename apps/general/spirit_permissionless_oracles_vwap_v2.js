@@ -139,9 +139,10 @@ module.exports = {
     }
   ],
 
-  getTokenTxs: async function (pairAddr, graphUrl, deploymentID) {
-    let currentTimestamp = getTimestamp()
-    const last30Min = currentTimestamp - 1800
+  getTokenTxs: async function (pairAddr, graphUrl, deploymentID, start, end) {
+    const currentTimestamp = getTimestamp()
+    const timestamp_lt = end ? end : currentTimestamp
+    const timestamp_gt = start ? start : currentTimestamp - 1800
     let skip = 0
     let tokenTxs = []
     let queryIndex = 0
@@ -175,8 +176,8 @@ module.exports = {
                 skip: ${skip},
                 where: {
                   pair: "${pairAddr.toLowerCase()}",
-                  timestamp_gt: ${last30Min},
-                  timestamp_lt: ${currentTimestamp}
+                  timestamp_gt: ${timestamp_gt},
+                  timestamp_lt: ${timestamp_lt}
                 },
                 orderBy: timestamp,
                 orderDirection: desc
@@ -304,11 +305,13 @@ module.exports = {
     })
     return metadata
   },
-  prepareTokenTx: async function (pair, exchange) {
+  prepareTokenTx: async function (pair, exchange, start, end) {
     const tokenTxs = await this.getTokenTxs(
       pair,
       this.graphUrl[exchange],
-      this.graphDeploymentId[exchange]
+      this.graphDeploymentId[exchange],
+      start,
+      end
     )
 
     return tokenTxs
@@ -376,8 +379,8 @@ module.exports = {
     return x0.mul(new BN('3')).mul(y2).div(this.SCALE).add(x03)
   },
 
-  pairVWAP: async function (pair, index, exchange, isStable) {
-    const tokenTxs = await this.prepareTokenTx(pair, exchange)
+  pairVWAP: async function (pair, index, exchange, isStable, start, end) {
+    const tokenTxs = await this.prepareTokenTx(pair, exchange, start, end)
     if (tokenTxs) {
       let sumWeightedPrice = new BN('0')
       let sumVolume = new BN('0')
@@ -604,10 +607,10 @@ module.exports = {
     return metadata
   },
 
-  preparePromisePair: function (token, pairs, metadata) {
-    return this.makePromisePair(token, pairs, metadata)
+  preparePromisePair: function (token, pairs, metadata, start, end) {
+    return this.makePromisePair(token, pairs, metadata, start, end)
   },
-  makePromisePair: function (token, pairs, metadata) {
+  makePromisePair: function (token, pairs, metadata, start, end) {
     let inputToken = token
     return pairs.map((pair) => {
       let currentMetadata = metadata.find(
@@ -628,7 +631,9 @@ module.exports = {
         pair.address,
         index,
         pair.exchange,
-        currentMetadata.stable
+        currentMetadata.stable,
+        start,
+        end
       )
     })
   },
@@ -646,11 +651,17 @@ module.exports = {
     return { price, volume }
   },
 
-  tokenVWAP: async function (token, pairs, metadata) {
+  tokenVWAP: async function (token, pairs, metadata, start, end) {
     if (!metadata) {
       metadata = await this.prepareMetadataForTokenVWAP(pairs)
     }
-    let pairVWAPPromises = this.preparePromisePair(token, pairs, metadata)
+    let pairVWAPPromises = this.preparePromisePair(
+      token,
+      pairs,
+      metadata,
+      start,
+      end
+    )
 
     pairVWAPPromises = flatten(pairVWAPPromises)
     let pairVWAPs = await Promise.all(pairVWAPPromises)
@@ -691,7 +702,7 @@ module.exports = {
     return { price: fairPrice, sumVolume }
   },
 
-  LPTokenPrice: async function (token, pairs0, pairs1, chainId) {
+  LPTokenPrice: async function (token, pairs0, pairs1, chainId, start, end) {
     const contractCallContext = this.prepareCallContext(
       token,
       pairs0,
@@ -715,10 +726,10 @@ module.exports = {
 
       let _tokenVWAPResults = await Promise.all([
         pairs0.length
-          ? this.tokenVWAP(metadata.t0, pairs0, pairsMetadata)
+          ? this.tokenVWAP(metadata.t0, pairs0, pairsMetadata, start, end)
           : null,
         pairs1.length
-          ? this.tokenVWAP(metadata.t1, pairs1, pairsMetadata)
+          ? this.tokenVWAP(metadata.t1, pairs1, pairsMetadata, start, end)
           : null
       ])
 
@@ -746,7 +757,7 @@ module.exports = {
     switch (method) {
       case 'price':
         // Input validation or constraint
-        let { token, pairs, hashTimestamp, chainId } = params
+        let { token, pairs, hashTimestamp, chainId, start, end } = params
         // TODO do we need check valid chainId if yes whats the valid chain for aggregate
         if (chainId) {
           // if (!this.VALID_CHAINS.includes(chainId)) {
@@ -754,17 +765,26 @@ module.exports = {
           // }
           this.config = { ...this.config, chainId }
         }
-        let { price, volume } = await this.tokenVWAP(token, pairs)
+        let { price, volume } = await this.tokenVWAP(
+          token,
+          pairs,
+          null,
+          start,
+          end
+        )
         return {
           token: token,
           tokenPrice: price.toString(),
           // pairs: pairs,
           volume: volume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {}),
-          ...(chainId ? { chainId } : {})
+          ...(chainId ? { chainId } : {}),
+          ...(start ? { start } : {}),
+          ...(end ? { end } : {})
         }
       case 'lp_price': {
-        let { token, pairs0, pairs1, hashTimestamp, chainId } = params
+        let { token, pairs0, pairs1, hashTimestamp, chainId, start, end } =
+          params
 
         if (chainId) {
           // if (!this.VALID_CHAINS.includes(chainId)) {
@@ -777,7 +797,9 @@ module.exports = {
           token,
           pairs0,
           pairs1,
-          chainId
+          chainId,
+          start,
+          end
         )
 
         return {
@@ -787,7 +809,9 @@ module.exports = {
           // pairs1: pairs1,
           volume: sumVolume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {}),
-          ...(chainId ? { chainId } : {})
+          ...(chainId ? { chainId } : {}),
+          ...(start ? { start } : {}),
+          ...(end ? { end } : {})
         }
       }
 
@@ -826,13 +850,15 @@ module.exports = {
         ) {
           throw { message: 'Price threshold exceeded' }
         }
-        let { token, chainId } = result
+        let { token, chainId, start, end } = result
 
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
           // { type: 'address[]', value: pairs },
           ...(chainId ? [{ type: 'string', value: chainId }] : []),
+          ...(start ? [{ type: 'uint256', value: start }] : []),
+          ...(end ? [{ type: 'uint256', value: end }] : []),
           { type: 'uint256', value: request.data.result.tokenPrice },
           ...(hashVolume
             ? [{ type: 'uint256', value: request.data.result.volume }]
@@ -851,13 +877,15 @@ module.exports = {
         ) {
           throw { message: 'Price threshold exceeded' }
         }
-        let { token, chainId } = result
+        let { token, chainId, start, end } = result
         return soliditySha3([
           { type: 'uint32', value: this.APP_ID },
           { type: 'address', value: token },
           // { type: 'address[]', value: pairs0 },
           // { type: 'address[]', value: pairs1 },
           ...(chainId ? [{ type: 'string', value: chainId }] : []),
+          ...(start ? [{ type: 'uint256', value: start }] : []),
+          ...(end ? [{ type: 'uint256', value: end }] : []),
           { type: 'uint256', value: request.data.result.tokenPrice },
           ...(hashVolume
             ? [{ type: 'uint256', value: request.data.result.volume }]
