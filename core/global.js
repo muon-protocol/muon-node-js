@@ -5,6 +5,8 @@
 const axios = require('axios')
 const Web3 = require('web3')
 const web3Instance = new Web3()
+const { flatten, groupBy } = require('lodash')
+
 const { toBaseUnit } = require('../utils/crypto')
 const { timeout, floatToBN } = require('../utils/helpers')
 const util = require('ethereumjs-util')
@@ -28,6 +30,8 @@ function soliditySha3(params) {
 global.MuonAppUtils = {
   axios,
   Web3,
+  flatten,
+  groupBy,
   ws,
   timeout,
   BN: Web3.utils.BN,

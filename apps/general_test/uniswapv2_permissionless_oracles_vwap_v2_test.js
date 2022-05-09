@@ -1,12 +1,12 @@
 require('dotenv').config({ path: './dev-chain/dev-node-1.env' })
 require('../../core/global')
 const { dynamicExtend } = require('../../core/utils')
-const SpiritApp = dynamicExtend(
+const uniswapApp = dynamicExtend(
   class {},
-  require('../general/spirit_permissionless_oracles_vwap')
+  require('../general/uniswapv2_permissionless_oracles_vwap_v2')
 )
 
-const app = new SpiritApp()
+const app = new uniswapApp()
 
 const testLP = async () => {
   let method = 'lp_price'
@@ -15,9 +15,16 @@ const testLP = async () => {
       method,
       data: {
         params: {
-          token: '0xe7E90f5a767406efF87Fdad7EB07ef407922EC1D',
-          pairs0: '',
-          pairs1: '0xe7E90f5a767406efF87Fdad7EB07ef407922EC1D'
+          token: '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc',
+          chainId: 1,
+          pairs0: [],
+          pairs1: [
+            {
+              exchange: 'uniswap',
+              chainId: '1',
+              address: '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+            }
+          ]
         }
       }
     })
@@ -35,9 +42,14 @@ const testPrice = async () => {
       method,
       data: {
         params: {
-          token: '0xDE5ed76E7c05eC5e4572CfC88d1ACEA165109E44',
-          pairs:
-            '0x2599eba5fd1e49f294c76d034557948034d6c96e,0xe7e90f5a767406eff87fdad7eb07ef407922ec1d'
+          token: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+          pairs: [
+            {
+              exchange: 'uniswap',
+              chainId: '1',
+              address: '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+            }
+          ]
         }
       }
     })
