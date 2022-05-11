@@ -4,6 +4,7 @@
 
 const axios = require('axios')
 const Web3 = require('web3')
+const tron = require('../utils/tron')
 const web3Instance = new Web3()
 const { toBaseUnit } = require('../utils/crypto')
 const { timeout, floatToBN } = require('../utils/helpers')
@@ -28,6 +29,7 @@ function soliditySha3(params) {
 global.MuonAppUtils = {
   axios,
   Web3,
+  tron,
   ws,
   timeout,
   BN: Web3.utils.BN,
