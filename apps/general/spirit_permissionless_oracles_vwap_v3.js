@@ -515,7 +515,8 @@ module.exports = {
         pair
       )
       const latestBlock = await web3.eth.getBlockNumber()
-      let startBlock = latestBlock - 10000
+      let startBlock = latestBlock - 1000
+      console.log(startBlock)
       let events = await contract.getPastEvents('allEvents', {
         fromBlock: startBlock.toString(),
         toBlock: latestBlock.toString()
