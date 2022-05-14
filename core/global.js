@@ -4,6 +4,7 @@
 
 const axios = require('axios')
 const Web3 = require('web3')
+const tron = require('../utils/tron')
 const web3Instance = new Web3()
 const { flatten, groupBy } = require('lodash')
 
@@ -32,6 +33,7 @@ global.MuonAppUtils = {
   Web3,
   flatten,
   groupBy,
+  tron,
   ws,
   timeout,
   BN: Web3.utils.BN,
