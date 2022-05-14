@@ -160,8 +160,8 @@ class RemoteCall extends BasePlugin {
           if (!error)
             resultPromise.resolve(response)
           else {
-            console.log('remote side error', error);
-            resultPromise.reject(error)
+            // console.log('remote side error', error);
+            resultPromise.reject({...error, onRemoteSide: true})
           }
         }
         else{
@@ -195,7 +195,7 @@ class RemoteCall extends BasePlugin {
         if(!options?.silent) {
           console.error(`RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
         }
-        this.emit("error", {peerId: peer.id, method})
+        this.emit("error", {peerId: peer.id, method, onRemoteSide: e.onRemoteSide})
           .catch(e => {
             console.log("RemoteCall.call.error handler failed", e)
           })

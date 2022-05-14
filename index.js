@@ -3,7 +3,6 @@ const path = require('path');
 const fs = require('fs');
 const {dynamicExtend} = require('./core/utils')
 const BaseApp = require('./plugins/base/base-app-plugin')
-const BaseService = require('./plugins/base/base-service-plugin')
 const BaseTssApp = require('./plugins/base/base-tss-app-plugin')
 const Gateway = require('./gateway/index')
 require('./core/global')
@@ -29,7 +28,7 @@ function getEnvPlugins() {
 
 function getAppParent(app) {
   if (app.useTss === false) {
-    return app.isService ? BaseService : BaseApp
+    return BaseApp
   }
   return BaseTssApp;
 }
@@ -114,7 +113,6 @@ var muon;
         'collateral': [require('./plugins/collateral-info'), {}],
         'remote-call': [require('./plugins/remote-call'), {}],
         'gateway-interface': [require('./plugins/gateway-Interface'), {}],
-        'ping-pong': [require('./plugins/ping-pong'), {}],
         // 'gw-log': [require('./plugins/gateway-log'), {}],
         'content-verify': [require('./plugins/content-verify-plugin'), {}],
         'content': [require('./plugins/content-app'), {}],

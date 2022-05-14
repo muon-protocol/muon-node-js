@@ -1,7 +1,6 @@
 const { axios, soliditySha3, ethCall } = MuonAppUtils
 const web3 = require('web3');
 
-const OLD_SYNCHRONIZER_SERVER = 'https://oracle1.deus.finance'
 const SYNCHRONIZER_SERVER = 'https://oracle1.deus.finance'
 
 const MIN_RATIO = 10;
@@ -24,37 +23,6 @@ const CHAINS = {
     heco: 128
 }
 
-async function oldGetPrice(params) {
-    let { tokenId, action, chain, useMultiplier } = params
-
-    const address = web3.utils.toChecksumAddress(tokenId);
-
-    const currentTimestamp = Date.now() / 1000
-
-    const tokens = await axios
-        .get(`${OLD_SYNCHRONIZER_SERVER}/${chain}/signatures.json?timestamp=${currentTimestamp}`)
-        .then(({ data }) => data)
-
-    const timestamp = tokens['timestamp']
-    if (currentTimestamp - timestamp > 2.5 * 60) {
-        throw { message: 'Price is outdated' }
-    }
-
-    if (!(address in tokens)) {
-        throw { message: 'Unknown token address' }
-    }
-
-    const token = tokens[tokenId]
-
-    return {
-        price: token.price,
-        address: address,
-        action: action,
-        chain: chain,
-    }
-
-}
-
 module.exports = {
     APP_NAME: 'synchronizer',
     APP_ID: 9,
@@ -70,14 +38,10 @@ module.exports = {
             case 'signature':
                 let { tokenId, action, chain, id } = params
 
-                if (!id) return await oldGetPrice(params);
-
                 const address = web3.utils.toChecksumAddress(tokenId);
 
-                const currentTimestamp = Date.now() / 1000
-
                 const priceInfo = await axios
-                    .get(`${SYNCHRONIZER_SERVER}/v2/price?address=${address}&network=${chain}&id=${id}&timestamp=${currentTimestamp}`)
+                    .get(`${SYNCHRONIZER_SERVER}/v2/price?address=${address}&network=${chain}&id=${id}`)
                     .then(({ data }) => data)
 
                 if ('error' in priceInfo) {

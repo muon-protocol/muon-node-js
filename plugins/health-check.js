@@ -17,15 +17,16 @@ class HealthCheck extends CallablePlugin {
     this.muon.getPlugin('remote-call').on('error', this.onRemoteCallFailed.bind(this))
   }
 
-  async onRemoteCallFailed({peerId, method}) {
-    if(method === this.healthCheckEndpoint)
+  async onRemoteCallFailed({peerId, method, onRemoteSide=false}) {
+    // TODO: need more check
+    if(method === this.healthCheckEndpoint || onRemoteSide)
       return;
     let peerIdStr = peerId.toB58String()
     if(this.checkingTime[peerIdStr] && Date.now() - this.checkingTime[peerIdStr] < 30000) {
       return;
     }
 
-    console.log(`checking peer ${peerId.toB58String()} health ...`)
+    console.log(`checking peer ${peerId.toB58String()} health ...`, {peer: peerIdStr, method, onRemoteSide})
 
     this.checkingTime[peerIdStr] = Date.now();
 
@@ -38,12 +39,13 @@ class HealthCheck extends CallablePlugin {
       try {
         let response = await this.remoteCall(peer, RemoteMethods.CheckHealth, null, {silent: true})
         if (response === 'OK') {
+          console.log(`peer responded OK.`)
           return;
         }
       }catch (e) {}
       await timeout(5000)
     }
-    console.log(`trigger muon onDisconnect`);
+    console.log(`peer not responding. trigger muon onDisconnect`);
     await this.muon.onPeerDisconnect({remotePeer: peerId})
   }
 
