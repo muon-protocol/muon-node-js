@@ -1,7 +1,10 @@
 const { axios, toBaseUnit, soliditySha3, BN, multiCall, flatten, groupBy } =
   MuonAppUtils
 const SpriteVWAP = require('./spirit_permissionless_oracles_vwap_v2')
-
+const {
+  Info_ABI,
+  STABLE_EXCHANGES
+} = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
 const APP_CONFIG = {
   chainId: 250
 }
@@ -21,7 +24,7 @@ module.exports = {
       pair.forEach((item) => {
         if (!pairCache.includes(item.address)) {
           pairCache.push(item.address)
-          const stableCall = this.stableExchanges.includes(item.exchange)
+          const stableCall = STABLE_EXCHANGES.includes(item.exchange)
             ? [
                 {
                   reference: prefix + ':' + item.address,
@@ -32,7 +35,7 @@ module.exports = {
           calls.push({
             reference: prefix + '_' + item.exchange + ':' + item.address,
             contractAddress: item.address,
-            abi: this.Info_ABI,
+            abi: Info_ABI,
             calls: [
               {
                 reference: prefix + ':' + item.address,

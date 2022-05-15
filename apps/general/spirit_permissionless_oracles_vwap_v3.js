@@ -9,8 +9,18 @@ const {
   flatten
 } = MuonAppUtils
 const { getWeb3 } = require('../../utils/eth')
-const staticInfo = require('./dex_oracle_constants')
-
+const {
+  Info_ABI,
+  TOKEN,
+  TOTAL_SUPPLY,
+  PAIRS,
+  STABLE_EXCHANGES,
+  ERC20_TOTAL_SUPPLY_ABI,
+  ERC20_DECIMALS_ABI,
+  CHAINS_AVG_BLOCK_TIME,
+  CHAINS_BLOCK_COUNT_FOR_30_MINS,
+  EVENTS_ABI
+} = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
 const APP_CONFIG = {
@@ -18,17 +28,13 @@ const APP_CONFIG = {
 }
 
 module.exports = {
-  ...staticInfo,
   APP_NAME: 'spirit_permissionless_oracles_vwap_v3',
   APP_ID: 31,
   config: APP_CONFIG,
   // REMOTE_CALL_TIMEOUT: 60000,
   getEvents: async function (web3, pair, exchange) {
     try {
-      const contract = new web3.eth.Contract(
-        this.EVENTS_ABI[exchange],
-        pair
-      )
+      const contract = new web3.eth.Contract(EVENTS_ABI[exchange], pair)
       const latestBlock = await web3.eth.getBlockNumber()
       let startBlock = latestBlock - 1200
       console.log(startBlock)
@@ -46,46 +52,45 @@ module.exports = {
     let web3 = await getWeb3(chainId)
     let events = await this.getEvents(web3, pair, exchange)
     let result = []
-    if(!events.length) {
+    if (!events.length) {
       throw { message: 'NO_EVENTS_EXIST' }
     }
-    const firstBlockNumber = events[events.length-1].blockNumber
+    const firstBlockNumber = events[events.length - 1].blockNumber
     const firstBlock = await web3.eth.getBlock(firstBlockNumber)
     const firstBlockTimestamp = firstBlock.timestamp
-    await Promise.all(events.map(async (item, i) => {
-      if(item.event == 'Swap')
-      {
-        //TODO: what's meant by 'removed'?
-        const sync = events[i-1]
-        if(
-          i == 0 ||
-          !sync ||
-          sync.event != 'Sync' ||
-          item.blockNumber != sync.blockNumber ||
-          item.transactionHash != sync.transactionHash ||
-          item.logIndex != sync.logIndex + 1
-        )
-        {
-          throw { message: "SYNC_EVENT_NOT_FOUND" }
-        }
-        let timestamp = Math.floor(
-          firstBlockTimestamp + (
-            (item.blockNumber-firstBlockNumber)*this.CHAINS_AVG_BLOCK_TIME[chainId]
+    await Promise.all(
+      events.map(async (item, i) => {
+        if (item.event == 'Swap') {
+          //TODO: what's meant by 'removed'?
+          const sync = events[i - 1]
+          if (
+            i == 0 ||
+            !sync ||
+            sync.event != 'Sync' ||
+            item.blockNumber != sync.blockNumber ||
+            item.transactionHash != sync.transactionHash ||
+            item.logIndex != sync.logIndex + 1
+          ) {
+            throw { message: 'SYNC_EVENT_NOT_FOUND' }
+          }
+          let timestamp = Math.floor(
+            firstBlockTimestamp +
+              (item.blockNumber - firstBlockNumber) *
+                CHAINS_AVG_BLOCK_TIME[chainId]
           )
-        )
-        result.push({
-          blockNumber: item.blockNumber,
-          transactionHash: item.transactionHash,
-          amount0In: item.returnValues.amount0In,
-          amount1In: item.returnValues.amount1In,
-          amount0Out: item.returnValues.amount0Out,
-          amount1Out: item.returnValues.amount1Out,
-          reserve0: sync.returnValues.reserve0,
-          reserve1: sync.returnValues.reserve1,
-          timestamp: timestamp
-        })
-      }
-    })
+          result.push({
+            blockNumber: item.blockNumber,
+            transactionHash: item.transactionHash,
+            amount0In: item.returnValues.amount0In,
+            amount1In: item.returnValues.amount1In,
+            amount0Out: item.returnValues.amount0Out,
+            amount1Out: item.returnValues.amount1Out,
+            reserve0: sync.returnValues.reserve0,
+            reserve1: sync.returnValues.reserve1,
+            timestamp: timestamp
+          })
+        }
+      })
     )
     return result
   },
@@ -103,7 +108,7 @@ module.exports = {
       {
         reference: prefix + ':' + 't0' + ':' + item.t0,
         contractAddress: item.t0,
-        abi: this.ERC20_DECIMALS_ABI,
+        abi: ERC20_DECIMALS_ABI,
         calls: [
           {
             reference: 't0' + ':' + item.t0,
@@ -118,7 +123,7 @@ module.exports = {
       {
         reference: prefix + ':' + 't1' + ':' + item.t1,
         contractAddress: item.t1,
-        abi: this.ERC20_DECIMALS_ABI,
+        abi: ERC20_DECIMALS_ABI,
         calls: [
           {
             reference: 't1' + ':' + item.t1,
@@ -163,11 +168,7 @@ module.exports = {
     return metadata
   },
   prepareTokenTx: async function (pair, exchange, chainId, start, end) {
-    const tokenTxs = await this.getTokenTxs(
-      pair,
-      exchange,
-      chainId
-    )
+    const tokenTxs = await this.getTokenTxs(pair, exchange, chainId)
 
     return tokenTxs
   },
@@ -234,8 +235,22 @@ module.exports = {
     return x0.mul(new BN('3')).mul(y2).div(this.SCALE).add(x03)
   },
 
-  pairVWAP: async function (pair, index, exchange, chainId, metadata, start, end) {
-    const tokenTxs = await this.prepareTokenTx(pair, exchange, chainId, start, end)
+  pairVWAP: async function (
+    pair,
+    index,
+    exchange,
+    chainId,
+    metadata,
+    start,
+    end
+  ) {
+    const tokenTxs = await this.prepareTokenTx(
+      pair,
+      exchange,
+      chainId,
+      start,
+      end
+    )
     if (tokenTxs) {
       let sumWeightedPrice = new BN('0')
       let sumVolume = new BN('0')
@@ -291,7 +306,7 @@ module.exports = {
     pair.forEach((item) => {
       if (!pairCache.includes(item.address)) {
         pairCache.push(item.address)
-        const stableCall = this.stableExchanges.includes(item.exchange)
+        const stableCall = STABLE_EXCHANGES.includes(item.exchange)
           ? [
               {
                 reference: prefix + ':' + item.address,
@@ -302,7 +317,7 @@ module.exports = {
         calls.push({
           reference: prefix + '_' + item.exchange + ':' + item.address,
           contractAddress: item.address,
-          abi: this.Info_ABI,
+          abi: Info_ABI,
           calls: [
             {
               reference: prefix + ':' + item.address,
@@ -335,20 +350,20 @@ module.exports = {
   prepareCallContext: function (token, pairs0, pairs1, chainId) {
     const contractCallContextToken = [
       {
-        reference: this.TOKEN + '_' + ':' + token,
+        reference: TOKEN + '_' + ':' + token,
         contractAddress: token,
-        abi: this.Info_ABI,
+        abi: Info_ABI,
         calls: [
           {
-            reference: this.TOKEN + ':' + token,
+            reference: TOKEN + ':' + token,
             methodName: 'getReserves'
           },
           {
-            reference: this.TOKEN + ':' + token,
+            reference: TOKEN + ':' + token,
             methodName: 'token0'
           },
           {
-            reference: this.TOKEN + ':' + token,
+            reference: TOKEN + ':' + token,
             methodName: 'token1'
           }
         ],
@@ -359,12 +374,12 @@ module.exports = {
     ]
     const contractCallContextSupply = [
       {
-        reference: this.TOTAL_SUPPLY,
+        reference: TOTAL_SUPPLY,
         contractAddress: token,
-        abi: this.ERC20_TOTAL_SUPPLY_ABI,
+        abi: ERC20_TOTAL_SUPPLY_ABI,
         calls: [
           {
-            reference: this.TOTAL_SUPPLY,
+            reference: TOTAL_SUPPLY,
             methodName: 'totalSupply'
           }
         ],
@@ -376,7 +391,7 @@ module.exports = {
 
     const contractCallContextPairs = this.makeCallContextInfo(
       [...pairs0, ...pairs1],
-      this.PAIRS
+      PAIRS
     )
 
     return [
@@ -424,17 +439,11 @@ module.exports = {
   },
 
   prepareData: async function (multiCallResult) {
-    let metadata = this.getMetadata(multiCallResult, this.TOKEN)
-    let pairsMetadata = this.getMetadata(multiCallResult, this.PAIRS)
-    const callContextDecimalToken = this.makeCallContextDecimal(
-      metadata,
-      this.TOKEN
-    )
+    let metadata = this.getMetadata(multiCallResult, TOKEN)
+    let pairsMetadata = this.getMetadata(multiCallResult, PAIRS)
+    const callContextDecimalToken = this.makeCallContextDecimal(metadata, TOKEN)
 
-    let callContextPairs = this.makeCallContextDecimal(
-      pairsMetadata,
-      this.PAIRS
-    )
+    let callContextPairs = this.makeCallContextDecimal(pairsMetadata, PAIRS)
 
     const contractCallContextDecimal = [
       ...callContextDecimalToken,
@@ -442,25 +451,21 @@ module.exports = {
     ]
     let resultDecimals = await this.runMultiCall(contractCallContextDecimal)
 
-    metadata = this.getFinalMetaData(resultDecimals, metadata, this.TOKEN)[0]
-    pairsMetadata = this.getFinalMetaData(
-      resultDecimals,
-      pairsMetadata,
-      this.PAIRS
-    )
+    metadata = this.getFinalMetaData(resultDecimals, metadata, TOKEN)[0]
+    pairsMetadata = this.getFinalMetaData(resultDecimals, pairsMetadata, PAIRS)
 
     return { metadata, pairsMetadata }
   },
 
   prepareMetadataForTokenVWAP: async function (pairs) {
-    const contractCallContext = this.makeCallContextInfo(pairs, this.PAIRS)
+    const contractCallContext = this.makeCallContextInfo(pairs, PAIRS)
     let result = await this.runMultiCall(contractCallContext)
 
-    let metadata = this.getMetadata(result, this.PAIRS)
+    let metadata = this.getMetadata(result, PAIRS)
 
-    let callContextPairs = this.makeCallContextDecimal(metadata, this.PAIRS)
+    let callContextPairs = this.makeCallContextDecimal(metadata, PAIRS)
     let resultDecimals = await this.runMultiCall(callContextPairs)
-    metadata = this.getFinalMetaData(resultDecimals, metadata, this.PAIRS)
+    metadata = this.getFinalMetaData(resultDecimals, metadata, PAIRS)
     return metadata
   },
 
@@ -472,8 +477,7 @@ module.exports = {
     return pairs.map((pair) => {
       let currentMetadata = metadata.find(
         (item) =>
-          item.reference ===
-          this.PAIRS + '_' + pair.exchange + ':' + pair.address
+          item.reference === PAIRS + '_' + pair.exchange + ':' + pair.address
       )
       let index =
         inputToken.toLowerCase() == currentMetadata.t0.toLowerCase() ? 0 : 1
@@ -570,7 +574,7 @@ module.exports = {
     let result = await this.runMultiCall(contractCallContext)
     if (result) {
       const { metadata, pairsMetadata } = await this.prepareData(result)
-      let totalSupply = this.getInfoContract(result, this.TOTAL_SUPPLY)[0]
+      let totalSupply = this.getInfoContract(result, TOTAL_SUPPLY)[0]
         .callsReturnContext
       totalSupply = new BN(totalSupply[0].returnValues[0])
 
