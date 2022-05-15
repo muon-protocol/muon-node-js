@@ -8,7 +8,7 @@ const RemoteMethods = {
 
 @remoteApp
 class HealthCheck extends CallablePlugin {
-
+  APP_NAME="health"
   healthCheckEndpoint = null;
   checkingTime = {}
 
@@ -49,8 +49,36 @@ class HealthCheck extends CallablePlugin {
     await this.muon.onPeerDisconnect({remotePeer: peerId})
   }
 
+  @gatewayMethod("list-nodes")
+  async _onListNodes(data){
+    let tssPlugin = this.muon.getPlugin('tss-plugin')
+
+    let partners = Object.values(tssPlugin.tssParty.partners)
+      .filter(({peer, wallet}) => (!!peer && wallet !== process.env.SIGN_WALLET_ADDRESS))
+
+    let result = {
+      [process.env.SIGN_WALLET_ADDRESS]: "CURRENT"
+    }
+
+    const peerList = partners.map(({peer}) => peer)
+
+    let calls = peerList.map(peer => {
+      return this.remoteCall(peer, RemoteMethods.CheckHealth, {log: true})
+        .catch(e => null)
+    });
+    let responses = await Promise.all(calls)
+
+    for(let i=0 ; i<responses.length ; i++){
+      result[partners[i].wallet] = responses[i];
+    }
+
+    return result;
+  }
+
   @remoteMethod(RemoteMethods.CheckHealth)
-  async _onHealthCheck() {
+  async _onHealthCheck(data={}) {
+    if(data.log)
+      console.log(`===== HealthCheck._onHealthCheck =====`, Date.now());
     return "OK"
   }
 }
