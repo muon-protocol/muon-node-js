@@ -72,8 +72,8 @@ const createEnv = async () => {
   MUON_PLUGINS = ''\n
   MUON_CUSTOM_APPS = "tss-test|sample"
   `
-  if(!fs.existsSync('./dev-chain/')) {
-    fs.mkdirSync('./dev-chain/');
+  if (!fs.existsSync('./dev-chain/')) {
+    fs.mkdirSync('./dev-chain/')
   }
   fs.writeFileSync('./dev-chain/dev-node-1.env', env1)
   console.log(emoji.get('o'), 'Node-1 Ethereum Address: ', accountEnv1.address)
@@ -145,13 +145,17 @@ const createEnv = async () => {
 
   /***** Create Other net.conf.json ******/
 
-  let netConf = JSON.stringify({
-    tss: {
-      threshold: node_n,
-      max: 20
+  let netConf = JSON.stringify(
+    {
+      tss: {
+        threshold: node_n,
+        max: 20
+      },
+      collateralWallets
     },
-    collateralWallets
-  }, null, 2)
+    null,
+    2
+  )
 
   fs.writeFileSync(`./config/global/net.conf.json`, netConf)
   console.log(emoji.get('o'), `net.conf.json is created`)

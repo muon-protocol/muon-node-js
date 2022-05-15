@@ -32,6 +32,10 @@ module.exports = {
   APP_ID: 31,
   config: APP_CONFIG,
   // REMOTE_CALL_TIMEOUT: 60000,
+  SCALE: new BN('1000000000000000000'),
+  PRICE_TOLERANCE: '0.05',
+  VALID_CHAINS: ['250'],
+
   getEvents: async function (web3, pair, exchange) {
     try {
       const contract = new web3.eth.Contract(EVENTS_ABI[exchange], pair)
