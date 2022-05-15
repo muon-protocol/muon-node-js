@@ -19,7 +19,8 @@ const {
   ERC20_DECIMALS_ABI,
   CHAINS_AVG_BLOCK_TIME,
   CHAINS_BLOCK_COUNT_FOR_30_MINS,
-  EVENTS_ABI
+  EVENTS_ABI,
+  EVENT_TOPICS
 } = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -44,7 +45,10 @@ module.exports = {
       console.log(startBlock)
       let events = await contract.getPastEvents('allEvents', {
         fromBlock: startBlock.toString(),
-        toBlock: latestBlock.toString()
+        toBlock: latestBlock.toString(),
+        topics: [
+          EVENT_TOPICS[exchange]
+        ]
       })
       return events
     } catch (error) {
