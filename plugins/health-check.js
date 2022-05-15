@@ -77,7 +77,7 @@ class HealthCheck extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.CheckHealth)
   async _onHealthCheck(data={}) {
-    if(data.log)
+    if(data?.log)
       console.log(`===== HealthCheck._onHealthCheck =====`, Date.now());
     return "OK"
   }
