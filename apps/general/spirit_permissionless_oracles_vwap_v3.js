@@ -68,8 +68,7 @@ module.exports = {
     const firstBlockTimestamp = firstBlock.timestamp
     await Promise.all(
       events.map(async (item, i) => {
-        if (item.event == 'Swap') {
-          //TODO: what's meant by 'removed'?
+        if (item.event == 'Swap' && !item.removed) {
           const sync = events[i - 1]
           if (
             i == 0 ||
