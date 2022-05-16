@@ -1,19 +1,14 @@
-const { axios, toBaseUnit, soliditySha3, ethCall, BN, multiCall } = MuonAppUtils
-const web3 = require('web3');
-
-// on chain spooky
-// index is spooky
-// + spirit
+const { axios, toBaseUnit, soliditySha3, ethCall, BN } = MuonAppUtils
 
 const SPOOKY_SUBGRAPH = 'https://api.thegraph.com/subgraphs/name/vahid-dev/deus-price-spooky'
-const SPIRIT_SUBGRAPH = 'https://api.thegraph.com/subgraphs/id/QmVQ36GkyZpdEjH33wnVw2Y2GJFhvExe2EJ3RVFpFegB7u'
+const SPIRIT_SUBGRAPH = 'https://api.thegraph.com/subgraphs/name/vahid-dev/deus-price-spirit'
 
 const TELORANCE = 0.10;
 
-const TIME = 8 * 60 * 60; // seconds
+const TIME = 12 * 60 * 60; // seconds
 
-function getQuery(timestamp) {
-    const toTimestamp = timestamp;
+function getQuery() {
+    const toTimestamp = new Date().getTime() / 1000;
     const fromTimestamp = toTimestamp - TIME;
 
     const query = `{
@@ -57,15 +52,22 @@ function getQuery(timestamp) {
     return query
 }
 
-async function getSubgraphPrice(subgraphUrl, timestamp) {
+async function getSubgraphPrice(subgraphUrl) {
     const {
         data: { data }
     } = await axios.post(subgraphUrl, {
-        query: getQuery(timestamp)
+        query: getQuery()
     })
 
     const lastPrice = new BN(data.pricePoints[0].priceDeusUsdc);
-    const lastFactor = new BN((+((new Date().getTime() / 1000).toFixed(0)) - +data.pricePoints[0].timestamp) * (+data.pricePoints[0].id + 1));
+    const lastFactor = new BN(
+        (
+            +((new Date().getTime() / 1000).toFixed(0)) -
+            +data.pricePoints[0].timestamp
+        ) * (
+            +data.pricePoints[0].id + 1
+        )
+    );
 
     const numerator = (new BN(data.pointB[0].numerator)).sub(new BN(data.pointA[0].numerator)).add(lastPrice.mul(lastFactor))
     const denominator = (new BN(data.pointB[0].denominator)).sub(new BN(data.pointA[0].denominator)).add(lastFactor);
@@ -107,11 +109,11 @@ function isPriceToleranceOk(spookyPrice, spiritPrice, spookyOnChainPrice) {
     spiritPrice = new BN(spiritPrice);
     spookyOnChainPrice = new BN(spookyOnChainPrice);
 
-    if (spookyPrice.sub(spiritPrice).div(spookyPrice) > TELORANCE) {
+    if (spookyPrice.sub(spiritPrice).abs().div(spookyPrice) > TELORANCE) {
         return false
     }
 
-    if (spookyPrice.sub(spookyOnChainPrice).div(spookyPrice) > TELORANCE) {
+    if (spookyPrice.sub(spookyOnChainPrice).abs().div(spookyPrice) > TELORANCE) {
         return false
     }
 
@@ -130,17 +132,16 @@ module.exports = {
 
         switch (method) {
             case 'price':
-                const { timestamp } = params;
-
-                const spookyPrice = await getSubgraphPrice(SPOOKY_SUBGRAPH, timestamp)
-                const spiritPrice = await getSubgraphPrice(SPIRIT_SUBGRAPH, timestamp)
-                const spookyOnChainPrice = await getSpookyOnChainPrice();
+                const prices = await Promise.all([
+                    getSubgraphPrice(SPOOKY_SUBGRAPH),
+                    getSubgraphPrice(SPIRIT_SUBGRAPH),
+                    getSpookyOnChainPrice()
+                ])
 
                 return {
-                    timestamp: timestamp,
-                    a: spookyPrice.toString(),
-                    b: spiritPrice.toString(),
-                    c: spookyOnChainPrice.toString()
+                    a: prices[0].toString(),
+                    b: prices[1].toString(),
+                    c: prices[2].toString()
                 }
 
             default:
@@ -155,7 +156,7 @@ module.exports = {
         } = request
         switch (method) {
             case 'price': {
-                const { timestamp, a, b, c } = result
+                const { a, b, c } = result
 
                 if (!isPriceToleranceOk(request.data.result.a, b, c)) {
                     throw { message: 'Price threshold exceeded' }
@@ -163,8 +164,7 @@ module.exports = {
 
                 return soliditySha3([
                     { type: 'uint32', value: this.APP_ID },
-                    { type: 'uint256', value: timestamp },
-                    { type: 'uint256', value: request.data.result.a},
+                    { type: 'uint256', value: request.data.result.a },
                 ])
 
             }
