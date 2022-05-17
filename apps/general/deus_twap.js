@@ -7,15 +7,15 @@ const TELORANCE = 0.10;
 
 const TIME = 12 * 60 * 60; // seconds
 
-function getQuery() {
-    const toTimestamp = new Date().getTime() / 1000;
+function getQuery(timestamp) {
+    const toTimestamp = timestamp;
     const fromTimestamp = toTimestamp - TIME;
 
     const query = `{
         pointA: twapPoints(
             first: 1,
             where: {
-                timestamp_lte: ${fromTimestamp.toFixed(0)}
+                timestamp_lte: ${fromTimestamp}
             },
             orderBy: timestamp,
             orderDirection: desc
@@ -27,7 +27,7 @@ function getQuery() {
         pointB: twapPoints(
             first: 1,
             where: {
-                timestamp_lte: ${toTimestamp.toFixed(0)}
+                timestamp_lte: ${toTimestamp}
             },
             orderBy: timestamp,
             orderDirection: desc
@@ -52,17 +52,17 @@ function getQuery() {
     return query
 }
 
-async function getSubgraphPrice(subgraphUrl) {
+async function getSubgraphPrice(subgraphUrl, timestamp) {
     const {
         data: { data }
     } = await axios.post(subgraphUrl, {
-        query: getQuery()
+        query: getQuery(timestamp)
     })
 
     const lastPrice = new BN(data.pricePoints[0].priceDeusUsdc);
     const lastFactor = new BN(
         (
-            +((new Date().getTime() / 1000).toFixed(0)) -
+            timestamp -
             +data.pricePoints[0].timestamp
         ) * (
             +data.pricePoints[0].id + 1
@@ -104,16 +104,21 @@ async function getSpookyOnChainPrice() {
 }
 
 
-function isPriceToleranceOk(spookyPrice, spiritPrice, spookyOnChainPrice) {
+function isPriceToleranceOk(firstPrice, spookyPrice, spiritPrice, spookyOnChainPrice, timestamp) {
+    firstPrice = new BN(spookyPrice);
     spookyPrice = new BN(spookyPrice);
     spiritPrice = new BN(spiritPrice);
     spookyOnChainPrice = new BN(spookyOnChainPrice);
 
-    if (spookyPrice.sub(spiritPrice).abs().div(spookyPrice) > TELORANCE) {
+    if (firstPrice.sub(spookyPrice).abs().div(firstPrice) > TELORANCE) {
         return false
     }
 
-    if (spookyPrice.sub(spookyOnChainPrice).abs().div(spookyPrice) > TELORANCE) {
+    if (firstPrice.sub(spiritPrice).abs().div(firstPrice) > TELORANCE) {
+        return false
+    }
+
+    if (firstPrice.sub(spookyOnChainPrice).abs().div(firstPrice) > TELORANCE) {
         return false
     }
 
@@ -132,16 +137,19 @@ module.exports = {
 
         switch (method) {
             case 'price':
+                const timestamp = (new Date().getTime() / 1000).toFixed(0);
+
                 const prices = await Promise.all([
-                    getSubgraphPrice(SPOOKY_SUBGRAPH),
-                    getSubgraphPrice(SPIRIT_SUBGRAPH),
+                    getSubgraphPrice(SPOOKY_SUBGRAPH, timestamp),
+                    getSubgraphPrice(SPIRIT_SUBGRAPH, timestamp),
                     getSpookyOnChainPrice()
                 ])
 
                 return {
                     a: prices[0].toString(),
                     b: prices[1].toString(),
-                    c: prices[2].toString()
+                    c: prices[2].toString(),
+                    timestamp
                 }
 
             default:
@@ -156,15 +164,16 @@ module.exports = {
         } = request
         switch (method) {
             case 'price': {
-                const { a, b, c } = result
+                const { a, b, c, timestamp } = result
 
-                if (!isPriceToleranceOk(request.data.result.a, b, c)) {
+                if (!isPriceToleranceOk(request.data.result.a, a, b, c, timestamp)) {
                     throw { message: 'Price threshold exceeded' }
                 }
 
                 return soliditySha3([
                     { type: 'uint32', value: this.APP_ID },
                     { type: 'uint256', value: request.data.result.a },
+                    { type: 'uint256', value: request.data.result.timestamp },
                 ])
 
             }
