@@ -104,7 +104,7 @@ async function getSpookyOnChainPrice() {
 }
 
 
-function isPriceToleranceOk(firstPrice, spookyPrice, spiritPrice, spookyOnChainPrice, timestamp) {
+function isPriceToleranceOk(firstPrice, spookyPrice, spiritPrice, spookyOnChainPrice) {
     firstPrice = new BN(spookyPrice);
     spookyPrice = new BN(spookyPrice);
     spiritPrice = new BN(spiritPrice);
@@ -164,17 +164,19 @@ module.exports = {
         } = request
         switch (method) {
             case 'price': {
-                const { a, b, c, timestamp } = result
+                const { a, b, c } = result
 
-                if (!isPriceToleranceOk(request.data.result.a, a, b, c, timestamp)) {
+                if (!isPriceToleranceOk(request.data.result.a, a, b, c)) {
                     throw { message: 'Price threshold exceeded' }
                 }
 
-                return soliditySha3([
+                const res = soliditySha3([
                     { type: 'uint32', value: this.APP_ID },
                     { type: 'uint256', value: request.data.result.a },
-                    { type: 'uint256', value: request.data.result.timestamp },
+                    { type: 'uint256', value: request.data.result.timestamp }
                 ])
+
+                return res;
 
             }
             default:
