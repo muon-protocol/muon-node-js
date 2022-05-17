@@ -1,6 +1,10 @@
 const CallablePlugin = require('./base/callable-plugin')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 const {timeout} = require('../utils/helpers')
+const OS = require('os')
+const util = require('util');
+const shellExec = util.promisify(require('child_process').exec);
+
 
 const RemoteMethods = {
   CheckHealth: 'check-health',
@@ -38,7 +42,7 @@ class HealthCheck extends CallablePlugin {
     for (let i = 0; i < 3; i++) {
       try {
         let response = await this.remoteCall(peer, RemoteMethods.CheckHealth, null, {silent: true})
-        if (response === 'OK') {
+        if (response?.status === 'OK') {
           console.log(`peer responded OK.`)
           return;
         }
@@ -49,6 +53,18 @@ class HealthCheck extends CallablePlugin {
     await this.muon.onPeerDisconnect({remotePeer: peerId})
   }
 
+  async getNodeStatus(){
+    const {stdout: uptimeStdOut, stderr: uptimeStdErr} = await shellExec('uptime');
+    const {stdout: freeStdOut, stderr: freeStdErr} = await shellExec('free');
+
+    const freeCols = freeStdOut.split("\n")[1].split(' ').filter(i => !!i)
+    return {
+      numCpus: OS.cpus().length,
+      loadAvg: uptimeStdOut.split('load average')[1].substr(2).trim(),
+      memory: `${freeCols[6]}/${freeCols[1]}`
+    }
+  }
+
   @gatewayMethod("list-nodes")
   async _onListNodes(data){
     let tssPlugin = this.muon.getPlugin('tss-plugin')
@@ -57,7 +73,10 @@ class HealthCheck extends CallablePlugin {
       .filter(({peer, wallet}) => (!!peer && wallet !== process.env.SIGN_WALLET_ADDRESS))
 
     let result = {
-      [process.env.SIGN_WALLET_ADDRESS]: "CURRENT"
+      [process.env.SIGN_WALLET_ADDRESS]: {
+        status: "CURRENT",
+        ... await this.getNodeStatus()
+      }
     }
 
     const peerList = partners.map(({peer}) => peer)
@@ -79,7 +98,10 @@ class HealthCheck extends CallablePlugin {
   async _onHealthCheck(data={}) {
     if(data?.log)
       console.log(`===== HealthCheck._onHealthCheck =====`, new Date());
-    return "OK"
+    return {
+      status: "OK",
+      ... await this.getNodeStatus()
+    }
   }
 }
 
