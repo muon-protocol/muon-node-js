@@ -64,9 +64,7 @@ async function getSubgraphPrice(subgraphUrl, timestamp) {
         (
             timestamp -
             +data.pricePoints[0].timestamp
-        ) * (
-            +data.pricePoints[0].id + 1
-        )
+        ) ** 2
     );
 
     const numerator = (new BN(data.pointB[0].numerator)).sub(new BN(data.pointA[0].numerator)).add(lastPrice.mul(lastFactor))
