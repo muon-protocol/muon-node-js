@@ -54,10 +54,9 @@ const testPrice = async (params, token, tokenName) => {
 
 const tokenName = 'DEUS'
 const token = '0xDE5ed76E7c05eC5e4572CfC88d1ACEA165109E44' // token:deus
+
 const example_1 = {
   token,
-  start: 1652067389,
-  end: 1652075389,
   pairs: [
     [
       {
@@ -97,16 +96,28 @@ const example_1 = {
     ],
     [
       {
-        exchange: 'uniswap',
-        chainId: '1',
-        address: '0x367E2D443988E4b222FBFdAFDb35eeB7ddA9FBB7' // WETH/DEUS
+        exchange: 'spooky',
+        chainId: '250',
+        address: '0xaF918eF5b9f33231764A5557881E6D3e5277d456' // deus/ftm
       },
       {
-        exchange: 'uniswap',
-        chainId: '1',
-        address: '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc' //  WETH/USDC
+        exchange: 'spooky',
+        chainId: '250',
+        address: '0x2b4C76d0dc16BE1C31D4C1DC53bF9B45987Fc75c' // ftm/usdc
       }
     ]
+    // [
+    //   {
+    //     exchange: 'uniswap',
+    //     chainId: '1',
+    //     address: '0x367E2D443988E4b222FBFdAFDb35eeB7ddA9FBB7' // WETH/DEUS
+    //   },
+    //   {
+    //     exchange: 'uniswap',
+    //     chainId: '1',
+    //     address: '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc' //  WETH/USDC
+    //   }
+    // ]
   ]
 }
 
@@ -253,8 +264,8 @@ const LP_Params2 = {
     ]
   ]
 }
-testLP(LP_Params, tokenLP, tokenNameLP)
-testLP(LP_Params2, tokenLP2, tokenNameLP2)
+// testLP(LP_Params, tokenLP, tokenNameLP)
+// testLP(LP_Params2, tokenLP2, tokenNameLP2)
 
 testPrice(example_1, token, tokenName)
-testPrice(example_2, token2, tokenName2)
+// testPrice(example_2, token2, tokenName2)

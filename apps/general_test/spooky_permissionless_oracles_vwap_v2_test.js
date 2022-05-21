@@ -42,12 +42,17 @@ const testPrice = async () => {
       method,
       data: {
         params: {
-          token: '0x21be370d5312f44cb42ce377bc9b8a0cef1a4c83',
+          token: '0xDE5ed76E7c05eC5e4572CfC88d1ACEA165109E44',
           pairs: [
             {
               exchange: 'spooky',
               chainId: '250',
-              address: '0x2b4C76d0dc16BE1C31D4C1DC53bF9B45987Fc75c'
+              address: '0xaF918eF5b9f33231764A5557881E6D3e5277d456' // deus/ftm
+            },
+            {
+              exchange: 'spooky',
+              chainId: '250',
+              address: '0x2b4C76d0dc16BE1C31D4C1DC53bF9B45987Fc75c' // ftm/usdc
             }
           ]
         }
