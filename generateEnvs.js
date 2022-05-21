@@ -39,6 +39,8 @@ const createEnv = async () => {
   PEER_PUBLIC_KEY = "${libP2PConfigsEnv1.pubKey}"\n
   PEER_PRIVATE_KEY = "${libP2PConfigsEnv1.privKey}"\n
   PEER_PORT = 4000\n
+  
+  DISABLE_ANNOUNCE_FILTER=1
 
   FINNHUB_API_KEY = ${process.env.FINNHUB_API_KEY}\n
   INFURA_PROJECT_ID=${process.env.INFURA_PROJECT_ID}\n
@@ -49,7 +51,7 @@ const createEnv = async () => {
   FINNHUB_SUBSCRIBE_SYMBOLS="GME;TSLA"\n
 
   WEB3_PROVIDER_GANACHE = "http://localhost:8545"\n
-  WEB3_PROVIDER_ETH = https://mainnet.infura.io/v3/${
+  WEB3_PROVIDER_ETH = "https://mainnet.infura.io/v3/${
     process.env.INFURA_PROJECT_ID
   }"\n
   WEB3_PROVIDER_ROPSTEN = "https://ropsten.infura.io/v3/${
@@ -101,6 +103,7 @@ const createEnv = async () => {
     PEER_PORT = ${index + 4000}\n
     PEER_BOOTSTRAP_0= "/ip4/127.0.0.1/tcp/4000/p2p/${libP2PConfigsEnv1.id}"
 
+    DISABLE_ANNOUNCE_FILTER=1
     FINNHUB_API_KEY = ${process.env.FINNHUB_API_KEY}\n
     INFURA_PROJECT_ID=${process.env.INFURA_PROJECT_ID}\n
   
