@@ -1,4 +1,5 @@
-const { axios, toBaseUnit, soliditySha3, BN, multiCall, ethCall, Web3 } = MuonAppUtils
+const { axios, toBaseUnit, soliditySha3, BN, multiCall, ethCall, Web3 } =
+  MuonAppUtils
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 
@@ -43,8 +44,8 @@ const SCALE = new BN('1000000000000000000')
 const GRAPH_DEPLOYMENT_ID = 'QmedPFoUR8iCji2r4BRBjpLvaHyGag6c3irb4REF8cJVVE'
 const GRAPH_URL =
   'https://api.thegraph.com/subgraphs/name/shayanshiravani/beetsfi'
-const MULTICALL_VAULT_INFO = "vault_info"
-const MULTICALL_POOLS_INFO = "polls_info"
+const MULTICALL_VAULT_INFO = 'vault_info'
+const MULTICALL_POOLS_INFO = 'polls_info'
 
 async function getTokenTxs(pairAddr, graphUrl, deploymentID) {
   let currentTimestamp = getTimestamp()
@@ -141,18 +142,20 @@ function makeCallContextForPoolTokens(poolIds, prefix) {
     methodName: 'getPoolTokens',
     methodParameters: [item]
   }))
-  let contractCallContext = [{
-    reference: MULTICALL_VAULT_INFO,
-    contractAddress: VAULT_CONTRACT,
-    abi: POOL_TOKENS_ABI,
-    calls: calls
-  }]
+  let contractCallContext = [
+    {
+      reference: MULTICALL_VAULT_INFO,
+      contractAddress: VAULT_CONTRACT,
+      abi: POOL_TOKENS_ABI,
+      calls: calls
+    }
+  ]
   return contractCallContext
 }
 
 function makeCallContextForTokenDecimal(metadata, prefix) {
   let callContext = metadata.map((pool) => {
-    const callData = pool.tokens.map(token => ({
+    const callData = pool.tokens.map((token) => ({
       reference: prefix + '_' + token,
       contractAddress: token,
       abi: ERC20_DECIMALS_ABI,
@@ -173,12 +176,12 @@ function getPoolTokensInfo(multiCallResult) {
   info = multiCallResult[0]
   let tokensInfo = info.callsReturnContext.map((item) => {
     const poolTokens = item.returnValues
-    const balances = poolTokens[1].map((balanceObj) => (
+    const balances = poolTokens[1].map((balanceObj) =>
       Web3.utils.hexToNumberString(balanceObj.hex)
-    ))
+    )
     return {
-      "tokens": poolTokens[0],
-      "balances": balances
+      tokens: poolTokens[0],
+      balances: balances
     }
   })
   return tokensInfo
@@ -190,36 +193,39 @@ function getMultiCallTokenInfo(multiCallInfo, filterBy) {
 
 function getFinalMetaData(resultDecimals, prevMetaData, prefix) {
   let metadata = prevMetaData.map((pool) => {
-    const decimals = pool.tokens.map(token => {
-      const info = getMultiCallTokenInfo(resultDecimals, prefix+"_"+token)
+    const decimals = pool.tokens.map((token) => {
+      const info = getMultiCallTokenInfo(resultDecimals, prefix + '_' + token)
       const decimal = info[0].callsReturnContext[0].returnValues[0]
-      return new BN(10)
-        .pow(new BN(decimal))
-        .toString()
+      return new BN(10).pow(new BN(decimal)).toString()
     })
     return {
       ...pool,
       decimals: decimals
     }
   })
-  console.log(metadata)
   return metadata
 }
 
 async function tokenVWAP(token, poolIds, metadata) {
   if (!metadata) {
-    const contractCallContext = makeCallContextForPoolTokens(poolIds, MULTICALL_POOLS_INFO)
+    const contractCallContext = makeCallContextForPoolTokens(
+      poolIds,
+      MULTICALL_POOLS_INFO
+    )
     let result = await multiCall(FANTOM_ID, contractCallContext)
 
     metadata = getPoolTokensInfo(result)
 
-    let callContextPairs = makeCallContextForTokenDecimal(metadata, MULTICALL_POOLS_INFO)
+    let callContextPairs = makeCallContextForTokenDecimal(
+      metadata,
+      MULTICALL_POOLS_INFO
+    )
     let resultDecimals = await multiCall(FANTOM_ID, callContextPairs)
     console.log(resultDecimals)
 
     metadata = getFinalMetaData(resultDecimals, metadata, MULTICALL_POOLS_INFO)
   }
-  throw "test"
+  throw 'test'
   let { tokenPrice, sumVolume } = await poolVWAP(poolId, token)
 
   let price = new BN(SCALE)

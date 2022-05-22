@@ -145,8 +145,6 @@ module.exports = {
   },
   prepareMetadataForTokenVWAP: async function (pairs) {
     const contractCallContext = this.makeCallContextInfo(pairs, PAIRS)
-    console.log(JSON.stringify(contractCallContext, undefined, 2))
-
     let result = await this.runMultiCall(contractCallContext)
     const poolInfo = result.map((item) => {
       const poolId = this.getReturnValue(
@@ -160,14 +158,13 @@ module.exports = {
 
     const multiCallInfo = await this.runMultiCall(callContextMeta)
     let metadata = this.getMetadata(multiCallInfo, PAIRS)
-    console.log(JSON.stringify(metadata, undefined, 2))
-
     let callContextPairs = this.makeCallContextDecimal(metadata, PAIRS)
 
     let resultDecimals = await this.runMultiCall(callContextPairs)
 
     metadata = this.getFinalMetaData(resultDecimals, metadata, PAIRS)
     console.log(JSON.stringify(metadata, undefined, 2))
+
     return metadata
   },
 
