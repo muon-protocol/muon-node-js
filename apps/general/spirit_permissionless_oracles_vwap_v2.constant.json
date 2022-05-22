@@ -3,6 +3,7 @@
   "TOTAL_SUPPLY": "totalSupply",
   "PAIRS": "pairs",
   "STABLE_EXCHANGES": ["solidly"],
+  "PRICING_ASSETS": ["WETH", "WBTC", "USDC", "DAI", "BAL"],
   "GRAPH_URL": {
     "solidly": "https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly",
     "spirit": "https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap",

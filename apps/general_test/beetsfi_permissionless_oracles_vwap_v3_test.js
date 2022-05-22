@@ -29,8 +29,6 @@ const tokenName = 'DEUS'
 const token = '0xDE5ed76E7c05eC5e4572CfC88d1ACEA165109E44' // token:deus
 const example_1 = {
   token,
-  start: 1652067389,
-  end: 1652075389,
   pairs: [
     {
       exchange: 'beets',

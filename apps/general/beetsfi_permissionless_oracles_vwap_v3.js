@@ -4,6 +4,7 @@ const SpriteVWAP = require('./spirit_permissionless_oracles_vwap_v3')
 const {
   GET_POOL_INFO_ABI,
   PAIRS,
+  PRICING_ASSETS,
   POOL_TOKENS_ABI,
   ERC20_DECIMALS_ABI
 } = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
@@ -139,10 +140,13 @@ module.exports = {
         tokensInfo: decimals
       }
     })
+
     return metadata
   },
   prepareMetadataForTokenVWAP: async function (pairs) {
     const contractCallContext = this.makeCallContextInfo(pairs, PAIRS)
+    console.log(JSON.stringify(contractCallContext, undefined, 2))
+
     let result = await this.runMultiCall(contractCallContext)
     const poolInfo = result.map((item) => {
       const poolId = this.getReturnValue(
@@ -156,11 +160,14 @@ module.exports = {
 
     const multiCallInfo = await this.runMultiCall(callContextMeta)
     let metadata = this.getMetadata(multiCallInfo, PAIRS)
+    console.log(JSON.stringify(metadata, undefined, 2))
+
     let callContextPairs = this.makeCallContextDecimal(metadata, PAIRS)
 
     let resultDecimals = await this.runMultiCall(callContextPairs)
 
     metadata = this.getFinalMetaData(resultDecimals, metadata, PAIRS)
+    console.log(JSON.stringify(metadata, undefined, 2))
     return metadata
   },
 
@@ -181,7 +188,12 @@ module.exports = {
       )
     })
   },
-
+  isPricingAsset: function (asset) {
+    for (let i = 0; i < PRICING_ASSETS.length; i++) {
+      if (PRICING_ASSETS[i] == asset) return true
+    }
+    return false
+  },
   pairVWAP: async function (
     token,
     pair,
@@ -212,11 +224,21 @@ module.exports = {
         ) {
           continue
         }
+        if (this.isPricingAsset(swap.tokenInAddress)) {
+          let price = newInAmount
+            .div(tokenInWeight)
+            .div(newOutAmount.div(tokenOutWeight))
+        }
+        if (isPricingAsset(tokenOutAddress)) {
+          let price = newOutAmount
+            .div(tokenOutWeight)
+            .div(newInAmount.div(tokenInWeight))
+        }
         // let dec0 = new BN(metadata.dec0)
         // let dec1 = new BN(metadata.dec1)
-        let reserve0 = new BN(swap.reserve0).mul(this.SCALE).div(dec0)
-        let reserve1 = new BN(swap.reserve1).mul(this.SCALE).div(dec1)
-        let price = this.tokenPrice(metadata.stable, index, reserve0, reserve1)
+        // let reserve0 = new BN(swap.reserve0).mul(this.SCALE).div(dec0)
+        // let reserve1 = new BN(swap.reserve1).mul(this.SCALE).div(dec1)
+        // let price = this.tokenPrice(metadata.stable, index, reserve0, reserve1)
         // let volume = new BN('0')
         // switch (index) {
         //   case 0:
@@ -236,14 +258,14 @@ module.exports = {
         //   default:
         //     break
         // }
-        sumWeightedPrice = sumWeightedPrice.add(price.mul(volume))
-        sumVolume = sumVolume.add(volume)
+        //   sumWeightedPrice = sumWeightedPrice.add(price.mul(volume))
+        //   sumVolume = sumVolume.add(volume)
       }
-      if (sumVolume > new BN('0')) {
-        let tokenPrice = sumWeightedPrice.div(sumVolume)
-        return { pair, tokenPrice, sumVolume }
-      }
-      return { pair, tokenPrice: new BN('0'), sumVolume: new BN('0') }
+      // if (sumVolume > new BN('0')) {
+      //   let tokenPrice = sumWeightedPrice.div(sumVolume)
+      //   return { pair, tokenPrice, sumVolume }
+      // }
+      // return { pair, tokenPrice: new BN('0'), sumVolume: new BN('0') }
     }
   }
 }

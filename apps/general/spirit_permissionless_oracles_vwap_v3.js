@@ -46,9 +46,7 @@ module.exports = {
       let events = await contract.getPastEvents('allEvents', {
         fromBlock: startBlock.toString(),
         toBlock: latestBlock.toString(),
-        topics: [
-          EVENT_TOPICS[exchange]
-        ]
+        topics: [EVENT_TOPICS[exchange]]
       })
       return events
     } catch (error) {
@@ -410,11 +408,12 @@ module.exports = {
 
   runMultiCall: async function (contractCallContext) {
     let groupByChainId = groupBy(contractCallContext, 'context.chainId')
-
     let multiCallPromises = Object.keys(groupByChainId).map((chainId) =>
       multiCall(Number(chainId), groupByChainId[chainId])
     )
     let result = await Promise.all(multiCallPromises)
+    console.log(result)
+
     return flatten(result)
   },
 
