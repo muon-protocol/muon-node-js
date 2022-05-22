@@ -5,9 +5,7 @@ async function multiCall(chainId, contractCallContext, tryAggregate = false) {
   try {
     const web3 = await getWeb3(chainId)
     const multicall = new Multicall({ web3Instance: web3, tryAggregate })
-
     let { results } = await multicall.call(contractCallContext)
-    console.log(results)
     results = contractCallContext.map((item) => ({
       reference: item.reference,
       contractAddress: item.contractAddress,

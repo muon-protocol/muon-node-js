@@ -412,8 +412,6 @@ module.exports = {
       multiCall(Number(chainId), groupByChainId[chainId])
     )
     let result = await Promise.all(multiCallPromises)
-    console.log(result)
-
     return flatten(result)
   },
 
