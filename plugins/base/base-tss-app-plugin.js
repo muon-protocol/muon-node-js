@@ -153,14 +153,14 @@ class BaseTssAppPlugin extends BaseAppPlugin {
       confirmed ? [{
         owner: tss.pub2addr(masterWalletPubKey),
         ownerPubKey: {
-          x: '0x' + masterWalletPubKey.x.toString(16),
+          x: '0x' + masterWalletPubKey.x.toBuffer('be', 32).toString('hex'),
           yParity: masterWalletPubKey.y.mod(toBN(2)).toString(),
         },
         // signers: signersIndices,
         timestamp: getTimestamp(),
         result: newRequest.data.result,
         // signature: `0x${aggregatedSign.s.toString(16)},0x${aggregatedSign.e.toString(16)}`,
-        signature: `0x${aggregatedSign.s.toString(16)}`,
+        signature: '0x' + aggregatedSign.s.toBuffer('be', 32).toString('hex'),
         // sign: {
         //   s: `0x${aggregatedSign.s.toString(16)}`,
         //   e: `0x${aggregatedSign.e.toString(16)}`
