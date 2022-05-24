@@ -18,7 +18,8 @@ const {
   call: ethCall,
   getTokenInfo: ethGetTokenInfo,
   getNftInfo: ethGetNftInfo,
-  hashCallOutput: ethHashCallOutput
+  hashCallOutput: ethHashCallOutput,
+  getWeb3
 } = require('../utils/eth')
 
 const { multiCall } = require('../utils/multicall')
@@ -40,6 +41,7 @@ global.MuonAppUtils = {
   toBN: Web3.utils.toBN,
   floatToBN,
   multiCall,
+  getWeb3,
   ethRead,
   ethCall,
   ethGetTokenInfo,

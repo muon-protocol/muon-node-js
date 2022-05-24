@@ -43,4 +43,20 @@ const example_1 = {
   ]
 }
 
-testPrice(example_1, token, tokenName)
+const tokenName2 = 'dei'
+const token2 = '0x8B858Eaf095A7337dE6f9bC212993338773cA34e' // token:dei
+const example_2 = {
+  token,
+  start: 1645230624,
+  end: 1645230624,
+  pairs: [
+    {
+      exchange: 'beets',
+      chainId: '250',
+      address: '0x8B858Eaf095A7337dE6f9bC212993338773cA34e' // DEI/USDC
+    }
+  ]
+}
+
+// testPrice(example_1, token, tokenName)
+testPrice(example_2, token2, tokenName2)
