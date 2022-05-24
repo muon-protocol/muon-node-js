@@ -6,9 +6,9 @@ const {
   BNSqrt,
   multiCall,
   groupBy,
-  flatten
+  flatten,
+  getWeb3
 } = MuonAppUtils
-const { getWeb3 } = require('../../utils/eth')
 const {
   Info_ABI,
   TOKEN,
