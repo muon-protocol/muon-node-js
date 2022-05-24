@@ -258,7 +258,6 @@ module.exports = {
                 .div(new BN(this.AMP_PRECISION))
             )
         )
-      console.log('*************invariant*************', invariant.toString())
       if (invariant.gt(prevInvariant)) {
         if (invariant.sub(prevInvariant).lte(new BN(1))) return invariant
       } else if (prevInvariant.sub(invariant).lte(new BN(1))) return invariant
@@ -287,6 +286,9 @@ module.exports = {
       .div(ampTimesTotal.mul(P_D))
       .mul(new BN(this.AMP_PRECISION))
       .mul(new BN(balances[tokenIndex]))
+    //             invariant
+    // b = sum + --------------- * AMP_PRECISION
+    //            ampTimesTotal
     let b = sum.add(
       invariant.div(ampTimesTotal).mul(new BN(this.AMP_PRECISION))
     )
@@ -345,15 +347,6 @@ module.exports = {
     indexIn,
     indexOut
   ) {
-    console.log({
-      startTime,
-      endTime,
-      blockTimestamp,
-      amount,
-      balances,
-      indexIn,
-      indexOut
-    })
     const { currentAmp } = this.getAmplificationParameter(
       startTime,
       endTime,
@@ -361,7 +354,6 @@ module.exports = {
     )
 
     const invariant = this.calculateInvariant(currentAmp, balances)
-    console.log({ invariant: invariant.toString() })
 
     const amountOut = this.calcOutGivenIn(
       currentAmp,
@@ -371,7 +363,6 @@ module.exports = {
       amount,
       invariant
     )
-    console.log(amountOut.toString())
     // TODO why * .9999
     return amountOut.mul(toBaseUnit('0.9999', 4)).div(new BN(10).pow(new BN(4)))
   },
@@ -413,16 +404,32 @@ module.exports = {
     // TODO based on subgraph filter these things from metadata
     let web3 = await getWeb3(this.config.chainId)
     let lastBlock = await web3.eth.getBlock('latest')
+    // let swap = {
+    //   blockTimestamp: lastBlock.timestamp,
+    //   reserve0: new BN(metadata.balances[0])
+    //     .mul(new BN(10).pow(new BN(12)))
+    //     .toString(),
+    //   reserve1: metadata.balances[1],
+    //   amount: '1000000000000000000',
+    //   indexIn: 1,
+    //   indexOut: 0
+    // }
+    // console.log(swap)
     let swap = {
       blockTimestamp: lastBlock.timestamp,
-      reserve0: new BN(metadata.balances[0])
-        .mul(new BN(10).pow(new BN(12)))
+      reserve0: new BN(metadata.tokensInfo[0].balance)
+        .mul(this.SCALE)
+        .div(new BN(metadata.tokensInfo[0].decimal))
         .toString(),
-      reserve1: metadata.balances[1],
+      reserve1: new BN(metadata.tokensInfo[1].balance)
+        .mul(this.SCALE)
+        .div(new BN(metadata.tokensInfo[1].decimal))
+        .toString(),
       amount: '1000000000000000000',
-      indexIn: 1,
-      indexOut: 0
+      indexIn: metadata.tokensInfo[0].token === token ? 0 : 1,
+      indexOut: metadata.tokensInfo[0].token === token ? 1 : 0
     }
+    console.log(swap)
     // let dec0 = new BN(metadata.dec0)
     // let dec1 = new BN(metadata.dec1)
     // let reserve0 = new BN(swap.reserve0).mul(this.SCALE).div(dec0)
@@ -430,14 +437,15 @@ module.exports = {
     let price = this.tokenPrice(
       startTime,
       endTime,
-      1653315278,
-      '1000000000000000000',
-      ['279108605311000000000000', '4854616092288770358231965'],
+      swap.blockTimestamp,
+      swap.amount,
+      [swap.reserve0, swap.reserve1],
 
       swap.indexIn,
       swap.indexOut
     )
     console.log({ price: price.toString() })
+    // TODO to complete this part I need to know which data exist in subgraph for every pairs
     // let price = this.tokenPrice(metadata.stable, index, reserve0, reserve1)
     // let volume = new BN('0')
     // switch (index) {
