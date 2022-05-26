@@ -41,12 +41,12 @@ class TssParty {
    *
    */
   addPartner(partner){
+    if(typeof partner === 'string')
+      throw {message: "partner most be object of type {wallet,peerId}"}
     // if(this.partners[partner.wallet] === undefined)
     {
-      let partnerIndex = Object.keys(this.partners).length + 1;
       this.partners[partner.wallet] = {
         // if partner has "i" property, it replace default "i".
-        i: partnerIndex,
         ...partner
       }
       if(this.isFulfilled()) {

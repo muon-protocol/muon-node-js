@@ -169,16 +169,6 @@ class Muon extends Events {
     return tssPlugin.tssKey.publicKey
   }
 
-  getNodesWalletIndex() {
-    // return MUON_WALLETS_INDEX
-    let tssPlugin = this.getPlugin('tss-plugin');
-    // let partners = tssPlugin.tssKey.party.partners;
-    if(!tssPlugin.tssParty)
-      return {};
-    let partners = tssPlugin.tssParty.partners;
-    return Object.keys(partners).reduce((obj, w) => ({...obj, [w]: partners[w].i}), {})
-  }
-
   get peerIdStr(){
     return this.peerId.toB58String();
   }

@@ -126,6 +126,7 @@ var muon;
       },
       net,
       account,
+      // TODO: pass it into the tss-plugin
       tss,
       ...otherConfigs,
     })

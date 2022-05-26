@@ -39,7 +39,7 @@ module.exports = class BasePlugin extends Events{
     catch (e) {
       // TODO: what to do?
       if(process.env.VERBOSE)
-        console.error("BasePlugin.findPeer", e.stack)
+        console.error("BasePlugin.findPeer", peerId.toB58String(), e.stack)
       return null;
     }
   }

@@ -2,8 +2,8 @@ const BasePlugin = require('./base/base-plugin')
 
 class CollateralInfoPlugin extends BasePlugin{
 
-  wallets = []
   peersWallet = {}
+  walletsPeer = {}
 
   constructor(muon, configs) {
     super(muon, configs);
@@ -16,20 +16,23 @@ class CollateralInfoPlugin extends BasePlugin{
       throw "Invalid collateral wallet config located at config/global/net.conf.json"
     }
 
-    this.wallets = parts.map(p => p[0])
-    this.peersWallet = parts.reduce((obj, [wallet, peerId]) => {
-      obj[peerId] = wallet;
-      return obj;
-    }, {})
+    parts.forEach(([wallet, peerId]) => {
+      this.peersWallet[peerId] = wallet
+      this.walletsPeer[wallet] = peerId
+    })
   }
 
   // TODO: not implemented
   getWallets(){
-    return this.wallets;
+    return Object.keys(this.walletsPeer);
   }
 
   getPeerWallet(peerId) {
     return this.peersWallet[peerId.toB58String()];
+  }
+
+  getWalletPeerId(wallet) {
+    return this.walletsPeer[wallet];
   }
 }
 

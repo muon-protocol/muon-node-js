@@ -216,7 +216,7 @@ function shareKey(privateKey, t, n, indices, polynomial) {
   if(polynomial)
     assert(polynomial.length === t)
   else
-    polynomial = [privateKey.getPrivate(), ...(range(1, t).map(random))]
+    polynomial = [privateKey, ...(range(1, t).map(random))]
   return {
     polynomial: polynomial,
     shares: indices.map(i => {
@@ -305,10 +305,15 @@ function keyFromPublic(pubKeyStr, encoding='hex') {
   return curve.keyFromPublic(pubKeyStr, encoding).getPublic()
 }
 
+// function key2pub(privateKey) {
+//   let _PK = BN.isBN(privateKey) ? privateKey : toBN(privateKey)
+//   let {x, y} = curve.g.mul(_PK);
+//   return new Point(x, y);
+// }
+
 function key2pub(privateKey) {
   let _PK = BN.isBN(privateKey) ? privateKey : toBN(privateKey)
-  let {x, y} = curve.g.mul(_PK);
-  return new Point(x, y);
+  return curve.g.mul(_PK);
 }
 
 function pub2addr(publicKey) {
