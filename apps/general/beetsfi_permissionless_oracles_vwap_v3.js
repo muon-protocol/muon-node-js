@@ -237,9 +237,9 @@ module.exports = {
         P_D = P_D.mul(new BN(balances[j])).mul(new BN(numTokens)).div(invariant)
       }
       prevInvariant = invariant
-      //                                                         ampTimesTotal * sum * P_D
-      //                (numTokens * invariant * invariant) +  ------------------------------                  //
-      //                                                                 AMP_PRECISION
+      //                                                    ampTimesTotal * sum * P_D
+      //                (numTokens * invariant ^ 2 ) +  ------------------------------                  //
+      //                                                          AMP_PRECISION
       // invariant =   --------------------------------------------------------------------------------                  //
       //                                                     (ampTimesTotal - AMP_PRECISION) * P_D)
       //                ((numTokens + 1) * invariant) +   ----------------------------------------
@@ -295,7 +295,7 @@ module.exports = {
 
     let prevTokenBalance = new BN(0)
     let tokenBalance = inv2.add(c).div(invariant.add(b))
-
+    // TODO why use this for
     for (let i = 0; i < 255; i++) {
       prevTokenBalance = tokenBalance
       //                     ((tokenBalance * tokenBalance) + c)
@@ -404,17 +404,8 @@ module.exports = {
     // TODO based on subgraph filter these things from metadata
     let web3 = await getWeb3(this.config.chainId)
     let lastBlock = await web3.eth.getBlock('latest')
-    // let swap = {
-    //   blockTimestamp: lastBlock.timestamp,
-    //   reserve0: new BN(metadata.balances[0])
-    //     .mul(new BN(10).pow(new BN(12)))
-    //     .toString(),
-    //   reserve1: metadata.balances[1],
-    //   amount: '1000000000000000000',
-    //   indexIn: 1,
-    //   indexOut: 0
-    // }
-    // console.log(swap)
+
+    console.log(metadata)
     let swap = {
       blockTimestamp: lastBlock.timestamp,
       reserve0: new BN(metadata.tokensInfo[0].balance)
@@ -426,10 +417,11 @@ module.exports = {
         .div(new BN(metadata.tokensInfo[1].decimal))
         .toString(),
       amount: '1000000000000000000',
-      indexIn: metadata.tokensInfo[0].token === token ? 0 : 1,
-      indexOut: metadata.tokensInfo[0].token === token ? 1 : 0
+      tokenIn: metadata.tokensInfo[1].token,
+      tokenOut: metadata.tokensInfo[0].token
     }
-    console.log(swap)
+    let indexIn = metadata.tokens.findIndex((item) => item === swap.tokenIn)
+    let indexOut = metadata.tokens.findIndex((item) => item === swap.tokenOut)
     // let dec0 = new BN(metadata.dec0)
     // let dec1 = new BN(metadata.dec1)
     // let reserve0 = new BN(swap.reserve0).mul(this.SCALE).div(dec0)
@@ -441,8 +433,8 @@ module.exports = {
       swap.amount,
       [swap.reserve0, swap.reserve1],
 
-      swap.indexIn,
-      swap.indexOut
+      indexIn,
+      indexOut
     )
     console.log({ price: price.toString() })
     // TODO to complete this part I need to know which data exist in subgraph for every pairs
