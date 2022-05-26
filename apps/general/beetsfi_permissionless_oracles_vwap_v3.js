@@ -1,4 +1,4 @@
-const { Web3, BN, toBaseUnit, getWeb3 } = MuonAppUtils
+const { Web3, toBaseUnit, getWeb3, BigNumber, BN } = MuonAppUtils
 
 const SpriteVWAP = require('./spirit_permissionless_oracles_vwap_v3')
 const {
@@ -14,6 +14,38 @@ const APP_CONFIG = {
 }
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
+const bn = (value) => new BigNumber(value)
+const ZERO = bn(0)
+const ONE = bn(1)
+const TWO = bn(2)
+const div = (a, b, roundUp) => {
+  return roundUp ? divUp(a, b) : divDown(a, b)
+}
+
+const divDown = (a, b) => {
+  if (b.isZero()) {
+    throw new Error('ZERO_DIVISION')
+  }
+  return a.idiv(b)
+}
+
+const divUp = (a, b) => {
+  if (b.isZero()) {
+    throw new Error('ZERO_DIVISION')
+  }
+  return a.isZero() ? ZERO : ONE.plus(a.minus(ONE).idiv(b))
+}
+
+const scale = (value, decimalPlaces) =>
+  bn(value).times(bn(10).pow(decimalPlaces))
+
+const upScale = (amount, decimals) => {
+  return scale(amount, decimals).times(bn(10).pow(18 - decimals))
+}
+
+const downScaleDown = (amount, decimals) => {
+  return scale(divDown(bn(amount), bn(10).pow(18 - decimals)), -decimals)
+}
 
 module.exports = {
   ...SpriteVWAP,
@@ -148,6 +180,7 @@ module.exports = {
 
     return metadata
   },
+
   prepareMetadataForTokenVWAP: async function (pairs) {
     const contractCallContext = this.makeCallContextInfo(pairs, PAIRS)
     let result = await this.runMultiCall(contractCallContext)
@@ -188,12 +221,13 @@ module.exports = {
       )
     })
   },
-  isPricingAsset: function (asset) {
-    for (let i = 0; i < PRICING_ASSETS.length; i++) {
-      if (PRICING_ASSETS[i] == asset) return true
-    }
-    return false
-  },
+
+  // isPricingAsset: function (asset) {
+  //   for (let i = 0; i < PRICING_ASSETS.length; i++) {
+  //     if (PRICING_ASSETS[i] == asset) return true
+  //   }
+  //   return false
+  // },
 
   getAmplificationParameter: function (startTime, endTime, blockTimestamp) {
     let isUpdating, value
@@ -217,52 +251,74 @@ module.exports = {
     return { currentAmp: value, isUpdating }
   },
 
-  calculateInvariant: function (amplificationParameter, balances) {
-    const numTokens = balances.length
+  calculateInvariant: function (amplificationParameter, balances, roundUp) {
+    /**********************************************************************************************
+    // invariant                                                                                 //
+    // D = invariant                                                  D^(n+1)                    //
+    // A = amplification coefficient      A  n^n S + D = A D n^n + -----------                   //
+    // S = sum of balances                                             n^n P                     //
+    // P = product of balances                                                                   //
+    // n = number of tokens                                                                      //
+    **********************************************************************************************/
+
+    // We support rounding up or down.
+
+    const numTokens = bn(balances.length)
 
     let sum = balances.reduce(
-      (previousValue, currentValue) => previousValue.add(new BN(currentValue)),
-      new BN(0)
+      (previousValue, currentValue) => previousValue.plus(currentValue),
+      ZERO
     )
-    if (sum.eq(new BN(0))) return 0
-    let prevInvariant = new BN(0)
+    if (sum.isZero()) return ZERO
+    let prevInvariant = ZERO
     let invariant = sum
-    let ampTimesTotal = new BN(amplificationParameter).mul(new BN(numTokens))
+    let ampTimesTotal = amplificationParameter.times(numTokens)
     for (let i = 0; i < 255; i++) {
-      let P_D = new BN(balances[0]).mul(new BN(numTokens))
-      for (let j = 1; j < numTokens; j++) {
+      let P_D = balances[0].times(numTokens)
+      for (let j = 1; j < balances.length; j++) {
         //                  P_D * balances[j] * numTokens       //
         //       P_D =  --------------------------------------                   //
         //                        invariant
-        P_D = P_D.mul(new BN(balances[j])).mul(new BN(numTokens)).div(invariant)
+        P_D = div(P_D.times(balances[j]).times(numTokens), invariant, roundUp)
       }
       prevInvariant = invariant
-      //                                                    ampTimesTotal * sum * P_D
-      //                (numTokens * invariant ^ 2 ) +  ------------------------------                  //
-      //                                                          AMP_PRECISION
+      //                                                           ampTimesTotal * sum * P_D
+      //                (numTokens * invariant * invariant ) +  ------------------------------                  //
+      //                                                              AMP_PRECISION
       // invariant =   --------------------------------------------------------------------------------                  //
-      //                                                     (ampTimesTotal - AMP_PRECISION) * P_D)
+      //                                                    (ampTimesTotal - AMP_PRECISION) * P_D)
       //                ((numTokens + 1) * invariant) +   ----------------------------------------
-      //                                                                       AMP_PRECISION
-      invariant = new BN(numTokens)
-        .mul(new BN(invariant).pow(new BN(2)))
-        .add(ampTimesTotal.mul(sum).mul(P_D).div(new BN(this.AMP_PRECISION)))
-        .div(
-          new BN(numTokens)
-            .add(new BN(1))
-            .mul(invariant)
-            .add(
-              ampTimesTotal
-                .sub(new BN(this.AMP_PRECISION))
-                .mul(P_D)
-                .div(new BN(this.AMP_PRECISION))
+      //                                                                AMP_PRECISION
+      invariant = div(
+        numTokens
+          .times(invariant)
+          .times(invariant)
+          .plus(
+            div(
+              ampTimesTotal.times(sum).times(P_D),
+              bn(this.AMP_PRECISION),
+              roundUp
             )
-        )
+          ),
+
+        numTokens
+          .plus(ONE)
+          .times(invariant)
+          .plus(
+            div(
+              ampTimesTotal.minus(bn(this.AMP_PRECISION)).times(P_D),
+              bn(this.AMP_PRECISION),
+              !roundUp
+            )
+          ),
+
+        roundUp
+      )
       if (invariant.gt(prevInvariant)) {
-        if (invariant.sub(prevInvariant).lte(new BN(1))) return invariant
-      } else if (prevInvariant.sub(invariant).lte(new BN(1))) return invariant
+        if (invariant.minus(prevInvariant).lte(ONE)) return invariant
+      } else if (prevInvariant.minus(invariant).lte(ONE)) return invariant
     }
-    return invariant
+    throw new Error("STABLE_GET_BALANCE_DIDN'T_CONVERGE")
   },
 
   getTokenBalanceGivenInvariantAndAllOtherBalances: function (
@@ -271,49 +327,62 @@ module.exports = {
     invariant,
     tokenIndex
   ) {
-    const balanceLen = balances.length
-    let ampTimesTotal = new BN(amplificationParameter).mul(new BN(balanceLen))
-    let sum = new BN(balances[0])
-    let P_D = new BN(balances[0]).mul(new BN(balanceLen))
-    for (let j = 1; j < balanceLen; j++) {
-      P_D = P_D.mul(new BN(balances[j])).mul(new BN(balanceLen)).div(invariant)
-      sum = sum.add(new BN(balances[j]))
+    const numTokens = bn(balances.length)
+    let ampTimesTotal = amplificationParameter.times(numTokens)
+    let sum = balances[0]
+    let P_D = balances[0].times(numTokens)
+    for (let j = 1; j < balances.length; j++) {
+      //        P_D * balances[j] * numTokens
+      // P_D = --------------------------------  //floor
+      //            invariant
+      P_D = divDown(P_D.times(balances[j]).times(numTokens), invariant)
+      sum = sum.plus(balances[j])
     }
 
-    sum = sum.sub(new BN(balances[tokenIndex]))
-    let inv2 = invariant.pow(new BN(2))
-    let c = inv2
-      .div(ampTimesTotal.mul(P_D))
-      .mul(new BN(this.AMP_PRECISION))
-      .mul(new BN(balances[tokenIndex]))
+    sum = sum.minus(balances[tokenIndex])
+    const inv2 = invariant.times(invariant)
+    // We remove the balance fromm c by multiplying it
+    //             inv2
+    // c =  ----------------------------- * AMP_PRECISION * Balances[tokenIndex] // Ceil
+    //       ampTimesTotal  * P_D
+    const c = divUp(inv2, ampTimesTotal.times(P_D))
+      .times(bn(this.AMP_PRECISION))
+      .times(balances[tokenIndex])
     //             invariant
-    // b = sum + --------------- * AMP_PRECISION
+    // b = sum + --------------- * AMP_PRECISION // floor
     //            ampTimesTotal
-    let b = sum.add(
-      invariant.div(ampTimesTotal).mul(new BN(this.AMP_PRECISION))
+    const b = sum.plus(
+      divDown(invariant, ampTimesTotal).times(bn(this.AMP_PRECISION))
     )
+    // We iterate to find the balance
 
-    let prevTokenBalance = new BN(0)
-    let tokenBalance = inv2.add(c).div(invariant.add(b))
+    let prevTokenBalance = ZERO
+    // We multiply the first iteration outside the loop with the invariant to set the value of the
+    // initial approximation.
+
+    //                       inv2 + c
+    //  tokenBalance = --------------------     // Ceil
+    //                    invariant +b
+
+    let tokenBalance = div(inv2.plus(c), invariant.plus(b))
     // TODO why use this for
     for (let i = 0; i < 255; i++) {
       prevTokenBalance = tokenBalance
       //                     ((tokenBalance * tokenBalance) + c)
-      // tokenBalance = ----------------------------------------------
+      // tokenBalance = ----------------------------------------------  //ceil
       //                      ((tokenBalance * 2) + b - invariant)
-      tokenBalance = tokenBalance
-        .mul(tokenBalance)
-        .add(c)
-        .div(tokenBalance.mul(new BN(2)).add(b).sub(invariant))
+      tokenBalance = divUp(
+        tokenBalance.times(tokenBalance).plus(c),
+        tokenBalance.times(TWO).plus(b).minus(invariant)
+      )
 
       if (tokenBalance.gt(prevTokenBalance)) {
-        if (tokenBalance.sub(prevTokenBalance).lte(new BN(1)))
-          return tokenBalance
-      } else if (prevTokenBalance.sub(tokenBalance).lte(new BN(1)))
+        if (tokenBalance.minus(prevTokenBalance).lte(ONE)) return tokenBalance
+      } else if (prevTokenBalance.minus(tokenBalance).lte(ONE))
         return tokenBalance
     }
 
-    return tokenBalance
+    throw new Error("STABLE_GET_BALANCE_DIDN'T_CONVERGE")
   },
 
   calcOutGivenIn: function (
@@ -324,9 +393,7 @@ module.exports = {
     tokenAmountIn,
     invariant
   ) {
-    balances[tokenIndexIn] = new BN(balances[tokenIndexIn]).add(
-      new BN(tokenAmountIn)
-    )
+    balances[tokenIndexIn] = balances[tokenIndexIn].plus(tokenAmountIn)
     finalBalanceOut = this.getTokenBalanceGivenInvariantAndAllOtherBalances(
       amplificationParameter,
       [...balances],
@@ -334,8 +401,8 @@ module.exports = {
       tokenIndexOut
     )
 
-    balances[tokenIndexIn] = balances[tokenIndexIn].sub(new BN(tokenAmountIn))
-    return new BN(balances[tokenIndexOut]).sub(finalBalanceOut).sub(new BN(1))
+    balances[tokenIndexIn] = balances[tokenIndexIn].minus(tokenAmountIn)
+    return balances[tokenIndexOut].minus(finalBalanceOut).minus(ONE)
   },
 
   tokenPrice: function (
@@ -347,13 +414,13 @@ module.exports = {
     indexIn,
     indexOut
   ) {
-    const { currentAmp } = this.getAmplificationParameter(
+    let { currentAmp } = this.getAmplificationParameter(
       startTime,
       endTime,
       blockTimestamp
     )
-
-    const invariant = this.calculateInvariant(currentAmp, balances)
+    currentAmp = bn(currentAmp)
+    const invariant = this.calculateInvariant(currentAmp, balances, true)
 
     const amountOut = this.calcOutGivenIn(
       currentAmp,
@@ -364,7 +431,8 @@ module.exports = {
       invariant
     )
     // TODO why * .9999
-    return amountOut.mul(toBaseUnit('0.9999', 4)).div(new BN(10).pow(new BN(4)))
+    // return amountOut.times(bn(0.9999))
+    return amountOut
   },
 
   pairVWAP: async function (
@@ -389,8 +457,8 @@ module.exports = {
     //   endTime
     // )
     // if (tokenTxs) {
-    let sumWeightedPrice = new BN('0')
-    let sumVolume = new BN('0')
+    let sumWeightedPrice = bn('0')
+    let sumVolume = bn('0')
     // for (let i = 0; i < tokenTxs.length; i++) {
     //   let swap = tokenTxs[i]
     //   if (
@@ -420,52 +488,19 @@ module.exports = {
       tokenIn: metadata.tokensInfo[1].token,
       tokenOut: metadata.tokensInfo[0].token
     }
+    console.log(swap)
     let indexIn = metadata.tokens.findIndex((item) => item === swap.tokenIn)
     let indexOut = metadata.tokens.findIndex((item) => item === swap.tokenOut)
-    // let dec0 = new BN(metadata.dec0)
-    // let dec1 = new BN(metadata.dec1)
-    // let reserve0 = new BN(swap.reserve0).mul(this.SCALE).div(dec0)
-    // let reserve1 = new BN(swap.reserve1).mul(this.SCALE).div(dec1)
     let price = this.tokenPrice(
       startTime,
       endTime,
       swap.blockTimestamp,
       swap.amount,
-      [swap.reserve0, swap.reserve1],
+      [bn(swap.reserve0), bn(swap.reserve1)],
 
       indexIn,
       indexOut
     )
     console.log({ price: price.toString() })
-    // TODO to complete this part I need to know which data exist in subgraph for every pairs
-    // let price = this.tokenPrice(metadata.stable, index, reserve0, reserve1)
-    // let volume = new BN('0')
-    // switch (index) {
-    //   case 0:
-    //     if (swap.amount0In != 0) {
-    //       volume = new BN(swap.amount0In).mul(this.SCALE).div(dec0)
-    //     } else {
-    //       volume = new BN(swap.amount0Out).mul(this.SCALE).div(dec0)
-    //     }
-    //     break
-    //   case 1:
-    //     if (swap.amount0In != 0) {
-    //       volume = new BN(swap.amount1Out).mul(this.SCALE).div(dec1)
-    //     } else {
-    //       volume = new BN(swap.amount1In).mul(this.SCALE).div(dec1)
-    //     }
-    //     break
-    //   default:
-    //     break
-    // }
-    //   sumWeightedPrice = sumWeightedPrice.add(price.mul(volume))
-    //   sumVolume = sumVolume.add(volume)
-    // }
-    // if (sumVolume > new BN('0')) {
-    //   let tokenPrice = sumWeightedPrice.div(sumVolume)
-    //   return { pair, tokenPrice, sumVolume }
-    // }
-    // return { pair, tokenPrice: new BN('0'), sumVolume: new BN('0') }
-    // }
   }
 }

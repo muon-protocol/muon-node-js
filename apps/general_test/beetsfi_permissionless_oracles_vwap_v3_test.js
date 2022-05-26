@@ -44,7 +44,7 @@ const example_1 = {
 }
 
 const tokenName2 = 'dei'
-const token2 = '0x8B858Eaf095A7337dE6f9bC212993338773cA34e' // token:dei
+const token2 = '0x8B858Eaf095A7337dE6f9bC212993338773cA34e'
 const example_2 = {
   token,
   start: 1645230624,
@@ -53,7 +53,7 @@ const example_2 = {
     {
       exchange: 'beets',
       chainId: '250',
-      address: '0x8B858Eaf095A7337dE6f9bC212993338773cA34e' // DEI/USDC
+      address: '0x8B858Eaf095A7337dE6f9bC212993338773cA34e'
     }
   ]
 }

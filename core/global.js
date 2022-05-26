@@ -21,7 +21,7 @@ const {
   hashCallOutput: ethHashCallOutput,
   getWeb3
 } = require('../utils/eth')
-
+const { BigNumber } = require('bignumber.js')
 const { multiCall } = require('../utils/multicall')
 const { BNSqrt } = require('../utils/bn-sqrt')
 
@@ -37,6 +37,7 @@ global.MuonAppUtils = {
   tron,
   ws,
   timeout,
+  BigNumber,
   BN: Web3.utils.BN,
   toBN: Web3.utils.toBN,
   floatToBN,
