@@ -146,7 +146,7 @@ class TssPlugin extends CallablePlugin {
       return false
     // load party
     let collateralInfo = this.muon.getPlugin('collateral');
-    tssConfig.party.partners = tssConfig.party.partners.map(wallet => ({
+    tssConfig.party.partners = collateralInfo.getWallets().map(wallet => ({
       wallet,
       peerId: collateralInfo.getWalletPeerId(wallet)
     }))
