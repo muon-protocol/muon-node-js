@@ -719,7 +719,7 @@ class TssPlugin extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.addNewPartner)
   async __addNewPartner(data = {}, callerInfo) {
-    console.log('TssPlugin.__addNewPartner', data, callerInfo)
+    // console.log('TssPlugin.__addNewPartner', data, callerInfo)
     let {party: partyId} = data;
     let {tssParty, tssKey} = this;
     if (tssParty.id !== partyId) {
