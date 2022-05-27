@@ -174,12 +174,19 @@ class Muon extends Events {
   }
 
   get configDir(){
-    let baseDir = `${process.env.PWD}/config/`
+    let baseDir = `${process.env.PWD}/config/`;
     return !!process.env.CONFIG_BASE_PATH ? `${baseDir}${process.env.CONFIG_BASE_PATH}/` : baseDir
   }
 
   saveConfig(data, fileName){
     fs.writeFileSync(`${this.configDir}/${fileName}`, JSON.stringify(data, null, 2))
+  }
+
+  backupConfigFile(fileName){
+    if(fs.existsSync(`${this.configDir}/${fileName}`)) {
+      let content = fs.readFileSync(`${this.configDir}/${fileName}`);
+      fs.writeFileSync(`${this.configDir}/${fileName}_[${new Date().toISOString()}].bak`, content)
+    }
   }
 }
 

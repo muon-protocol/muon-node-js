@@ -215,6 +215,7 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.saveTssConfig', tssConfig);
 
     // TODO: backup old key >> tss.conf.json.[date:time].bak
+    this.muon.backupConfigFile('tss.conf.json');
     // console.log('save config temporarily disabled for test.')
     this.muon.saveConfig(tssConfig, 'tss.conf.json')
   }
