@@ -199,8 +199,7 @@ class TssPlugin extends CallablePlugin {
       party: {
         id: party.id,
         t: party.t,
-        max: party.max,
-        partners: Object.values(party.partners).map(({wallet}) => wallet)
+        max: party.max
       },
       key: {
         id: key.id,
