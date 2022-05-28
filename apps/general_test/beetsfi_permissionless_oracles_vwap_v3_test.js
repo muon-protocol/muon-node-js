@@ -32,13 +32,15 @@ const example_1 = {
   pairs: [
     {
       exchange: 'beets',
+      pool: 'weighted',
       chainId: '250',
       address: '0x0e8e7307E43301CF28c5d21d5fD3EF0876217D41' // DEI/DEUS
     },
     {
       exchange: 'beets',
+      pool: 'stable',
       chainId: '250',
-      address: '0xDFc65c1F15AD3507754EF0fd4BA67060C108db7E' // DEI/USDC
+      address: '0x8B858Eaf095A7337dE6f9bC212993338773cA34e' // DEI/USDC
     }
   ]
 }
@@ -47,11 +49,11 @@ const tokenName2 = 'dei'
 const token2 = '0x8B858Eaf095A7337dE6f9bC212993338773cA34e'
 const example_2 = {
   token,
-  start: 1645230624,
-  end: 1645230624,
+
   pairs: [
     {
       exchange: 'beets',
+      pool: 'stable',
       chainId: '250',
       address: '0x8B858Eaf095A7337dE6f9bC212993338773cA34e'
     }

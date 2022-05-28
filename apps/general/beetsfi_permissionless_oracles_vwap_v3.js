@@ -9,15 +9,20 @@ const {
   ERC20_DECIMALS_ABI
 } = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
 const { async } = require('regenerator-runtime')
+
 const APP_CONFIG = {
   chainId: 250
 }
+
+const STABLE = 'stable'
+const WEIGHTED = 'weighted'
 
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 const bn = (value) => new BigNumber(value)
 const ZERO = bn(0)
 const ONE = bn(1)
 const TWO = bn(2)
+const ONE_18 = bn('1000000000000000000') // 1e18
 const div = (a, b, roundUp) => {
   return roundUp ? divUp(a, b) : divDown(a, b)
 }
@@ -36,8 +41,65 @@ const divUp = (a, b) => {
   return a.isZero() ? ZERO : ONE.plus(a.minus(ONE).idiv(b))
 }
 
-const scale = (value, decimalPlaces) =>
-  bn(value).times(bn(10).pow(decimalPlaces))
+const fpMulDown = (a, b) => {
+  return a.times(b).idiv(ONE)
+}
+
+const fpMulUp = (a, b) => {
+  const product = a.times(b)
+  if (product.isZero()) {
+    return product
+  } else {
+    // The traditional divUp formula is:
+    // divUp(x, y) := (x + y - 1) / y
+    // To avoid intermediate overflow in the addition, we distribute the division and get:
+    // divUp(x, y) := (x - 1) / y + 1
+    // Note that this requires x != 0, which we already tested for
+
+    return product.minus(bn(1)).idiv(ONE).plus(bn(1))
+  }
+}
+
+const fpDivDown = (a, b) => {
+  if (b.isZero()) {
+    throw new Error('ZERO_DIVISION')
+  }
+  if (a.isZero()) {
+    return a
+  } else {
+    return a.times(ONE).idiv(b)
+  }
+}
+
+const fpDivUp = (a, b) => {
+  if (b.isZero()) {
+    throw new Error('ZERO_DIVISION')
+  }
+  if (a.isZero()) {
+    return a
+  } else {
+    // The traditional divUp formula is:
+    // divUp(x, y) := (x + y - 1) / y
+    // To avoid intermediate overflow in the addition, we distribute the division and get:
+    // divUp(x, y) := (x - 1) / y + 1
+    // Note that this requires x != 0, which we already tested for.
+
+    return a.times(ONE).minus(bn(1)).idiv(b).plus(bn(1))
+  }
+}
+
+const fpPowUp = (x, y) => {
+  const raw = logExpPow(x, y)
+  const maxError = fpMulUp(raw, MAX_POW_RELATIVE_ERROR).plus(ONE)
+
+  return raw.plus(maxError)
+}
+
+const fpComplement = (x) => {
+  return x.lt(ONE) ? ONE.minus(x) : ZERO
+}
+
+// TODO add fun LogExpPow
 
 module.exports = {
   ...SpriteVWAP,
@@ -46,6 +108,10 @@ module.exports = {
   APP_ID: 32,
   config: APP_CONFIG,
 
+  upScale: function (amount, decimals) {
+    return bn(amount).times(this.SCALE).div(bn(decimals))
+  },
+
   makeCallContextInfo: function (pair, prefix) {
     let calls = []
     let pairCache = []
@@ -53,6 +119,25 @@ module.exports = {
     pair.forEach((item) => {
       if (!pairCache.includes(item.address)) {
         pairCache.push(item.address)
+        let param
+        switch (item.pool) {
+          case STABLE:
+            param = {
+              reference: prefix + ':' + item.address,
+              methodName: 'getAmplificationParameter'
+            }
+            break
+
+          case WEIGHTED:
+            param = {
+              reference: prefix + ':' + item.address,
+              methodName: 'getNormalizedWeights'
+            }
+            break
+
+          default:
+            break
+        }
         calls.push({
           reference: prefix + '_' + item.exchange + ':' + item.address,
           contractAddress: item.address,
@@ -66,15 +151,13 @@ module.exports = {
               reference: prefix + ':' + item.address,
               methodName: 'getVault'
             },
-            {
-              reference: prefix + ':' + item.address,
-              methodName: 'getAmplificationParameter'
-            }
+            param
           ],
           context: {
             pair: item.address,
             exchange: item.exchange,
-            chainId: item.chainId
+            chainId: item.chainId,
+            pool: item.pool
           }
         })
       }
@@ -86,8 +169,21 @@ module.exports = {
   makeCallContextMeta: function (poolInfo, prefix) {
     let calls = []
     poolInfo.forEach((item) => {
-      // TODO check do we need stable here or not
-      console.log(item)
+      let param = {}
+      switch (item.pool) {
+        case STABLE:
+          param = {
+            ampValue: bn(item.ampValue),
+            ampPrecision: bn(item.ampPrecision)
+          }
+          break
+        case WEIGHTED:
+          param = { weighted: item.weighted }
+          break
+
+        default:
+          break
+      }
       calls.push({
         reference: prefix + '_' + item.exchange + ':' + item.pair,
         contractAddress: item.vault,
@@ -103,8 +199,8 @@ module.exports = {
           pair: item.pair,
           exchange: item.exchange,
           chainId: item.chainId,
-          ampValue: bn(item.ampValue),
-          ampPrecision: bn(item.ampPrecision)
+          pool: item.pool,
+          ...param
         }
       })
     })
@@ -121,13 +217,28 @@ module.exports = {
       const balances = poolTokens[1].map((balanceObj) =>
         Web3.utils.hexToNumberString(balanceObj.hex)
       )
+      let param = {}
+      switch (item.context.pool) {
+        case STABLE:
+          param = {
+            ampValue: item.context.ampValue,
+            ampPrecision: item.context.ampPrecision
+          }
+          break
+        case WEIGHTED:
+          param = { weighted: item.context.weighted }
+          break
+
+        default:
+          break
+      }
       return {
         reference: item.reference,
         pair: item.context.pair,
         exchange: item.context.exchange,
         chainId: item.context.chainId,
-        ampValue: item.context.ampValue,
-        ampPrecision: item.context.ampPrecision,
+        pool: item.context.pool,
+        ...param,
         tokens: poolTokens[0],
         balances
       }
@@ -163,11 +274,14 @@ module.exports = {
       const tokensInfo = item.tokens.map((token, index) => {
         const info = this.getInfoContract(resultDecimals, prefix + '_' + token)
         const decimals = info[0].callsReturnContext[0].returnValues[0]
-
+        const weighted =
+          item.pool === WEIGHTED ? { weighted: item.weighted[index] } : {}
         return {
           token,
+          index: index,
           decimals: bn(10).pow(bn(decimals)).toString(),
-          balance: item.balances[index]
+          balance: item.balances[index],
+          ...weighted
         }
       })
       return {
@@ -188,24 +302,40 @@ module.exports = {
         'getPoolId'
       )[0]
       const vault = this.getReturnValue(item.callsReturnContext, 'getVault')[0]
-      const [ampValue, isUpdating, ampPrecision] = this.getReturnValue(
-        item.callsReturnContext,
-        'getAmplificationParameter'
-      )
-      return { poolId, vault, ampValue, ampPrecision, ...item.context }
+      let param = {}
+      switch (item.context.pool) {
+        case STABLE:
+          const [ampValue, isUpdating, ampPrecision] = this.getReturnValue(
+            item.callsReturnContext,
+            'getAmplificationParameter'
+          )
+          param = { ampValue, ampPrecision }
+          break
+
+        case WEIGHTED:
+          const weighted = this.getReturnValue(
+            item.callsReturnContext,
+            'getNormalizedWeights'
+          )
+          param = { weighted }
+
+        default:
+          break
+      }
+
+      return { poolId, vault, ...param, ...item.context }
     })
     const callContextMeta = this.makeCallContextMeta(poolInfo, PAIRS)
 
     const multiCallInfo = await this.runMultiCall(callContextMeta)
     let metadata = this.getMetadata(multiCallInfo, PAIRS)
-    console.log(JSON.stringify(metadata, undefined, 2))
-
     let callContextPairs = this.makeCallContextDecimal(metadata, PAIRS)
 
     let resultDecimals = await this.runMultiCall(callContextPairs)
 
     metadata = this.getFinalMetaData(resultDecimals, metadata, PAIRS)
-    console.log(JSON.stringify(metadata, undefined, 2))
+
+    // console.log(JSON.stringify(metadata, undefined, 2))
     return metadata
   },
 
@@ -390,7 +520,7 @@ module.exports = {
     return balances[tokenIndexOut].minus(finalBalanceOut).minus(ONE)
   },
 
-  tokenPrice: function (
+  tokenPriceStable: function (
     ampValue,
     ampPrecision,
     amount,
@@ -414,10 +544,18 @@ module.exports = {
       amount,
       invariant
     )
-    // TODO why * .9999
+    // TODO Do we need fee network??????????
     // return amountOut.times(bn(0.9999))
     return amountOut
   },
+
+  tokenPriceWeighted: function (
+    balanceIn,
+    weightIn,
+    balanceOut,
+    weightOut,
+    amountIn
+  ) {},
 
   pairVWAP: async function (
     token,
@@ -455,27 +593,53 @@ module.exports = {
     //   }
     // TODO based on subgraph filter these things from metadata
 
-    console.log(metadata)
     let swap = {
       balances: metadata.tokensInfo.map((t) =>
-        bn(t.balance).times(this.SCALE).div(bn(t.decimals))
+        this.upScale(t.balance, t.decimals)
       ),
       amount: '1000000000000000000',
+      tokenInBalance: metadata.tokensInfo[1].balance,
+      tokenOutBalance: metadata.tokensInfo[0].balance,
+
       tokenIn: metadata.tokensInfo[1].token,
       tokenOut: metadata.tokensInfo[0].token
     }
 
-    let indexIn = metadata.tokens.findIndex((item) => item === swap.tokenIn)
-    let indexOut = metadata.tokens.findIndex((item) => item === swap.tokenOut)
-    let price = this.tokenPrice(
-      metadata.ampValue,
-      metadata.ampPrecision,
-      swap.amount,
-      [...swap.balances],
-
-      indexIn,
-      indexOut
+    const tokenIn = metadata.tokensInfo.find(
+      (item) => item.token === swap.tokenIn
     )
+    const tokenOut = metadata.tokensInfo.find(
+      (item) => item.token === swap.tokenOut
+    )
+
+    let price
+    switch (metadata.pool) {
+      case STABLE:
+        price = this.tokenPriceStable(
+          metadata.ampValue,
+          metadata.ampPrecision,
+          swap.amount,
+          [...swap.balances],
+
+          tokenIn.index,
+          tokenOut.index
+        )
+        break
+      case WEIGHTED:
+        //  TODO double check to be sure about weighted decimal
+        price = this.tokenPriceWeighted(
+          this.upScale(swap.tokenInBalance, tokenIn.decimals),
+          tokenIn.weighted,
+          this.upScale(swap.tokenOutBalance, tokenOut.decimals),
+          tokenOut.weighted,
+          swap.amount
+        )
+        break
+
+      default:
+        break
+    }
+
     console.log({ price: price.toString() })
   }
 }
