@@ -53,10 +53,6 @@ module.exports = {
   APP_NAME: 'beetsfi_permissionless_oracles_vwap_v3',
   APP_ID: 32,
   config: APP_CONFIG,
-  // TODO how to set this value
-  startValue: 100000,
-  endValue: 100000,
-  AMP_PRECISION: 1000,
 
   makeCallContextInfo: function (pair, prefix) {
     let calls = []
@@ -77,6 +73,10 @@ module.exports = {
             {
               reference: prefix + ':' + item.address,
               methodName: 'getVault'
+            },
+            {
+              reference: prefix + ':' + item.address,
+              methodName: 'getAmplificationParameter'
             }
           ],
           context: {
@@ -95,6 +95,7 @@ module.exports = {
     let calls = []
     poolInfo.forEach((item) => {
       // TODO check do we need stable here or not
+      console.log(item)
       calls.push({
         reference: prefix + '_' + item.exchange + ':' + item.pair,
         contractAddress: item.vault,
@@ -109,7 +110,9 @@ module.exports = {
         context: {
           pair: item.pair,
           exchange: item.exchange,
-          chainId: item.chainId
+          chainId: item.chainId,
+          ampValue: bn(item.ampValue),
+          ampPrecision: bn(item.ampPrecision)
         }
       })
     })
@@ -131,6 +134,8 @@ module.exports = {
         pair: item.context.pair,
         exchange: item.context.exchange,
         chainId: item.context.chainId,
+        ampValue: item.context.ampValue,
+        ampPrecision: item.context.ampPrecision,
         tokens: poolTokens[0],
         balances
       }
@@ -162,18 +167,18 @@ module.exports = {
   },
 
   getFinalMetaData: function (resultDecimals, prevMetaData, prefix) {
-    let metadata = prevMetaData.map((pool) => {
-      const decimals = pool.tokens.map((token, index) => {
+    let metadata = prevMetaData.map((item) => {
+      const decimals = item.tokens.map((token, index) => {
         const info = this.getInfoContract(resultDecimals, prefix + '_' + token)
         const decimal = info[0].callsReturnContext[0].returnValues[0]
         return {
           token,
           decimal: new BN(10).pow(new BN(decimal)).toString(),
-          balance: pool.balances[index]
+          balance: item.balances[index]
         }
       })
       return {
-        ...pool,
+        ...item,
         tokensInfo: decimals
       }
     })
@@ -190,17 +195,24 @@ module.exports = {
         'getPoolId'
       )[0]
       const vault = this.getReturnValue(item.callsReturnContext, 'getVault')[0]
-      return { poolId, vault, ...item.context }
+      const [ampValue, isUpdating, ampPrecision] = this.getReturnValue(
+        item.callsReturnContext,
+        'getAmplificationParameter'
+      )
+      return { poolId, vault, ampValue, ampPrecision, ...item.context }
     })
     const callContextMeta = this.makeCallContextMeta(poolInfo, PAIRS)
 
     const multiCallInfo = await this.runMultiCall(callContextMeta)
     let metadata = this.getMetadata(multiCallInfo, PAIRS)
+    console.log(JSON.stringify(metadata, undefined, 2))
+
     let callContextPairs = this.makeCallContextDecimal(metadata, PAIRS)
 
     let resultDecimals = await this.runMultiCall(callContextPairs)
 
     metadata = this.getFinalMetaData(resultDecimals, metadata, PAIRS)
+    console.log(JSON.stringify(metadata, undefined, 2))
     return metadata
   },
 
@@ -229,29 +241,12 @@ module.exports = {
   //   return false
   // },
 
-  getAmplificationParameter: function (startTime, endTime, blockTimestamp) {
-    let isUpdating, value
-    if (blockTimestamp < endTime) {
-      isUpdating = true
-      if (this.endValue > this.startValue)
-        value =
-          this.startValue +
-          ((this.endValue - this.startValue) * (blockTimestamp - startTime)) /
-            (endTime - startTime)
-      else
-        value =
-          this.startValue -
-          ((this.startValue - this.endValue) * (blockTimestamp - startTime)) /
-            (endTime - startTime)
-    } else {
-      isUpdating = false
-      value = this.endValue
-    }
-
-    return { currentAmp: value, isUpdating }
-  },
-
-  calculateInvariant: function (amplificationParameter, balances, roundUp) {
+  calculateInvariant: function (
+    amplificationParameter,
+    ampPrecision,
+    balances,
+    roundUp
+  ) {
     /**********************************************************************************************
     // invariant                                                                                 //
     // D = invariant                                                  D^(n+1)                    //
@@ -294,11 +289,7 @@ module.exports = {
           .times(invariant)
           .times(invariant)
           .plus(
-            div(
-              ampTimesTotal.times(sum).times(P_D),
-              bn(this.AMP_PRECISION),
-              roundUp
-            )
+            div(ampTimesTotal.times(sum).times(P_D), ampPrecision, roundUp)
           ),
 
         numTokens
@@ -306,8 +297,8 @@ module.exports = {
           .times(invariant)
           .plus(
             div(
-              ampTimesTotal.minus(bn(this.AMP_PRECISION)).times(P_D),
-              bn(this.AMP_PRECISION),
+              ampTimesTotal.minus(ampPrecision).times(P_D),
+              ampPrecision,
               !roundUp
             )
           ),
@@ -323,6 +314,7 @@ module.exports = {
 
   getTokenBalanceGivenInvariantAndAllOtherBalances: function (
     amplificationParameter,
+    ampPrecision,
     balances,
     invariant,
     tokenIndex
@@ -346,14 +338,12 @@ module.exports = {
     // c =  ----------------------------- * AMP_PRECISION * Balances[tokenIndex] // Ceil
     //       ampTimesTotal  * P_D
     const c = divUp(inv2, ampTimesTotal.times(P_D))
-      .times(bn(this.AMP_PRECISION))
+      .times(ampPrecision)
       .times(balances[tokenIndex])
     //             invariant
     // b = sum + --------------- * AMP_PRECISION // floor
     //            ampTimesTotal
-    const b = sum.plus(
-      divDown(invariant, ampTimesTotal).times(bn(this.AMP_PRECISION))
-    )
+    const b = sum.plus(divDown(invariant, ampTimesTotal).times(ampPrecision))
     // We iterate to find the balance
 
     let prevTokenBalance = ZERO
@@ -387,6 +377,7 @@ module.exports = {
 
   calcOutGivenIn: function (
     amplificationParameter,
+    ampPrecision,
     balances,
     tokenIndexIn,
     tokenIndexOut,
@@ -396,6 +387,7 @@ module.exports = {
     balances[tokenIndexIn] = balances[tokenIndexIn].plus(tokenAmountIn)
     finalBalanceOut = this.getTokenBalanceGivenInvariantAndAllOtherBalances(
       amplificationParameter,
+      ampPrecision,
       [...balances],
       invariant,
       tokenIndexOut
@@ -406,24 +398,23 @@ module.exports = {
   },
 
   tokenPrice: function (
-    startTime,
-    endTime,
-    blockTimestamp,
+    ampValue,
+    ampPrecision,
     amount,
     balances,
     indexIn,
     indexOut
   ) {
-    let { currentAmp } = this.getAmplificationParameter(
-      startTime,
-      endTime,
-      blockTimestamp
+    const invariant = this.calculateInvariant(
+      ampValue,
+      ampPrecision,
+      balances,
+      true
     )
-    currentAmp = bn(currentAmp)
-    const invariant = this.calculateInvariant(currentAmp, balances, true)
 
     const amountOut = this.calcOutGivenIn(
-      currentAmp,
+      ampValue,
+      ampPrecision,
       [...balances],
       indexIn,
       indexOut,
@@ -470,12 +461,9 @@ module.exports = {
     //     continue
     //   }
     // TODO based on subgraph filter these things from metadata
-    let web3 = await getWeb3(this.config.chainId)
-    let lastBlock = await web3.eth.getBlock('latest')
 
     console.log(metadata)
     let swap = {
-      blockTimestamp: lastBlock.timestamp,
       reserve0: new BN(metadata.tokensInfo[0].balance)
         .mul(this.SCALE)
         .div(new BN(metadata.tokensInfo[0].decimal))
@@ -492,9 +480,8 @@ module.exports = {
     let indexIn = metadata.tokens.findIndex((item) => item === swap.tokenIn)
     let indexOut = metadata.tokens.findIndex((item) => item === swap.tokenOut)
     let price = this.tokenPrice(
-      startTime,
-      endTime,
-      swap.blockTimestamp,
+      metadata.ampValue,
+      metadata.ampPrecision,
       swap.amount,
       [bn(swap.reserve0), bn(swap.reserve1)],
 
