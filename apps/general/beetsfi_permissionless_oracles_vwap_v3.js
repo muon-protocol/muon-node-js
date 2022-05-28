@@ -1,4 +1,4 @@
-const { Web3, toBaseUnit, getWeb3, BigNumber, BN } = MuonAppUtils
+const { Web3, BigNumber } = MuonAppUtils
 
 const SpriteVWAP = require('./spirit_permissionless_oracles_vwap_v3')
 const {
@@ -38,14 +38,6 @@ const divUp = (a, b) => {
 
 const scale = (value, decimalPlaces) =>
   bn(value).times(bn(10).pow(decimalPlaces))
-
-const upScale = (amount, decimals) => {
-  return scale(amount, decimals).times(bn(10).pow(18 - decimals))
-}
-
-const downScaleDown = (amount, decimals) => {
-  return scale(divDown(bn(amount), bn(10).pow(18 - decimals)), -decimals)
-}
 
 module.exports = {
   ...SpriteVWAP,
@@ -168,18 +160,19 @@ module.exports = {
 
   getFinalMetaData: function (resultDecimals, prevMetaData, prefix) {
     let metadata = prevMetaData.map((item) => {
-      const decimals = item.tokens.map((token, index) => {
+      const tokensInfo = item.tokens.map((token, index) => {
         const info = this.getInfoContract(resultDecimals, prefix + '_' + token)
-        const decimal = info[0].callsReturnContext[0].returnValues[0]
+        const decimals = info[0].callsReturnContext[0].returnValues[0]
+
         return {
           token,
-          decimal: new BN(10).pow(new BN(decimal)).toString(),
+          decimals: bn(10).pow(bn(decimals)).toString(),
           balance: item.balances[index]
         }
       })
       return {
         ...item,
-        tokensInfo: decimals
+        tokensInfo
       }
     })
 
@@ -464,26 +457,21 @@ module.exports = {
 
     console.log(metadata)
     let swap = {
-      reserve0: new BN(metadata.tokensInfo[0].balance)
-        .mul(this.SCALE)
-        .div(new BN(metadata.tokensInfo[0].decimal))
-        .toString(),
-      reserve1: new BN(metadata.tokensInfo[1].balance)
-        .mul(this.SCALE)
-        .div(new BN(metadata.tokensInfo[1].decimal))
-        .toString(),
+      balances: metadata.tokensInfo.map((t) =>
+        bn(t.balance).times(this.SCALE).div(bn(t.decimals))
+      ),
       amount: '1000000000000000000',
       tokenIn: metadata.tokensInfo[1].token,
       tokenOut: metadata.tokensInfo[0].token
     }
-    console.log(swap)
+
     let indexIn = metadata.tokens.findIndex((item) => item === swap.tokenIn)
     let indexOut = metadata.tokens.findIndex((item) => item === swap.tokenOut)
     let price = this.tokenPrice(
       metadata.ampValue,
       metadata.ampPrecision,
       swap.amount,
-      [bn(swap.reserve0), bn(swap.reserve1)],
+      [...swap.balances],
 
       indexIn,
       indexOut
