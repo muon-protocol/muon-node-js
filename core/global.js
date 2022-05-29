@@ -29,6 +29,12 @@ function soliditySha3(params) {
   return web3Instance.utils.soliditySha3(...params)
 }
 
+BigNumber.config({
+  EXPONENTIAL_AT: [-100, 100],
+  ROUNDING_MODE: 1,
+  DECIMAL_PLACES: 18
+})
+
 global.MuonAppUtils = {
   axios,
   Web3,

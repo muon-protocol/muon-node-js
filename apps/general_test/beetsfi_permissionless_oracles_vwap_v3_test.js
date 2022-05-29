@@ -60,5 +60,5 @@ const example_2 = {
   ]
 }
 
-// testPrice(example_1, token, tokenName)
-testPrice(example_2, token2, tokenName2)
+testPrice(example_1, token, tokenName)
+// testPrice(example_2, token2, tokenName2)
