@@ -3,6 +3,7 @@ const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators'
 const tssModule = require('../utils/tss')
 const {timeout} = require('../utils/helpers');
 const TimeoutPromise = require('../core/timeout-promise')
+const {utils:{sha3}} = require('web3')
 
 const RemoteMethods = {
   AskElectionPermission: "AskElectionPermission",
@@ -185,7 +186,7 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   isWalletPermittedToElect(wallet, election) {
     // console.log("===========", {wallet, election, lastElection: this.lastElection})
-    return  election === this.lastElection+1 && wallet.toLowerCase() > process.env.SIGN_WALLET_ADDRESS.toLowerCase();
+    return  election === this.lastElection+1 && this.currentExecutor === wallet;
   }
 
   _electionComplete(key) {
@@ -207,6 +208,16 @@ class GroupLeaderPlugin extends CallablePlugin {
   get onlinePartners() {
     return Object.values(this.TssPlugin.tssParty.onlinePartners)
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
+  }
+
+  get currentExecutor() {
+    let walletList = [
+      process.env.SIGN_WALLET_ADDRESS,
+      ...this.onlinePartners.map(p =>p.wallet)
+    ]
+    let hashes = walletList.map(w => sha3(`${w}-${new Date().getHours()}-${this.lastElection+1}`));
+    let minIndex = hashes.reduce((min, val, index, arr)=>(val<arr[min]?index:min), 0);
+    return walletList[minIndex]
   }
 
   async callParty(method, data={}, partners){
