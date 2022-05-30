@@ -112,7 +112,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   async electionStart() {
     let responses = await this.callParty(RemoteMethods.ElectionStart,{election: this.lastElection+1});
     // console.log(`GroupLeaderPlugin.electionStart electionStart responses:`, responses)
-    let allDone = responses.filter(r => (r===true)).length > responses.length*0.55;
+    let allDone = responses.findIndex(r => (r!==true)) < 0;
     // TODO: is need to 50% of nodes agree with election start?
     return allDone && (responses.length + 1) >= this.TssPlugin.TSS_THRESHOLD
   }
@@ -150,8 +150,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   async isPermittedToDoElection() {
     let responses = await this.callParty(RemoteMethods.AskElectionPermission, {election: this.lastElection+1});
     console.log(`election ${this.lastElection+1} permission responses`, responses);
-    return responses.length+1 >= this.TssPlugin.TSS_THRESHOLD
-      && responses.filter(res => res === true).length > responses.length*0.55;
+    return responses.length+1 >= this.TssPlugin.TSS_THRESHOLD && responses.findIndex(res => res !== true) < 0;
   }
 
   async informElectionReady() {
@@ -237,6 +236,10 @@ class GroupLeaderPlugin extends CallablePlugin {
   async _askElectionPermission(data={}, callerInfo) {
     // console.log('GroupLeaderPlugin.AskElectionPermission', {data, callerInfo});
     let {election} = data;
+    console.log("GroupLeadePlugin._askElectionPermission", {
+      wallet: callerInfo.wallet,
+      permitted: this.isWalletPermittedToElect(callerInfo.wallet, election)
+    })
     return this.isWalletPermittedToElect(callerInfo.wallet, election)
   }
 
