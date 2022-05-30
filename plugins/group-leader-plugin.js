@@ -95,8 +95,10 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   async electionStart() {
     let responses = await this.callParty(RemoteMethods.ElectionStart,{election: this.lastElection+1});
+    // console.log(`GroupLeaderPlugin.electionStart electionStart responses:`, responses)
     let allDone = responses.findIndex(r => (r!==true)) < 0;
-    return allDone && responses.length >= this.TssPlugin.TSS_THRESHOLD
+    // TODO: is need to 50% of nodes agree with election start?
+    return allDone && (responses.length + 1) >= this.TssPlugin.TSS_THRESHOLD
   }
 
   async leaderAlreadySelected(){
@@ -131,7 +133,7 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   async isPermittedToDoElection() {
     let responses = await this.callParty(RemoteMethods.AskElectionPermission, {election: this.lastElection+1});
-    console.log(`election ${this.lastElection+1} permission responses`, responses);
+    // console.log(`election ${this.lastElection+1} permission responses`, responses);
     return responses.length+1 >= this.TssPlugin.TSS_THRESHOLD && responses.findIndex(res => res !== true) < 0;
   }
 
