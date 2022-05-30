@@ -4,9 +4,10 @@ const SpriteVWAP = require('./spirit_permissionless_oracles_vwap_v3')
 const {
   GET_POOL_INFO_ABI,
   PAIRS,
-  PRICING_ASSETS,
   POOL_TOKENS_ABI,
-  ERC20_DECIMALS_ABI
+  ERC20_DECIMALS_ABI,
+  STABLE,
+  WEIGHTED
 } = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
 const { async } = require('regenerator-runtime')
 
@@ -14,11 +15,9 @@ const APP_CONFIG = {
   chainId: 250
 }
 
-const STABLE = 'stable'
-const WEIGHTED = 'weighted'
-
 const getTimestamp = () => Math.floor(Date.now() / 1000)
 const bn = (value) => new BigNumber(value)
+
 const ZERO = bn(0)
 const ONE = bn(1)
 const TWO = bn(2)
@@ -1073,21 +1072,6 @@ module.exports = {
         )
         break
       case WEIGHTED:
-        // const tokenIn = {
-        //   token: '0xDE5ed76E7c05eC5e4572CfC88d1ACEA165109E44',
-        //   index: 1,
-        //   decimals: '1000000000000000000',
-        //   balance: '9402437328459364289291',
-        //   weight: '800000000000000000'
-        // }
-        // const tokenOut = {
-        //   token: '0xDE12c7959E1a72bbe8a5f7A1dc8f8EeF9Ab011B3',
-        //   index: 0,
-        //   decimals: '1000000000000000000',
-        //   balance: '507538331497951845171512',
-        //   weight: '200000000000000000'
-        // }
-        // const amountIn = '1000000000000000000'
         //  TODO double check to be sure about weighted decimal
         price = this.tokenPriceWeighted(
           this.upScale(tokenIn.balance, tokenIn.decimals),

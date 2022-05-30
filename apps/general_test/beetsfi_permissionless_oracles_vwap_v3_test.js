@@ -46,7 +46,7 @@ const example_1 = {
 }
 
 const tokenName2 = 'dei'
-const token2 = '0x8B858Eaf095A7337dE6f9bC212993338773cA34e'
+const token2 = '0xDFc65c1F15AD3507754EF0fd4BA67060C108db7E'
 const example_2 = {
   token,
 
@@ -60,5 +60,5 @@ const example_2 = {
   ]
 }
 
-testPrice(example_1, token, tokenName)
-// testPrice(example_2, token2, tokenName2)
+// testPrice(example_1, token, tokenName)
+testPrice(example_2, token2, tokenName2)
