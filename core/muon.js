@@ -83,7 +83,7 @@ class Muon extends Events {
       emoji.get('large_blue_circle'),
       chalk.blue(` ${connection.remotePeer.toB58String()}`)
     )
-    this.emit('peer', connection.remotePeer)
+    this.emit('peer:connect', connection.remotePeer)
   }
 
   onPeerDisconnect(connection){
@@ -97,7 +97,7 @@ class Muon extends Events {
   }
 
   async onPeerDiscovery(peerId){
-    this.emit('peer', peerId)
+    this.emit('peer:discovery', peerId)
     console.log('found peer');
     try {
       const peerInfo = await this.libp2p.peerRouting.findPeer(peerId)

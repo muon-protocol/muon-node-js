@@ -29,7 +29,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
       throw {message: 'party not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
-    let nonce = await tssPlugin.keyGen(party, nonceParticipantsCount)
+    let nonce = await tssPlugin.keyGen(party, {maxPartners: nonceParticipantsCount})
 
     // let sign = tssPlugin.sign(null, party);
     return {
@@ -113,8 +113,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let {data: {init: {nonce: nonceId}}} = request;
     let nonce = tssPlugin.getSharedKey(nonceId)
-    //
-    // let idx = this.muon.getNodesWalletIndex()[sign.owner];
+
     let idx = owner;
     let Z_i = pubKey;
     let K_i = nonce.getPubKey(idx);

@@ -22,10 +22,12 @@ const keysCache = new NodeCache({
   useClones: false,
 });
 
-const MSG_TYPE_NEED_GROUP = 'MSG_TYPE_NEED_GROUP';
-const MSG_TYPE_JOINED_TO_GROUP = 'MSG_TYPE_JOINED_TO_GROUP';
-const MSG_TYPE_JOIN_PARTY_REQ = 'MSG_TYPE_JOIN_PARTY_REQ';
-const MSG_TYPE_INFORM_ENTRANCE = 'MSG_TYPE_INFORM_ENTRANCE';
+const BroadcastMessage = {
+  NeedGroup: 'BROADCAST_MSG_NEED_GROUP',
+  JoinedToGroup: 'BROADCAST_MSG_JOINED_TO_GROUP',
+  JoinPartyRequest: 'BROADCAST_MSG_JOIN_PARTY_REQ',
+  WhoIsThere: 'BROADCAST_MSG_WHO_IS_THERE',
+};
 
 const RemoteMethods = {
   joinToParty: 'joinToParty',
@@ -36,7 +38,8 @@ const RemoteMethods = {
   distributeKey: 'distributeKey',
   distributePubKey: 'distributePubKey',
   storeTssKey: 'storeTssKey',
-  informEntrance: 'informEntrance',
+  iAmHere: "iAmHere",
+  checkTssStatus: "checkTssStatus",
 }
 
 const GroupStatus = {
@@ -65,9 +68,18 @@ class TssPlugin extends CallablePlugin {
 
   async onStart() {
     super.onStart();
-    this.muon.once('peer', () => {
-      console.log('first node connected ...')
-      this.joinToGroup();
+
+    this.collateralPlugin.once('loaded', async () => {
+      /**
+       * Normally, broadcast subscription will done inside the super.onStart().
+       * But, at the start time, BROADCAST_CHANNEL has a null value and while BROADCAST_CHANNEL is null, subscription will ignored.
+       * So, now that BROADCAST_CHANNEL has a value, we call registerBroadcastHandler again to subscribe to group channel.
+       */
+      await this.registerBroadcastHandler();
+
+      this.loadTssInfo();
+
+      // this.collateralPlugin.onEvent('AddPartner', txs => console.log('AddPartner....', txs))
     })
 
     this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
@@ -94,103 +106,136 @@ class TssPlugin extends CallablePlugin {
     return this.muon.configs.net.tss.max;
   }
 
-  async joinToGroup() {
-    this.informEntrance();
-    try {
-      /**
-       * check and load previews tss config.
-       */
-        // TODO: handle loading error. this may destroy saved keys
-      let loadedFromStorage = await this.loadSavedTss()
-      if (loadedFromStorage) {
-        console.log('tss loaded from storage.')
-        return true
-      }
-    } catch (e) {
-      console.error('TssPlugin.joinToGroup', e, e.stack)
-    }
-
-    while (!this.isReady) {
-      try {
-        // TODO: check this field changes.
-        // this.groupStatus = GroupStatus.Checking;
-
-        let joinedToExistingGroup = await this.tryToJoinExistingGroup(3)
-        if (joinedToExistingGroup) {
-          console.log('tss joined to existing group.');
-          break;
-        }
-
-        if(this.isReady)
-          break;
-        this.informNeedGroup();
-
-        // TODO: check this field changes.
-        this.groupStatus = GroupStatus.ReadyToJoin;
-
-        /**
-         * if previews config cannot be loaded, create and save new one
-         */
-        await this.tryToCreateTssParty(15);
-      } catch (e) {
-        console.error('TssPlugin.joinToGroup', e, e.stack);
-      }
-    }
-
-    this.groupStatus = GroupStatus.Joined;
+  get collateralPlugin() {
+    return this.muon.getPlugin('collateral')
   }
 
-  async loadSavedTss() {
-    let {tss: tssConfig, account} = this.muon.configs;
-    if (!tssConfig || tssConfig.party.t !== this.TSS_THRESHOLD)
-      return false
-    // load party
-    let collateralInfo = this.muon.getPlugin('collateral');
-    tssConfig.party.partners = collateralInfo.getWallets().map(wallet => ({
-      wallet,
-      peerId: collateralInfo.getWalletPeerId(wallet)
-    }))
-    let party = Party.load(tssConfig.party);
+  get leaderPlugin() {
+    return this.muon.getPlugin('group-leader');
+  }
+
+  get GroupAddress() {
+    return this.isReady ? this.tssKey.address : null;
+  }
+
+  getTssConfig(){
+    let {tss: tssConfig} = this.muon.configs;
+    if(!tssConfig)
+      return null;
+
+    if(!tssConfig.party.t) {
+      return null;
+    }
+
+    return tssConfig;
+  }
+
+  async loadTssInfo() {
+    let {groupInfo: {isValid, group, sharedKey, partners}, networkInfo} = this.collateralPlugin;
+
+    //TODO: handle {isValid: false};
+
+    let party = Party.load({
+      id: group,
+      t: parseInt(networkInfo.tssThreshold),
+      max: parseInt(networkInfo.maxGroupSize),
+      partners: partners.map(wallet => ({wallet}))
+    });
     this.parties[party.id] = party
-
-    let _key = {
-      ...tssConfig.key,
-      share: toBN(tssConfig.key.share),
-      publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
-    }
-    let key = DKey.load(party, _key)
-    keysCache.set(key.id, key, 0);
-
     this.tssParty = party;
-    this.tssKey = key;
-    this.isReady = true
-    return true;
-  }
 
-  async informEntrance() {
-    for(let i=0 ; i<15 ; i++) {
-      this.broadcast({
-        type: MSG_TYPE_INFORM_ENTRANCE,
-        peerId: process.env.PEER_ID,
-        wallet: process.env.SIGN_WALLET_ADDRESS,
-      })
-      await timeout(15000)
+    this.emit('party-load');
+
+    this.tryToFindOthers(3);
+
+    // validate tssConfig
+    let tssConfig = this.getTssConfig();
+
+    if(tssConfig){
+      let _key = {
+        ...tssConfig.key,
+        share: toBN(tssConfig.key.share),
+        publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
+      }
+      let key = DKey.load(this.tssParty, _key);
+      keysCache.set(key.id, key, 0);
+      this.tssKey = key;
+      this.isReady = true
+      console.log('tss ready');
+    }
+    else{
+      console.log('waiting to leader be selected ...');
+      let leader = await this.leaderPlugin.waitToLeaderSelect();
+
+      if (leader === process.env.SIGN_WALLET_ADDRESS && await this.isNeedToCreateKey()) {
+        let key = await this.tryToCreateTssKey();
+        console.log(`TSS key generated with ${key.partners.length} partners`);
+      }
+      else{
+        await timeout(6000);
+
+        this.tryToFindOthers();
+
+        while (!this.isReady) {
+          await timeout(5000);
+          let onlinePartners = Object.values(this.tssParty.onlinePartners)
+            .filter(({wallet:w}) => w !== process.env.SIGN_WALLET_ADDRESS);
+
+          let statuses = await Promise.all(onlinePartners.map(p => {
+            return this.remoteCall(
+              p.peer,
+              RemoteMethods.checkTssStatus
+            ).catch(e => 'error')
+          }))
+
+          let filter = statuses.map(s => s.isReady)
+          onlinePartners = onlinePartners.filter((p, i) => filter[i]);
+          statuses = statuses.filter((s, i) => filter[i]);
+
+          if(statuses.length >= this.collateralPlugin.TssThreshold){
+            await this.tryToRecoverTssKey(onlinePartners.map(p => p.wallet));
+          }
+        }
+      }
     }
   }
 
-  informNeedGroup(){
-    this.broadcast({
-      type: MSG_TYPE_NEED_GROUP,
-      peerId: process.env.PEER_ID,
-      wallet: process.env.SIGN_WALLET_ADDRESS,
-    })
+  async isNeedToCreateKey(){
+    let myWallet = process.env.SIGN_WALLET_ADDRESS;
+    let onlinePartners = Object.values(this.tssParty.onlinePartners).filter(p => (p.wallet !== myWallet))
+    let statuses = await Promise.all(onlinePartners.map(p => {
+      return this.remoteCall(
+        p.peer,
+        RemoteMethods.checkTssStatus
+      ).catch(e => 'error')
+    }))
+
+    // TODO: is this ok?
+    let numReadyNodes = statuses.map(s => (s.isReady?1:0))
+      .reduce((sum, r) => (sum+r), 0);
+
+    return numReadyNodes < this.collateralPlugin.TssThreshold;
+  }
+
+  async tryToFindOthers(numTry=1) {
+    for (let i = 0 ; i < numTry ; i++) {
+      this.broadcast({
+        method: BroadcastMessage.WhoIsThere,
+        params: {
+          peerId: process.env.PEER_ID,
+        }
+      })
+      await timeout(5000)
+    }
   }
 
   informJoinedToGroup() {
     this.broadcast({
-      type: MSG_TYPE_JOINED_TO_GROUP,
-      peerId: process.env.PEER_ID,
-      wallet: process.env.SIGN_WALLET_ADDRESS,
+      method: BroadcastMessage.JoinedToGroup,
+      params: {
+        peerId: process.env.PEER_ID,
+        wallet: process.env.SIGN_WALLET_ADDRESS,
+      }
     })
   }
 
@@ -215,78 +260,32 @@ class TssPlugin extends CallablePlugin {
 
     // TODO: backup old key >> tss.conf.json.[date:time].bak
     this.muon.backupConfigFile('tss.conf.json');
-    // console.log('save config temporarily disabled for test.')
+    // console.log('save config temporarily disabled for test.');
     this.muon.saveConfig(tssConfig, 'tss.conf.json')
   }
 
-  async tryToJoinExistingGroup(numTry = 20) {
-    let partyToJoin = await this.muon.getPlugin('tss-party-search').searchParty(numTry);
-    // console.log({partyToJoin})
-    if (!partyToJoin)
-      return false
-    console.log(`trying to join party: ${partyToJoin.id} ...`);
-    let party = Party.load(partyToJoin);
-    try {
-      let peers = await this.getPartyPeers(party);
-      party.setPeers(peers);
-    } catch (e) {
-      console.log('TssPlugin.tryToJoinExistingGroup', e)
-      return false;
-    }
+  async tryToRecoverTssKey(partners){
+    partners = partners.map(w => this.tssParty.partners[w]);
 
-    // TODO: ignore addNewPartner if already added
-    let onlinePartners = Object.values(party.partners).filter(p => !!p.peer);
-    if(onlinePartners.length < this.TSS_THRESHOLD) {
-      console.log({onlinePartners});
-      console.log('No enough online partners.');
-      return false;
-    }
+    if(partners.length < this.collateralPlugin.TssThreshold)
+      throw {message: "No enough online partners to recover key."};
 
-    if (Object.keys(party.partners).includes(process.env.SIGN_WALLET_ADDRESS)) {
-      console.log('already in party');
-    }
-    else {
-      let newPartnerInfo = {
-        wallet: process.env.SIGN_WALLET_ADDRESS,
-        peerId: process.env.PEER_ID
-      }
-      let addResults = await this.remoteCall(
-        // online partners
-        onlinePartners.map(p => p.peer),
-        RemoteMethods.addNewPartner,
-        {party: party.id,}
-      )
-      console.log({addResults})
-      let numNodeAdded = addResults.map(added => added ? 1 : 0).reduce((acc, a) => acc + a, 0);
-      /**
-       * if sufficient nodes accepted current node address
-       */
-      if (numNodeAdded < this.TSS_THRESHOLD) {
-        console.log('cannot join to existing group.')
-        return false
-      }
-
-      party.addPartner(newPartnerInfo);
-    }
-
-    this.parties[party.id] = party;
-    this.tssParty = party;
-    let nonce = await this.keyGen(party);
+    let nonce = await this.keyGen(this.tssParty);
 
     let keyResults = await Promise.all(
-      onlinePartners.map(p => {
-        return this.remoteCall(
-          // online partners
-          p.peer,
-          RemoteMethods.recoverMyKey,
-          {nonce: nonce.id,}
+      partners.map(p => {
+          return this.remoteCall(
+            // online partners
+            p.peer,
+            RemoteMethods.recoverMyKey,
+            {nonce: nonce.id,}
           ).catch(e => null)
         }
       )
     )
-    let shares = onlinePartners
+    let shares = partners
       .map((p, j) => {
-          if(!keyResults[j])
+          if (!keyResults[j])
             return null
           return {
             i: p.wallet,
@@ -295,8 +294,8 @@ class TssPlugin extends CallablePlugin {
         }
       )
       .filter(s => !!s)
-    if(shares.length < party.t) {
-      console.log(`Need's of ${party.t} result to recover the Key, but received ${shares.n} result.`)
+    if (shares.length < this.tssParty.t) {
+      console.log(`Need's of ${this.tssParty.t} result to recover the Key, but received ${shares.n} result.`)
       return false;
     }
 
@@ -309,6 +308,7 @@ class TssPlugin extends CallablePlugin {
     // this.parties[party.id] = party
     let tssKey = DKey.load(this.tssParty, {
       id: keyResults[0].id,
+      i: myIndex,
       share: myKey,
       publicKey: tssModule.keyFromPublic(keyResults[0].publicKey),
       address: keyResults[0].address,
@@ -316,132 +316,67 @@ class TssPlugin extends CallablePlugin {
 
     this.tssKey = tssKey
     this.isReady = true;
-    this.saveTssConfig(this.tssParty, tssKey);
+    this.saveTssConfig(this.tssParty, tssKey)
+    console.log('tss key recovered');
     return true;
   }
 
-  async tryToCreateTssParty() {
-    let {nodesNeedGroup, TSS_THRESHOLD} = this;
-    /**
-     * needs at least TSS_THRESHOLD number of nodes.
-     */
-    if(Object.keys(nodesNeedGroup).length < TSS_THRESHOLD-1) {
-      console.log(`No enough node to create tss group. already exist [${1+Object.keys(nodesNeedGroup).length}/${TSS_THRESHOLD}]`)
-      return;
-    }
-    let selfWallet = process.env.SIGN_WALLET_ADDRESS
-    let wallets = Object.keys(nodesNeedGroup);
-    /**
-     * lower wallet address has more priority to create group
-     */
-    if(wallets.findIndex(w => w.toLowerCase() < selfWallet.toLowerCase()) >= 0)
-      return;
-
-    console.log('trying to create a new tss group ...')
+  async tryToCreateTssKey() {
     try {
-      let party = await this.makeParty(this.TSS_THRESHOLD, {config: {isTssParty: true}});
-      this.tssParty = party;
 
       let key;
       do {
-        key = await this.keyGen(party)
-      }while(tssModule.HALF_N.lt(key.getTotalPubKey().x));
+        key = await this.keyGen(this.tssParty)
+      } while (tssModule.HALF_N.lt(key.getTotalPubKey().x));
 
-      let callResult = await Promise.all(Object.values(party.partners).map(({wallet, peerId, peer}) => {
+      let keyPartners = key.partners.map(wallet => this.tssParty.partners[wallet])
+      let callResult = await Promise.all(keyPartners.map(({wallet, peer}) => {
         if (wallet === process.env.SIGN_WALLET_ADDRESS)
           return Promise.resolve(true);
+        ;
 
         return this.remoteCall(
           peer,
           RemoteMethods.storeTssKey,
           {
-            party: party.id,
+            party: this.tssParty.id,
             key: key.id,
           }
-        ).catch(() => false)
+        ).catch(() => false);
       }))
-      this.saveTssConfig(party, key)
+      // console.log(`key save broadcast count: ${key.partners.length}`, callResult);
+      this.saveTssConfig(this.tssParty, key)
 
-      this.parties[party.id] = party
-      keysCache.set(key.id, key, 0) // keep for ever
+      keysCache.set(key.id, key, 0);
       this.tssKey = key;
       this.isReady = true;
       this.informJoinedToGroup();
       console.log('tss ready.')
+
+      return key;
     } catch (e) {
-      console.error('TssPlugin.tryToCreateTssParty', e, e.stack);
+      console.error('TssPlugin.tryToCreateTssKey', e, e.stack);
     }
   }
 
   /**
-   * This makes a group of nodes that will works together in order to make Key/Signature.
-   * @param t: number of nodes needed to reconstruct shared key.
-   * @returns {Promise<TssParty|null>}
+   *
+   * @param party
+   * @param options
+   * @param options.id: create key with specific id
+   * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
+   * @returns {Promise<DistributedKey>}
    */
-  async makeParty(t = 2, options) {
-    // TODO: redesign this method
-    // let party = await this._makeNewParty(2);
-    // const peers = await this.getPartyPeers(party)
-    // party.setPeers(peers)
-    // await this.initParty(party)
-    let {peers: defaultPeers, config} = options
+  async keyGen(party, options={}) {
+    if(!party)
+      party = this.tssParty;
 
-    if (this.joiningTssGroup)
-      throw {message: 'Already joining to group'};
-
-    let party = new Party(t, this.TSS_MAX, null, 15000);
-    this.newParty = party;
-    this.parties[party.id] = party;
-    this.joiningTssGroup = party.id;
-
-    if (defaultPeers) {
-      // TODO: not implemented
-      throw {message: "not implemented"};
-    } else {
-      this.broadcast({
-        type: MSG_TYPE_JOIN_PARTY_REQ,
-        id: party.id,
-        peerId: process.env.PEER_ID,
-        wallet: process.env.SIGN_WALLET_ADDRESS,
-      })
-      await party.waitToFulfill()
-    }
-
-    if(this.joiningTssGroup !== party.id)
-      throw {message: 'Joined to remote party'}
-
-    if (!party.hasEnoughPartners()) {
-      delete this.parties[party.id]
-      this.joiningTssGroup = null;
-      throw {message: `Need to ${party.t} partners, but ${Object.keys(party.partners).length} partner joined after 5 seconds.`}
-    }
-
-    // let partners = Object.values(party.partners).filter(({peerId}) => peerId != process.env.PEER_ID)
-    // let peers = await Promise.all(partners.map(({peerId}) => this.findPeer(peerId)))
-    let peers = await this.getPartyPeers(party);
-    party.setPeers(peers);
-
-    await this.remoteCall(
-      peers,
-      RemoteMethods.setPartners,
-      {
-        id: party.id,
-        t: party.t,
-        max: party.max,
-        partners: party.partners,
-        config,
-      }
-    )
-    return party;
-  }
-
-  async keyGen(party, maxPartners) {
     if(party.onlinePartners.length < this.TSS_THRESHOLD){
       throw {message: "No enough online node."}
     }
     let t0 = Date.now()
     // 1- create new key
-    let key = await this.createKey(party, maxPartners)
+    let key = await this.createKey(party, options)
     let t1 = Date.now()
     // 2- distribute key initialization
     await this.broadcastKey(key)
@@ -460,9 +395,18 @@ class TssPlugin extends CallablePlugin {
     return key;
   }
 
-  async createKey(party, maxPartners) {
+  /**
+   *
+   * @param party
+   * @param options
+   * @param options.id: create key with specific id
+   * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
+   * @returns {Promise<DistributedKey>}
+   */
+  async createKey(party, options={}) {
+    let {id, maxPartners} = options;
     // 1- create new key
-    let key = new DKey(party, null, 15000)
+    let key = new DKey(party, id, 15000)
     /**
      * TODO: check from misbehavior
      * prevent app crash
@@ -505,10 +449,6 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
     key.partners = partners.filter((p, i) => callResult[i]!=='error').map(p => p.wallet)
     return key;
-  }
-
-  getNodesWalletIndex(party) {
-    return party.walletIndexes
   }
 
   async broadcastKey(key) {
@@ -571,42 +511,28 @@ class TssPlugin extends CallablePlugin {
     return keysCache.get(id);
   }
 
-  async hash(msg, party) {
-  }
-
-  async sign(hash, party, nonce) {
-    console.log({
-      ...nonce,
-      keyPart: nonce.keyPart.toString(),
-      pubKey: {
-        x: nonce.pubKey.x.toString(),
-        y: nonce.pubKey.y.toString(),
-      }
-    })
-  }
-
-  async verify(hash, sign) {
-  }
-
-  async handleBroadcastMessage(msg) {
-    // console.log('tss-plugin.handleBroadcastMessage', msg);
-    switch (msg.type) {
-      case MSG_TYPE_NEED_GROUP: {
-        let {peerId, wallet} = msg;
+  async handleBroadcastMessage(msg, callerInfo) {
+    // TODO: use {wallet, peer} from callerInfo instead of msg params.
+    let {method, params} = msg;
+    // console.log("TssPlugin.handleBroadcastMessage",msg, {callerInfo})
+    switch (method) {
+      case BroadcastMessage.NeedGroup: {
+        let {peerId} = params;
+        let {wallet} = callerInfo
         this.nodesNeedGroup[wallet] = {peerId, wallet};
         // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
         break;
       }
-      case MSG_TYPE_JOINED_TO_GROUP: {
-        let {wallet} = msg;
+      case BroadcastMessage.JoinedToGroup: {
+        let {wallet} = callerInfo;
         delete this.nodesNeedGroup[wallet];
         // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
         break;
       }
-      case MSG_TYPE_JOIN_PARTY_REQ: {
+      case BroadcastMessage.JoinPartyRequest: {
         if (this.groupStatus !== GroupStatus.ReadyToJoin)
           return;
-        let {id, peerId} = msg;
+        let {id, peerId} = params;
         /**
          * Join to the group with lower id, on concurrent request.
          * Ignore if id is grater than current group id.
@@ -633,20 +559,16 @@ class TssPlugin extends CallablePlugin {
         )
         break
       }
-      case MSG_TYPE_INFORM_ENTRANCE: {
-        let {peerId, wallet} = msg;
+      case BroadcastMessage.WhoIsThere: {
+        let {peerId} = params;
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
         // TODO: is this message from 'wallet'
         let peer = await this.findPeer(peerId);
-        if(!peer){
-          console.log("TssPlugin.handleBroadcastMessage(MSG_TYPE_INFORM_ENTRANCE): peer not found.", {peerId})
-          // TODO: is need to return?
-        }
-        if (peer && this.isReady) {
-          this.tssParty.setWalletPeer(wallet, peer);
+        if (!!this.tssParty) {
+          this.tssParty.setWalletPeer(callerInfo.wallet, peer);
           this.remoteCall(
             peer,
-            RemoteMethods.informEntrance
+            RemoteMethods.iAmHere
           ).catch(e => {})
         }
         break;
@@ -656,24 +578,13 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
-  async onBroadcastReceived(data) {
+  async onBroadcastReceived(data={}, callerInfo) {
     try {
       // let data = JSON.parse(uint8ArrayToString(msg.data));
-      await this.handleBroadcastMessage(data)
+      await this.handleBroadcastMessage(data, callerInfo)
     } catch (e) {
       console.error('TssPlugin.__onBroadcastReceived', e)
     }
-  }
-
-  callParty(party, remoteMethod, data) {
-    return Promise.all(
-      Object.values(party.partners)
-        .filter(p => {
-          // filter out current node & partners that not connected
-          return !!p.peer && p.wallet !== process.env.SIGN_WALLET_ADDRESS
-        })
-        .map(({peer}) => this.remoteCall(peer, remoteMethod, data))
-    )
   }
 
   /**==================================
@@ -839,6 +750,7 @@ class TssPlugin extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.storeTssKey)
   async __storeTssKey(data = {}) {
+    // TODO: problem condition: request arrive when tss is ready
     // console.log('TssPlugin.__storeTssKey', data)
     let {party: partyId, key: keyId} = data
     let party = this.getParty(partyId)
@@ -856,12 +768,21 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
-  @remoteMethod(RemoteMethods.informEntrance)
-  async __informEntrance(data = {}, callerInfo) {
-    // console.log('TssPlugin.__informEntrance', data, callerInfo)
+  @remoteMethod(RemoteMethods.iAmHere)
+  async __iAmHere(data={}, callerInfo) {
+    // console.log('TssPlugin.__iAmHere', data)
     let peer = await this.findPeer(callerInfo.peerId);
-    if (this.isReady)
-      this.tssParty.setPeers([peer]);
+    if (!!this.tssParty) {
+      this.tssParty.setWalletPeer(callerInfo.wallet, peer)
+    }
+  }
+
+  @remoteMethod(RemoteMethods.checkTssStatus)
+  async __checkTssStatus(data={}, callerInfo) {
+    return {
+      isReady: this.isReady,
+      address: this.tssKey?.address,
+    }
   }
 }
 

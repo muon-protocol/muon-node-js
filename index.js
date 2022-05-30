@@ -120,6 +120,7 @@ var muon;
         'tss-plugin': [require('./plugins/tss-plugin'), {}],
         'tss-party-search': [require('./plugins/tss-party-search'), {}],
         'health-check': [require('./plugins/health-check'), {}],
+        'group-leader': [require('./plugins/group-leader-plugin'), {}],
         ...getEnvPlugins(),
         ...getCustomApps(),
         ...await getGeneralApps(),
