@@ -112,7 +112,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   async electionStart() {
     let responses = await this.callParty(RemoteMethods.ElectionStart,{election: this.lastElection+1});
     // console.log(`GroupLeaderPlugin.electionStart electionStart responses:`, responses)
-    let allDone = responses.findIndex(r => (r!==true)) < 0;
+    let allDone = responses.filter(r => (r===true)).length > responses.length*0.55;
     // TODO: is need to 50% of nodes agree with election start?
     return allDone && (responses.length + 1) >= this.TssPlugin.TSS_THRESHOLD
   }
