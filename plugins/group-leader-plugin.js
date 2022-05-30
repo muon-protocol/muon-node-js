@@ -49,6 +49,21 @@ class GroupLeaderPlugin extends CallablePlugin {
     super.onStart();
 
     this.TssPlugin.once('party-load', this._checkStatus.bind(this))
+    this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+  }
+
+  onPeerDisconnect(peerId) {
+    if(!!this.leader){
+      let leaderPeerIdStr = this.collateralPlugin.getWalletPeerId(this.leader);
+      if(peerId.toB58String() === leaderPeerIdStr){
+        this.leader = null;
+        setTimeout(this._checkStatus.bind(this), 5000);
+      }
+    }
+  }
+
+  get collateralPlugin(){
+    return this.muon.getPlugin('collateral');
   }
 
   async _checkStatus(){
@@ -179,7 +194,10 @@ class GroupLeaderPlugin extends CallablePlugin {
     this.lastElection ++;
     this.emit('leader-change', this.leader);
     this._leaderSelectPromise.resolve(this.leader);
-    console.log(`********* leader[${this.lastElection}] is now ${this.leader} *********`);
+    if(this.leader === process.env.SIGN_WALLET_ADDRESS)
+      console.log(`********* I am the leader[${this.lastElection}] now *********`);
+    else
+      console.log(`********* leader[${this.lastElection}] is now ${this.leader} *********`);
   }
 
   waitToLeaderSelect() {
