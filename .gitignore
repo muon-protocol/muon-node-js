@@ -46,3 +46,4 @@ Thumbs.db
 .venv*
 *.conf.json
 .vscode/
+*.bak

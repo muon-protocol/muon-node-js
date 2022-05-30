@@ -41,12 +41,12 @@ class TssParty {
    *
    */
   addPartner(partner){
+    if(typeof partner === 'string')
+      throw {message: "partner most be object of type {wallet,peerId}"}
     // if(this.partners[partner.wallet] === undefined)
     {
-      let partnerIndex = Object.keys(this.partners).length + 1;
       this.partners[partner.wallet] = {
         // if partner has "i" property, it replace default "i".
-        i: partnerIndex,
         ...partner
       }
       if(this.isFulfilled()) {
@@ -56,18 +56,24 @@ class TssParty {
   }
 
   setPeers(peers){
-    let id2wallet = {}
-    for(let wallet in this.partners){
-      let {peerId} = this.partners[wallet]
-      id2wallet[peerId] = wallet
+    try {
+      let id2wallet = {};
+      for (let wallet in this.partners) {
+        let {peerId} = this.partners[wallet]
+        id2wallet[peerId] = wallet
+      }
+      peers.filter(p => !!p).map(peer => {
+        if (peer.id === undefined)
+          console.log({peer})
+        let key = peer.id.toB58String()
+        let wallet = id2wallet[key]
+        this.partners[wallet].peer = peer
+      })
     }
-    peers.filter(p => !!p).map(peer => {
-      if(peer.id === undefined)
-        console.log({peer})
-      let key = peer.id.toB58String()
-      let wallet = id2wallet[key]
-      this.partners[wallet].peer = peer
-    })
+    catch (e) {
+      console.error("Party.setPeers", e);
+      throw e;
+    }
   }
 
   setWalletPeer(wallet, peer){

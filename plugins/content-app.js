@@ -18,7 +18,7 @@ class ContentApp extends BaseApp {
   async onStart() {
     this.muon.getPlugin('gateway-interface').on('confirmed', this.onGatewayConfirmed.bind(this))
 
-    this.muon.once('peer', () => {
+    this.muon.once('peer:connect', () => {
       this.provideContents();
     })
   }

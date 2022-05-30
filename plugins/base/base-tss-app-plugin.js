@@ -29,7 +29,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
       throw {message: 'party not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
-    let nonce = await tssPlugin.keyGen(party, nonceParticipantsCount)
+    let nonce = await tssPlugin.keyGen(party, {maxPartners: nonceParticipantsCount})
 
     // let sign = tssPlugin.sign(null, party);
     return {
@@ -113,9 +113,8 @@ class BaseTssAppPlugin extends BaseAppPlugin {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let {data: {init: {nonce: nonceId}}} = request;
     let nonce = tssPlugin.getSharedKey(nonceId)
-    //
-    // let idx = this.muon.getNodesWalletIndex()[sign.owner];
-    let idx = nonce.party.partners[owner].i;
+
+    let idx = owner;
     let Z_i = pubKey;
     let K_i = nonce.getPubKey(idx);
 
@@ -141,8 +140,7 @@ class BaseTssAppPlugin extends BaseAppPlugin {
       let [s, e] = signature.split(',').map(toBN)
       return {s, e};
     })
-    signersIndices = owners.map(w => this.muon.getNodesWalletIndex()[w])
-    let aggregatedSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, signersIndices)
+    let aggregatedSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, owners)
     let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
 
     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.

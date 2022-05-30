@@ -83,7 +83,7 @@ class Muon extends Events {
       emoji.get('large_blue_circle'),
       chalk.blue(` ${connection.remotePeer.toB58String()}`)
     )
-    this.emit('peer', connection.remotePeer)
+    this.emit('peer:connect', connection.remotePeer)
   }
 
   onPeerDisconnect(connection){
@@ -97,7 +97,7 @@ class Muon extends Events {
   }
 
   async onPeerDiscovery(peerId){
-    this.emit('peer', peerId)
+    this.emit('peer:discovery', peerId)
     console.log('found peer');
     try {
       const peerInfo = await this.libp2p.peerRouting.findPeer(peerId)
@@ -169,27 +169,24 @@ class Muon extends Events {
     return tssPlugin.tssKey.publicKey
   }
 
-  getNodesWalletIndex() {
-    // return MUON_WALLETS_INDEX
-    let tssPlugin = this.getPlugin('tss-plugin');
-    // let partners = tssPlugin.tssKey.party.partners;
-    if(!tssPlugin.tssParty)
-      return {};
-    let partners = tssPlugin.tssParty.partners;
-    return Object.keys(partners).reduce((obj, w) => ({...obj, [w]: partners[w].i}), {})
-  }
-
   get peerIdStr(){
     return this.peerId.toB58String();
   }
 
   get configDir(){
-    let baseDir = `${process.env.PWD}/config/`
+    let baseDir = `${process.env.PWD}/config/`;
     return !!process.env.CONFIG_BASE_PATH ? `${baseDir}${process.env.CONFIG_BASE_PATH}/` : baseDir
   }
 
   saveConfig(data, fileName){
     fs.writeFileSync(`${this.configDir}/${fileName}`, JSON.stringify(data, null, 2))
+  }
+
+  backupConfigFile(fileName){
+    if(fs.existsSync(`${this.configDir}/${fileName}`)) {
+      let content = fs.readFileSync(`${this.configDir}/${fileName}`);
+      fs.writeFileSync(`${this.configDir}/${fileName}_[${new Date().toISOString()}].bak`, content)
+    }
   }
 }
 

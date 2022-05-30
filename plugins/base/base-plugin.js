@@ -39,7 +39,7 @@ module.exports = class BasePlugin extends Events{
     catch (e) {
       // TODO: what to do?
       if(process.env.VERBOSE)
-        console.error("BasePlugin.findPeer", e.stack)
+        console.error("BasePlugin.findPeer", peerId.toB58String(), e.stack)
       return null;
     }
   }
@@ -78,30 +78,22 @@ module.exports = class BasePlugin extends Events{
       return;
     }
     let dataStr = JSON.stringify(data)
-    let signature = crypto.sign(dataStr)
-    let msg = `${signature}|${dataStr}`
-    this.muon.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(msg))
+    this.muon.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(dataStr))
   }
 
-  async __onPluginBroadcastReceived(msg){
+  async __onPluginBroadcastReceived({data: rawData, from, ...otherItems}){
     try{
-      // let data = JSON.parse(uint8ArrayToString(msg.data));
-
-      let [sign, message] = uint8ArrayToString(msg.data).split('|');
-      let sigOwner = crypto.recover(message, sign)
-      let data = JSON.parse(message)
-
+      let strData = uint8ArrayToString(rawData)
+      let data = JSON.parse(strData);
       let collateralPlugin = this.muon.getPlugin('collateral');
-      let validWallets = collateralPlugin.getWallets()
-      if(!validWallets.includes(sigOwner)){
-        throw {message: `Unrecognized request owner ${sigOwner}`}
-        // let {responseId} = data;
-        // let remoteResult = this._calls[responseId]
-        // return remoteResult && remoteResult.reject({message: `Unrecognized request owner ${sigOwner}`})
+
+      let senderWallet = collateralPlugin.getPeerWallet(from);
+      if(!senderWallet){
+        throw {message: `Unrecognized broadcast owner ${senderWallet}`, data: strData}
       }
 
       /*eslint no-undef: "error"*/
-      await this.onBroadcastReceived(data)
+      await this.onBroadcastReceived(data, {wallet: senderWallet, peerId: from});
     }
     catch (e) {
       console.log('BasePlugin.__onPluginBroadcastReceived', e)
