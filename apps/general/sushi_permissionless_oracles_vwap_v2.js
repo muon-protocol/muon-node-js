@@ -1,11 +1,11 @@
-const SpriteVWAP = require('./spirit_permissionless_oracles_vwap_v2')
+const ParentOraclesV2 = require('./parent_oracles_v2')
 const {
   GRAPH_URL,
   GRAPH_DEPLOYMENT_ID
-} = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
+} = require('./parent_oracles.constant.json')
 const APP_CONFIG = {}
 module.exports = {
-  ...SpriteVWAP,
+  ...ParentOraclesV2,
 
   APP_NAME: 'sushi_permissionless_oracles_vwap_v2',
   APP_ID: 28,

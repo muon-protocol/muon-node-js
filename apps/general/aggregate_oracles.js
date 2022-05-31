@@ -1,16 +1,13 @@
 const { axios, toBaseUnit, soliditySha3, BN, multiCall, flatten, groupBy } =
   MuonAppUtils
-const SpriteVWAP = require('./spirit_permissionless_oracles_vwap_v2')
-const {
-  Info_ABI,
-  STABLE_EXCHANGES
-} = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
+const ParentOraclesV2 = require('./parent_oracles_v2')
+const { Info_ABI, STABLE_EXCHANGES } = require('./parent_oracles.constant.json')
 const APP_CONFIG = {
   chainId: 250
 }
 
 module.exports = {
-  ...SpriteVWAP,
+  ...ParentOraclesV2,
 
   APP_NAME: 'aggregate_oracles',
   APP_ID: 30,

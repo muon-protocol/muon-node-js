@@ -1,6 +1,6 @@
 const { Web3, BigNumber } = MuonAppUtils
 
-const SpriteVWAP = require('./spirit_permissionless_oracles_vwap_v3')
+const ParentOraclesV3 = require('./parent_oracles_v3')
 const {
   GET_POOL_INFO_ABI,
   PAIRS,
@@ -8,7 +8,7 @@ const {
   ERC20_DECIMALS_ABI,
   STABLE,
   WEIGHTED
-} = require('./spirit_permissionless_oracles_vwap_v2.constant.json')
+} = require('./parent_oracles.constant.json')
 const { async } = require('regenerator-runtime')
 
 const APP_CONFIG = {
@@ -525,7 +525,7 @@ const fpComplement = (x) => {
 }
 
 module.exports = {
-  ...SpriteVWAP,
+  ...ParentOraclesV3,
 
   APP_NAME: 'beetsfi_permissionless_oracles_vwap_v3',
   APP_ID: 32,
@@ -946,7 +946,7 @@ module.exports = {
   tokenPriceStable: function (
     ampValue,
     ampPrecision,
-    amount,
+    amountIn,
     balances,
     indexIn,
     indexOut
@@ -964,12 +964,11 @@ module.exports = {
       [...balances],
       indexIn,
       indexOut,
-      amount,
+      amountIn,
       invariant
     )
-    // TODO Do we need fee network??????????
-    // return amountOut.times(bn(0.9999))
-    return amountOut
+    const price = amountOut.div(amountIn)
+    return price
   },
 
   tokenPriceWeighted: function (
@@ -999,10 +998,9 @@ module.exports = {
     const denominator = balanceIn.plus(amountIn)
     const base = fpDivUp(balanceIn, denominator)
     const exponent = fpDivDown(weightIn, weightOut)
-
     const power = fpPowUp(base, exponent)
-
-    return fpMulDown(balanceOut, fpComplement(power))
+    const amountOut = fpMulDown(balanceOut, fpComplement(power))
+    return amountOut.div(amountIn)
   },
 
   pairVWAP: async function (
@@ -1045,7 +1043,7 @@ module.exports = {
       balances: metadata.tokensInfo.map((t) =>
         this.upScale(t.balance, t.decimals)
       ),
-      amount: '1000000000000000000',
+      amountIn: '1000000000000000000',
       tokenInBalance: metadata.tokensInfo[1].balance,
       tokenOutBalance: metadata.tokensInfo[0].balance,
 
@@ -1064,7 +1062,7 @@ module.exports = {
         price = this.tokenPriceStable(
           metadata.ampValue,
           metadata.ampPrecision,
-          swap.amount,
+          swap.amountIn,
           [...swap.balances],
 
           tokenIn.index,
@@ -1078,7 +1076,7 @@ module.exports = {
           this.upScale(tokenIn.weight, this.SCALE),
           this.upScale(tokenOut.balance, tokenOut.decimals),
           this.upScale(tokenOut.weight, this.SCALE),
-          this.upScale(swap.amount, tokenIn.decimals)
+          this.upScale(swap.amountIn, tokenIn.decimals)
         )
         break
 
