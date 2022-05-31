@@ -173,7 +173,7 @@ module.exports = {
     return metadata
   },
   prepareTokenTx: async function (pair, exchange, chainId, start, end) {
-    const tokenTxs = await this.getTokenTxs(pair, exchange, chainId)
+    const tokenTxs = await this.getTokenTxs(pair, exchange, chainId, start, end)
 
     return tokenTxs
   },

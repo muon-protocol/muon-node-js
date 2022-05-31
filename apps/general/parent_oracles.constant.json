@@ -7,6 +7,7 @@
   "STABLE": "stable",
   "WEIGHTED": "weighted",
   "GRAPH_URL": {
+    "beets": "https://api.thegraph.com/subgraphs/name/shayanshiravani/beetsfi",
     "solidly": "https://api.thegraph.com/subgraphs/name/shayanshiravani/solidly",
     "spirit": "https://api.thegraph.com/subgraphs/name/shayanshiravani/spiritswap",
     "uniswap": "https://api.thegraph.com/subgraphs/name/ianlapham/uniswapv2",
@@ -22,6 +23,7 @@
     }
   },
   "GRAPH_DEPLOYMENT_ID": {
+    "beets": "QmedPFoUR8iCji2r4BRBjpLvaHyGag6c3irb4REF8cJVVE",
     "solidly": "QmY4uUc7kjAC2sCbviZGoTwttbJ6dXezWELyrn9oebAr58",
     "spirit": "QmUptbhTmAVCUTNeK2afecQJ3DFLgk9m4dBerfpqkTEJvi",
     "uniswap": "Qmc7K8dKoadu1VcHfAV45pN4sPnwZcU2okV6cuU4B7qQp1",

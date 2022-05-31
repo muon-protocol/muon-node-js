@@ -1,4 +1,4 @@
-const { Web3, BigNumber } = MuonAppUtils
+const { Web3, BigNumber, axios } = MuonAppUtils
 
 const ParentOraclesV3 = require('./parent_oracles_v3')
 const {
@@ -531,6 +531,100 @@ module.exports = {
   APP_ID: 32,
   config: APP_CONFIG,
 
+  getTokenTxs: async function (pairAddr, graphUrl, deploymentID, start, end) {
+    const currentTimestamp = getTimestamp()
+    const timestamp_lt = end ? end : currentTimestamp
+    const timestamp_gt = start ? start : currentTimestamp - 1800
+    let skip = 0
+    let tokenTxs = []
+    let queryIndex = 0
+    while (true) {
+      queryIndex += 1
+      let lastRowQuery =
+        queryIndex === 1
+          ? `
+              swaps_last_rows:swaps(
+                first: 1,
+                where: {
+                  pair: "${pairAddr.toLowerCase()}"
+                },
+                orderBy: timestamp,
+                orderDirection: desc
+              ) {
+                amount0In
+                amount1In
+                amount0Out
+                amount1Out
+                reserve0
+                reserve1
+                timestamp
+              }
+            `
+          : ''
+      const query = `
+              {
+                swaps(
+                  first: 1000,
+                  skip: ${skip},
+                  where: {
+                    pair: "${pairAddr.toLowerCase()}",
+                    timestamp_gt: ${timestamp_gt},
+                    timestamp_lt: ${timestamp_lt}
+                  },
+                  orderBy: timestamp,
+                  orderDirection: desc
+                ) {
+                  amount0In
+                  amount1In
+                  amount0Out
+                  amount1Out
+                  reserve0
+                  reserve1
+                  timestamp
+                }
+                ${lastRowQuery}
+                _meta {
+                  deployment
+                }
+              }
+            `
+      skip += 1000
+      try {
+        const {
+          data: { data },
+          status
+        } = await axios.post(graphUrl, {
+          query: query
+        })
+        if (status == 200 && data) {
+          const {
+            swaps,
+            _meta: { deployment }
+          } = data
+          if (deployment != deploymentID) {
+            throw { message: 'SUBGRAPH_IS_UPDATED' }
+          }
+          if (!swaps.length) {
+            if (queryIndex == 1) {
+              tokenTxs = tokenTxs.concat(data.swaps_last_rows)
+            }
+            break
+          }
+          tokenTxs = tokenTxs.concat(swaps)
+          if (skip > 5000) {
+            currentTimestamp = swaps[swaps.length - 1]['timestamp']
+            skip = 0
+          }
+        } else {
+          throw { message: 'INVALID_SUBGRAPH_RESPONSE' }
+        }
+      } catch (error) {
+        throw { message: `SUBGRAPH_QUERY_FAILED:${error.message}` }
+      }
+    }
+    return tokenTxs
+  },
+
   upScale: function (amount, decimals) {
     return bn(amount).times(this.SCALE).div(decimals)
   },
@@ -758,7 +852,7 @@ module.exports = {
 
     metadata = this.getFinalMetaData(resultDecimals, metadata, PAIRS)
 
-    // console.log(JSON.stringify(metadata, undefined, 2))
+    console.log(JSON.stringify(metadata, undefined, 2))
     return metadata
   },
 
@@ -779,13 +873,6 @@ module.exports = {
       )
     })
   },
-
-  // isPricingAsset: function (asset) {
-  //   for (let i = 0; i < PRICING_ASSETS.length; i++) {
-  //     if (PRICING_ASSETS[i] == asset) return true
-  //   }
-  //   return false
-  // },
 
   calculateInvariant: function (
     amplificationParameter,
@@ -1012,58 +1099,55 @@ module.exports = {
     start,
     end
   ) {
-    const currentTimestamp = getTimestamp()
-    const endTime = end ? end : currentTimestamp
-    const startTime = start ? start : currentTimestamp - 1800
-
     // TODO based on subgraph prepare this fun
     // const tokenTxs = await this.prepareTokenTx(
     //   pair,
     //   exchange,
     //   chainId,
-    //   startTime,
-    //   endTime
+    //   start,
+    //   end
     // )
     // if (tokenTxs) {
-    let sumWeightedPrice = bn('0')
-    let sumVolume = bn('0')
+    let sumWeightedPrice = ZERO
+    let sumVolume = ZERO
     // for (let i = 0; i < tokenTxs.length; i++) {
-    //   let swap = tokenTxs[i]
-    //   if (
-    //     (swap.amount0In != 0 && swap.amount1In != 0) ||
-    //     (swap.amount0Out != 0 && swap.amount1Out != 0) ||
-    //     (swap.amount0In != 0 && swap.amount0Out != 0) ||
-    //     (swap.amount1In != 0 && swap.amount1Out != 0)
-    //   ) {
-    //     continue
-    //   }
-    // TODO based on subgraph filter these things from metadata
+    // let swap = tokenTxs[i]
+    // TODO remove this after graph is synced
 
     let swap = {
-      balances: metadata.tokensInfo.map((t) =>
+      poolTokenBalances: metadata.tokensInfo.map((t) =>
         this.upScale(t.balance, t.decimals)
       ),
-      amountIn: '1000000000000000000',
-      tokenInBalance: metadata.tokensInfo[1].balance,
-      tokenOutBalance: metadata.tokensInfo[0].balance,
+      tokenAmountIn: '1000000000000000000',
+      tokenAmountOut: '1000000000000000000',
+
+      balanceIn: metadata.tokensInfo[1].balance,
+      balanceIn: metadata.tokensInfo[0].balance,
 
       tokenIn: metadata.tokensInfo[1].token,
       tokenOut: metadata.tokensInfo[0].token
     }
+    console.log(swap)
+    // // TODO to be sure this condition is enough
+    // if (!swap.tokenAmountIn || !swap.tokenAmountOut) {
+    //   continue
+    // }
+
     const tokenIn = metadata.tokensInfo.find(
-      (item) => item.token === swap.tokenIn
+      (item) => item.token.toLowerCase() === swap.tokenIn.toLowerCase()
     )
     const tokenOut = metadata.tokensInfo.find(
-      (item) => item.token === swap.tokenOut
+      (item) => item.token.toLowerCase() === swap.tokenOut.toLowerCase()
     )
-    let price
+    let price = ZERO
+    let volume = ZERO
     switch (metadata.pool) {
       case STABLE:
         price = this.tokenPriceStable(
           metadata.ampValue,
           metadata.ampPrecision,
-          swap.amountIn,
-          [...swap.balances],
+          swap.tokenAmountIn,
+          [...swap.poolTokenBalances],
 
           tokenIn.index,
           tokenOut.index
@@ -1076,7 +1160,7 @@ module.exports = {
           this.upScale(tokenIn.weight, this.SCALE),
           this.upScale(tokenOut.balance, tokenOut.decimals),
           this.upScale(tokenOut.weight, this.SCALE),
-          this.upScale(swap.amountIn, tokenIn.decimals)
+          this.upScale(swap.tokenAmountIn, tokenIn.decimals)
         )
         break
 
@@ -1085,5 +1169,23 @@ module.exports = {
     }
 
     console.log({ price: price.toString() })
+    console.log(token.toLowerCase(), swap.tokenIn.toLowerCase())
+    // TODO the token pass to this fun must be changed
+    switch (token.toLowerCase()) {
+      case swap.tokenIn.toLowerCase():
+        volume = this.upScale(swap.tokenAmountIn, tokenIn.decimals)
+
+        break
+      case swap.tokenOut.toLowerCase():
+        volume = this.upScale(swap.tokenAmountOut, tokenOut.decimals)
+
+        break
+
+      default:
+        throw new Error('INVALID TOKEN BASED ON SWAP')
+    }
+    console.log(volume.toString())
+    // }
+    // }
   }
 }

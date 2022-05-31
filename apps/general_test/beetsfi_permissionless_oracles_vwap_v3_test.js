@@ -46,7 +46,7 @@ const example_1 = {
 }
 
 const tokenName2 = 'dei'
-const token2 = '0x8B858Eaf095A7337dE6f9bC212993338773cA34e'
+const token2 = '0xde12c7959e1a72bbe8a5f7a1dc8f8eef9ab011b3'
 const example_2 = {
   token,
 
