@@ -200,7 +200,7 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   isWalletPermittedToElect(wallet, election) {
     // console.log("===========", {wallet, election, lastElection: this.lastElection})
-    return  election === this.lastElection+1 && this.currentExecutor === wallet;
+    return !this.leader && election === this.lastElection+1 && this.currentExecutor === wallet;
   }
 
   _electionComplete(key) {
