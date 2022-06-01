@@ -8,8 +8,8 @@
     "start": "env-cmd babel-node ./index.js",
     "start.debug": "env-cmd --use-shell 'DEBUG=libp2p:noise babel-node ./index.js' ",
     "dev": "env-cmd nodemon --exec babel-node ./index.js",
-    "dev-chain": "node generateEnvs.js",
-    "node": "node runNode.js",
+    "dev-chain-init": "node dev-chain-generate-envs.js",
+    "dev-chain-run": "node dev-chain-run.js",
     "test": "jest --verbose"
   },
   "jest": {
