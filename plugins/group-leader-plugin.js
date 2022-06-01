@@ -54,13 +54,26 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   onPeerDisconnect(peerId) {
+    let peerIdStr = peerId.toB58String()
     if(!!this.leader){
       let leaderPeerIdStr = this.collateralPlugin.getWalletPeerId(this.leader);
-      if(peerId.toB58String() === leaderPeerIdStr){
-        this.leader = null;
-        setTimeout(this._checkStatus.bind(this), 5000);
+      if(peerIdStr === leaderPeerIdStr){
+        console.log(`Leader disconnect and need to reselect another leader.`)
+        this.reselectLeader();
+      }
+      else{
+        let onlineNodes = this.onlinePartners.map(p => p.wallet).filter(w => w!==peerIdStr);
+        if(onlineNodes.length+1 < this.collateralPlugin.TssThreshold){
+          console.log(`No enough online nodes. The leader will be cleared to select it again.`)
+          this.reselectLeader();
+        }
       }
     }
+  }
+
+  reselectLeader() {
+    this.leader = null;
+    setTimeout(this._checkStatus.bind(this), 5000);
   }
 
   get collateralPlugin(){
@@ -117,6 +130,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     return allDone && (responses.length + 1) >= this.TssPlugin.TSS_THRESHOLD
   }
 
+  // TODO: if all nodes except leader restart, then leader cannot be select
   async leaderAlreadySelected(){
     let responses = await this.callParty(RemoteMethods.WhoIsLeader)
     let leaderCount = responses.filter(r => !!r?.leader)
@@ -236,10 +250,6 @@ class GroupLeaderPlugin extends CallablePlugin {
   async _askElectionPermission(data={}, callerInfo) {
     // console.log('GroupLeaderPlugin.AskElectionPermission', {data, callerInfo});
     let {election} = data;
-    console.log("GroupLeadePlugin._askElectionPermission", {
-      wallet: callerInfo.wallet,
-      permitted: this.isWalletPermittedToElect(callerInfo.wallet, election)
-    })
     return this.isWalletPermittedToElect(callerInfo.wallet, election)
   }
 
