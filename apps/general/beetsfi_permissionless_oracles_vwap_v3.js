@@ -7,9 +7,10 @@ const {
   POOL_TOKENS_ABI,
   ERC20_DECIMALS_ABI,
   STABLE,
-  WEIGHTED
+  WEIGHTED,
+  GRAPH_URL,
+  GRAPH_DEPLOYMENT_ID
 } = require('./parent_oracles.constant.json')
-const { async } = require('regenerator-runtime')
 
 const APP_CONFIG = {
   chainId: 250
@@ -531,7 +532,7 @@ module.exports = {
   APP_ID: 32,
   config: APP_CONFIG,
 
-  getTokenTxs: async function (pairAddr, graphUrl, deploymentID, start, end) {
+  getTokenTxs: async function (poolId, graphUrl, deploymentID, start, end) {
     const currentTimestamp = getTimestamp()
     const timestamp_lt = end ? end : currentTimestamp
     const timestamp_gt = start ? start : currentTimestamp - 1800
@@ -546,17 +547,23 @@ module.exports = {
               swaps_last_rows:swaps(
                 first: 1,
                 where: {
-                  pair: "${pairAddr.toLowerCase()}"
+                  poolId: "${poolId.toLowerCase()}"
                 },
                 orderBy: timestamp,
                 orderDirection: desc
               ) {
-                amount0In
-                amount1In
-                amount0Out
-                amount1Out
-                reserve0
-                reserve1
+                poolId
+                tokenIn{
+                  id
+                  name
+                }
+                tokenOut{
+                  id
+                  name
+                }
+                tokenAmountIn
+                tokenAmountOut
+                poolTokenBalances
                 timestamp
               }
             `
@@ -567,19 +574,25 @@ module.exports = {
                   first: 1000,
                   skip: ${skip},
                   where: {
-                    pair: "${pairAddr.toLowerCase()}",
+                    poolId: "${poolId.toLowerCase()}",
                     timestamp_gt: ${timestamp_gt},
                     timestamp_lt: ${timestamp_lt}
                   },
                   orderBy: timestamp,
                   orderDirection: desc
                 ) {
-                  amount0In
-                  amount1In
-                  amount0Out
-                  amount1Out
-                  reserve0
-                  reserve1
+                  poolId
+                  tokenIn{
+                    id
+                    name
+                  }
+                  tokenOut{
+                    id
+                    name
+                  }
+                  tokenAmountIn
+                  tokenAmountOut
+                  poolTokenBalances
                   timestamp
                 }
                 ${lastRowQuery}
@@ -716,6 +729,7 @@ module.exports = {
           pair: item.pair,
           exchange: item.exchange,
           chainId: item.chainId,
+          poolId: item.poolId,
           pool: item.pool,
           ...param
         }
@@ -755,6 +769,7 @@ module.exports = {
         exchange: item.context.exchange,
         chainId: item.context.chainId,
         pool: item.context.pool,
+        poolId: item.context.poolId,
         ...param,
         tokens: poolTokens[0],
         balances
@@ -856,7 +871,7 @@ module.exports = {
 
     metadata = this.getFinalMetaData(resultDecimals, metadata, PAIRS)
 
-    console.log(JSON.stringify(metadata, undefined, 2))
+    // console.log(JSON.stringify(metadata, undefined, 2))
     return metadata
   },
 
@@ -882,7 +897,7 @@ module.exports = {
       return this.pairVWAP(
         pairTokenIn,
         pairTokenOut,
-        pair.address,
+        currentMetadata.poolId,
         pair.exchange,
         pair.chainId,
         currentMetadata,
@@ -1093,13 +1108,13 @@ module.exports = {
     // wo = weightOut                                                                       //
     *****************************************************************************************/
 
-    console.log({
-      bI: balanceIn.toString(),
-      wi: weightIn.toString(),
-      bo: balanceOut.toString(),
-      wo: weightOut.toString(),
-      amountIn: amountIn.toString()
-    })
+    // console.log({
+    //   bI: balanceIn.toString(),
+    //   wi: weightIn.toString(),
+    //   bo: balanceOut.toString(),
+    //   wo: weightOut.toString(),
+    //   amountIn: amountIn.toString()
+    // })
     const denominator = balanceIn.plus(amountIn)
     const base = fpDivUp(balanceIn, denominator)
     const exponent = fpDivDown(weightIn, weightOut)
@@ -1111,7 +1126,7 @@ module.exports = {
   pairVWAP: async function (
     pairTokenIn,
     pairTokenOut,
-    pair,
+    poolId,
     exchange,
     chainId,
     metadata,
@@ -1119,10 +1134,10 @@ module.exports = {
     end
   ) {
     // TODO based on subgraph prepare this fun
-    const tokenTxs = await this.prepareTokenTx(
-      pair,
-      exchange,
-      chainId,
+    const tokenTxs = await this.getTokenTxs(
+      poolId,
+      GRAPH_URL[exchange],
+      GRAPH_DEPLOYMENT_ID[exchange],
       start,
       end
     )
@@ -1146,15 +1161,16 @@ module.exports = {
           tokenIn: metadata.tokensInfo[1].token,
           tokenOut: metadata.tokensInfo[0].token
         }
-        console.log(swap)
+        // console.log(swap)
         // TODO to be sure this condition is enough and if it's true combine with next condition
+
         if (!swap.tokenAmountIn || !swap.tokenAmountOut) {
           continue
         }
-
+        // console.log('*********************************', swap.tokenIn)
         if (
-          ![pairTokenIn, pairTokenOut].includes(tokenIn) ||
-          ![pairTokenIn, pairTokenOut].includes(tokenOut)
+          ![pairTokenIn, pairTokenOut].includes(swap.tokenIn) ||
+          ![pairTokenIn, pairTokenOut].includes(swap.tokenOut)
         ) {
           continue
         }
@@ -1194,8 +1210,7 @@ module.exports = {
             break
         }
 
-        console.log({ price: price.toString() })
-        console.log(token.toLowerCase(), swap.tokenIn.toLowerCase())
+        // console.log({ price: price.toString() })
         // TODO to be sure these condition are true
         switch (pairTokenIn.toLowerCase()) {
           case swap.tokenIn.toLowerCase():
@@ -1209,15 +1224,19 @@ module.exports = {
           default:
             throw new Error('INVALID TOKEN BASED ON SWAP')
         }
-        console.log(volume.toString())
+        // console.log('volume', volume.toString())
         sumWeightedPrice = sumWeightedPrice.plus(price.times(volume))
         sumVolume = sumVolume.plus(volume)
       }
+      console.log({
+        tokenPrice: sumWeightedPrice.toString(),
+        sumVolume: sumVolume.toString()
+      })
       if (sumVolume > ZERO) {
         let tokenPrice = sumWeightedPrice.div(sumVolume)
-        return { pair, tokenPrice, sumVolume }
+        return { tokenPrice, sumVolume }
       }
-      return { pair, tokenPrice: ZERO, sumVolume: ZERO }
+      return { tokenPrice: ZERO, sumVolume: ZERO }
     }
   }
 }

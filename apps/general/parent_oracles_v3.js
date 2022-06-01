@@ -504,6 +504,7 @@ module.exports = {
     })
   },
   calculatePriceToken: function (pairVWAPs, pairs) {
+    console.log(JSON.stringify(pairVWAPs, undefined, 2))
     let volume = pairVWAPs.reduce((previousValue, currentValue) => {
       return previousValue.add(currentValue.sumVolume)
     }, new BN(0))
