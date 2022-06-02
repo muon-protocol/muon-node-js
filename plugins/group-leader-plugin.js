@@ -3,6 +3,7 @@ const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators'
 const tssModule = require('../utils/tss')
 const {timeout} = require('../utils/helpers');
 const TimeoutPromise = require('../core/timeout-promise')
+const {utils:{sha3}} = require('web3')
 
 const RemoteMethods = {
   AskElectionPermission: "AskElectionPermission",
@@ -49,6 +50,34 @@ class GroupLeaderPlugin extends CallablePlugin {
     super.onStart();
 
     this.TssPlugin.once('party-load', this._checkStatus.bind(this))
+    this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+  }
+
+  onPeerDisconnect(peerId) {
+    let peerIdStr = peerId.toB58String()
+    if(!!this.leader){
+      let leaderPeerIdStr = this.collateralPlugin.getWalletPeerId(this.leader);
+      if(peerIdStr === leaderPeerIdStr){
+        console.log(`Leader disconnect and need to reselect another leader.`)
+        this.reselectLeader();
+      }
+      else{
+        let onlineNodes = this.onlinePartners.map(p => p.wallet).filter(w => w!==peerIdStr);
+        if(onlineNodes.length+1 < this.collateralPlugin.TssThreshold){
+          console.log(`No enough online nodes. The leader will be cleared to select it again.`)
+          this.reselectLeader();
+        }
+      }
+    }
+  }
+
+  reselectLeader() {
+    this.leader = null;
+    setTimeout(this._checkStatus.bind(this), 5000);
+  }
+
+  get collateralPlugin(){
+    return this.muon.getPlugin('collateral');
   }
 
   async _checkStatus(){
@@ -95,10 +124,13 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   async electionStart() {
     let responses = await this.callParty(RemoteMethods.ElectionStart,{election: this.lastElection+1});
+    // console.log(`GroupLeaderPlugin.electionStart electionStart responses:`, responses)
     let allDone = responses.findIndex(r => (r!==true)) < 0;
-    return allDone && responses.length >= this.TssPlugin.TSS_THRESHOLD
+    // TODO: is need to 50% of nodes agree with election start?
+    return allDone && (responses.length + 1) >= this.TssPlugin.TSS_THRESHOLD
   }
 
+  // TODO: if all nodes except leader restart, then leader cannot be select
   async leaderAlreadySelected(){
     let responses = await this.callParty(RemoteMethods.WhoIsLeader)
     let leaderCount = responses.filter(r => !!r?.leader)
@@ -168,7 +200,7 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   isWalletPermittedToElect(wallet, election) {
     // console.log("===========", {wallet, election, lastElection: this.lastElection})
-    return  election === this.lastElection+1 && wallet.toLowerCase() > process.env.SIGN_WALLET_ADDRESS.toLowerCase();
+    return !this.leader && election === this.lastElection+1 && this.currentExecutor === wallet;
   }
 
   _electionComplete(key) {
@@ -177,7 +209,10 @@ class GroupLeaderPlugin extends CallablePlugin {
     this.lastElection ++;
     this.emit('leader-change', this.leader);
     this._leaderSelectPromise.resolve(this.leader);
-    console.log(`********* leader[${this.lastElection}] is now ${this.leader} *********`);
+    if(this.leader === process.env.SIGN_WALLET_ADDRESS)
+      console.log(`********* I am the leader[${this.lastElection}] now *********`);
+    else
+      console.log(`********* leader[${this.lastElection}] is now ${this.leader} *********`);
   }
 
   waitToLeaderSelect() {
@@ -187,6 +222,16 @@ class GroupLeaderPlugin extends CallablePlugin {
   get onlinePartners() {
     return Object.values(this.TssPlugin.tssParty.onlinePartners)
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
+  }
+
+  get currentExecutor() {
+    let walletList = [
+      process.env.SIGN_WALLET_ADDRESS,
+      ...this.onlinePartners.map(p =>p.wallet)
+    ]
+    let hashes = walletList.map(w => sha3(`${w}-${new Date().getHours()}-${this.lastElection+1}`));
+    let minIndex = hashes.reduce((min, val, index, arr)=>(val<arr[min]?index:min), 0);
+    return walletList[minIndex]
   }
 
   async callParty(method, data={}, partners){

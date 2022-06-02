@@ -90,7 +90,7 @@ class TssPlugin extends CallablePlugin {
       for(let wallet in this.tssParty.partners){
         let {peerId} = this.tssParty.partners[wallet]
         if(peerId === peer._idB58String){
-          console.log(`TssPlugin: remove online peer ${peerId} #2`)
+          console.log(`TssPlugin: remove online peer ${peerId}`)
           this.tssParty.setWalletPeer(wallet, null);
           return
         }
@@ -139,7 +139,7 @@ class TssPlugin extends CallablePlugin {
       id: group,
       t: parseInt(networkInfo.tssThreshold),
       max: parseInt(networkInfo.maxGroupSize),
-      partners: partners.map(wallet => ({wallet}))
+      partners: partners.map(wallet => ({wallet, peerId: this.collateralPlugin.getWalletPeerId(wallet)}))
     });
     this.parties[party.id] = party
     this.tssParty = party;
