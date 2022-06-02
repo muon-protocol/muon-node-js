@@ -1,3 +1,5 @@
+const dotenv = require('dotenv')
+dotenv.config()
 const PeerId = require('peer-id')
 const emoji = require('node-emoji')
 const fs = require('fs')

@@ -44,7 +44,7 @@ async function runNodes() {
     })
     // console.log('Setting Up Envs ...')
     const result = spawn('node', [
-      'generateEnvs.js',
+      'devnet-generate-envs.js',
       `-n=${node_n}`,
       `-p=${port}`
     ])
@@ -79,7 +79,7 @@ async function runNodes() {
         })
       }
       const result = spawn('node', [
-        'generateEnvs.js',
+        'devnet-generate-envs.js',
         `-n=${node_n}`,
         `-p=${port}`
       ])
