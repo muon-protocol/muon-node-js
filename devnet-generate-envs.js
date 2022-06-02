@@ -30,7 +30,7 @@ const createEnv = async () => {
   REDIS_QUEUE = muon_queue_1\n
   REDIS_GATEWAY_CHANNEL = dev_node\n
   GATEWAY_HOST = 0.0.0.0\n
-  GATEWAY_PORT = ${params['p'] ? params['p'] : 8080}\n
+  GATEWAY_PORT = ${params['p'] ? params['p'] : 8000}\n
   CONFIG_BASE_PATH = node-1\n
 
   MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
@@ -92,7 +92,7 @@ const createEnv = async () => {
     REDIS_QUEUE = muon_queue_${index + 1}\n
     REDIS_GATEWAY_CHANNEL = dev_node\n
     GATEWAY_HOST = 0.0.0.0\n
-    GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8080 + index}\n
+    GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8000 + index}\n
     CONFIG_BASE_PATH = node-${index + 1}\n
 
     MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
