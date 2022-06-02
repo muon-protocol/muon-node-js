@@ -1,3 +1,5 @@
+const dotenv = require('dotenv')
+dotenv.config()
 const PeerId = require('peer-id')
 const emoji = require('node-emoji')
 const fs = require('fs')
@@ -28,7 +30,7 @@ const createEnv = async () => {
   REDIS_QUEUE = muon_queue_1\n
   REDIS_GATEWAY_CHANNEL = dev_node\n
   GATEWAY_HOST = 0.0.0.0\n
-  GATEWAY_PORT = ${params['p'] ? params['p'] : 8080}\n
+  GATEWAY_PORT = ${params['p'] ? params['p'] : 8000}\n
   CONFIG_BASE_PATH = node-1\n
 
   MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
@@ -72,8 +74,8 @@ const createEnv = async () => {
   MUON_PLUGINS = ''\n
   MUON_CUSTOM_APPS = "tss-test|sample"
   `
-  if(!fs.existsSync('./dev-chain/')) {
-    fs.mkdirSync('./dev-chain/');
+  if (!fs.existsSync('./dev-chain/')) {
+    fs.mkdirSync('./dev-chain/')
   }
   fs.writeFileSync('./dev-chain/dev-node-1.env', env1)
   console.log(emoji.get('o'), 'Node-1 Ethereum Address: ', accountEnv1.address)
@@ -90,7 +92,7 @@ const createEnv = async () => {
     REDIS_QUEUE = muon_queue_${index + 1}\n
     REDIS_GATEWAY_CHANNEL = dev_node\n
     GATEWAY_HOST = 0.0.0.0\n
-    GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8080 + index}\n
+    GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8000 + index}\n
     CONFIG_BASE_PATH = node-${index + 1}\n
 
     MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
@@ -145,13 +147,17 @@ const createEnv = async () => {
 
   /***** Create Other net.conf.json ******/
 
-  let netConf = JSON.stringify({
-    tss: {
-      threshold: node_n,
-      max: 20
+  let netConf = JSON.stringify(
+    {
+      tss: {
+        threshold: node_n,
+        max: 20
+      },
+      collateralWallets
     },
-    collateralWallets
-  }, null, 2)
+    null,
+    2
+  )
 
   fs.writeFileSync(`./config/global/net.conf.json`, netConf)
   console.log(emoji.get('o'), `net.conf.json is created`)
