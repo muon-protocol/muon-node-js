@@ -44,7 +44,7 @@ async function runNodes() {
     })
     // console.log('Setting Up Envs ...')
     const result = spawn('node', [
-      'generateEnvs.js',
+      'devnet-generate-envs.js',
       `-n=${node_n}`,
       `-p=${port}`
     ])
@@ -54,7 +54,7 @@ async function runNodes() {
     result.on('exit', () => {
       runMuonNode(node_n)
     })
-    // await exec(`node generateEnvs.js -n=${node_n} -p=${port}`)
+    // await exec(`node devnet-generate-envs.js -n=${node_n} -p=${port}`)
   } else {
     if (fs.existsSync(`./dev-chain/dev-node-${node_n}.env`)) {
       runMuonNode(node_n)
@@ -79,7 +79,7 @@ async function runNodes() {
         })
       }
       const result = spawn('node', [
-        'generateEnvs.js',
+        'devnet-generate-envs.js',
         `-n=${node_n}`,
         `-p=${port}`
       ])
