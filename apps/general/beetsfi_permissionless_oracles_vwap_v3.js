@@ -642,6 +642,10 @@ module.exports = {
     return bn(amount).times(this.SCALE).div(decimals)
   },
 
+  upScale2: function (amount, decimals) {
+    return bn(amount).times(this.SCALE)
+  },
+
   makeCallContextInfo: function (pair, prefix) {
     let calls = []
     let pairCache = []
@@ -885,16 +889,17 @@ module.exports = {
           item.reference === PAIRS + '_' + pair.exchange + ':' + pair.address
       )
       pairTokenIn = currentMetadata.tokens.find((item) =>
-        pairTokenOut.includes(item)
+        [pairTokenOut.toLowerCase()].includes(item.toLowerCase())
       )
       pairTokenOut = currentMetadata.tokens.filter(
         (item) => item.toLowerCase() !== pairTokenIn.toLowerCase()
       )
       let filterDestToken = pairTokenOut.find(
-        (item) => item.toLowerCase() === destToken.toLocaleLowerCase()
+        (item) => item.toLowerCase() === destToken.toLowerCase()
       )
       pairTokenOut = filterDestToken ? filterDestToken : pairTokenOut[0]
       return this.pairVWAP(
+        token,
         pairTokenIn,
         pairTokenOut,
         currentMetadata.poolId,
@@ -1124,6 +1129,7 @@ module.exports = {
   },
 
   pairVWAP: async function (
+    token,
     pairTokenIn,
     pairTokenOut,
     poolId,
@@ -1133,6 +1139,7 @@ module.exports = {
     start,
     end
   ) {
+    // console.log({ token, pairTokenIn, pairTokenOut, poolId })
     // TODO based on subgraph prepare this fun
     const tokenTxs = await this.getTokenTxs(
       poolId,
@@ -1143,25 +1150,12 @@ module.exports = {
     )
     if (tokenTxs) {
       let sumWeightedPrice = ZERO
+      let sumWeightedP = ZERO
+
       let sumVolume = ZERO
       for (let i = 0; i < tokenTxs.length; i++) {
-        // let swap = tokenTxs[i]
-        // TODO remove this after graph is synced
+        let swap = tokenTxs[i]
 
-        let swap = {
-          poolTokenBalances: metadata.tokensInfo.map((t) =>
-            this.upScale(t.balance, t.decimals)
-          ),
-          tokenAmountIn: '1000000000000000000',
-          tokenAmountOut: '1000000000000000000',
-
-          balanceIn: metadata.tokensInfo[1].balance,
-          balanceIn: metadata.tokensInfo[0].balance,
-
-          tokenIn: metadata.tokensInfo[1].token,
-          tokenOut: metadata.tokensInfo[0].token
-        }
-        // console.log(swap)
         // TODO to be sure this condition is enough and if it's true combine with next condition
 
         if (!swap.tokenAmountIn || !swap.tokenAmountOut) {
@@ -1169,41 +1163,79 @@ module.exports = {
         }
         // console.log('*********************************', swap.tokenIn)
         if (
-          ![pairTokenIn, pairTokenOut].includes(swap.tokenIn) ||
-          ![pairTokenIn, pairTokenOut].includes(swap.tokenOut)
+          ![pairTokenIn.toLowerCase(), pairTokenOut.toLowerCase()].includes(
+            swap.tokenIn.id.toLowerCase()
+          ) ||
+          ![pairTokenIn.toLowerCase(), pairTokenOut.toLowerCase()].includes(
+            swap.tokenOut.id.toLowerCase()
+          )
         ) {
           continue
         }
-
         const tokenIn = metadata.tokensInfo.find(
-          (item) => item.token.toLowerCase() === swap.tokenIn.toLowerCase()
+          (item) => item.token.toLowerCase() === swap.tokenIn.id.toLowerCase()
         )
         const tokenOut = metadata.tokensInfo.find(
-          (item) => item.token.toLowerCase() === swap.tokenOut.toLowerCase()
+          (item) => item.token.toLowerCase() === swap.tokenOut.id.toLowerCase()
         )
+        const exchange =
+          swap.tokenIn.id.toLowerCase() !== pairTokenIn.toLowerCase()
         let price = ZERO
+        let p = ZERO
         let volume = ZERO
+        const poolTokenBalances = swap.poolTokenBalances.map((item, index) =>
+          this.upScale(item, metadata.decimals[index])
+        )
         switch (metadata.pool) {
           case STABLE:
             price = this.tokenPriceStable(
               metadata.ampValue,
               metadata.ampPrecision,
-              swap.tokenAmountIn,
-              [...swap.poolTokenBalances],
-
-              tokenIn.index,
-              tokenOut.index
+              exchange
+                ? this.upScale2(swap.tokenAmountOut, tokenOut.decimals)
+                : this.upScale2(swap.tokenAmountIn, tokenIn.decimals),
+              [...poolTokenBalances],
+              exchange ? tokenOut.index : tokenIn.index,
+              exchange ? tokenIn.index : tokenOut.index
             )
+            p = exchange
+              ? this.upScale2(swap.tokenAmountIn, tokenIn.decimals).div(
+                  this.upScale2(swap.tokenAmountOut, tokenOut.decimals)
+                )
+              : this.upScale2(swap.tokenAmountOut, tokenOut.decimals).div(
+                  this.upScale2(swap.tokenAmountIn, tokenIn.decimals)
+                )
             break
           case WEIGHTED:
             //  TODO double check to be sure about weighted decimal
+
             price = this.tokenPriceWeighted(
-              this.upScale(tokenIn.balance, tokenIn.decimals),
-              this.upScale(tokenIn.weight, this.SCALE),
-              this.upScale(tokenOut.balance, tokenOut.decimals),
-              this.upScale(tokenOut.weight, this.SCALE),
-              this.upScale(swap.tokenAmountIn, tokenIn.decimals)
+              exchange
+                ? poolTokenBalances[tokenOut.index]
+                : poolTokenBalances[tokenIn.index],
+              exchange
+                ? this.upScale(tokenOut.weight, this.SCALE)
+                : this.upScale(tokenIn.weight, this.SCALE),
+              exchange
+                ? poolTokenBalances[tokenIn.index]
+                : poolTokenBalances[tokenOut.index],
+              exchange
+                ? this.upScale(tokenIn.weight, this.SCALE)
+                : this.upScale(tokenOut.weight, this.SCALE),
+              exchange
+                ? this.upScale2(swap.tokenAmountOut, tokenOut.decimals)
+                : this.upScale2(swap.tokenAmountIn, tokenIn.decimals)
             )
+            p = exchange
+              ? this.upScale2(swap.tokenAmountIn, tokenIn.decimals).div(
+                  this.upScale2(swap.tokenAmountOut, tokenOut.decimals)
+                )
+              : this.upScale2(swap.tokenAmountOut, tokenOut.decimals).div(
+                  this.upScale2(swap.tokenAmountIn, tokenIn.decimals)
+                )
+            // console.log(swap)
+            // console.log('price by formula', price.toString())
+            // console.log('price by amount', p.toString())
             break
 
           default:
@@ -1213,30 +1245,56 @@ module.exports = {
         // console.log({ price: price.toString() })
         // TODO to be sure these condition are true
         switch (pairTokenIn.toLowerCase()) {
-          case swap.tokenIn.toLowerCase():
+          case swap.tokenIn.id.toLowerCase():
             volume = this.upScale(swap.tokenAmountIn, tokenIn.decimals)
             break
 
-          case swap.tokenOut.toLowerCase():
+          case swap.tokenOut.id.toLowerCase():
             volume = this.upScale(swap.tokenAmountOut, tokenOut.decimals)
             break
 
           default:
             throw new Error('INVALID TOKEN BASED ON SWAP')
         }
-        // console.log('volume', volume.toString())
         sumWeightedPrice = sumWeightedPrice.plus(price.times(volume))
+
+        sumWeightedP = sumWeightedP.plus(p.times(volume))
+
         sumVolume = sumVolume.plus(volume)
       }
-      console.log({
-        tokenPrice: sumWeightedPrice.toString(),
-        sumVolume: sumVolume.toString()
-      })
+      // console.log('sumWeightedPrice by formula', sumWeightedPrice.toString())
+      // console.log('sumWeightedPrice by amount', sumWeightedP.toString())
+
       if (sumVolume > ZERO) {
         let tokenPrice = sumWeightedPrice.div(sumVolume)
-        return { tokenPrice, sumVolume }
+        let tokenP = sumWeightedP.div(sumVolume)
+        // console.log('price by formula', tokenPrice.toString())
+        // console.log('price by amount', tokenP.toString())
+        // console.log('sum volume', sumVolume.toString())
+        return {
+          tokenPrice: this.upScale2(tokenPrice),
+          sumVolume,
+          tokenP: this.upScale2(tokenP)
+        }
       }
       return { tokenPrice: ZERO, sumVolume: ZERO }
     }
+  },
+
+  calculatePriceToken: function (pairVWAPs, pairs) {
+    let volume = pairVWAPs.reduce((previousValue, currentValue) => {
+      return previousValue.plus(currentValue.sumVolume)
+    }, ZERO)
+    let price = pairVWAPs.reduce((price, currentValue) => {
+      return price.times(currentValue.tokenPrice).div(this.SCALE)
+    }, bn(this.SCALE))
+    let p = pairVWAPs.reduce((price, currentValue) => {
+      return price.times(currentValue.tokenP).div(this.SCALE)
+    }, bn(this.SCALE))
+
+    if (volume.toString() == '0' || price.toString() == '0') {
+      throw { message: 'INVALID_PRICE' }
+    }
+    return { p: p.div(this.SCALE), price: price.div(this.SCALE), volume }
   }
 }

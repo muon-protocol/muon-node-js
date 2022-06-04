@@ -19,9 +19,9 @@ const testPrice = async (params, token, tokenName) => {
         params
       }
     })
-    .then(({ tokenPrice, volume }) => {
+    .then(({ tokenPriceByAmount, tokenPrice, volume }) => {
       console.log(`\n \nResult for PRICE ${tokenName}: ${token}`)
-      console.log({ tokenPrice, volume })
+      console.log({ tokenPriceByAmount, tokenPrice, volume })
     })
     .catch((error) => console.log(error))
 }
@@ -82,6 +82,22 @@ const example_3 = {
   ]
 }
 
-// testPrice(example_1, token, tokenName)
-// testPrice(example_2, token2, tokenName2)
+const tokenName4 = 'WFTM'
+const token4 = '0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83'
+const example_4 = {
+  token: token4,
+
+  pairs: [
+    {
+      exchange: 'beets',
+      pool: 'weighted',
+      chainId: '250',
+      address: '0xf3A602d30dcB723A74a0198313a7551FEacA7DAc' //  wFTM - wBTC - wETH - USDC
+    }
+  ]
+}
+
+testPrice(example_1, token, tokenName)
+testPrice(example_2, token2, tokenName2)
 testPrice(example_3, token3, tokenName3)
+testPrice(example_4, token4, tokenName4)

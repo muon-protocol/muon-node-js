@@ -504,8 +504,8 @@ module.exports = {
     })
   },
   calculatePriceToken: function (pairVWAPs, pairs) {
-    console.log(JSON.stringify(pairVWAPs, undefined, 2))
     let volume = pairVWAPs.reduce((previousValue, currentValue) => {
+      console.log(previousValue.toString(), currentValue.toString())
       return previousValue.add(currentValue.sumVolume)
     }, new BN(0))
     let price = pairVWAPs.reduce((price, currentValue) => {
@@ -532,9 +532,10 @@ module.exports = {
 
     pairVWAPPromises = flatten(pairVWAPPromises)
     let pairVWAPs = await Promise.all(pairVWAPPromises)
-    let { price, volume } = this.calculatePriceToken(pairVWAPs, pairs)
+    // TODO remove p it's test for beets
+    let { p, price, volume } = this.calculatePriceToken(pairVWAPs, pairs)
 
-    return { price, volume }
+    return { p, price, volume }
   },
 
   calculatePrice: function (
@@ -632,16 +633,21 @@ module.exports = {
           // }
           this.config = { ...this.config, chainId }
         }
-        let { price, volume } = await this.tokenVWAP(
+        // TODO remove p it's for test beets
+        let { p, price, volume } = await this.tokenVWAP(
           token,
           pairs,
           null,
           start,
           end
         )
+        // TODO remove tokenPriceByAmount it's for test beets
+
         return {
           token: token,
           tokenPrice: price.toString(),
+          tokenPriceByAmount: p.toString(),
+
           // pairs: pairs,
           volume: volume.toString(),
           ...(hashTimestamp ? { timestamp: request.data.timestamp } : {}),
