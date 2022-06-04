@@ -66,6 +66,8 @@ const createEnv = async () => {
   WEB3_PROVIDER_BSCTEST = "https://data-seed-prebsc-1-s2.binance.org:8545"\n
   WEB3_PROVIDER_FTM = "https://rpcapi.fantom.network/"\n
   WEB3_PROVIDER_FTMTEST = "https://rpc.testnet.fantom.network/"\n
+  WEB3_PROVIDER_POLYGON="https://polygon-rpc.com"\n
+  WEB3_PROVIDER_MUMBAI="https://matic-mumbai.chainstacklabs.com"\n
 
   watch_muon_on_bsctest="0xda2D1567Dfca43Dc2Bc9f8D072D746d0bfbF3E1a"\n
   watch_muon_on_rinkeby="0x8ed35887C77Ee1BB533f05f85661fcDeF1FEda1E"\n
@@ -128,6 +130,8 @@ const createEnv = async () => {
     WEB3_PROVIDER_BSCTEST = "https://data-seed-prebsc-1-s2.binance.org:8545"\n
     WEB3_PROVIDER_FTM = "https://rpcapi.fantom.network/"\n
     WEB3_PROVIDER_FTMTEST = "https://rpc.testnet.fantom.network/"\n
+    WEB3_PROVIDER_POLYGON="https://polygon-rpc.com"\n
+    WEB3_PROVIDER_MUMBAI="https://matic-mumbai.chainstacklabs.com"\n
   
     watch_muon_on_bsctest="0xda2D1567Dfca43Dc2Bc9f8D072D746d0bfbF3E1a"\n
     watch_muon_on_rinkeby="0x8ed35887C77Ee1BB533f05f85661fcDeF1FEda1E"\n
