@@ -31,7 +31,7 @@ const createEnv = async () => {
   REDIS_GATEWAY_CHANNEL = dev_node\n
   GATEWAY_HOST = 0.0.0.0\n
   GATEWAY_PORT = ${params['p'] ? params['p'] : 8000}\n
-  CONFIG_BASE_PATH = node-1\n
+  CONFIG_BASE_PATH = dev-node-1\n
 
   MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
   # ============ LibP2P Configs ==============
@@ -79,6 +79,20 @@ const createEnv = async () => {
   if (!fs.existsSync('./dev-chain/')) {
     fs.mkdirSync('./dev-chain/')
   }
+  const configFiles = fs
+    .readdirSync('./config')
+    .filter((item) => item.startsWith('dev-node'))
+
+  if (configFiles.length > 0) {
+    configFiles.forEach((item) => {
+      // delete dev-node directory recursively
+      fs.rm(`./config/${item}`, { recursive: true, force: true }, (err) => {
+        if (err) {
+          throw err
+        }
+      })
+    })
+  }
   fs.writeFileSync('./dev-chain/dev-node-1.env', env1)
   console.log(emoji.get('o'), 'Node-1 Ethereum Address: ', accountEnv1.address)
   collateralWallets.push(`${accountEnv1.address}@${libP2PConfigsEnv1.id}`)
@@ -95,7 +109,7 @@ const createEnv = async () => {
     REDIS_GATEWAY_CHANNEL = dev_node\n
     GATEWAY_HOST = 0.0.0.0\n
     GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8000 + index}\n
-    CONFIG_BASE_PATH = node-${index + 1}\n
+    CONFIG_BASE_PATH = dev-node-${index + 1}\n
 
     MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
     # ============ LibP2P Configs ==============
