@@ -106,6 +106,7 @@ class BaseAppPlugin extends CallablePlugin {
       nSign = this.getNSign(nSign)
 
     let newRequest = new Request({
+      hash: null,
       app: this.APP_NAME,
       method: method,
       nSign,
@@ -142,6 +143,7 @@ class BaseAppPlugin extends CallablePlugin {
       };
 
       let resultHash = this.hashRequestResult(newRequest, result)
+      newRequest.hash = this.calculateRequestHash(newRequest, resultHash);
       let memWrite = this.getMemWrite(newRequest, result)
       if (!!memWrite) {
         newRequest.data.memWrite = memWrite
@@ -199,6 +201,15 @@ class BaseAppPlugin extends CallablePlugin {
 
       return requestData
     }
+  }
+
+  calculateRequestHash(request, resultHash) {
+    return crypto.soliditySha3([
+      {type: "string", value: request.app},
+      {type: "string", value: request.method},
+      {type: "address", value: request.data.init.nonceAddress},
+      {type: "uint256", value: resultHash},
+    ]);
   }
 
   async onFirstNodeRequestSucceed(request) {
@@ -284,43 +295,6 @@ class BaseAppPlugin extends CallablePlugin {
     ]
   }
 
-  async isOtherNodesConfirmed0(newRequest) {
-    let secondsToCheck = 0
-    let confirmed = false
-    let allSignatures = []
-    let signers = {}
-
-    while (!confirmed && secondsToCheck < 5) {
-      await timeout(250)
-      allSignatures = await Signature.find({ request: newRequest._id })
-      signers = {}
-      for (let sig of allSignatures) {
-        let sigOwner = this.recoverSignature(newRequest, sig)
-        if (!!sigOwner && sigOwner !== sig['owner']) continue
-
-        signers[sigOwner] = true
-      }
-
-      if (Object.keys(signers).length >= newRequest.nSign) {
-        confirmed = true
-      }
-      secondsToCheck += 0.25
-    }
-
-    return [
-      confirmed,
-      allSignatures
-        .filter((sig) => Object.keys(signers).includes(sig['owner']))
-        .map((sig) => ({
-          owner: sig['owner'],
-          timestamp: sig['timestamp'],
-          result: sig['data'],
-          signature: sig['signature'],
-          memWriteSignature: sig['memWriteSignature']
-        }))
-    ]
-  }
-
   async onBroadcastReceived(data) {
     let remoteCall = this.muon.getPlugin('remote-call')
     try {
@@ -385,16 +359,6 @@ class BaseAppPlugin extends CallablePlugin {
       _id: request._id
     })
   }
-
-  // remoteMethodEndpoint(title) {
-  //   return `app-${this.APP_NAME}-${title}`
-  // }
-
-  // remoteCall(peer, methodName, data) {
-  //   let remoteCall = this.muon.getPlugin('remote-call')
-  //   let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
-  //   return remoteCall.call(peer, remoteMethodEndpoint, data)
-  // }
 
   /**
    * hash parameters that smart contract need it.
