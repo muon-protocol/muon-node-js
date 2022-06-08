@@ -7,11 +7,15 @@ const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const {makeAppDependency} = require('./app-dependencies')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
+const tss = require('../../utils/tss');
+const {toBN} = require('../../utils/tss/utils')
 const { omit } = require('lodash')
 const AppRequestManager = require('./app-request-manager');
+const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
+@remoteApp
 class BaseAppPlugin extends CallablePlugin {
   APP_NAME = null
   REMOTE_CALL_TIMEOUT = 15000
@@ -49,37 +53,31 @@ class BaseAppPlugin extends CallablePlugin {
   async onStart() {
     super.onStart();
     // console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
-    /**
-     * Remote call handlers
-     */
-    this.muon
-      .getPlugin('remote-call')
-      .on(
-        `remote:app-${this.APP_NAME}-get-request`,
-        this.__onRemoteWantRequest.bind(this)
-      )
-    this.muon
-      .getPlugin('remote-call')
-      .on(
-        `remote:app-${this.APP_NAME}-request-sign`,
-        this.__onRemoteSignRequest.bind(this)
-      )
-
-    let gateway = this.muon.getPlugin('gateway-interface')
-    gateway.registerAppCall(
-      this.APP_NAME,
-      'request',
-      this.__onRequestArrived.bind(this)
-    )
 
     /**
-     * register readonly methods
+     * register apps readonly methods
      */
     if(this.readOnlyMethods.length > 0){
+      let gateway = this.muon.getPlugin('gateway-interface')
       this.readOnlyMethods.forEach(method => {
         gateway.registerAppCall(this.APP_NAME, method, this[method].bind(this))
       })
     }
+  }
+
+  getNSign () {
+    if(!this.tssPlugin.isReady)
+      throw {message: 'Tss not initialized'};
+    return this.tssPlugin.tssKey.party.t;
+  }
+
+  get tssWalletAddress(){
+    let tssPlugin = this.muon.getPlugin('tss-plugin');
+    return tss.pub2addr(tssPlugin.tssKey.publicKey)
+  }
+
+  get tssPlugin(){
+    return this.muon.getPlugin('tss-plugin');
   }
 
   async invoke(appName, method, params) {
@@ -95,6 +93,7 @@ class BaseAppPlugin extends CallablePlugin {
     return this.APP_NAME ? super.BROADCAST_CHANNEL : null
   }
 
+  @gatewayMethod("request")
   async __onRequestArrived(method, params, nSign, mode) {
     let t0 = Date.now()
     let startedAt = getTimestamp()
@@ -213,6 +212,25 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onFirstNodeRequestSucceed(request) {
+    let tssPlugin = this.muon.getPlugin(`tss-plugin`)
+    if(!tssPlugin.isReady){
+      throw {message: 'Tss not initialized'};
+    }
+    let party = tssPlugin.tssKey.party;
+    // console.log('party generation done.')
+    if(!party)
+      throw {message: 'party not generated'}
+
+    let nonceParticipantsCount = Math.ceil(party.t * 1.2)
+    let nonce = await tssPlugin.keyGen(party, {maxPartners: nonceParticipantsCount})
+
+    // let sign = tssPlugin.sign(null, party);
+    return {
+      party: party.id,
+      nonce: nonce.id,
+      // noncePub: nonce.publicKey.encode('hex'),
+      nonceAddress: tss.pub2addr(nonce.publicKey),
+    }
   }
 
   /**
@@ -274,53 +292,48 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async isOtherNodesConfirmed(newRequest) {
+    let signers = {}
 
-    let signers = await this.requestManager.onRequestSignFullFilled(newRequest._id)
+    let {party: partyId} = newRequest.data.init;
+    let party = this.tssPlugin.getParty(partyId);
+    let masterWalletPubKey = this.muon.getSharedWalletPubKey()
+    let signersIndices;
+
+    signers = await this.requestManager.onRequestSignFullFilled(newRequest._id)
 
     let owners = Object.keys(signers)
     let allSignatures = owners.map(w => signers[w]);
 
-    let confirmed = Object.keys(signers).length >= newRequest.nSign
+    let schnorrSigns = allSignatures.map(({signature}) => {
+      let [s, e] = signature.split(',').map(toBN)
+      return {s, e};
+    })
+    let aggregatedSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, owners)
+    let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
+
+    // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
+    let confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, aggregatedSign)
 
     return [
       confirmed,
-      allSignatures
-        .map((sig) => ({
-          owner: sig['owner'],
-          timestamp: sig['timestamp'],
-          result: sig['data'],
-          signature: sig['signature'],
-          memWriteSignature: sig['memWriteSignature']
-        }))
+      confirmed ? [{
+        owner: tss.pub2addr(masterWalletPubKey),
+        ownerPubKey: {
+          x: '0x' + masterWalletPubKey.x.toBuffer('be', 32).toString('hex'),
+          yParity: masterWalletPubKey.y.mod(toBN(2)).toString(),
+        },
+        // signers: signersIndices,
+        timestamp: getTimestamp(),
+        result: newRequest.data.result,
+        // signature: `0x${aggregatedSign.s.toString(16)},0x${aggregatedSign.e.toString(16)}`,
+        signature: '0x' + aggregatedSign.s.toBuffer('be', 32).toString('hex'),
+        // sign: {
+        //   s: `0x${aggregatedSign.s.toString(16)}`,
+        //   e: `0x${aggregatedSign.e.toString(16)}`
+        // },
+        memWriteSignature: allSignatures[0]['memWriteSignature']
+      }] : []
     ]
-  }
-
-  async onBroadcastReceived(data) {
-    let remoteCall = this.muon.getPlugin('remote-call')
-    try {
-      // let data = JSON.parse(uint8ArrayToString(msg.data))
-      if (data && data.type === 'new_request') {
-        let peerId = PeerId.createFromB58String(data.peerId)
-        let peer = await this.findPeer(peerId)
-        let request = await remoteCall.call(
-          peer,
-          `app-${this.APP_NAME}-get-request`,
-          { _id: data._id }
-        )
-        if (request) {
-          // console.log(`request info found: `, request)
-          let [sign, memWrite] = await this.processRemoteRequest(request)
-          await remoteCall.call(peer, `app-${this.APP_NAME}-request-sign`, {
-            sign,
-            memWrite
-          })
-        } else {
-          // console.log(`request info not found "${data.id}"`)
-        }
-      }
-    } catch (e) {
-      console.error(e)
-    }
   }
 
   /**
@@ -348,15 +361,53 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   recoverSignature(request, sign) {
-    let hash = this.hashRequestResult(request, sign.result)
-    return crypto.recover(hash, sign.signature)
+    let tt0 = Date.now();
+    let {owner, pubKey: pubKeyStr} = sign;
+    let pubKey = tss.keyFromPublic(pubKeyStr);
+    // TODO: need to recheck
+    // if(owner !== tss.pub2addr(pubKey)) {
+    //   console.log({owner, pubKeyStr,})
+    //   throw {message: 'Sign recovery error: invalid pubKey address'}
+    // }
+
+    let [s, e] = sign.signature.split(',').map(toBN)
+    // let sig = {s, e}
+    //
+    let tssPlugin = this.muon.getPlugin('tss-plugin');
+    let {data: {init: {nonce: nonceId}}} = request;
+    let nonce = tssPlugin.getSharedKey(nonceId)
+
+    let idx = owner;
+    let Z_i = pubKey;
+    let K_i = nonce.getPubKey(idx);
+
+    let p1 = tss.pointAdd(K_i, Z_i.mul(e.neg())).encode('hex')
+    let p2 = tss.curve.g.mul(s).encode('hex');
+    return p1 === p2 ? owner : null;
   }
 
   broadcastNewRequest(request) {
-    this.broadcast({
-      type: 'new_request',
-      peerId: process.env.PEER_ID,
-      _id: request._id
+    let tssPlugin = this.muon.getPlugin('tss-plugin');
+    let {data: {init: {party: partyId, nonce: nonceId}}} = request;
+    let party = tssPlugin.getParty(partyId)
+    let nonce = tssPlugin.getSharedKey(nonceId)
+
+    let partners = Object.values(party.partners)
+      .filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(wallet)))
+
+    this.requestManager.setPartnerCount(request._id, partners.length + 1);
+
+    partners.map(async ({peer, wallet}) => {
+      return this.remoteCall(peer, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT})
+        .then(this.__onRemoteSignRequest.bind(this))
+        .catch(e => {
+          // console.log('base-tss-app-plugin: on broadcast request error', e)
+          return this.__onRemoteSignRequest(null, {
+            request: request._id.toString(),
+            peerId: peer.id,
+            ...e
+          });
+        })
     })
   }
 
@@ -373,13 +424,29 @@ class BaseAppPlugin extends CallablePlugin {
 
   makeSignature(request, result, resultHash) {
     let signTimestamp = getTimestamp()
-    let signature = crypto.sign(resultHash)
+    // let signature = crypto.sign(resultHash)
+
+    let tssPlugin = this.muon.getPlugin('tss-plugin');
+    let {data: {init: {party: partyId, nonce: nonceId}}} = request;
+    let party = tssPlugin.getParty(partyId)
+    let nonce = tssPlugin.getSharedKey(nonceId)
+
+    let tssKey = tssPlugin.tssKey;
+    let k_i = nonce.share
+    let K = nonce.publicKey;
+    let signature = tss.schnorrSign(tssKey.share, k_i, K, resultHash)
+
+    const currentNodeIndex = nonce.party.partners[process.env.SIGN_WALLET_ADDRESS].i
+
     return {
       request: request._id,
+      // node stake wallet address
       owner: process.env.SIGN_WALLET_ADDRESS,
+      // tss shared public key
+      pubKey: tss.keyFromPrivate(tssKey.share).getPublic().encode('hex'),
       timestamp: signTimestamp,
       result,
-      signature
+      signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`
     }
   }
 
@@ -443,6 +510,18 @@ class BaseAppPlugin extends CallablePlugin {
     catch (e) {
       console.error('BaseAppPlugin.__onRemoteSignRequest', e);
     }
+  }
+
+  @remoteMethod('wantSign')
+  async __onRemoteWantSign(request) {
+    let {nonce: nonceId} = request.data.init;
+    let nonce = this.tssPlugin.getSharedKey(nonceId);
+    // wait for nonce broadcast complete
+    await nonce.waitToFulfill()
+
+    let [sign, memWrite] = await this.processRemoteRequest(request)
+    // console.log('wantSign', request._id, sign)
+    return { sign, memWrite }
   }
 }
 

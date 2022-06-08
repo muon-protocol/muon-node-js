@@ -1,4 +1,4 @@
-const BaseApp = require('./base/base-app-plugin')
+const CallablePlugin = require('./base/callable-plugin')
 const Content = require('../gateway/models/Content')
 const all = require('it-all')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
@@ -6,7 +6,7 @@ const {loadCID} = require('../utils/cid')
 const {timeout} = require('../utils/helpers')
 
 @remoteApp
-class ContentApp extends BaseApp {
+class ContentApp extends CallablePlugin {
   APP_NAME = 'content'
 
   async onGatewayConfirmed(response){
