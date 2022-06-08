@@ -31,7 +31,7 @@ const createEnv = async () => {
   REDIS_GATEWAY_CHANNEL = dev_node\n
   GATEWAY_HOST = 0.0.0.0\n
   GATEWAY_PORT = ${params['p'] ? params['p'] : 8000}\n
-  CONFIG_BASE_PATH = node-1\n
+  CONFIG_BASE_PATH = dev-node-1\n
 
   MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
   # ============ LibP2P Configs ==============
@@ -66,6 +66,8 @@ const createEnv = async () => {
   WEB3_PROVIDER_BSCTEST = "https://data-seed-prebsc-1-s2.binance.org:8545"\n
   WEB3_PROVIDER_FTM = "https://rpcapi.fantom.network/"\n
   WEB3_PROVIDER_FTMTEST = "https://rpc.testnet.fantom.network/"\n
+  WEB3_PROVIDER_POLYGON="https://polygon-rpc.com"\n
+  WEB3_PROVIDER_MUMBAI="https://matic-mumbai.chainstacklabs.com"\n
 
   watch_muon_on_bsctest="0xda2D1567Dfca43Dc2Bc9f8D072D746d0bfbF3E1a"\n
   watch_muon_on_rinkeby="0x8ed35887C77Ee1BB533f05f85661fcDeF1FEda1E"\n
@@ -76,6 +78,20 @@ const createEnv = async () => {
   `
   if (!fs.existsSync('./dev-chain/')) {
     fs.mkdirSync('./dev-chain/')
+  }
+  const configFiles = fs
+    .readdirSync('./config')
+    .filter((item) => item.startsWith('dev-node'))
+
+  if (configFiles.length > 0) {
+    configFiles.forEach((item) => {
+      // delete dev-node directory recursively
+      fs.rm(`./config/${item}`, { recursive: true, force: true }, (err) => {
+        if (err) {
+          throw err
+        }
+      })
+    })
   }
   fs.writeFileSync('./dev-chain/dev-node-1.env', env1)
   console.log(emoji.get('o'), 'Node-1 Ethereum Address: ', accountEnv1.address)
@@ -93,7 +109,7 @@ const createEnv = async () => {
     REDIS_GATEWAY_CHANNEL = dev_node\n
     GATEWAY_HOST = 0.0.0.0\n
     GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8000 + index}\n
-    CONFIG_BASE_PATH = node-${index + 1}\n
+    CONFIG_BASE_PATH = dev-node-${index + 1}\n
 
     MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
     # ============ LibP2P Configs ==============
@@ -128,6 +144,8 @@ const createEnv = async () => {
     WEB3_PROVIDER_BSCTEST = "https://data-seed-prebsc-1-s2.binance.org:8545"\n
     WEB3_PROVIDER_FTM = "https://rpcapi.fantom.network/"\n
     WEB3_PROVIDER_FTMTEST = "https://rpc.testnet.fantom.network/"\n
+    WEB3_PROVIDER_POLYGON="https://polygon-rpc.com"\n
+    WEB3_PROVIDER_MUMBAI="https://matic-mumbai.chainstacklabs.com"\n
   
     watch_muon_on_bsctest="0xda2D1567Dfca43Dc2Bc9f8D072D746d0bfbF3E1a"\n
     watch_muon_on_rinkeby="0x8ed35887C77Ee1BB533f05f85661fcDeF1FEda1E"\n

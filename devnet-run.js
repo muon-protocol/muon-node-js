@@ -33,6 +33,20 @@ async function runNodes() {
   const dir = './dev-chain'
 
   if (params['setup']) {
+    const configFiles = fs
+      .readdirSync('./config')
+      .filter((item) => item.startsWith('dev-node'))
+
+    if (configFiles.length > 0) {
+      configFiles.forEach((item) => {
+        // delete dev-node directory recursively
+        fs.rm(`./config/${item}`, { recursive: true, force: true }, (err) => {
+          if (err) {
+            throw err
+          }
+        })
+      })
+    }
     // delete directory recursively
     fs.rm(dir, { recursive: true, force: true }, (err) => {
       if (err) {
@@ -73,6 +87,20 @@ async function runNodes() {
       }
     } else {
       // console.log('Generating Envs...')
+      const configFiles = fs
+        .readdirSync('./config')
+        .filter((item) => item.startsWith('dev-node'))
+
+      if (configFiles.length > 0) {
+        configFiles.forEach((item) => {
+          // delete dev-node directory recursively
+          fs.rm(`./config/${item}`, { recursive: true, force: true }, (err) => {
+            if (err) {
+              throw err
+            }
+          })
+        })
+      }
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, {
           recursive: true
