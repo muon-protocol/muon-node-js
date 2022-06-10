@@ -152,7 +152,6 @@ class BaseAppPlugin extends CallablePlugin {
          * One REMOTE_CALL_TIMEOUT for other nodes (all other nodes proceed parallel).
          * 5000 for networking
          */
-        // TODO: race condition
         this.requestManager.addRequest(newRequest, {requestTimeout: this.REMOTE_CALL_TIMEOUT * 2 + 5000});
 
         newRequest.data.init = {
@@ -483,8 +482,22 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @remoteMethod('wantSign')
-  async __onRemoteWantSign(request) {
-    // TODO: check owner, timestamp < 40 sec
+  async __onRemoteWantSign(request, callerInfo) {
+    /**
+     * Check request owner
+     */
+    if(request.owner !== callerInfo.wallet){
+      throw "Only request owner can want signature."
+    }
+    /**
+     * Check request timestamp
+     */
+    if(getTimestamp() - request.data.timestamp > 40) {
+      throw "Request timestamp expired to sign."
+    }
+    /**
+     * Check request result to be same.
+     */
     let result = await this.onRequest(clone(request))
 
     let hash1 = await this.hashRequestResult(request, request.data.result)
