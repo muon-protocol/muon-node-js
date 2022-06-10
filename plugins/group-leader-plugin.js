@@ -17,11 +17,6 @@ class GroupLeaderPlugin extends CallablePlugin {
   // TODO: How about adversarial behavior?
 
   /**
-   * Each election has an unique ID.
-   * @type {number}
-   */
-  lastElection = 0
-  /**
    * Election start time in ms.
    * @type {timestamp}
    */
@@ -81,12 +76,11 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async _checkStatus(){
-    let already = await this.leaderAlreadySelected();
-    if(!!already && !this.leader){
-      console.log(`leader already selected: `, already)
-      this.lastElection = already.lastElection;
-      this.leader = already.leader;
-      this._leaderSelectPromise.resolve(already.leader);
+    let leader = await this.leaderAlreadySelected();
+    if(!!leader && !this.leader){
+      console.log(`leader already selected: `, leader)
+      this.leader = leader;
+      this._leaderSelectPromise.resolve(leader);
       return ;
     }
 
@@ -101,11 +95,11 @@ class GroupLeaderPlugin extends CallablePlugin {
           throw {message: "Election start failed."}
 
         console.log(`** Got permission to do election **`);
-        let key = await this.TssPlugin.keyGen(null, {id: `election-${this.lastElection+1}-key`});
+        this.electionKey = await this.TssPlugin.keyGen();
         let done = await this.informElectionReady();
         if(done){
           console.log(`Election complete successfully`);
-          this._electionComplete(key);
+          this._electionComplete(this.electionKey);
           return;
         }
         else{
@@ -123,7 +117,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async electionStart() {
-    let responses = await this.callParty(RemoteMethods.ElectionStart,{election: this.lastElection+1});
+    let responses = await this.callParty(RemoteMethods.ElectionStart);
     // console.log(`GroupLeaderPlugin.electionStart electionStart responses:`, responses)
     let allDone = responses.findIndex(r => (r!==true)) < 0;
     // TODO: is need to 50% of nodes agree with election start?
@@ -133,8 +127,9 @@ class GroupLeaderPlugin extends CallablePlugin {
   // TODO: if all nodes except leader restart, then leader cannot be select
   async leaderAlreadySelected(){
     let responses = await this.callParty(RemoteMethods.WhoIsLeader)
-    let leaderCount = responses.filter(r => !!r?.leader)
-      .map(r => `${r.lastElection}-${r.leader}`)
+    let leaderCount = responses
+      .filter(r => !!r?.leader)
+      .map(r => `${r.leader}`)
       .reduce((obj, val) => {
         if(obj[val] === undefined)
           obj[val] = 0
@@ -148,10 +143,9 @@ class GroupLeaderPlugin extends CallablePlugin {
       }
       return null
     }
-    let leaderStr = Object.keys(leaderCount)[0];
-    if(leaderCount[leaderStr] >= this.TssPlugin.TSS_THRESHOLD){
-      let [lastElection, leader] = leaderStr.split('-')
-      return {lastElection: parseInt(lastElection), leader};
+    let leader = Object.keys(leaderCount)[0];
+    if(leaderCount[leader] >= this.TssPlugin.TSS_THRESHOLD){
+      return leader;
     }
     else
       return null;
@@ -162,19 +156,18 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async isPermittedToDoElection() {
-    let responses = await this.callParty(RemoteMethods.AskElectionPermission, {election: this.lastElection+1});
-    console.log(`election ${this.lastElection+1} permission responses`, responses);
+    let responses = await this.callParty(RemoteMethods.AskElectionPermission);
+    console.log(`election permission responses`, responses);
     return responses.length+1 >= this.TssPlugin.TSS_THRESHOLD && responses.findIndex(res => res !== true) < 0;
   }
 
   async informElectionReady() {
-    let electionKey = this.TssPlugin.getSharedKey(this.getElectionId(this.lastElection+1));
 
-    let partners = electionKey.partners
+    let partners = this.electionKey.partners
       .map(w => this.TssPlugin.tssParty.onlinePartners[w])
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
 
-    let responses = await this.callParty(RemoteMethods.ElectionResultReady, {election: this.lastElection+1}, partners)
+    let responses = await this.callParty(RemoteMethods.ElectionResultReady, {electionKey: this.electionKey.id}, partners)
     // console.log(`election ${this.lastElection+1} ready inform responses`, responses);
     return responses.findIndex(res => res !== true) < 0;
   }
@@ -194,25 +187,19 @@ class GroupLeaderPlugin extends CallablePlugin {
     return this.leader === process.env.SIGN_WALLET_ADDRESS;
   }
 
-  getElectionId(election) {
-    return `election-${election}-key`
-  }
-
-  isWalletPermittedToElect(wallet, election) {
-    // console.log("===========", {wallet, election, lastElection: this.lastElection})
-    return !this.leader && election === this.lastElection+1 && this.currentExecutor === wallet;
+  isWalletPermittedToElect(wallet) {
+    return !this.leader && this.currentExecutor === wallet;
   }
 
   _electionComplete(key) {
     this.electionKey = key;
     this.leader = this.extractLeaderFromKey(key);
-    this.lastElection ++;
     this.emit('leader-change', this.leader);
     this._leaderSelectPromise.resolve(this.leader);
     if(this.leader === process.env.SIGN_WALLET_ADDRESS)
-      console.log(`********* I am the leader[${this.lastElection}] now *********`);
+      console.log(`********* I am the leader now *********`);
     else
-      console.log(`********* leader[${this.lastElection}] is now ${this.leader} *********`);
+      console.log(`********* leader is now ${this.leader} *********`);
   }
 
   waitToLeaderSelect() {
@@ -229,7 +216,7 @@ class GroupLeaderPlugin extends CallablePlugin {
       process.env.SIGN_WALLET_ADDRESS,
       ...this.onlinePartners.map(p =>p.wallet)
     ]
-    let hashes = walletList.map(w => sha3(`${w}-${new Date().getHours()}-${this.lastElection+1}`));
+    let hashes = walletList.map(w => sha3(`${w}-${new Date().getHours()}`));
     let minIndex = hashes.reduce((min, val, index, arr)=>(val<arr[min]?index:min), 0);
     return walletList[minIndex]
   }
@@ -249,14 +236,12 @@ class GroupLeaderPlugin extends CallablePlugin {
   @remoteMethod(RemoteMethods.AskElectionPermission)
   async _askElectionPermission(data={}, callerInfo) {
     // console.log('GroupLeaderPlugin.AskElectionPermission', {data, callerInfo});
-    let {election} = data;
-    return this.isWalletPermittedToElect(callerInfo.wallet, election)
+    return this.isWalletPermittedToElect(callerInfo.wallet)
   }
 
   @remoteMethod(RemoteMethods.ElectionStart)
   async _ElectionStart(data={}, callerInfo) {
-    let {election} = data
-    let permitted = this.isWalletPermittedToElect(callerInfo.wallet, election)
+    let permitted = this.isWalletPermittedToElect(callerInfo.wallet)
     /**
      * Next election start should call after at least 15 seconds.
      * if called immediately, two nodes may get permission to do election
@@ -271,10 +256,9 @@ class GroupLeaderPlugin extends CallablePlugin {
   @remoteMethod(RemoteMethods.ElectionResultReady)
   async _electionResultReady(data={}, callerInfo) {
     // console.log('GroupLeaderPlugin.ElectionResultReady', {data, callerInfo});
-    let {election} = data;
-    let permitted = this.isWalletPermittedToElect(callerInfo.wallet, election);
+    let permitted = this.isWalletPermittedToElect(callerInfo.wallet);
     if(permitted){
-      let key = this.TssPlugin.getSharedKey(this.getElectionId(election));
+      let key = this.TssPlugin.getSharedKey(data.electionKey);
       await key.waitToFulfill();
       this._electionComplete(key);
       return true;
@@ -284,8 +268,8 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.WhoIsLeader)
   async _whoIsLeader(data={}, callerInfo) {
-    let {leader, lastElection} = this;
-    return {lastElection, leader};
+    let {leader} = this;
+    return {leader};
   }
 }
 
