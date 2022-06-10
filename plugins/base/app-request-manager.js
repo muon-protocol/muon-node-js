@@ -39,8 +39,8 @@ class AppRequestManager{
    * @param options.requestTimeout
    */
   addRequest(req, options={}){
-    if(!requestCache.has(req._id)){
-      requestCache.set(req._id.toString(), {
+    if(!requestCache.has(req.hash)){
+      requestCache.set(req.hash, {
         /** options can override items above "...options" */
         partnerCount: Infinity,
         requestTimeout: 40000,
@@ -55,33 +55,37 @@ class AppRequestManager{
     }
   }
 
-  setPartnerCount(reqId, partnerCount) {
-    let item = this.getItem(reqId);
+  hasRequest(reqHash){
+    return requestCache.has(reqHash);
+  }
+
+  setPartnerCount(reqHash, partnerCount) {
+    let item = this.getItem(reqHash);
     item.partnerCount = partnerCount
   }
 
-  getRequest(_id){
-    return requestCache.get(_id.toString()).request
+  getRequest(reqHash){
+    return requestCache.get(reqHash).request
   }
 
-  addSignature(reqId, owner, sign){
-    let item = this.getItem(reqId);
+  addSignature(reqHash, owner, sign){
+    let item = this.getItem(reqHash);
     if(item.signatures[owner] === undefined){
       item.signatures[owner] = sign
-      if(this.isRequestFullFilled(reqId)){
+      if(this.isRequestFullFilled(reqHash)){
         if(item.promise)
           item.promise.resolve(item.signatures)
       }
     }
   }
 
-  addError(reqId, owner, error) {
-    console.log('request error', reqId, owner, error);
-    let item = this.getItem(reqId);
+  addError(reqHash, owner, error) {
+    console.log('request error', reqHash, owner, error);
+    let item = this.getItem(reqHash);
     if(item.errors[owner] === undefined){
       item.errors[owner] = error
-      if(this.isRequestFailed(reqId)){
-        const req = this.getRequest(reqId);
+      if(this.isRequestFailed(reqHash)){
+        const req = this.getRequest(reqHash);
         if(item.promise)
           item.promise.reject({
             message: "Request failed to confirm.",
@@ -99,14 +103,14 @@ class AppRequestManager{
     }
   }
 
-  isRequestFullFilled(_id){
-    let item = this.getItem(_id);
+  isRequestFullFilled(reqHash){
+    let item = this.getItem(reqHash);
     let {request: {nSign}, signatures: sigs} = item
     return !!sigs && Object.keys(sigs).length >= nSign;
   }
 
-  isRequestFailed(_id){
-    let item = this.getItem(_id);
+  isRequestFailed(reqHash){
+    let item = this.getItem(reqHash);
     let {request: {nSign}, errors, signatures} = item
     const signCount = Object.keys(signatures).length
     const needMoreSignature = nSign - signCount;
@@ -116,8 +120,8 @@ class AppRequestManager{
     return remainingPartners < needMoreSignature || failedCount >= 2;
   }
 
-  onRequestSignFullFilled(_id){
-    let item = this.getItem(_id);
+  onRequestSignFullFilled(reqHash){
+    let item = this.getItem(reqHash);
     if(!item)
       return Promise.reject({message: "RequestManager: request not added to RequestManager"})
 

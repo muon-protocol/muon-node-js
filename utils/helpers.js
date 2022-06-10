@@ -5,7 +5,7 @@ const toBN = require('web3').utils.toBN;
 module.exports.timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 module.exports.getTimestamp = () => Math.floor(Date.now() / 1000);
 module.exports.newCallId = () => {
-  return Date.now().toString(32) + Math.floor(Math.random()*999999).toString(32);
+  return Date.now().toString(32) + Math.floor(Math.random()*999999999).toString(32);
 }
 module.exports.sortObject = o => Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {})
 module.exports.floatToBN = (num, decimals) => {

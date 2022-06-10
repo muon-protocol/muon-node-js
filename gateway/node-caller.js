@@ -1,13 +1,13 @@
 const Redis = require('redis');
 const {newCallId} = require('../utils/helpers')
 
-const redisCongig = {
+const redisConfig = {
   host: process.env.REDIS_HOST || '127.0.0.1',
   port: process.env.REDIS_PORT || 6379
 }
-const callRedis = Redis.createClient(redisCongig);
-const responseRedis = Redis.createClient(redisCongig);
-const broadcastRedis = Redis.createClient(redisCongig);
+const callRedis = Redis.createClient(redisConfig);
+const responseRedis = Redis.createClient(redisConfig);
+const broadcastRedis = Redis.createClient(redisConfig);
 
 const GATEWAY_CALL_REQUEST  = `/muon/gateway/${process.env.GATEWAY_PORT}/call/request`
 const GATEWAY_CALL_RESPONSE = `/muon/gateway/${process.env.GATEWAY_PORT}/call/response`

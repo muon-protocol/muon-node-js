@@ -57,17 +57,17 @@ class GatewayInterface extends BasePlugin{
         let response
         if(app){
           if(this.listenerCount(`call/${app}/${method}`) > 0){
-            response = await this.emit(`call/${app}/${method}`, params, nSign, mode)
+            response = await this.emit(`call/${app}/${method}`, params, nSign, mode, callId)
           }
           else if(this.listenerCount(`call/${app}/request`) > 0){
-            response = await this.emit(`call/${app}/request`, method, params, nSign, mode)
+            response = await this.emit(`call/${app}/request`, method, params, nSign, mode, callId)
           }
           else{
             throw {message: `app:[${app}] method:[${method}] handler not defined`}
           }
         }
         else{
-          response = await this.emit(`call/muon/${method}`, params, nSign)
+          response = await this.emit(`call/muon/${method}`, params, nSign, mode, callId)
         }
         await this.__handleCallResponse(data, response)
       }

@@ -94,7 +94,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @gatewayMethod("request")
-  async __onRequestArrived(method, params, nSign, mode) {
+  async __onRequestArrived(method, params, nSign, mode, gatewayCallId) {
     let t0 = Date.now()
     let startedAt = getTimestamp()
     nSign = !!nSign
@@ -112,6 +112,7 @@ class BaseAppPlugin extends CallablePlugin {
       owner: process.env.SIGN_WALLET_ADDRESS,
       peerId: process.env.PEER_ID,
       data: {
+        uid: gatewayCallId,
         params,
         timestamp: startedAt,
       },
@@ -136,37 +137,46 @@ class BaseAppPlugin extends CallablePlugin {
       newRequest.data.result = result
       let t3 = Date.now()
 
-      newRequest.data.init = {
-        ... newRequest.data.init,
-        ... await this.onFirstNodeRequestSucceed(clone(newRequest))
-      };
-
       let resultHash = this.hashRequestResult(newRequest, result)
       newRequest.hash = this.calculateRequestHash(newRequest, resultHash);
-      let memWrite = this.getMemWrite(newRequest, result)
-      if (!!memWrite) {
-        newRequest.data.memWrite = memWrite
+
+      let isDuplicateRequest = false;
+      if(this.requestManager.hasRequest(newRequest.hash)){
+        isDuplicateRequest = true;
+        newRequest = this.requestManager.getRequest(newRequest.hash);
       }
+      else {
+        /**
+         * A request need's (2 * REMOTE_CALL_TIMEOUT + 5000) millisecond to be confirmed.
+         * One REMOTE_CALL_TIMEOUT for first node
+         * One REMOTE_CALL_TIMEOUT for other nodes (all other nodes proceed parallel).
+         * 5000 for networking
+         */
+        // TODO: race condition
+        this.requestManager.addRequest(newRequest, {requestTimeout: this.REMOTE_CALL_TIMEOUT * 2 + 5000});
 
-      /**
-       * A request need's (2 * REMOTE_CALL_TIMEOUT + 5000) millisecond to be confirmed.
-       * One REMOTE_CALL_TIMEOUT for first node
-       * One REMOTE_CALL_TIMEOUT for other nodes (all other nodes proceed parallel).
-       * 5000 for networking
-       */
-      this.requestManager.addRequest(newRequest, {requestTimeout: this.REMOTE_CALL_TIMEOUT * 2 + 5000});
+        newRequest.data.init = {
+          ... newRequest.data.init,
+          ... await this.onFirstNodeRequestSucceed(clone(newRequest))
+        };
 
-      // await newRequest.save()
+        let memWrite = this.getMemWrite(newRequest, result)
+        if (!!memWrite) {
+          newRequest.data.memWrite = memWrite
+        }
 
-      let sign = this.makeSignature(newRequest, result, resultHash)
-      if (!!memWrite) {
-        sign.memWriteSignature = memWrite.signature
+        // await newRequest.save()
+
+        let sign = this.makeSignature(newRequest, result, resultHash)
+        if (!!memWrite) {
+          sign.memWriteSignature = memWrite.signature
+        }
+        this.requestManager.addSignature(newRequest.hash, sign.owner, sign);
+        // new Signature(sign).save()
+
+        this.broadcastNewRequest(newRequest)
+        let t4 = Date.now()
       }
-      this.requestManager.addSignature(newRequest._id, sign.owner, sign);
-      // new Signature(sign).save()
-
-      this.broadcastNewRequest(newRequest)
-      let t4 = Date.now()
 
       let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
       let t5 = Date.now()
@@ -193,7 +203,7 @@ class BaseAppPlugin extends CallablePlugin {
         signatures: confirmed ? signatures : []
       }
 
-      if (confirmed) {
+      if (confirmed && !isDuplicateRequest) {
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
       }
@@ -204,9 +214,11 @@ class BaseAppPlugin extends CallablePlugin {
 
   calculateRequestHash(request, resultHash) {
     return crypto.soliditySha3([
-      {type: "string", value: request.app},
-      {type: "string", value: request.method},
-      {type: "address", value: request.data.init.nonceAddress},
+      {type: "address", value: request.owner},
+      {type: "uint256", value: crypto.soliditySha3(request.data.uid)},
+      {type: "uint32", value: request.data.timestamp},
+      {type: "uint256", value: request.app}, // TODO: APP_ID instead of name
+      {type: "string", value: crypto.soliditySha3(request.method)},
       {type: "uint256", value: resultHash},
     ]);
   }
@@ -222,36 +234,15 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: 'party not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
-    let nonce = await tssPlugin.keyGen(party, {maxPartners: nonceParticipantsCount})
+    let nonce = await tssPlugin.keyGen(party, {
+      id: request.hash,
+      maxPartners: nonceParticipantsCount
+    })
 
     // let sign = tssPlugin.sign(null, party);
     return {
-      party: party.id,
-      nonce: nonce.id,
       // noncePub: nonce.publicKey.encode('hex'),
       nonceAddress: tss.pub2addr(nonce.publicKey),
-    }
-  }
-
-  /**
-   * This method should response a Signature model object
-   * @param request
-   * @returns {Promise<void>} >> Response object
-   */
-  async processRemoteRequest(request) {
-    let result = await this.onRequest(clone(request))
-
-    let hash1 = await this.hashRequestResult(request, request.data.result)
-    let hash2 = await this.hashRequestResult(request, result)
-
-    if (hash1 === hash2) {
-      let memWrite = this.getMemWrite(request, result)
-      return [this.makeSignature(request, result, hash2), memWrite]
-    } else {
-      throw {
-        message: `Request result is not the same as the first node's result.`,
-        result
-      }
     }
   }
 
@@ -294,12 +285,11 @@ class BaseAppPlugin extends CallablePlugin {
   async isOtherNodesConfirmed(newRequest) {
     let signers = {}
 
-    let {party: partyId} = newRequest.data.init;
-    let party = this.tssPlugin.getParty(partyId);
+    let party = this.tssPlugin.getSharedKey(newRequest.hash).party
     let masterWalletPubKey = this.muon.getSharedWalletPubKey()
     let signersIndices;
 
-    signers = await this.requestManager.onRequestSignFullFilled(newRequest._id)
+    signers = await this.requestManager.onRequestSignFullFilled(newRequest.hash)
 
     let owners = Object.keys(signers)
     let allSignatures = owners.map(w => signers[w]);
@@ -374,8 +364,7 @@ class BaseAppPlugin extends CallablePlugin {
     // let sig = {s, e}
     //
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let {data: {init: {nonce: nonceId}}} = request;
-    let nonce = tssPlugin.getSharedKey(nonceId)
+    let nonce = tssPlugin.getSharedKey(request.hash)
 
     let idx = owner;
     let Z_i = pubKey;
@@ -388,14 +377,13 @@ class BaseAppPlugin extends CallablePlugin {
 
   broadcastNewRequest(request) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let {data: {init: {party: partyId, nonce: nonceId}}} = request;
-    let party = tssPlugin.getParty(partyId)
-    let nonce = tssPlugin.getSharedKey(nonceId)
+    let nonce = tssPlugin.getSharedKey(request.hash)
+    let party = nonce.party;
 
     let partners = Object.values(party.partners)
       .filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(wallet)))
 
-    this.requestManager.setPartnerCount(request._id, partners.length + 1);
+    this.requestManager.setPartnerCount(request.hash, partners.length + 1);
 
     partners.map(async ({peer, wallet}) => {
       return this.remoteCall(peer, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT})
@@ -403,7 +391,7 @@ class BaseAppPlugin extends CallablePlugin {
         .catch(e => {
           // console.log('base-tss-app-plugin: on broadcast request error', e)
           return this.__onRemoteSignRequest(null, {
-            request: request._id.toString(),
+            request: request.hash,
             peerId: peer.id,
             ...e
           });
@@ -427,19 +415,17 @@ class BaseAppPlugin extends CallablePlugin {
     // let signature = crypto.sign(resultHash)
 
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let {data: {init: {party: partyId, nonce: nonceId}}} = request;
-    let party = tssPlugin.getParty(partyId)
-    let nonce = tssPlugin.getSharedKey(nonceId)
+    let {hash: requestHash} = request;
+    let nonce = tssPlugin.getSharedKey(requestHash)
 
     let tssKey = tssPlugin.tssKey;
     let k_i = nonce.share
     let K = nonce.publicKey;
+    // TODO: remove nonce after sign
     let signature = tss.schnorrSign(tssKey.share, k_i, K, resultHash)
 
-    const currentNodeIndex = nonce.party.partners[process.env.SIGN_WALLET_ADDRESS].i
-
     return {
-      request: request._id,
+      request: request.hash,
       // node stake wallet address
       owner: process.env.SIGN_WALLET_ADDRESS,
       // tss shared public key
@@ -450,32 +436,16 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  /**
-   * Remote call handlers
-   * This methods will call from remote peer
-   */
-
-  async __onRemoteWantRequest(data) {
-    try {
-      // console.log('RemoteCall.getRequestData', data)
-      // let req = await Request.findOne({_id: data._id})
-      let req = this.requestManager.getRequest(data._id)
-      return req
-    }catch (e) {
-      console.error(e);
-    }
-  }
-
   async __onRemoteSignRequest(data = {}, error) {
     // console.log('BaseAppPlugin.__onRemoteSignRequest', data)
     if(error){
       let collateralPlugin = this.muon.getPlugin('collateral');
-      let {peerId, request: requestId, ...otherParts} = error;
-      let request = this.requestManager.getRequest(requestId);
+      let {peerId, request: reqHash, ...otherParts} = error;
+      let request = this.requestManager.getRequest(reqHash);
       if(request) {
         const owner = collateralPlugin.getPeerWallet(peerId);
         if(owner) {
-          this.requestManager.addError(requestId, owner, otherParts);
+          this.requestManager.addError(reqHash, owner, otherParts);
         }
       }
       return;
@@ -492,12 +462,12 @@ class BaseAppPlugin extends CallablePlugin {
             // TODO: validate memWright signature
             sign.memWriteSignature = memWrite.signature
           }
-          this.requestManager.addSignature(request._id, sign.owner, sign)
+          this.requestManager.addSignature(request.hash, sign.owner, sign)
           // let newSignature = new Signature(sign)
           // await newSignature.save()
         } else {
           console.log('signature mismatch', {
-            request: request._id,
+            request: request.hash,
             signer,
             sigOwner: sign.owner
           })
@@ -514,13 +484,34 @@ class BaseAppPlugin extends CallablePlugin {
 
   @remoteMethod('wantSign')
   async __onRemoteWantSign(request) {
-    let {nonce: nonceId} = request.data.init;
-    let nonce = this.tssPlugin.getSharedKey(nonceId);
+    // TODO: check owner, timestamp < 40 sec
+    let result = await this.onRequest(clone(request))
+
+    let hash1 = await this.hashRequestResult(request, request.data.result)
+    let hash2 = await this.hashRequestResult(request, result)
+
+    if (hash1 !== hash2) {
+      throw {
+        message: `Request result is not the same as the first node's result.`,
+        result
+      }
+    }
+
+    let requestHash = this.calculateRequestHash(request, hash1);
+    if(requestHash !== request.hash) {
+      throw {
+        message: `Request hash mismatch.`,
+        result
+      }
+    }
+
+    let nonce = this.tssPlugin.getSharedKey(request.hash);
     // wait for nonce broadcast complete
     await nonce.waitToFulfill()
 
-    let [sign, memWrite] = await this.processRemoteRequest(request)
-    // console.log('wantSign', request._id, sign)
+    let sign = this.makeSignature(request, result, hash2)
+    let memWrite = this.getMemWrite(request, result)
+
     return { sign, memWrite }
   }
 }
