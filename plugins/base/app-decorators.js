@@ -39,7 +39,6 @@ module.exports.remoteApp = function (constructor) {
         for (let i = 0; i < constructor.prototype.__remoteMethods.length; i++) {
           let item = constructor.prototype.__remoteMethods[i];
           // console.log('########## registering remote method', item, this.remoteMethodEndpoint(item.title))
-          console.log(item)
           this.registerRemoteMethod(item.title, this[item.property].bind(this))
         }
       }
