@@ -157,6 +157,7 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   async isPermittedToDoElection() {
     let responses = await this.callParty(RemoteMethods.AskElectionPermission);
+    console.log('Current executor:', this.currentExecutor)
     console.log(`election permission responses`, responses);
     return responses.length+1 >= this.TssPlugin.TSS_THRESHOLD && responses.findIndex(res => res !== true) < 0;
   }
