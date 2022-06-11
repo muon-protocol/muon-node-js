@@ -159,7 +159,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     let responses = await this.callParty(RemoteMethods.AskElectionPermission);
     console.log('Current executor:', this.currentExecutor)
     console.log(`election permission responses`, responses);
-    return responses.length+1 >= this.TssPlugin.TSS_THRESHOLD && responses.findIndex(res => res !== true) < 0;
+    return responses.length+1 >= this.TssPlugin.TSS_THRESHOLD && responses.findIndex(res => res !== 'YES') < 0;
   }
 
   async informElectionReady() {
@@ -217,7 +217,7 @@ class GroupLeaderPlugin extends CallablePlugin {
       process.env.SIGN_WALLET_ADDRESS,
       ...this.onlinePartners.map(p =>p.wallet)
     ]
-    let hashes = walletList.map(w => sha3(`${w}-${new Date().getHours()}`));
+    let hashes = walletList.map(w => sha3(`${w}-${parseInt(Date.now() / 100000)}`));
     let minIndex = hashes.reduce((min, val, index, arr)=>(val<arr[min]?index:min), 0);
     return walletList[minIndex]
   }
@@ -237,7 +237,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   @remoteMethod(RemoteMethods.AskElectionPermission)
   async _askElectionPermission(data={}, callerInfo) {
     // console.log('GroupLeaderPlugin.AskElectionPermission', {data, callerInfo});
-    return this.isWalletPermittedToElect(callerInfo.wallet)
+    return this.isWalletPermittedToElect(callerInfo.wallet) ? 'YES' : "NO";
   }
 
   @remoteMethod(RemoteMethods.ElectionStart)
