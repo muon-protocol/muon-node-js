@@ -107,6 +107,7 @@ class BaseAppPlugin extends CallablePlugin {
     let newRequest = new Request({
       hash: null,
       app: this.APP_NAME,
+      appId: this.APP_ID,
       method: method,
       nSign,
       owner: process.env.SIGN_WALLET_ADDRESS,

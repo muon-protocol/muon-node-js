@@ -6,6 +6,7 @@ const BaseApp = require('./plugins/base/base-app-plugin')
 const Gateway = require('./gateway/index')
 require('./core/global')
 const bootstrap = require('./core/bootstrap')
+const {utils: {sha3}} = require('web3')
 
 function getEnvBootstraps() {
   return Object.keys(process.env)
@@ -25,6 +26,13 @@ function getEnvPlugins() {
   }, {})
 }
 
+function prepareApp(app, fileName) {
+  if(!app.APP_ID) {
+    app.APP_ID = '0x' + sha3(fileName).slice(-8);
+  }
+  return [dynamicExtend(BaseApp, app), {}]
+}
+
 function getCustomApps() {
   let pluginsStr = process.env['MUON_CUSTOM_APPS']
   if (!pluginsStr)
@@ -42,7 +50,7 @@ function getCustomApps() {
     if (!!app.APP_NAME) {
       return {
         ...res,
-        [key]: [dynamicExtend(BaseApp, app), {}]
+        [key]: prepareApp(app, `${key}.js`)
       }
     } else {
       return res;
@@ -63,7 +71,7 @@ function getGeneralApps() {
         if (ext.toLowerCase() === 'js') {
           let app = require(`./apps/general/${file}`)
           if (!!app.APP_NAME) {
-            result[app.APP_NAME] = [dynamicExtend(BaseApp, app), {}]
+            result[app.APP_NAME] = prepareApp(app, file)
           }
         }
       });

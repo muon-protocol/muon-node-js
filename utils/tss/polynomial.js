@@ -19,6 +19,10 @@ class Polynomial {
     }
     return result.umod(this.curve.n)
   }
+
+  coefPubKeys() {
+    return this.coefficients.map(a => a.getPublic())
+  }
 }
 
 module.exports = Polynomial;
