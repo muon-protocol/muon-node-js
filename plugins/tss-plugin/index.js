@@ -292,8 +292,8 @@ class TssPlugin extends CallablePlugin {
   }
 
   async tryToCreateTssKey() {
+    // TODO: need to redesign. Now, the executor can loop over the key generation, until it becomes the leader.
     try {
-
       let key;
       do {
         key = await this.keyGen(this.tssParty)
@@ -523,7 +523,7 @@ class TssPlugin extends CallablePlugin {
    *
    * @param callerInfo: caller node information
    * @param callerInfo.wallet: collateral wallet of caller node
-   * @param callerInfo.peerId: collateral wallet of caller node
+   * @param callerInfo.peerId: PeerID of caller node
    * @returns {Promise<{address: string, recoveryShare: string, id: *, publicKey: string}|null>}
    * @private
    */
@@ -592,7 +592,7 @@ class TssPlugin extends CallablePlugin {
    *
    * @param callerInfo: caller node information
    * @param callerInfo.wallet: collateral wallet of caller node
-   * @param callerInfo.peerId: collateral wallet of caller node
+   * @param callerInfo.peerId: PeerID of caller node
    * @returns {Promise<boolean>}
    * @private
    */
@@ -621,6 +621,16 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
+  /**
+   * Leader inform other nodes that tss creation completed.
+   *
+   * @param data
+   * @param callerInfo: caller node information
+   * @param callerInfo.wallet: collateral wallet of caller node
+   * @param callerInfo.peerId: PeerID of caller node
+   * @returns {Promise<boolean>}
+   * @private
+   */
   @remoteMethod(RemoteMethods.storeTssKey)
   async __storeTssKey(data = {}, callerInfo) {
     // TODO: problem condition: request arrive when tss is ready
