@@ -74,10 +74,6 @@ class DistributedKey {
     return key
   }
 
-  setFH(fromIndex, f, h){
-    this.keyParts[fromIndex] = {f:toBN(f), h: toBN(h)}
-  }
-
   getFH(toIndex){
     return {
       f: this.f_x.calc(toIndex),
