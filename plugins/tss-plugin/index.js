@@ -622,7 +622,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.storeTssKey)
-  async __storeTssKey(data = {}) {
+  async __storeTssKey(data = {}, callerInfo) {
     // TODO: problem condition: request arrive when tss is ready
     // console.log('TssPlugin.__storeTssKey', data)
     let {party: partyId, key: keyId} = data
@@ -631,13 +631,18 @@ class TssPlugin extends CallablePlugin {
     if (!party)
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
-      throw {message: 'TssPlugin.__storeTssKey: key not found.'}
-    await key.waitToFulfill()
-    this.saveTssConfig(party, key);
-    this.tssKey = key
-    this.isReady = true;
-    console.log('save done')
-    return true;
+      throw {message: 'TssPlugin.__storeTssKey: key not found.'};
+    if(await this.isNeedToCreateKey() && this.leaderPlugin.isLeader(callerInfo.wallet)) {
+      await key.waitToFulfill()
+      this.saveTssConfig(party, key);
+      this.tssKey = key
+      this.isReady = true;
+      console.log('save done')
+      return true;
+    }
+    else{
+      throw "Not permitted to create tss key"
+    }
   }
 
   @remoteMethod(RemoteMethods.iAmHere)

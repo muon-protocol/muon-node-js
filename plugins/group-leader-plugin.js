@@ -184,8 +184,8 @@ class GroupLeaderPlugin extends CallablePlugin {
     return partners[leaderIndex];
   }
 
-  isLeader(){
-    return this.leader === process.env.SIGN_WALLET_ADDRESS;
+  isLeader(wallet){
+    return this.leader === wallet;
   }
 
   isWalletPermittedToElect(wallet) {
