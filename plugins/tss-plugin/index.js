@@ -23,44 +23,24 @@ const keysCache = new NodeCache({
 });
 
 const BroadcastMessage = {
-  NeedGroup: 'BROADCAST_MSG_NEED_GROUP',
-  JoinedToGroup: 'BROADCAST_MSG_JOINED_TO_GROUP',
-  JoinPartyRequest: 'BROADCAST_MSG_JOIN_PARTY_REQ',
   WhoIsThere: 'BROADCAST_MSG_WHO_IS_THERE',
 };
 
 const RemoteMethods = {
-  joinToParty: 'joinToParty',
-  setPartners: 'setPartners',
-  addNewPartner: 'addNewPartner',
   recoverMyKey: 'recoverMyKey',
   createKey: 'createKey',
   distributeKey: 'distributeKey',
-  distributePubKey: 'distributePubKey',
   storeTssKey: 'storeTssKey',
   iAmHere: "iAmHere",
   checkTssStatus: "checkTssStatus",
 }
 
-const GroupStatus = {
-  Initial: 0,
-  Checking: 1,
-  ReadyToJoin: 2,
-  Joining: 3,
-  Joined: 4,
-}
-
 @remoteApp
 class TssPlugin extends CallablePlugin {
-
-  groupStatus = GroupStatus.Initial;
-  joiningTssGroup = null
   isReady = false
   parties = {}
   tssKey = null;
   tssParty = null;
-
-  nodesNeedGroup = {}
 
   constructor(...params) {
     super(...params)
@@ -229,16 +209,6 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
-  informJoinedToGroup() {
-    this.broadcast({
-      method: BroadcastMessage.JoinedToGroup,
-      params: {
-        peerId: process.env.PEER_ID,
-        wallet: process.env.SIGN_WALLET_ADDRESS,
-      }
-    })
-  }
-
   saveTssConfig(party, key) {
     let tssConfig = {
       party: {
@@ -350,7 +320,6 @@ class TssPlugin extends CallablePlugin {
       keysCache.set(key.id, key, 0);
       this.tssKey = key;
       this.isReady = true;
-      this.informJoinedToGroup();
       console.log('tss ready.')
 
       return key;
@@ -457,13 +426,10 @@ class TssPlugin extends CallablePlugin {
     let {party} = key;
 
     // set key self FH
-
     let selfWalletIndex = process.env.SIGN_WALLET_ADDRESS
-
     let selfFH = key.getFH(selfWalletIndex)
-    key.setFH(selfWalletIndex, selfFH.f, selfFH.h);
-    let A_ik = key.f_x.coefficients.map(a_k => a_k.getPublic())
-    key.setParticipantPubKeys(selfWalletIndex, A_ik)
+    let A_ik = key.f_x.coefPubKeys()
+    key.setSelfShare(selfFH.f, selfFH.h, A_ik);
 
     let keyPartners = key.partners.map(w => party.partners[w]);
     let distKeyResult = await Promise.all(
@@ -481,17 +447,15 @@ class TssPlugin extends CallablePlugin {
           peer,
           RemoteMethods.distributeKey,
           {
-            from: process.env.SIGN_WALLET_ADDRESS,
             party: party.id,
             key: key.id,
             partners: key.partners,
-            commitment: key.commitment.map(c => c.serialize()),
-            walletIndex: wallet,
+            commitment: key.commitment.map(c => c.encode('hex')),
             pubKeys: A_ik.map(pubKey => pubKey.encode('hex')),
             ...key.getFH(wallet),
           }
         )
-          .catch(e => 'error')
+          .catch(e => 'error');
       }))
     // console.log('TssPlugin.broadcastKey', {distKeyResult})
     return distKeyResult;
@@ -516,49 +480,6 @@ class TssPlugin extends CallablePlugin {
     let {method, params} = msg;
     // console.log("TssPlugin.handleBroadcastMessage",msg, {callerInfo})
     switch (method) {
-      case BroadcastMessage.NeedGroup: {
-        let {peerId} = params;
-        let {wallet} = callerInfo
-        this.nodesNeedGroup[wallet] = {peerId, wallet};
-        // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
-        break;
-      }
-      case BroadcastMessage.JoinedToGroup: {
-        let {wallet} = callerInfo;
-        delete this.nodesNeedGroup[wallet];
-        // console.log({nodesNeedGroup: Object.keys(this.nodesNeedGroup)})
-        break;
-      }
-      case BroadcastMessage.JoinPartyRequest: {
-        if (this.groupStatus !== GroupStatus.ReadyToJoin)
-          return;
-        let {id, peerId} = params;
-        /**
-         * Join to the group with lower id, on concurrent request.
-         * Ignore if id is grater than current group id.
-         */
-        if (!!this.joiningTssGroup && id > this.joiningTssGroup)
-          return;
-        console.log(`joining to group ${id}`)
-        this.joiningTssGroup = id;
-        if(this.clearTimeout)
-          clearTimeout(this.clearTimeout);
-        this.clearTimeout = setTimeout(() => {
-          this.clearTimeout = null;
-          this.joiningTssGroup = null
-        }, 18000)
-        let peer = await this.findPeer(peerId)
-        await this.remoteCall(
-          peer,
-          RemoteMethods.joinToParty,
-          {
-            id,
-            peerId: process.env.PEER_ID,
-            wallet: process.env.SIGN_WALLET_ADDRESS
-          }
-        )
-        break
-      }
       case BroadcastMessage.WhoIsThere: {
         let {peerId} = params;
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
@@ -592,74 +513,23 @@ class TssPlugin extends CallablePlugin {
    *           Remote Methods
    *
    *===================================*/
-  @remoteMethod(RemoteMethods.joinToParty)
-  async __joinToParty(data = {}) {
-    // console.log('TssPlugin.__joinToParty', data)
-    let {id, peerId, wallet} = data
-    let party = this.parties[id];
-    if (party && !party.isFulfilled()) {
-      this.parties[id].addPartner({peerId, wallet})
-    }
-    // else{
-    // console.log(`party ${id} full filled ignoring peer join ${peerId}`)
-    // }
-  }
 
-  @remoteMethod(RemoteMethods.setPartners)
-  async __setPartners(data = {}) {
-    // console.log('TssPlugin.__setPartners', data)
-    let {id, t, max, partners, config} = data;
-    if (!this.joiningTssGroup || this.joiningTssGroup !== id)
-      throw {message: `Create group with id ${id} not allowed.`}
-    if (!this.parties[id])
-      this.parties[id] = new Party(t, max, id)
-    Object.values(partners).map(p => {
-      this.parties[id].addPartner(p)
-    })
-    let peers = await this.getPartyPeers(this.parties[id])
-    this.parties[id].setPeers(peers)
-    // TODO: check here
-    // if (config.isTssParty) {
-      this.tssParty = this.parties[id]
-    // }
-    this.groupStatus = GroupStatus.Joined;
-    // this.joiningTssGroup = null;
-    console.log('joined to group');
-  }
-
-  @remoteMethod(RemoteMethods.addNewPartner)
-  async __addNewPartner(data = {}, callerInfo) {
-    // console.log('TssPlugin.__addNewPartner', data, callerInfo)
-    let {party: partyId} = data;
-    let {tssParty, tssKey} = this;
-    if (tssParty.id !== partyId) {
-      return false;
-    }
-
-    /**
-     * if already in group
-     */
-    // if (!!tssParty.partners[callerInfo.wallet]) {
-    //   return tssParty.partners[callerInfo.wallet].id === partner.id;
-    // }
-
-    /**
-     * cannot assign other's id
-     */
-    // let idIsInUse = Object.values(tssParty.partners).findIndex(p => (p.id === partner.id)) >= 0;
-    // if (partner.id < 1 || idIsInUse)
-    //   return false;
-
-    tssParty.addPartner({wallet: callerInfo.wallet, peerId: callerInfo.peerId.toB58String()});
-    let peer = await this.findPeer(callerInfo.peerId)
-    tssParty.setPeers([peer])
-    this.saveTssConfig(tssParty, tssKey);
-    console.log('new partner added.')
-    return true;
-  }
-
+  /**
+   * Each node can request other nodes to recover its own key.
+   * This process will be done after creating a DistributedKey as a nonce.
+   *
+   * @param data: Key recovery info
+   * @param data.nonce: Nonce id that crated for key recovery
+   *
+   * @param callerInfo: caller node information
+   * @param callerInfo.wallet: collateral wallet of caller node
+   * @param callerInfo.peerId: collateral wallet of caller node
+   * @returns {Promise<{address: string, recoveryShare: string, id: *, publicKey: string}|null>}
+   * @private
+   */
   @remoteMethod(RemoteMethods.recoverMyKey)
   async __recoverMyKey(data = {}, callerInfo) {
+    // TODO: can malicious user use a nonce twice?
     // console.log('TssPlugin.__recoverMyKey', data, callerInfo.wallet)
     let {tssParty, tssKey} = this
 
@@ -683,6 +553,15 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
+  /**
+   * Before distributing a key information, it must be created on all partners.
+   *
+   * @param data: key information
+   * @param data.party: Party id that new key belongs to.
+   * @param data.key: New key id
+   * @returns {Promise<boolean>}
+   * @private
+   */
   @remoteMethod(RemoteMethods.createKey)
   async __createKey(data = {}) {
     // console.log('TssPlugin.__createKey', data)
@@ -700,13 +579,30 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
+  /**
+   * Handler for key info broadcast.
+   *
+   * @param data: each partner receive key info
+   * @param data.f: total key is sum of this f values.
+   * @param data.h: second key used for commitment.
+   * @param data.partners: List of wallets of partners that making this key.
+   * @param data.keyId: Each key has a unique identifier.
+   * @param data.party: Each key belongs to a Party.
+   * @param data.commitment: By this commitment current nod can verify {f,h} is generated from unique polynomial.
+   *
+   * @param callerInfo: caller node information
+   * @param callerInfo.wallet: collateral wallet of caller node
+   * @param callerInfo.peerId: collateral wallet of caller node
+   * @returns {Promise<boolean>}
+   * @private
+   */
   @remoteMethod(RemoteMethods.distributeKey)
-  async __distributeKey(data = {}) {
+  async __distributeKey(data = {}, callerInfo) {
     // console.log('TssPlugin.__distributeKey', data)
     let {parties} = this
-    let {from, commitment, party, key: keyId, partners, pubKeys, f, h} = data
+    let {commitment, party, key: keyId, partners, pubKeys, f, h} = data
     if (!parties[party]) {
-      console.log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party);
+      console.log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party)
       throw {message: 'party not found'}
     }
     if (!keysCache.has(keyId)) {
@@ -715,37 +611,14 @@ class TssPlugin extends CallablePlugin {
     }
 
     let key = keysCache.get(keyId);
-    key.partners = partners
-
-    key.setFH(from, f, h)
-    key.setParticipantCommitment(from, commitment)
-
     pubKeys = pubKeys.map(pub => tssModule.curve.keyFromPublic(pub, 'hex').getPublic())
-    key.setParticipantPubKeys(from, pubKeys)
+    commitment = commitment.map(item => tssModule.keyFromPublic(item));
+    key.setPartnerShare(callerInfo.wallet, partners, f, h, pubKeys, commitment);
 
     if (!key.keyDistributed) {
       this.broadcastKey(key).catch(console.error);
     }
     return true;
-  }
-
-  @remoteMethod(RemoteMethods.distributePubKey)
-  async __distributePubKey(data = {}) {
-    // console.log('__distributePubKey', data.from)
-    let {parties} = this
-    let {from, party, key: keyId, pubKeys} = data
-    if (!parties[party]) {
-      console.error('TssPlugin.__distributePubKey>> party not fount on this node id: ' + party);
-      throw {message: 'party not found'}
-    }
-    if (!keysCache.has(keyId)) {
-      console.error('TssPlugin.__distributePubKey>> distributed key not found')
-      throw {message: 'distributed key not found'}
-    }
-    pubKeys = pubKeys.map(pub => tssModule.curve.keyFromPublic(pub, 'hex').getPublic())
-
-    let key = keysCache.get(keyId)
-    key.setParticipantPubKeys(from, pubKeys)
   }
 
   @remoteMethod(RemoteMethods.storeTssKey)
@@ -763,7 +636,6 @@ class TssPlugin extends CallablePlugin {
     this.saveTssConfig(party, key);
     this.tssKey = key
     this.isReady = true;
-    this.informJoinedToGroup()
     console.log('save done')
     return true;
   }
