@@ -14,6 +14,9 @@ const util = require('ethereumjs-util')
 const ws = require('ws')
 const ethSigUtil = require('eth-sig-util')
 const {
+  getBlock: ethGetBlock,
+  getBlockNumber: ethGetBlockNumber,
+  getPastEvents: ethGetPastEvents,
   read: ethRead,
   call: ethCall,
   getTokenInfo: ethGetTokenInfo,
@@ -40,6 +43,9 @@ global.MuonAppUtils = {
   toBN: Web3.utils.toBN,
   floatToBN,
   multiCall,
+  ethGetBlock,
+  ethGetBlockNumber,
+  ethGetPastEvents,
   ethRead,
   ethCall,
   ethGetTokenInfo,
