@@ -217,7 +217,7 @@ class BaseAppPlugin extends CallablePlugin {
       {type: "address", value: request.owner},
       {type: "uint256", value: crypto.soliditySha3(request.data.uid)},
       {type: "uint32", value: request.data.timestamp},
-      {type: "uint256", value: request.app}, // TODO: APP_ID instead of name
+      {type: "string", value: request.app}, // TODO: APP_ID instead of name
       {type: "string", value: crypto.soliditySha3(request.method)},
       {type: "uint256", value: resultHash},
     ]);
