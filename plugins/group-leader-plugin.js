@@ -220,7 +220,8 @@ class GroupLeaderPlugin extends CallablePlugin {
       process.env.SIGN_WALLET_ADDRESS,
       ...this.onlinePartners.map(p =>p.wallet)
     ]
-    let hashes = walletList.map(w => sha3(`${w}-${parseInt(Date.now() / 100000)}`));
+    let time = parseInt(Date.now() / 100000)
+    let hashes = walletList.map(w => sha3(`${w.toLowerCase()}-${time}`));
     let minIndex = hashes.reduce((min, val, index, arr)=>(val<arr[min]?index:min), 0);
     return walletList[minIndex]
   }
