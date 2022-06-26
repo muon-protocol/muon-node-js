@@ -99,7 +99,7 @@ class GroupLeaderPlugin extends CallablePlugin {
           throw {message: "Election start failed."}
 
         console.log(`** Got permission to do election **`);
-        this.electionKey = await this.TssPlugin.keyGen();
+        this.electionKey = await this.TssPlugin.keyGen(null, {timeout: 45000});
         let done = await this.informElectionReady();
         if(done){
           console.log(`Election complete successfully`);

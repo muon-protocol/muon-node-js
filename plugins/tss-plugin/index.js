@@ -372,6 +372,7 @@ class TssPlugin extends CallablePlugin {
    * @param options
    * @param options.id: create key with specific id
    * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
+   * @param options.timeout: time need for distributed key generation.
    * @returns {Promise<DistributedKey>}
    */
   async keyGen(party, options={}) {
@@ -411,7 +412,7 @@ class TssPlugin extends CallablePlugin {
    * @returns {Promise<DistributedKey>}
    */
   async createKey(party, options={}) {
-    let {id, maxPartners} = options;
+    let {id, maxPartners, timeout=15} = options;
     // 1- create new key
     let key = new DKey(party, id, 15000)
     /**
