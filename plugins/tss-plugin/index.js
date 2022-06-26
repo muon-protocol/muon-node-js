@@ -41,6 +41,7 @@ class TssPlugin extends CallablePlugin {
   parties = {}
   tssKey = null;
   tssParty = null;
+  availablePeers = {}
 
   constructor(...params) {
     super(...params)
@@ -62,19 +63,56 @@ class TssPlugin extends CallablePlugin {
       // this.collateralPlugin.onEvent('AddPartner', txs => console.log('AddPartner....', txs))
     })
 
+
+    this.muon.on('peer:discovery', this.onPeerDiscovery.bind(this));
+    this.muon.on('peer:connect', this.onPeerConnect.bind(this));
     this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
   }
 
-  onPeerDisconnect(peer) {
-    if(this.isReady){
+  async onPeerDiscovery(peerId) {
+    // console.log("peer available", peerId)
+    this.availablePeers[peerId._idB58String] = peerId
+    this.findPeerInfo(peerId);
+  }
+
+  async onPeerConnect(peerId) {
+    // console.log("peer connected", peerId)
+    this.availablePeers[peerId._idB58String] = peerId
+    this.findPeerInfo(peerId)
+  }
+
+  onPeerDisconnect(disconnectedPeer) {
+    // console.log("peer not available", peerId)
+    delete this.availablePeers[disconnectedPeer._idB58String];
+    if(this.tssParty){
       for(let wallet in this.tssParty.partners){
         let {peerId} = this.tssParty.partners[wallet]
-        if(peerId === peer._idB58String){
+        if(peerId === disconnectedPeer._idB58String){
           console.log(`TssPlugin: remove online peer ${peerId}`)
           this.tssParty.setWalletPeer(wallet, null);
           return
         }
       }
+    }
+  }
+
+  async findPeerInfo(peerId){
+    await timeout(1000)
+    try {
+      console.log(`trying to find peer ${peerId._idB58String}`)
+      if (!!this.tssParty) {
+        let peerWallet = this.collateralPlugin.getPeerWallet(peerId);
+        if(peerWallet) {
+          let peer = await this.findPeer(peerId);
+          console.log(`TssPlugin: adding online peer ${peerId._idB58String}`)
+          this.tssParty.setWalletPeer(peerWallet, peer);
+        }
+        else {
+          console.log("Peer connected with unknown peerId", peerId._idB58String);
+        }
+      }
+    }catch (e) {
+      console.log("TssPlugin.findPeerInfo", e);
     }
   }
 
@@ -126,12 +164,12 @@ class TssPlugin extends CallablePlugin {
 
     this.emit('party-load');
 
-    this.tryToFindOthers(3);
+    // this.tryToFindOthers(3);
 
     // validate tssConfig
     let tssConfig = this.getTssConfig();
 
-    if(tssConfig){
+    if(tssConfig && tssConfig.party.t == networkInfo.tssThreshold){
       let _key = {
         ...tssConfig.key,
         share: toBN(tssConfig.key.share),
@@ -154,7 +192,7 @@ class TssPlugin extends CallablePlugin {
       else{
         await timeout(6000);
 
-        this.tryToFindOthers();
+        // this.tryToFindOthers();
 
         while (!this.isReady) {
           await timeout(5000);
