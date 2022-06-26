@@ -3,7 +3,7 @@ const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators'
 const tssModule = require('../utils/tss')
 const {timeout} = require('../utils/helpers');
 const TimeoutPromise = require('../core/timeout-promise')
-const {utils:{sha3}} = require('web3')
+const {utils:{soliditySha3}} = require('web3')
 
 const RemoteMethods = {
   AskElectionPermission: "AskElectionPermission",
@@ -221,7 +221,8 @@ class GroupLeaderPlugin extends CallablePlugin {
       ...this.onlinePartners.map(p =>p.wallet)
     ]
     let time = parseInt(Date.now() / 100000)
-    let hashes = walletList.map(w => sha3(`${w.toLowerCase()}-${time}`));
+    // let hashes = walletList.map(w => sha3(`${w.toLowerCase()}-${time}`));
+    let hashes = walletList.map(w => soliditySha3({t:"address", v: w}, {t: 'uint32', v: time}));
     let minIndex = hashes.reduce((min, val, index, arr)=>(val<arr[min]?index:min), 0);
     return walletList[minIndex]
   }
