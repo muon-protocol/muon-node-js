@@ -44,7 +44,6 @@ module.exports = {
   APP_ID: 10,
 
   onRequest: async function (request) {
-    throw { message: `DEACTIVATED` }
     let {
       method,
       data: { params }
