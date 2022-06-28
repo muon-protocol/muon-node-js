@@ -18,7 +18,7 @@ class HealthCheck extends CallablePlugin {
 
   async onStart() {
     this.healthCheckEndpoint = this.remoteMethodEndpoint(RemoteMethods.CheckHealth)
-    this.muon.getPlugin('remote-call').on('error', this.onRemoteCallFailed.bind(this))
+    // this.muon.getPlugin('remote-call').on('error', this.onRemoteCallFailed.bind(this))
   }
 
   async onRemoteCallFailed({peerId, method, onRemoteSide=false}) {

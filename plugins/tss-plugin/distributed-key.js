@@ -1,7 +1,6 @@
 const Polynomial = require('../../utils/tss/polynomial')
-const Point = require('../../utils/tss/point')
 const tss = require('../../utils/tss/index')
-const {toBN, range} = require('../../utils/tss/utils')
+const {utils:{toBN}} = require('web3')
 const TimeoutPromise = require('../../core/timeout-promise')
 const assert = require('assert')
 
@@ -26,7 +25,21 @@ class DistributedKey {
   // pedersen commitment
   commitment = []
 
+  /**
+   * Key share from other key partners
+   * @type {{
+   *   [STAKE_WALLET_ADDRESS]: {f: f(i), h: h(i)},
+   *   ...
+   * }}
+   */
   keyParts = {};
+  /**
+   * PublicKey of F_x of each partners
+   * @type {{
+   *  [STAKE_WALLET_ADDRESS]: [ PublicKey ],
+   *  ...
+   * }}
+   */
   pubKeyParts = {};
   commitmentParts = {};
   keyDistributed = false;
@@ -43,11 +56,9 @@ class DistributedKey {
     this.f_x = new Polynomial(party.t, tss.curve);
     this.h_x = new Polynomial(party.t, tss.curve);
     // pedersen commitment
-    // this.commitment = this.f_x.coefficients.map((a, i) => {
-    //   let A = tss.scalarMult(a, tss.curve.g)
-    //   let H = tss.scalarMult(this.h_x.coefficients[i], tss.H)
-    //   return tss.pointAdd(A, H)
-    // })
+    let fxCoefPubKeys = this.f_x.coefPubKeys();
+    let hxCoefPubKeys = this.h_x.coefficients.map(c => c.getPrivate()).map(b_k => tss.H.mul(b_k))
+    this.commitment = fxCoefPubKeys.map((A, index) => tss.pointAdd(A, hxCoefPubKeys[index]));
     this.timeoutPromise = new TimeoutPromise(timeout, "DistributedKey timeout")
   }
 
@@ -62,10 +73,6 @@ class DistributedKey {
     return key
   }
 
-  setFH(fromIndex, f, h){
-    this.keyParts[fromIndex] = {f:toBN(f), h: toBN(h)}
-  }
-
   getFH(toIndex){
     return {
       f: this.f_x.calc(toIndex),
@@ -73,32 +80,39 @@ class DistributedKey {
     }
   }
 
-  setParticipantCommitment(fromIndex, commitment){
-    // TODO: Pedersen commitment, not implemented
-    // this.commitmentParts[fromIndex] = commitment.map(c => Point.deserialize(c))
+  setPartnerShare(from, keyPartners, f, h, publicKeys, commitment) {
+    /**
+     * Check pedersen commitment
+     */
+    let p1 = tss.calcPolyPoint(process.env.SIGN_WALLET_ADDRESS, commitment)
+    let p2 = tss.pointAdd(tss.curve.g.mul(f), tss.H.mul(h));
+    if(!p1.eq(p2)) {
+      throw `DistributedKey partial data verification failed from partner ${from}.`
+    }
+    this.commitmentParts[from] = commitment;
+
+    this.partners = keyPartners;
+    this.keyParts[from] = {f:toBN(f), h: toBN(h)}
+    this.pubKeyParts[from] = publicKeys
+
+    this.checkKeyFinalization()
   }
 
-  setParticipantPubKeys(fromIndex, A_ik){
-    this.pubKeyParts[fromIndex] = A_ik
-    if(this.isPubKeyDistributed()){
+  setSelfShare(f, h, publicKeys) {
+    const from = process.env.SIGN_WALLET_ADDRESS;
+    this.keyParts[from] = {f:toBN(f), h: toBN(h)}
+    this.pubKeyParts[from] = publicKeys
+
+    this.checkKeyFinalization()
+  }
+
+  checkKeyFinalization() {
+    if(this.isKeyDistributed()){
       let fh = this.getTotalFH()
       this.share = fh.f;
       this.publicKey = this.getTotalPubKey();
       this.timeoutPromise.resolve(this)
     }
-  }
-
-  verifyCommitment(index){
-    // TODO: not implemented
-    // let Cc = this.commitmentParts[index]
-    // let p1 = tss.calcPolyPoint(index, Cc)
-    // let {f, h} = this.keyParts[index]
-    // const mul = tss.scalarMult, G=tss.curve.g, H=tss.H;
-    // let p2 = tss.pointAdd(mul(f, G), mul(h,H));
-    // console.log('DistributedKey.verifyCommitment', {
-    //   p1: p1.serialize(),
-    //   p2: p2.serialize(),
-    // })
   }
 
   getTotalFH(){
@@ -144,12 +158,6 @@ class DistributedKey {
   }
 
   isKeyDistributed(){
-    let {keyParts, party: {t, partners, onlinePartners}} = this
-    // All nodes (except current node) must share their part of shared key.
-    return Object.keys(keyParts).length >= Object.keys(onlinePartners).length-1;
-  }
-
-  isPubKeyDistributed(){
     let {pubKeyParts, party: {t, partners, onlinePartners}} = this
     // All nodes must share their part of shared key.
     // return Object.keys(pubKeyParts).length >= Object.keys(onlinePartners).length;

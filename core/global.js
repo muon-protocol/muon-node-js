@@ -7,6 +7,7 @@ const Web3 = require('web3')
 const tron = require('../utils/tron')
 const web3Instance = new Web3()
 const { flatten, groupBy } = require('lodash')
+const { BigNumber } = require('bignumber.js')
 
 const { toBaseUnit } = require('../utils/crypto')
 const { timeout, floatToBN } = require('../utils/helpers')
@@ -14,6 +15,9 @@ const util = require('ethereumjs-util')
 const ws = require('ws')
 const ethSigUtil = require('eth-sig-util')
 const {
+  getBlock: ethGetBlock,
+  getBlockNumber: ethGetBlockNumber,
+  getPastEvents: ethGetPastEvents,
   read: ethRead,
   call: ethCall,
   getTokenInfo: ethGetTokenInfo,
@@ -37,9 +41,13 @@ global.MuonAppUtils = {
   ws,
   timeout,
   BN: Web3.utils.BN,
+  BigNumber,
   toBN: Web3.utils.toBN,
   floatToBN,
   multiCall,
+  ethGetBlock,
+  ethGetBlockNumber,
+  ethGetPastEvents,
   ethRead,
   ethCall,
   ethGetTokenInfo,

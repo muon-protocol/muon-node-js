@@ -18,10 +18,11 @@ const HALF_N = curve.n.shrn(1).addn(1);
  * used for pedersen commitment
  * @type {Point}
  */
-const H = new Point(
-  '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
-  '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
-);
+// const H = new Point(
+//   '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+//   '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
+// );
+const H = curve.keyFromPublic("04206ae271fa934801b55f5144bec8416be0b85f22d452ad410f3f0fca1083dc7ae41249696c446f8c5b166760377115943662991c35ff02f9585f892970af89ed", 'hex').getPublic()
 
 /**
  Returns the inverse of k modulo p.

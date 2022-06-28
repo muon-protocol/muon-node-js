@@ -1,3 +1,11 @@
+### Cloning this repository
+Because of containing submodule, add the `--recurse-submodules` flag to the `clone`/`pull` commands.
+
+    $ git clone <the-repo> --recurse-submodules
+    $ git pull --recurse-submodules
+If you already cloned the old repo before the `apps` submodule, run the code below
+
+    $ git submodule init 
 ### Run
     $ env-cmd babel-node index.js
     
