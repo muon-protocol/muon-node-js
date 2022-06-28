@@ -8,7 +8,7 @@ const {makeAppDependency} = require('./app-dependencies')
 const { getTimestamp, timeout } = require('../../utils/helpers')
 const crypto = require('../../utils/crypto')
 const tss = require('../../utils/tss');
-const {toBN} = require('../../utils/tss/utils')
+const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 const AppRequestManager = require('./app-request-manager');
 const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
@@ -107,6 +107,7 @@ class BaseAppPlugin extends CallablePlugin {
     let newRequest = new Request({
       hash: null,
       app: this.APP_NAME,
+      appId: this.APP_ID,
       method: method,
       nSign,
       owner: process.env.SIGN_WALLET_ADDRESS,
@@ -216,7 +217,7 @@ class BaseAppPlugin extends CallablePlugin {
       {type: "address", value: request.owner},
       {type: "uint256", value: crypto.soliditySha3(request.data.uid)},
       {type: "uint32", value: request.data.timestamp},
-      {type: "uint256", value: request.app}, // TODO: APP_ID instead of name
+      {type: "string", value: request.app}, // TODO: APP_ID instead of name
       {type: "string", value: crypto.soliditySha3(request.method)},
       {type: "uint256", value: resultHash},
     ]);

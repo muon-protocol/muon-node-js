@@ -139,6 +139,25 @@ function read(contractAddress, property, params, abi, network) {
   })
 }
 
+function getBlock(network, blockHashOrBlockNumber) {
+  return getWeb3(network).then((web3) => {
+    return web3.eth.getBlock(blockHashOrBlockNumber)
+  })
+}
+
+function getBlockNumber(network) {
+  return getWeb3(network).then((web3) => {
+    return web3.eth.getBlockNumber()
+  })
+}
+
+function getPastEvents(network, contractAddress, abi, event, options) {
+  return getWeb3(network).then((web3) => {
+    let contract = new web3.eth.Contract(abi, contractAddress)
+    return contract.getPastEvents(event, options)
+  })
+}
+
 const subscribeLogEvent = (
   network,
   contractAddress,
@@ -218,6 +237,9 @@ class Subscribe extends EventEmbitter {
 
 module.exports = {
   getWeb3,
+  getBlock,
+  getBlockNumber,
+  getPastEvents,
   getWeb3Sync,
   hashCallOutput,
   soliditySha3,

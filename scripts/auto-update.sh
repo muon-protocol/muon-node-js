@@ -30,7 +30,7 @@ setup (){
 check_for_update (){
     current_branch=`git rev-parse --abbrev-ref HEAD`
 
-    if git pull origin "$current_branch" | grep -q 'Already up to date'; then
+    if git pull --recurse-submodules origin "$current_branch" | grep -q 'Already up to date'; then
 #        log "Node: [`which node`]    PM2: [`which pm2`]";
         ``;
     else
