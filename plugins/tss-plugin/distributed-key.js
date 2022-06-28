@@ -1,7 +1,6 @@
 const Polynomial = require('../../utils/tss/polynomial')
-const Point = require('../../utils/tss/point')
 const tss = require('../../utils/tss/index')
-const {toBN, range} = require('../../utils/tss/utils')
+const {utils:{toBN}} = require('web3')
 const TimeoutPromise = require('../../core/timeout-promise')
 const assert = require('assert')
 
