@@ -1,13 +1,9 @@
 const CallablePlugin = require('./callable-plugin')
-const Request = require('../../gateway/models/Request')
-const Signature = require('../../gateway/models/Signature')
-const PeerId = require('peer-id')
-const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
-const uint8ArrayToString = require('uint8arrays/to-string').toString;
+const Request = require('../../../gateway/models/Request')
 const {makeAppDependency} = require('./app-dependencies')
-const { getTimestamp, timeout } = require('../../utils/helpers')
-const crypto = require('../../utils/crypto')
-const tss = require('../../utils/tss');
+const { getTimestamp, timeout } = require('../../../utils/helpers')
+const crypto = require('../../../utils/crypto')
+const tss = require('../../../utils/tss');
 const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 const AppRequestManager = require('./app-request-manager');

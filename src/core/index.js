@@ -1,11 +1,10 @@
-const Muon = require('./core/muon');
+const Muon = require('./muon');
 const path = require('path');
 const fs = require('fs');
-const {dynamicExtend} = require('./core/utils')
+const {dynamicExtend} = require('./utils')
 const BaseApp = require('./plugins/base/base-app-plugin')
-const Gateway = require('./gateway/index')
-require('./core/global')
-const bootstrap = require('./core/bootstrap')
+require('./global')
+const bootstrap = require('./bootstrap')
 const {utils: {sha3}} = require('web3')
 
 function getEnvBootstraps() {
@@ -40,13 +39,13 @@ function getCustomApps() {
   return pluginsStr.split('|').reduce((res, key) => {
     // check if app exist.
     try {
-      require.resolve(`./apps/custom/${key}`);
+      require.resolve(`../apps/custom/${key}`);
     } catch (e) {
       console.error(e);
       return res;
     }
     // load app
-    let app = require(`./apps/custom/${key}`)
+    let app = require(`../apps/custom/${key}`)
     if (!!app.APP_NAME) {
       return {
         ...res,
@@ -59,7 +58,7 @@ function getCustomApps() {
 }
 
 function getGeneralApps() {
-  const appDir = path.join(__dirname, 'apps/general');
+  const appDir = path.join(__dirname, '../apps/general');
   return new Promise(function (resolve, reject) {
     let result = {};
     fs.readdir(appDir, function (err, files) {
@@ -69,7 +68,7 @@ function getGeneralApps() {
       files.forEach(function (file) {
         let ext = file.split('.').pop();
         if (ext.toLowerCase() === 'js') {
-          let app = require(`./apps/general/${file}`)
+          let app = require(`../apps/general/${file}`)
           if (!!app.APP_NAME) {
             result[app.APP_NAME] = prepareApp(app, file)
           }
@@ -82,7 +81,7 @@ function getGeneralApps() {
 
 var muon;
 
-(async () => {
+async function start() {
   let config = await bootstrap();
   let {
     net,
@@ -135,14 +134,13 @@ var muon;
     await muon.initialize();
 
     muon.start();
-
-    Gateway.start({
-      host: process.env.GATEWAY_HOST,
-      port: process.env.GATEWAY_PORT,
-    })
   } catch (e) {
     console.error(e);
     throw e
   }
-})()
+}
+
+module.exports = {
+  start
+}
 

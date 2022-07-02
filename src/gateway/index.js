@@ -27,7 +27,14 @@ function start(options) {
 
   if (!db) console.log('Error connecting db')
   // console.log("Db connected successfully")
-  else app.use('/v1/', api)
+  else {
+    app.use('/v1/', api)
+    app.use('/status', (req, res, next) => {
+      res.json({
+        running: true
+      })
+    })
+  }
 
   app.listen(port, host, function () {
     console.log(`Running gateway on port ${port} at ${host}`)

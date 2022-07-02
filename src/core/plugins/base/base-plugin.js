@@ -1,6 +1,5 @@
 const Events = require('events-async')
 const PeerId = require('peer-id')
-const crypto = require('../../utils/crypto')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 
