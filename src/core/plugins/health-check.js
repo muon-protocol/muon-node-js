@@ -1,6 +1,6 @@
 const CallablePlugin = require('./base/callable-plugin')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
-const {timeout} = require('../utils/helpers')
+const {timeout} = require('@src/utils/helpers')
 const OS = require('os')
 const util = require('util');
 const shellExec = util.promisify(require('child_process').exec);

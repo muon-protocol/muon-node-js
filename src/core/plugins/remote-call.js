@@ -1,8 +1,7 @@
 const BasePlugin = require('./base/base-plugin.js')
 const pipe = require('it-pipe')
-const {newCallId} = require('../utils/helpers')
-const TimeoutPromise = require('../core/timeout-promise')
-const crypto = require('../utils/crypto')
+const {newCallId} = require('../../utils/helpers')
+const TimeoutPromise = require('../timeout-promise')
 const NodeCache = require('node-cache');
 
 const callCache = new NodeCache({

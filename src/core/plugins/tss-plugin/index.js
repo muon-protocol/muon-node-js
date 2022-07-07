@@ -4,10 +4,10 @@ const uint8ArrayToString = require('uint8arrays/to-string')
 const Party = require('./party')
 const {shuffle} = require('lodash')
 const DKey = require('./distributed-key')
-const tssModule = require('../../utils/tss')
+const tssModule = require('../../../utils/tss')
 const {utils:{toBN}} = require('web3')
 const path = require('path')
-const {timeout} = require('../../utils/helpers');
+const {timeout} = require('../../../utils/helpers');
 const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
 const NodeCache = require('node-cache');
 

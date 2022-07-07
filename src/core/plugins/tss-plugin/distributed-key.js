@@ -1,7 +1,7 @@
-const Polynomial = require('../../utils/tss/polynomial')
-const tss = require('../../utils/tss/index')
+const Polynomial = require('../../../utils/tss/polynomial')
+const tss = require('../../../utils/tss/index')
 const {utils:{toBN}} = require('web3')
-const TimeoutPromise = require('../../core/timeout-promise')
+const TimeoutPromise = require('../../../core/timeout-promise')
 const assert = require('assert')
 
 const random = () => Math.floor(Math.random()*9999999)

@@ -1,9 +1,9 @@
 const BasePlugin = require('./base/base-plugin')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
-const crypto = require('../utils/crypto')
-const {getTimestamp} = require('../utils/helpers')
-const Memory = require('../gateway/models/Memory')
+const crypto = require('../../utils/crypto')
+const {getTimestamp} = require('../../utils/helpers')
+const Memory = require('../../gateway/models/Memory')
 
 class MemoryPlugin extends BasePlugin {
 

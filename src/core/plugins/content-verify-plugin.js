@@ -1,8 +1,8 @@
 const BasePlugin = require('./base/base-plugin')
-const {createCIDFromString} = require('../utils/cid')
-const Violation = require('../gateway/models/Violation')
-const { subscribeLogEvent } = require('../utils/eth')
-const muonAbi = require('../utils/muon-abi')
+const {createCIDFromString} = require('../../utils/cid')
+const Violation = require('../../gateway/models/Violation')
+const { subscribeLogEvent } = require('../../utils/eth')
+const muonAbi = require('../../utils/muon-abi')
 
 const unique = (value, index, self) => {
   return self.indexOf(value) === index
