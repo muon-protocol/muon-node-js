@@ -8,8 +8,9 @@ const tssModule = require('../../../utils/tss')
 const {utils:{toBN}} = require('web3')
 const path = require('path')
 const {timeout} = require('../../../utils/helpers');
-const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
+const {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} = require('../base/app-decorators')
 const NodeCache = require('node-cache');
+const NetworkingIpc = require('../../../networking/ipc')
 
 const keysCache = new NodeCache({
   stdTTL: 6*60, // Keep distributed keys in memory for 6 minutes
@@ -51,15 +52,7 @@ class TssPlugin extends CallablePlugin {
     super.onStart();
 
     this.collateralPlugin.once('loaded', async () => {
-      /**
-       * Normally, broadcast subscription will done inside the super.onStart().
-       * But, at the start time, BROADCAST_CHANNEL has a null value and while BROADCAST_CHANNEL is null, subscription will ignored.
-       * So, now that BROADCAST_CHANNEL has a value, we call registerBroadcastHandler again to subscribe to group channel.
-       */
-      await this.registerBroadcastHandler();
-
       this.loadTssInfo();
-
       // this.collateralPlugin.onEvent('AddPartner', txs => console.log('AddPartner....', txs))
     })
 
@@ -71,23 +64,23 @@ class TssPlugin extends CallablePlugin {
 
   async onPeerDiscovery(peerId) {
     // console.log("peer available", peerId)
-    this.availablePeers[peerId._idB58String] = peerId
+    this.availablePeers[peerId] = true
     this.findPeerInfo(peerId);
   }
 
   async onPeerConnect(peerId) {
     // console.log("peer connected", peerId)
-    this.availablePeers[peerId._idB58String] = peerId
+    this.availablePeers[peerId] = true
     this.findPeerInfo(peerId)
   }
 
   onPeerDisconnect(disconnectedPeer) {
     // console.log("peer not available", peerId)
-    delete this.availablePeers[disconnectedPeer._idB58String];
+    delete this.availablePeers[disconnectedPeer];
     if(this.tssParty){
       for(let wallet in this.tssParty.partners){
         let {peerId} = this.tssParty.partners[wallet]
-        if(peerId === disconnectedPeer._idB58String){
+        if(peerId === disconnectedPeer){
           console.log(`TssPlugin: remove online peer ${peerId}`)
           this.tssParty.setWalletPeer(wallet, null);
           return
@@ -97,18 +90,15 @@ class TssPlugin extends CallablePlugin {
   }
 
   async findPeerInfo(peerId){
-    await timeout(1000)
     try {
-      console.log(`trying to find peer ${peerId._idB58String}`)
       if (!!this.tssParty) {
         let peerWallet = this.collateralPlugin.getPeerWallet(peerId);
         if(peerWallet) {
-          let peer = await this.findPeer(peerId);
-          console.log(`TssPlugin: adding online peer ${peerId._idB58String}`)
-          this.tssParty.setWalletPeer(peerWallet, peer);
+          console.log(`TssPlugin: adding online peer ${peerId}`)
+          this.tssParty.setWalletPeer(peerWallet, peerId);
         }
         else {
-          console.log("Peer connected with unknown peerId", peerId._idB58String);
+          console.log("Peer connected with unknown peerId", peerId);
         }
       }
     }catch (e) {
@@ -415,6 +405,10 @@ class TssPlugin extends CallablePlugin {
     let {id, maxPartners, timeout=15} = options;
     // 1- create new key
     let key = new DKey(party, id, 15000)
+    let taskId = `keygen-${key.id}`;
+    let assignResponse = await NetworkingIpc.assignTask(taskId);
+    if(assignResponse !== 'Ok')
+      throw "Cannot assign DKG task to itself."
     /**
      * TODO: check from misbehavior
      * prevent app crash
@@ -450,7 +444,8 @@ class TssPlugin extends CallablePlugin {
               party: party.id,
               key: key.id,
               partners: partners.map(({wallet}) => wallet)
-            }
+            },
+            {taskId}
           ).catch(e => 'error')
         })
     )
@@ -523,11 +518,10 @@ class TssPlugin extends CallablePlugin {
         let {peerId} = params;
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
         // TODO: is this message from 'wallet'
-        let peer = await this.findPeer(peerId);
         if (!!this.tssParty) {
-          this.tssParty.setWalletPeer(callerInfo.wallet, peer);
+          this.tssParty.setWalletPeer(callerInfo.wallet, peerId);
           this.remoteCall(
-            peer,
+            peerId,
             RemoteMethods.iAmHere
           ).catch(e => {})
         }
@@ -538,6 +532,7 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
+  @broadcastHandler
   async onBroadcastReceived(data={}, callerInfo) {
     try {
       // let data = JSON.parse(uint8ArrayToString(msg.data));
@@ -697,9 +692,8 @@ class TssPlugin extends CallablePlugin {
   @remoteMethod(RemoteMethods.iAmHere)
   async __iAmHere(data={}, callerInfo) {
     // console.log('TssPlugin.__iAmHere', data)
-    let peer = await this.findPeer(callerInfo.peerId);
     if (!!this.tssParty) {
-      this.tssParty.setWalletPeer(callerInfo.wallet, peer)
+      this.tssParty.setWalletPeer(callerInfo.wallet, callerInfo.peerId)
     }
   }
 

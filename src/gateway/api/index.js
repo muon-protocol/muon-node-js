@@ -1,6 +1,8 @@
 let router = require('express').Router();
 const RequestLog = require('../models/RequestLog')
+const { QueueProducer } = require('../../commot/message-bus')
 let NodeCaller = require('../node-caller')
+let requestQueue = new QueueProducer(`gateway-requests`);
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)
@@ -13,9 +15,9 @@ router.use('/', (req, res, next) => {
     ...req.body,
   }
   let {app, method, params, nSign, mode="sign"} = mixed
-  NodeCaller.appCall(app, method, params, nSign, mode)
-    .then(result => {
-      res.json({success: true, result})
+  // NodeCaller.appCall(app, method, params, nSign, mode)
+  requestQueue.send({app, method, params, nSign, mode})
+    .then(result=> {
       storeRequestLog({
         time: Date.now(),
         ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
@@ -26,9 +28,9 @@ router.use('/', (req, res, next) => {
         confirmed: result.confirmed,
         errorMessage: result.confirmed ? "" : "",
       });
+      res.json({success: true, result})
     })
     .catch(error => {
-      res.json({success: false, ...error})
       storeRequestLog({
         time: Date.now(),
         ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
@@ -37,8 +39,9 @@ router.use('/', (req, res, next) => {
         mode,
         success: false,
         confirmed: false,
-        errorMessage: error.error.message || error.error,
+        errorMessage: error.message || error.error,
       });
+      res.json({success: false, ...error})
     })
 })
 

@@ -16,13 +16,16 @@ class ContentApp extends CallablePlugin {
   }
 
   async onStart() {
+    super.onStart()
+
     this.muon.getPlugin('gateway-interface').on('confirmed', this.onGatewayConfirmed.bind(this))
 
-    this.muon.once('peer:connect', () => {
-      this.provideContents();
-    })
+    // this.muon.once('peer:connect', () => {
+    //   this.provideContents();
+    // })
   }
 
+  // TODO: move to networking
   async provideContents() {
     /** wait to DHT load peer info */
     await timeout(50000);

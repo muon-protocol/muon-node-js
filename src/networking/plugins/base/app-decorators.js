@@ -44,16 +44,6 @@ module.exports.ipcMethod = function (title, options={}) {
   }
 }
 
-module.exports.broadcastHandler = function (target, property, descriptor) {
-  if(target.__broadcastHandlerMethod !== undefined){
-    const error = `Broadcast handler method already defined.`
-    console.error({error})
-    throw error
-  }
-  target.__broadcastHandlerMethod = property
-  return descriptor
-}
-
 module.exports.remoteApp = function (constructor) {
   if(!classNames(constructor).includes('CallablePlugin'))
     throw {message: 'RemoteApp should be CallablePlugin.'}

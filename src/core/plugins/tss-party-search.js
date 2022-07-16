@@ -3,7 +3,7 @@ const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const {timeout} = require('@src/utils/helpers')
 const Party = require('./tss-plugin/party')
-const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
+const {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} = require('./base/app-decorators')
 
 const MSG_TYPE_PARTY_SEARCH_REQ = 'search_party_request'
 
@@ -109,7 +109,8 @@ class TssPartySearchPlugin extends CallablePlugin {
   // TODO: replace with node-cache.
   searches = {};
 
-  async onBroadcastReceived(data) {
+  @broadcastHandler
+  async __onBroadcastReceived(data) {
     try {
       // let data = JSON.parse(uint8ArrayToString(msg.data));
       await this.handleBroadcastMessage(data)

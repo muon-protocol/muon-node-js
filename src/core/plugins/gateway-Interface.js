@@ -1,4 +1,5 @@
 const BasePlugin = require('./base/base-plugin')
+const { QueueConsumer } = require('../../commot/message-bus')
 const { promisify } = require("util");
 const Redis = require('redis');
 
@@ -24,64 +25,50 @@ responseRedis.on('error', function(error) {
   console.error(error);
 })
 
+let gatewayRequests = null
+
 class GatewayInterface extends BasePlugin{
 
-  async __onData(data){
-    // console.log('gateway interface: ', data)
-    this.emit('data', data)
-    this.emit(`data/${data.type}`, data)
-  }
-
-  async __handleCallResponse(callData, response){
-    let {callId, app, method, params} = callData;
-
+  async __handleCallResponse(response){
     if(response.confirmed){
       await this.emit('confirmed', response)
     }
-
-    responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
-      responseId: callId,
-      response,
-    }))
   }
 
-  async __onGatewayCall(channel, message){
-    let data
-    if(channel === GATEWAY_CALL_REQUEST){
-      try {
-        data = JSON.parse(message);
-        let {callId, app, method, params, nSign, mode} = data
-        if(!['sign', 'view'].includes(mode)){
-          throw {message: `Invalid call mode: ${mode}`}
+  async __onGatewayCall(message, {pid, uid: callId}){
+    // console.log("GatewayInterface.__onGatewayCall", message)
+    try {
+      let {app, method, params, nSign, mode} = message
+      if(!['sign', 'view'].includes(mode)){
+        throw {message: `Invalid call mode: ${mode}`}
+      }
+      let response
+      if(app){
+        if(this.listenerCount(`call/${app}/${method}`) > 0){
+          response = await this.emit(`call/${app}/${method}`, params, nSign, mode, callId)
         }
-        let response
-        if(app){
-          if(this.listenerCount(`call/${app}/${method}`) > 0){
-            response = await this.emit(`call/${app}/${method}`, params, nSign, mode, callId)
-          }
-          else if(this.listenerCount(`call/${app}/request`) > 0){
-            response = await this.emit(`call/${app}/request`, method, params, nSign, mode, callId)
-          }
-          else{
-            throw {message: `app:[${app}] method:[${method}] handler not defined`}
-          }
+        else if(this.listenerCount(`call/${app}/request`) > 0){
+          response = await this.emit(`call/${app}/request`, method, params, nSign, mode, callId)
         }
         else{
-          response = await this.emit(`call/muon/${method}`, params, nSign, mode, callId)
+          throw {message: `app:[${app}] method:[${method}] handler not defined`}
         }
-        await this.__handleCallResponse(data, response)
       }
-      catch (e) {
-        if(typeof e === 'string')
-          e = {message: e};
-        console.error('gateway-interface error')
-        console.dir(e, {depth: null})
-        let {message, data: errorData} = e;
-        responseRedis.publish(GATEWAY_CALL_RESPONSE, JSON.stringify({
-          responseId: data ? data.callId : undefined,
-          error: message || "GatewayInterface: Unknown error occurred",
-          data: errorData,
-        }))
+      else{
+        response = await this.emit(`call/muon/${method}`, params, nSign, mode, callId)
+      }
+      await this.__handleCallResponse(response);
+      return response
+    }
+    catch (e) {
+      if(typeof e === 'string')
+        e = {message: e};
+      console.error('gateway-interface error', e)
+      console.dir(e, {depth: null})
+      let {message, data: errorData} = e;
+      return {
+        error: message || "GatewayInterface: Unknown error occurred",
+        data: errorData,
       }
     }
   }
@@ -96,21 +83,10 @@ class GatewayInterface extends BasePlugin{
 
   async onStart(){
     if(!!process.env.GATEWAY_PORT) {
-      callRedis.subscribe(GATEWAY_CALL_REQUEST)
-      callRedis.on('message', this.__onGatewayCall.bind(this))
-
-      // TODO: deprecated and will remove later.
-      while (true) {
-        try {
-          let [queue, dataStr] = await blpopAsync(process.env.REDIS_QUEUE, 0)
-          let data = JSON.parse(dataStr);
-          if (data) {
-            this.__onData(data)
-          }
-        } catch (e) {
-          console.error(e)
-        }
-      }
+      gatewayRequests = new QueueConsumer(`gateway-requests`);
+      gatewayRequests.on("message", this.__onGatewayCall.bind(this));
+      // callRedis.subscribe(GATEWAY_CALL_REQUEST)
+      // callRedis.on('message', this.__onGatewayCall.bind(this))
     }
   }
 }
