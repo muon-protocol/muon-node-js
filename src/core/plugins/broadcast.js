@@ -1,6 +1,6 @@
 const BasePlugin = require('./base/base-plugin')
 const { call: networkingIpcCall } = require('../../networking/ipc')
-const { QueueConsumer } = require('../../commot/message-bus')
+const { QueueConsumer } = require('../../common/message-bus')
 
 const BROADCAST_CHANNEL = 'core-broadcast';
 

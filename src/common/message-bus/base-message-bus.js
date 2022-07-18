@@ -33,8 +33,8 @@ class BaseMessageBus extends Events{
     return `/muon/${process.env.SIGN_WALLET_ADDRESS}/ms/response/bus/${pid}/${this.busName}`
   }
 
-  wrapMessage(message, mix) {
-    return {pid: process.pid, uid: newCallId(), message, ...mix};
+  wrapData(data, mix) {
+    return {pid: process.pid, uid: newCallId(), data, ...mix};
   }
 
   createRedisClient() {

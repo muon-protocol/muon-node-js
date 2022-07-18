@@ -1,5 +1,5 @@
 const BasePlugin = require('./base/base-plugin')
-const { QueueConsumer } = require('../../commot/message-bus')
+const { QueueConsumer } = require('../../common/message-bus')
 
 const IPC_CHANNEL = '/muon/core/ipc';
 
@@ -25,7 +25,7 @@ class CoreIpcPlugin extends BasePlugin {
       throw "ipc method not defined";
 
     if(this.listenerCount(`call/${method}`) > 0){
-      console.log({method, params, callerInfo})
+      // console.log("CoreIpcPlugin.onMessageReceived", {method, params, callerInfo})
       return await this.emit(`call/${method}`, params, callerInfo);
     }
     else {

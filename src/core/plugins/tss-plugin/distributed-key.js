@@ -52,13 +52,15 @@ class DistributedKey {
 
   constructor(party, id, timeout){
     this.id = id || `K${Date.now()}${random()}`
-    this.party = party;
-    this.f_x = new Polynomial(party.t, tss.curve);
-    this.h_x = new Polynomial(party.t, tss.curve);
-    // pedersen commitment
-    let fxCoefPubKeys = this.f_x.coefPubKeys();
-    let hxCoefPubKeys = this.h_x.coefficients.map(c => c.getPrivate()).map(b_k => tss.H.mul(b_k))
-    this.commitment = fxCoefPubKeys.map((A, index) => tss.pointAdd(A, hxCoefPubKeys[index]));
+    if(!!party) {
+      this.party = party;
+      this.f_x = new Polynomial(party.t, tss.curve);
+      this.h_x = new Polynomial(party.t, tss.curve);
+      // pedersen commitment
+      let fxCoefPubKeys = this.f_x.coefPubKeys();
+      let hxCoefPubKeys = this.h_x.coefficients.map(c => c.getPrivate()).map(b_k => tss.H.mul(b_k))
+      this.commitment = fxCoefPubKeys.map((A, index) => tss.pointAdd(A, hxCoefPubKeys[index]));
+    }
     this.timeoutPromise = new TimeoutPromise(timeout, "DistributedKey timeout")
   }
 
@@ -69,6 +71,13 @@ class DistributedKey {
     key.h_x = null;
     key.share = _key.share;
     key.publicKey = _key.publicKey
+    if(_key.partners)
+      key.partners = _key.partners;
+    if(_key.pubKeyParts && Object.keys(_key.pubKeyParts).length > 0){
+      Object.keys(_key.pubKeyParts).forEach(w => {
+        key.pubKeyParts[w] = _key.pubKeyParts[w].map(w => tss.keyFromPublic(w))
+      })
+    }
     key.timeoutPromise.resolve(key);
     return key
   }

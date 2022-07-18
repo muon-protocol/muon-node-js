@@ -126,10 +126,9 @@ class TssPartySearchPlugin extends CallablePlugin {
       case MSG_TYPE_PARTY_SEARCH_REQ:{
         if(tssPlugin.isReady) {
           let {searchId, peerId} = msg;
-          let peer = await this.findPeer(peerId)
           let {tssParty} = tssPlugin
           await this.remoteCall(
-            peer,
+            peerId,
             RemoteMethods.searchPartyResult,
             {
               searchId,
@@ -139,7 +138,7 @@ class TssPartySearchPlugin extends CallablePlugin {
                 max: tssParty.max,
               },
               wallet: process.env.SIGN_WALLET_ADDRESS,
-              partners: Object.values(tssParty.partners).map(({i, wallet, peerId}) => ({i, wallet, peerId}))
+              partners: Object.values(tssParty.partners).map(({wallet, peerId}) => ({wallet, peerId}))
             }
           )
         }

@@ -2,7 +2,7 @@ const CallablePlugin = require('./base/callable-plugin')
 const {remoteApp, remoteMethod, ipcMethod} = require('./base/app-decorators')
 const {timeout} = require('@src/utils/helpers')
 const NodeCache = require('node-cache');
-const { call: coreIpcCall, broadcast: coreIpcForwardBroadcast } = require('../../core/ipc')
+const coreIpc = require('../../core/ipc')
 
 const tasksCache = new NodeCache({
   stdTTL: 6*60, // Keep distributed keys in memory for 6 minutes
@@ -58,13 +58,21 @@ class NetworkIpcHandler extends CallablePlugin {
 
   async onBroadcastReceived(data={}, callerInfo) {
     // console.log('NetworkIpcHandler.onBroadcastReceived', data, callerInfo);
-    return await coreIpcForwardBroadcast({
+    return await coreIpc.broadcast({
       data,
       callerInfo: {
         wallet: callerInfo.wallet,
         peerId: callerInfo.peerId._idB58String
       }
     })
+  }
+
+  assignTaskToProcess(taskId, pid) {
+    tasksCache.set(taskId, pid)
+  }
+
+  getTaskProcess(taskId) {
+    return tasksCache.get(taskId);
   }
 
   /**
@@ -79,7 +87,7 @@ class NetworkIpcHandler extends CallablePlugin {
    */
   @ipcMethod('assign-task')
   async __assignTaskToProcess(data={}, callerInfo) {
-    tasksCache.set(data.taskId, callerInfo.pid)
+    this.assignTaskToProcess(data.taskId, callerInfo.pid);
     return 'Ok';
   }
 
@@ -115,9 +123,10 @@ class NetworkIpcHandler extends CallablePlugin {
       }
       else{
         needTaskAssign = true;
+        options.rawResponse = true;
       }
     }
-    const response = await coreIpcCall(
+    let response = await coreIpc.call(
       "forward-remote-call",
       {
         data,
@@ -129,11 +138,8 @@ class NetworkIpcHandler extends CallablePlugin {
       options);
 
     if(needTaskAssign){
-      console.log({
-        needTaskAssign,
-        data,
-        response
-      })
+      this.assignTaskToProcess(taskId, response.pid);
+      response = response.data.response
     }
 
     return response;

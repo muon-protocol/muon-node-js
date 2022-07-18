@@ -8,7 +8,7 @@ class MessagePublisher extends BaseMessageBus{
    * @returns {Promise<void>}
    */
   async send(message, options={}){
-    const wMsg = this.wrapMessage(message)
+    const wMsg = this.wrapData(message)
     this.sendRedis.publish(this.channelName, JSON.stringify(wMsg));
   }
 }

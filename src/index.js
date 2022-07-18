@@ -1,7 +1,7 @@
 const cluster = require('cluster');
 const Gateway = require('./gateway')
 const Networking = require('./networking');
-const SharedMemory = require('./commot/shared-memory')
+const SharedMemory = require('./common/shared-memory')
 const { timeout } = require('./utils/helpers')
 
 let {
@@ -9,8 +9,8 @@ let {
   MessageSubscriber,
   QueueProducer,
   QueueConsumer
-} = require('./commot/message-bus')
-const numCPUs = 2; //require('os').cpus().length;
+} = require('./common/message-bus')
+const numCPUs = 4; //require('os').cpus().length;
 
 const ON_CHILD_MESSAGE = message => {
   console.log({pid: process.pid, message});
@@ -38,9 +38,21 @@ async function boot() {
     // /** Start core */
     // require('./core').start();
 
-    /** Start application clusters */
-    for (let i = 0; i < numCPUs; i++) {
-      runNewApplicationCluster();
+    if(numCPUs > 1) {
+      /** Start application clusters */
+      for (let i = 0; i < numCPUs; i++) {
+        runNewApplicationCluster();
+      }
+    }
+    else{
+      console.log(`application cluster start pid:${process.pid}`)
+      //
+      // let consumer = new QueueConsumer('global-events');
+      // consumer.on("message", async (data) => {
+      //   data.num ++;
+      //   return data;
+      // })
+      require('./core').start()
     }
     //
     // cluster.on("exit", function (worker, code, signal) {
@@ -85,7 +97,7 @@ async function boot() {
     //   data.num ++;
     //   return data;
     // })
-    require('./core').start()
+    require('./core').start();
   }
 }
 

@@ -39,12 +39,20 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   async onPeerDiscovery(peerId) {
     // console.log("peer available", peerId)
-    this.onlinePeers[peerId._idB58String] = peerId
+    this.onlinePeers[peerId._idB58String] = {
+      wallet: this.getPeerWallet(peerId._idB58String),
+      peerId,
+      peer: await this.findPeer(peerId),
+    }
   }
 
   async onPeerConnect(peerId) {
     // console.log("peer connected", peerId)
-    this.onlinePeers[peerId._idB58String] = peerId
+    this.onlinePeers[peerId._idB58String] = {
+      wallet: this.getPeerWallet(peerId._idB58String),
+      peerId,
+      peer: await this.findPeer(peerId),
+    }
   }
 
   onPeerDisconnect(disconnectedPeer) {
@@ -117,6 +125,10 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   waitToLoad(){
     return this.loading.promise;
+  }
+
+  isLoaded(){
+    this.loading.isFulfilled;
   }
 }
 

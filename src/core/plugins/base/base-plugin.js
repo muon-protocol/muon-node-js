@@ -2,6 +2,7 @@ const Events = require('events-async')
 const PeerId = require('peer-id')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
+const SharedMem = require('../../../common/shared-memory')
 
 module.exports = class BasePlugin extends Events{
   muon = null;
@@ -33,11 +34,15 @@ module.exports = class BasePlugin extends Events{
     // return this.muon.peerId;
   }
 
+  get ConstructorName() {
+    let superClass = Object.getPrototypeOf(this);
+    return superClass.constructor.name
+  }
+
   get BROADCAST_CHANNEL(){
     if(this.__broadcastHandlerMethod === undefined)
       return null;
-    let superClass = Object.getPrototypeOf(this);
-    return `${superClass.constructor.name}.${this.__broadcastHandlerMethod}`
+    return `${this.ConstructorName}.${this.__broadcastHandlerMethod}`
   }
 
   async registerBroadcastHandler(){
@@ -60,4 +65,21 @@ module.exports = class BasePlugin extends Events{
     }
     this.muon.getPlugin('broadcast').broadcast(this.BROADCAST_CHANNEL, data);
   }
+
+  sharedMemKey(key) {
+    return `core.plugins.${this.ConstructorName}.${key}`
+  }
+
+  async setSharedMem(key, value) {
+    return await SharedMem.set(this.sharedMemKey(key), value)
+  }
+
+  async getSharedMem(key) {
+    return await SharedMem.get(this.sharedMemKey(key))
+  }
+
+  async clearSharedMem(key) {
+    return await SharedMem.clear(this.sharedMemKey(key))
+  }
+
 }

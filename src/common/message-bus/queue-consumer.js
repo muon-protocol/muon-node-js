@@ -11,10 +11,12 @@ class QueueConsumer extends BaseMessageQueue {
   }
 
   async readQueuedMessages() {
-    const blpopAsync = promisify(this.receiveRedis.blpop).bind(this.receiveRedis);
+    // const blpopAsync = promisify(this.receiveRedis.blpop).bind(this.receiveRedis);
+    const sendCommand = promisify(this.receiveRedis.sendCommand).bind(this.receiveRedis);
     while (true) {
       try {
-        let [queue, dataStr] = await blpopAsync(this.channelName, 0)
+        // let [queue, dataStr] = await blpopAsync(this.channelName, 0)
+        let [queue, dataStr] = await sendCommand("BLPOP", [this.channelName, `${this.channelName}@${process.pid}`, '0'])
         this.onMessageReceived(queue, dataStr);
       } catch (e) {
         console.error(e)
@@ -23,10 +25,10 @@ class QueueConsumer extends BaseMessageQueue {
   }
 
   async onMessageReceived(channel, strMessage) {
-    let {pid, uid, message} = JSON.parse(strMessage)
+    let {pid, uid, data} = JSON.parse(strMessage)
     let response, error;
     try {
-      response = await this.emit("message", message, {pid, uid})
+      response = await this.emit("message", data, {pid, uid})
     } catch (e) {
       console.log(e);
       error = typeof e === "string" ? {message: e} : e;
@@ -39,9 +41,9 @@ class QueueConsumer extends BaseMessageQueue {
    * @param {Object} options
    * @returns {Promise<void>}
    */
-  responseTo(pid, responseId, message, options={}){
+  responseTo(pid, responseId, data, options={}){
     const receivingProcessChannel = this.getProcessResponseChannel(pid);
-    let wMsg = this.wrapMessage(message, {uid: responseId});
+    let wMsg = this.wrapData(data, {uid: responseId});
     this.sendRedis.publish(receivingProcessChannel, JSON.stringify(wMsg));
   }
 }

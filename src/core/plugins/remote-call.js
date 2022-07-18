@@ -39,8 +39,10 @@ class RemoteCall extends BasePlugin {
    */
 
   async call(peer, method, params, options={}){
-    const result = await forwardCallToNetwork(peer, method, params, options)
-    return result
+    const {error, response} = await forwardCallToNetwork(peer, method, params, options)
+    if(error)
+      throw error;
+    return response;
   }
 }
 

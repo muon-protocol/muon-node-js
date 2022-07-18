@@ -4,7 +4,7 @@ const Events = require('events')
 const chalk = require('chalk')
 const emoji = require('node-emoji')
 const fs = require('fs')
-const { MessagePublisher, MessageSubscriber } = require('../commot/message-bus')
+const { MessagePublisher, MessageSubscriber } = require('../common/message-bus')
 const { GLOBAL_EVENT_CHANNEL, fireEvent } = require('./ipc')
 const { call: networkingIpcCall } = require('../networking/ipc')
 

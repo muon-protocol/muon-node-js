@@ -5,7 +5,7 @@ const PeerId = require('peer-id')
 const chalk = require('chalk')
 const emoji = require('node-emoji')
 const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
-const { fireEvent: fireCoreEvent } = require('../core/ipc')
+const coreIpc = require('../core/ipc')
 
 class Network extends Events {
   configs
@@ -117,7 +117,7 @@ class Network extends Events {
       chalk.blue(` ${connection.remotePeer.toB58String()}`)
     )
     this.emit('peer:connect', connection.remotePeer)
-    fireCoreEvent("peer:connect", connection.remotePeer.toB58String())
+    coreIpc.fireEvent("peer:connect", connection.remotePeer.toB58String())
   }
 
   onPeerDisconnect(connection) {
@@ -128,12 +128,12 @@ class Network extends Events {
       chalk.red(` ${connection.remotePeer.toB58String()}`)
     );
     this.emit('peer:disconnect', connection.remotePeer)
-    fireCoreEvent("peer:disconnect", connection.remotePeer.toB58String())
+    coreIpc.fireEvent("peer:disconnect", connection.remotePeer.toB58String())
   }
 
   async onPeerDiscovery(peerId) {
     this.emit('peer:discovery', peerId)
-    fireCoreEvent("peer:discovery", peerId.toB58String())
+    coreIpc.fireEvent("peer:discovery", peerId.toB58String())
     console.log('found peer');
     try {
       const peerInfo = await this.libp2p.peerRouting.findPeer(peerId)
@@ -179,6 +179,7 @@ async function start() {
       'remote-call': [require('./plugins/remote-call'), {}],
       'ipc': [require('./plugins/network-ipc-plugin'), {}],
       'ipc-handler': [require('./plugins/network-ipc-handler'), {}],
+      'group-leader': [require('./plugins/group-leader-plugin'), {}],
     },
     net,
     account,

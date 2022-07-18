@@ -28,11 +28,12 @@ class QueueProducer extends BaseMessageQueue {
     options = {
       timeout: 0,
       timeoutMessage: "Queue request timeout!",
+      rawResponse: false,
       pid: -1,
       ...(!!options ? options : {})
     };
 
-    let wMsg = this.wrapMessage(message)
+    let wMsg = this.wrapData(message)
     let resultPromise = new TimeoutPromise(options.timeout, options.timeoutMessage)
     // this._calls[callId] = remoteResult;
     callCache.set(wMsg.uid, {
@@ -48,11 +49,13 @@ class QueueProducer extends BaseMessageQueue {
   }
 
   async onResponseReceived(channel, strMessage) {
-    let {pid, uid, message: {error=undefined, response=undefined}} = JSON.parse(strMessage);
-    let {resultPromise=null} = callCache.get(uid);
+    const rawResponse = JSON.parse(strMessage);
+    let {pid, uid, data: {error=undefined, response=undefined}} = rawResponse;
+    let {resultPromise=null, options={}} = callCache.get(uid);
     if(resultPromise) {
-      if (!error)
-        resultPromise.resolve(response)
+      if (!error) {
+        resultPromise.resolve(options.rawResponse ? rawResponse : response)
+      }
       else {
         // console.log('remote side error', error);
         resultPromise.reject({...error, onRemoteSide: true})

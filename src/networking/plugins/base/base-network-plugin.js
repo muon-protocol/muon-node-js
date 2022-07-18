@@ -30,7 +30,6 @@ module.exports = class BaseNetworkingPlugin extends Events {
 
   async findPeer(peerId){
     if(!PeerId.isPeerId(peerId)) {
-      console.log('convert peerIdStr to PeerID', peerId)
       peerId = PeerId.createFromB58String(peerId)
     }
     try {

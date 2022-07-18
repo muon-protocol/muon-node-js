@@ -4,6 +4,7 @@ const tssModule = require('@src/utils/tss')
 const {timeout} = require('@src/utils/helpers');
 const TimeoutPromise = require('@src/core/timeout-promise')
 const {utils:{soliditySha3}} = require('web3')
+const CoreIpc = require('../../core/ipc')
 
 const RemoteMethods = {
   AskElectionPermission: "AskElectionPermission",
@@ -44,8 +45,13 @@ class GroupLeaderPlugin extends CallablePlugin {
   async onStart() {
     super.onStart();
 
-    this.TssPlugin.once('party-load', this._checkStatus.bind(this))
-    this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+    if(this.collateralPlugin.isLoaded){
+      this._checkStatus();
+    }
+    else{
+      this.collateralPlugin.once('loaded', this._checkStatus.bind(this))
+    }
+    this.network.on('peer:disconnect', this.onPeerDisconnect.bind(this));
   }
 
   onPeerDisconnect(peerId) {
@@ -72,7 +78,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   get collateralPlugin(){
-    return this.muon.getPlugin('collateral');
+    return this.network.getPlugin('collateral');
   }
 
   async _checkStatus(){
@@ -99,7 +105,8 @@ class GroupLeaderPlugin extends CallablePlugin {
           throw {message: "Election start failed."}
 
         console.log(`** Got permission to do election **`);
-        this.electionKey = await this.TssPlugin.keyGen(null, {timeout: 45000});
+        // this.electionKey = await this.TssPlugin.keyGen(null, {timeout: 45000});
+        this.electionKey = await CoreIpc.generateTssKey();
         let done = await this.informElectionReady();
         if(done){
           console.log(`Election complete successfully`);
@@ -125,7 +132,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     // console.log(`GroupLeaderPlugin.electionStart electionStart responses:`, responses)
     let allDone = responses.findIndex(r => (r!==true)) < 0;
     // TODO: is need to 50% of nodes agree with election start?
-    return allDone && (responses.length + 1) >= this.TssPlugin.TSS_THRESHOLD
+    return allDone && (responses.length + 1) >= this.collateralPlugin.TssThreshold
   }
 
   // TODO: if all nodes except leader restart, then leader cannot be select
@@ -148,7 +155,7 @@ class GroupLeaderPlugin extends CallablePlugin {
       return null
     }
     let leader = Object.keys(leaderCount)[0];
-    if(leaderCount[leader] >= this.TssPlugin.TSS_THRESHOLD){
+    if(leaderCount[leader] >= this.collateralPlugin.TssThreshold){
       return leader;
     }
     else
@@ -156,23 +163,31 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   get TssPlugin() {
-    return this.muon.getPlugin('tss-plugin')
+    return this.network.getPlugin('tss-plugin')
   }
 
   async isPermittedToDoElection() {
     let responses = await this.callParty(RemoteMethods.AskElectionPermission);
     console.log('Current executor:', this.currentExecutor)
     console.log(`election permission responses`, responses);
-    return responses.length+1 >= this.TssPlugin.TSS_THRESHOLD && responses.findIndex(res => res !== 'YES') < 0;
+    return responses.length+1 >= this.collateralPlugin.TssThreshold && responses.findIndex(res => res !== 'YES') < 0;
   }
 
   async informElectionReady() {
 
+    // let partners = this.electionKey.partners
+    //   .map(w => this.TssPlugin.tssParty.onlinePartners[w])
+    //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
     let partners = this.electionKey.partners
-      .map(w => this.TssPlugin.tssParty.onlinePartners[w])
-      .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
+      .filter(w => w !== process.env.SIGN_WALLET_ADDRESS)
+      .map(w => this.collateralPlugin.getWalletPeerId(w))
+      .map(peerId => this.collateralPlugin.onlinePeers[peerId])
 
-    let responses = await this.callParty(RemoteMethods.ElectionResultReady, {electionKey: this.electionKey.id}, partners)
+    let responses = await this.callParty(
+      RemoteMethods.ElectionResultReady,
+      {electionKey: this.electionKey.id},
+      partners
+    )
     // console.log(`election ${this.lastElection+1} ready inform responses`, responses);
     return responses.findIndex(res => res !== true) < 0;
   }
@@ -183,7 +198,6 @@ class GroupLeaderPlugin extends CallablePlugin {
       .map(w => key.getPubKey(w))
       .map(point => tssModule.pub2addr(point))
       .map(address => address.toLowerCase());
-
     let leaderIndex = sharedAddress.reduce((max, val, i, arr) => (val > arr[max] ? i : max), 0);
     return partners[leaderIndex];
   }
@@ -200,6 +214,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     this.electionKey = key;
     this.leader = this.extractLeaderFromKey(key);
     this.emit('leader-change', this.leader);
+    CoreIpc.fireEvent("leader:select", this.leader);
     this._leaderSelectPromise.resolve(this.leader);
     if(this.leader === process.env.SIGN_WALLET_ADDRESS)
       console.log(`********* I am the leader now *********`);
@@ -212,7 +227,10 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   get onlinePartners() {
-    return Object.values(this.TssPlugin.tssParty.onlinePartners)
+    // return Object.values(this.TssPlugin.tssParty.onlinePartners)
+    //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
+
+    return Object.values(this.collateralPlugin.onlinePeers)
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
   }
 
@@ -228,15 +246,19 @@ class GroupLeaderPlugin extends CallablePlugin {
     return walletList[minIndex]
   }
 
-  async callParty(method, data={}, partners){
+  async callParty(method, data={}, partners, options){
     if(partners === undefined)
       partners = this.onlinePartners
     return Promise.all(partners.map(p => {
       return this.remoteCall(
         p.peer,
         method,
-        data
-      ).catch(e => 'error')
+        data,
+        options
+      ).catch(e => {
+        console.log(e)
+        return 'error'
+      })
     }))
   }
 
@@ -265,8 +287,10 @@ class GroupLeaderPlugin extends CallablePlugin {
     // console.log('GroupLeaderPlugin.ElectionResultReady', {data, callerInfo});
     let permitted = this.isWalletPermittedToElect(callerInfo.wallet);
     if(permitted){
-      let key = this.TssPlugin.getSharedKey(data.electionKey);
-      await key.waitToFulfill();
+      // let key = this.TssPlugin.getSharedKey(data.electionKey);
+      // await key.waitToFulfill();
+      let pid = await this.network.getPlugin('ipc-handler').getTaskProcess(`keygen-${data.electionKey}`)
+      let key = await CoreIpc.getTssKey(data.electionKey, {pid});
       this._electionComplete(key);
       return true;
     }

@@ -1,4 +1,4 @@
-const { QueueProducer } = require('../commot/message-bus')
+const { QueueProducer } = require('../common/message-bus')
 const { IPC_CHANNEL } = require('./plugins/network-ipc-plugin')
 
 const callQueue = new QueueProducer(IPC_CHANNEL)

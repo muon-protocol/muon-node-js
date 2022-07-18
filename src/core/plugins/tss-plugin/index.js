@@ -51,6 +51,7 @@ class TssPlugin extends CallablePlugin {
   async onStart() {
     super.onStart();
 
+    // TODO: it may be loaded before this function call. (check collateralPlugin.isLoaded)
     this.collateralPlugin.once('loaded', async () => {
       this.loadTssInfo();
       // this.collateralPlugin.onEvent('AddPartner', txs => console.log('AddPartner....', txs))
@@ -487,7 +488,8 @@ class TssPlugin extends CallablePlugin {
             commitment: key.commitment.map(c => c.encode('hex')),
             pubKeys: A_ik.map(pubKey => pubKey.encode('hex')),
             ...key.getFH(wallet),
-          }
+          },
+          {taskId: `keygen-${key.id}`}
         )
           .catch(e => 'error');
       }))

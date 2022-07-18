@@ -1,5 +1,5 @@
 const BaseNetworkingPlugin = require('./base/base-network-plugin')
-const { QueueConsumer } = require('../../commot/message-bus')
+const { QueueConsumer } = require('../../common/message-bus')
 
 const IPC_CHANNEL = '/muon/network/ipc';
 
