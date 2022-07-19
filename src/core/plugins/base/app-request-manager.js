@@ -6,7 +6,7 @@
  *
  */
 
-const TimeoutPromise = require('../../timeout-promise')
+const TimeoutPromise = require('../../../common/timeout-promise')
 const NodeCache = require('node-cache');
 
 const requestCache = new NodeCache({

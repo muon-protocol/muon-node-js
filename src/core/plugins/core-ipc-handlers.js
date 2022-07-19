@@ -14,7 +14,7 @@ class CoreIpcHandlers extends CallablePlugin {
     // console.log(`CoreIpcHandlers.__onRemoteCallForward`, data, callerInfo)
     const {method, params, options} = data;
     if(this.remoteCallPlugin.listenerCount(method) < 1){
-      throw "Remote method handler not defined"
+      throw `Remote method [${method}] handler not defined`
     }
     return await this.remoteCallPlugin.handleCall(undefined, method, params, callerInfo.wallet, null, callerInfo.peerId)
   }

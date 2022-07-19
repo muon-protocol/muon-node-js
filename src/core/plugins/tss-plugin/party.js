@@ -1,4 +1,4 @@
-const TimeoutPromise = require('../../timeout-promise')
+const TimeoutPromise = require('../../../common/timeout-promise')
 
 class TssParty {
   t = 0

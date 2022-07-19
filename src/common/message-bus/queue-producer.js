@@ -1,5 +1,5 @@
 const BaseMessageQueue = require('./base-message-queue')
-const TimeoutPromise = require('../../core/timeout-promise')
+const TimeoutPromise = require('../timeout-promise')
 const NodeCache = require('node-cache');
 
 const callCache = new NodeCache({

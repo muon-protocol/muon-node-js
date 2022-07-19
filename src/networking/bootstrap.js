@@ -27,6 +27,8 @@ async function bootstrap(){
   else {
     net = require('@root/config/global/net.default.conf.json')
   }
+  net.tss.threshold = parseInt(net.tss.threshold)
+  net.tss.max = parseInt(net.tss.max)
 
   if(moduleExist(`${configDir}/tss.conf.json`)) {
     tss = require(`${configDir}/tss.conf.json`)

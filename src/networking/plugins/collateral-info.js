@@ -1,5 +1,5 @@
 const BaseNetworkPlugin = require('./base/base-network-plugin')
-const TimeoutPromise = require('../../core/timeout-promise');
+const TimeoutPromise = require('../../common/timeout-promise');
 
 class CollateralInfoPlugin extends BaseNetworkPlugin{
 
@@ -11,13 +11,7 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
   /**
    * @type {TimeoutPromise}
    */
-  loading = null;
-
-  constructor(network, config) {
-    super(network, config);
-
-    this.loading = new TimeoutPromise(0, "collateral loading timedout");
-  }
+  loading = new TimeoutPromise(0, "collateral loading timed out")
 
   async onStart(){
     super.onStart();
@@ -128,7 +122,7 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   isLoaded(){
-    this.loading.isFulfilled;
+    return this.loading.isFulfilled;
   }
 }
 

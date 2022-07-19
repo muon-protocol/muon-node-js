@@ -11,6 +11,10 @@ function forwardRemoteCall(peer, method, params, options) {
   return call("remote-call", {peer, method, params, options})
 }
 
+function reportClusterStatus(pid, status) {
+  return call('report-cluster-status', {pid, status});
+}
+
 function assignTask(taskId) {
   return call("assign-task", {taskId})
 }
@@ -18,5 +22,6 @@ function assignTask(taskId) {
 module.exports = {
   call,
   forwardRemoteCall,
+  reportClusterStatus,
   assignTask,
 }

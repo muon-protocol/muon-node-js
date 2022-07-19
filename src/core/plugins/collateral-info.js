@@ -1,4 +1,5 @@
 const BasePlugin = require('./base/base-plugin')
+const TimeoutPromise = require('../../common/timeout-promise');
 const { call: networkingIpcCall } = require('../../networking/ipc')
 
 class CollateralInfoPlugin extends BasePlugin{
@@ -7,6 +8,10 @@ class CollateralInfoPlugin extends BasePlugin{
   networkInfo = null;
   peersWallet = {}
   walletsPeer = {}
+  /**
+   * @type {TimeoutPromise}
+   */
+  loading = new TimeoutPromise(0, "collateral loading timedout");
 
   async onStart(){
     super.onStart();
@@ -24,7 +29,19 @@ class CollateralInfoPlugin extends BasePlugin{
   }
 
   async _loadCollateralInfo(){
-    const { groupInfo, networkInfo, peersWallet, walletsPeer } = await networkingIpcCall("get-collateral-info")
+    let info;
+    while(!info) {
+      try {
+        info = await networkingIpcCall(
+          "get-collateral-info",
+          {},
+          {timeout: 5000, timeoutMessage: "Retrieving collateral info timed out."},
+        );
+      }catch (e) {
+        console.log(e)
+      }
+    }
+    const { groupInfo, networkInfo, peersWallet, walletsPeer } = info
 
     this.groupInfo = groupInfo;
     this.networkInfo = networkInfo;
@@ -32,6 +49,7 @@ class CollateralInfoPlugin extends BasePlugin{
     this.walletsPeer = walletsPeer;
 
     this.emit('loaded');
+    this.loading.resolve();
   }
 
   // TODO: not implemented
@@ -64,6 +82,14 @@ class CollateralInfoPlugin extends BasePlugin{
 
   get MaxGroupSize(){
     return this.networkInfo?.maxGroupSize;
+  }
+
+  waitToLoad(){
+    return this.loading.promise;
+  }
+
+  isLoaded(){
+    return this.loading.isFulfilled;
   }
 }
 

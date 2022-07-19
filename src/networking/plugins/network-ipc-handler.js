@@ -18,6 +18,8 @@ const tasksCache = new NodeCache({
 @remoteApp
 class NetworkIpcHandler extends CallablePlugin {
 
+  clustersPids = {};
+
   async onStart() {
     super.onStart()
 
@@ -40,10 +42,11 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod("get-collateral-info")
-  async __onIpcCallTest(data={}) {
-    // console.log(`NetworkIpcHandler.__onIpcCallTest`, data)
+  async __onIpcGetCollateralInfo(data={}, callerInfo) {
+    console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
     const collateralPlugin = this.network.getPlugin('collateral');
     await collateralPlugin.waitToLoad();
+    console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, "data is ready", callerInfo);
 
     let {groupInfo, networkInfo, peersWallet, walletsPeer} = collateralPlugin;
     return {groupInfo, networkInfo, peersWallet, walletsPeer}
@@ -71,8 +74,29 @@ class NetworkIpcHandler extends CallablePlugin {
     tasksCache.set(taskId, pid)
   }
 
+  takeRandomProcess() {
+    let pList = Object.keys(this.clustersPids);
+    const index = Math.floor(Math.random() * pList.length)
+    return pList[index]
+  }
+
   getTaskProcess(taskId) {
     return tasksCache.get(taskId);
+  }
+
+  @ipcMethod('report-cluster-status')
+  async __reportClusterStatus(data={}) {
+    // console.log("NetworkIpcHandler.__reportClusterStatus", {data,callerInfo});
+    let {pid, status} = data
+    switch (status) {
+      case "start":
+        this.clustersPids[pid] = true
+        break;
+      case "exit":
+        delete this.clustersPids[pid];
+        break;
+    }
+    // console.log("NetworkIpcHandler.__reportClusterStatus", this.clustersPids);
   }
 
   /**
@@ -87,6 +111,8 @@ class NetworkIpcHandler extends CallablePlugin {
    */
   @ipcMethod('assign-task')
   async __assignTaskToProcess(data={}, callerInfo) {
+    if(Object.keys(this.clustersPids).length < 1)
+      throw {message: "No any online cluster"}
     this.assignTaskToProcess(data.taskId, callerInfo.pid);
     return 'Ok';
   }
@@ -115,18 +141,18 @@ class NetworkIpcHandler extends CallablePlugin {
   @remoteMethod("exec-ipc-remote-call")
   async __onIpcRemoteCallExec(data={}, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcRemoteCallExec`, data);
-    let taskId, needTaskAssign = false, options = {};
+    let taskId, options = {};
     if(data.options?.taskId){
       taskId = data.options.taskId;
       if(tasksCache.has(taskId)) {
         options.pid = tasksCache.get(data.options.taskId);
       }
       else{
-        needTaskAssign = true;
-        options.rawResponse = true;
+        options.pid = this.takeRandomProcess()
+        this.assignTaskToProcess(taskId, options.pid);
       }
     }
-    let response = await coreIpc.call(
+    return await coreIpc.call(
       "forward-remote-call",
       {
         data,
@@ -136,13 +162,6 @@ class NetworkIpcHandler extends CallablePlugin {
         }
       },
       options);
-
-    if(needTaskAssign){
-      this.assignTaskToProcess(taskId, response.pid);
-      response = response.data.response
-    }
-
-    return response;
   }
 }
 

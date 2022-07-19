@@ -68,7 +68,7 @@ class Muon extends Events {
   }
 
   async onGlobalEventReceived(data={}) {
-    // console.log("Muon.onGlobalEventReceived", data)
+    // console.log(`[${process.pid}] Muon.onGlobalEventReceived`, data)
     this.emit(data.type, ...data.args);
   }
 

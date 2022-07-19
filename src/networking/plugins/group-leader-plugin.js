@@ -2,7 +2,7 @@ const CallablePlugin = require('./base/callable-plugin')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 const tssModule = require('@src/utils/tss')
 const {timeout} = require('@src/utils/helpers');
-const TimeoutPromise = require('@src/core/timeout-promise')
+const TimeoutPromise = require('@src/common/timeout-promise')
 const {utils:{soliditySha3}} = require('web3')
 const CoreIpc = require('../../core/ipc')
 

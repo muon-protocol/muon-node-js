@@ -1,7 +1,7 @@
 const BaseNetworkingPlugin = require('./base/base-network-plugin')
 const pipe = require('it-pipe')
 const {newCallId} = require('../../utils/helpers')
-const TimeoutPromise = require('../../core/timeout-promise')
+const TimeoutPromise = require('../../common/timeout-promise')
 const NodeCache = require('node-cache');
 
 const callCache = new NodeCache({

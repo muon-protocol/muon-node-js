@@ -1,6 +1,7 @@
 const cluster = require('cluster');
 const Gateway = require('./gateway')
 const Networking = require('./networking');
+const NetworkingIpc = require('./networking/ipc');
 const SharedMemory = require('./common/shared-memory')
 const { timeout } = require('./utils/helpers')
 
@@ -22,6 +23,7 @@ function runNewApplicationCluster() {
   let child = cluster.fork({MASTER_PROCESS_ID: process.pid});
   child.on('message', ON_CHILD_MESSAGE);
   applicationWorkers[child.process.pid] = child
+  return child;
 }
 async function boot() {
   if (cluster.isMaster) {
@@ -37,31 +39,19 @@ async function boot() {
 
     // /** Start core */
     // require('./core').start();
-
-    if(numCPUs > 1) {
-      /** Start application clusters */
-      for (let i = 0; i < numCPUs; i++) {
-        runNewApplicationCluster();
-      }
-    }
-    else{
-      console.log(`application cluster start pid:${process.pid}`)
-      //
-      // let consumer = new QueueConsumer('global-events');
-      // consumer.on("message", async (data) => {
-      //   data.num ++;
-      //   return data;
-      // })
-      require('./core').start()
+    /** Start application clusters */
+    for (let i = 0; i < numCPUs; i++) {
+      let child = runNewApplicationCluster();
+      await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
     }
     //
-    // cluster.on("exit", function (worker, code, signal) {
-    //   console.log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
-    //   delete applicationWorkers[worker.process.pid];
-    //
-    //   console.log("Starting a new worker");
-    //   runNewApplicationCluster();
-    // });
+    cluster.on("exit", async function (worker, code, signal) {
+      console.log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
+      delete applicationWorkers[worker.process.pid];
+      await NetworkingIpc.reportClusterStatus(worker.process.pid, 'exit')
+      // console.log("Starting a new worker");
+      // runNewApplicationCluster();
+    });
     //
     // console.log(`Master thread PID:${process.pid}, starting clusters...`);
 

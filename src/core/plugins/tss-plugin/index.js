@@ -51,32 +51,29 @@ class TssPlugin extends CallablePlugin {
   async onStart() {
     super.onStart();
 
-    // TODO: it may be loaded before this function call. (check collateralPlugin.isLoaded)
-    this.collateralPlugin.once('loaded', async () => {
-      this.loadTssInfo();
-      // this.collateralPlugin.onEvent('AddPartner', txs => console.log('AddPartner....', txs))
-    })
-
-
     this.muon.on('peer:discovery', this.onPeerDiscovery.bind(this));
     this.muon.on('peer:connect', this.onPeerConnect.bind(this));
     this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+
+    await this.collateralPlugin.waitToLoad()
+    this.loadTssInfo();
+
   }
 
   async onPeerDiscovery(peerId) {
-    // console.log("peer available", peerId)
+    // console.log(`[${process.pid}] peer available`, peerId);
     this.availablePeers[peerId] = true
     this.findPeerInfo(peerId);
   }
 
   async onPeerConnect(peerId) {
-    // console.log("peer connected", peerId)
+    // console.log(`[${process.pid}] peer connected`, peerId)
     this.availablePeers[peerId] = true
     this.findPeerInfo(peerId)
   }
 
   onPeerDisconnect(disconnectedPeer) {
-    // console.log("peer not available", peerId)
+    // console.log(`[${process.pid}] peer disconnect`, peerId)
     delete this.availablePeers[disconnectedPeer];
     if(this.tssParty){
       for(let wallet in this.tssParty.partners){
@@ -91,16 +88,22 @@ class TssPlugin extends CallablePlugin {
   }
 
   async findPeerInfo(peerId){
+    if(!this.collateralPlugin.isLoaded()) {
+      return ;
+    }
     try {
-      if (!!this.tssParty) {
-        let peerWallet = this.collateralPlugin.getPeerWallet(peerId);
-        if(peerWallet) {
-          console.log(`TssPlugin: adding online peer ${peerId}`)
-          this.tssParty.setWalletPeer(peerWallet, peerId);
+      let peerWallet = this.collateralPlugin.getPeerWallet(peerId);
+      if(peerWallet) {
+        if (!!this.tssParty) {
+          if (peerWallet) {
+            console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
+            this.tssParty.setWalletPeer(peerWallet, peerId);
+          }
+        } else {
+          console.log(`[${process.pid}] There is no tss party`);
         }
-        else {
-          console.log("Peer connected with unknown peerId", peerId);
-        }
+      }else {
+        console.log("Peer connected with unknown peerId", peerId);
       }
     }catch (e) {
       console.log("TssPlugin.findPeerInfo", e);
@@ -152,6 +155,10 @@ class TssPlugin extends CallablePlugin {
     });
     this.parties[party.id] = party
     this.tssParty = party;
+
+    Object.keys(this.availablePeers).forEach(peerId => {
+      this.findPeerInfo(peerId);
+    })
 
     this.emit('party-load');
 
@@ -369,7 +376,9 @@ class TssPlugin extends CallablePlugin {
   async keyGen(party, options={}) {
     if(!party)
       party = this.tssParty;
-
+    if(!this.isReady){
+      throw {message: "Tss is not ready yet"}
+    }
     if(party.onlinePartners.length < this.TSS_THRESHOLD){
       throw {message: "No enough online node."}
     }
@@ -452,6 +461,9 @@ class TssPlugin extends CallablePlugin {
     )
     // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
     key.partners = partners.filter((p, i) => callResult[i]!=='error').map(p => p.wallet)
+    if(key.partners.length < this.TSS_THRESHOLD){
+      throw {message: "Error in key creation"}
+    }
     return key;
   }
 
