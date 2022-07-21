@@ -12,6 +12,7 @@ var modelSchema = mongoose.Schema({
   success: {type: Boolean},
   confirmed: {type: Boolean},
   errorMessage: {type: String},
+  extra: {type: Object},
 });
 
 module.exports = mongoose.model(MODEL_REQ_LOG, modelSchema);

@@ -10,6 +10,20 @@ async function storeRequestLog(logData) {
   await log.save();
 }
 
+function reqLogInfo(req) {
+  return {
+    time: Date.now(),
+    ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress,
+    extra: {
+      referrer: req.get('Referer'),
+      cra: req.connection.remoteAddress,
+      sra: req.socket.remoteAddress,
+      csra: req.connection.socket?.remoteAddress,
+      headers: req.headers,
+    }
+  }
+}
+
 router.use('/', (req, res, next) => {
   let mixed = {
     ...req.query,
@@ -21,8 +35,6 @@ router.use('/', (req, res, next) => {
   requestQueue.send({app, method, params, nSign, mode, gwSign})
     .then(result=> {
       storeRequestLog({
-        time: Date.now(),
-        ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
         app,
         method,
         params,
@@ -31,13 +43,12 @@ router.use('/', (req, res, next) => {
         success: true,
         confirmed: result.confirmed,
         errorMessage: result.confirmed ? "" : "",
+        ... reqLogInfo(req),
       });
       res.json({success: true, result})
     })
     .catch(error => {
       storeRequestLog({
-        time: Date.now(),
-        ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
         app,
         method,
         params,
@@ -46,6 +57,7 @@ router.use('/', (req, res, next) => {
         success: false,
         confirmed: false,
         errorMessage: error.message || error.error,
+        ... reqLogInfo(req),
       });
       res.json({success: false, ...error})
     })

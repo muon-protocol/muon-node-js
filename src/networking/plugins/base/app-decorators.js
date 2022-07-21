@@ -19,15 +19,6 @@ module.exports.remoteMethod = function (title, options={}) {
   }
 }
 
-module.exports.gatewayMethod = function (title, options={}) {
-  return function (target, property, descriptor) {
-    if(!target.__gatewayMethods)
-      target.__gatewayMethods = []
-    target.__gatewayMethods.push({title, property, options})
-    return descriptor
-  }
-}
-
 const ipcMethodDefined = {}
 module.exports.ipcMethod = function (title, options={}) {
   return function (target, property, descriptor) {
@@ -64,16 +55,6 @@ module.exports.remoteApp = function (constructor) {
           let item = constructor.prototype.__ipcMethods[i];
           // console.log('########## registering ipc method', item, this.remoteMethodEndpoint(item.title))
           this.registerIpcMethod(item.title, this[item.property].bind(this))
-        }
-      }
-
-      if(constructor.prototype.__gatewayMethods) {
-        let gateway = this.muon.getPlugin('gateway-interface')
-        for (let i = 0; i < constructor.prototype.__gatewayMethods.length; i++) {
-          let item = constructor.prototype.__gatewayMethods[i];
-          // let logTitle = `${this.APP_NAME}.${item.title}`
-          // console.log(`registering gateway method: ${logTitle} >> ${target.name}.${item.property}`)
-          gateway.registerAppCall(this.APP_NAME, item.title, this[item.property].bind(this))
         }
       }
     }
