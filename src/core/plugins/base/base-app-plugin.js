@@ -90,7 +90,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @gatewayMethod("request")
-  async __onRequestArrived(method, params, nSign, mode, gatewayCallId) {
+  async __onRequestArrived({method, params, nSign, mode, callId: gatewayCallId, gwSign}) {
     let t0 = Date.now()
     let startedAt = getTimestamp()
     nSign = !!nSign
@@ -199,6 +199,7 @@ class BaseAppPlugin extends CallablePlugin {
           '__v'
           // 'data.memWrite'
         ]),
+        ...((confirmed && gwSign) ? {gwSignature: crypto.sign(resultHash)} : {}),
         signatures: confirmed ? signatures : []
       }
 

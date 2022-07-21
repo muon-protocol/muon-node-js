@@ -38,24 +38,24 @@ class GatewayInterface extends BasePlugin{
   async __onGatewayCall(message, {pid, uid: callId}){
     // console.log("GatewayInterface.__onGatewayCall", message)
     try {
-      let {app, method, params, nSign, mode} = message
+      let {app, method, params, nSign, mode, gwSign} = message
       if(!['sign', 'view'].includes(mode)){
         throw {message: `Invalid call mode: ${mode}`}
       }
       let response
       if(app){
         if(this.listenerCount(`call/${app}/${method}`) > 0){
-          response = await this.emit(`call/${app}/${method}`, params, nSign, mode, callId)
+          response = await this.emit(`call/${app}/${method}`, {method, params, nSign, mode, callId, gwSign})
         }
         else if(this.listenerCount(`call/${app}/request`) > 0){
-          response = await this.emit(`call/${app}/request`, method, params, nSign, mode, callId)
+          response = await this.emit(`call/${app}/request`, {method, params, nSign, mode, callId, gwSign})
         }
         else{
           throw {message: `app:[${app}] method:[${method}] handler not defined`}
         }
       }
       else{
-        response = await this.emit(`call/muon/${method}`, params, nSign, mode, callId)
+        response = await this.emit(`call/muon/${method}`, {method, params, nSign, mode, callId})
       }
       await this.__handleCallResponse(response);
       return response

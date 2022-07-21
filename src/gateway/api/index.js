@@ -3,6 +3,7 @@ const RequestLog = require('../models/RequestLog')
 const { QueueProducer } = require('../../common/message-bus')
 let NodeCaller = require('../node-caller')
 let requestQueue = new QueueProducer(`gateway-requests`);
+let { parseBool } = require('@src/utils/helpers')
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)
@@ -14,16 +15,19 @@ router.use('/', (req, res, next) => {
     ...req.query,
     ...req.body,
   }
-  let {app, method, params, nSign, mode="sign"} = mixed
+  let {app, method, params, nSign, mode="sign", gwSign} = mixed
   // NodeCaller.appCall(app, method, params, nSign, mode)
-  requestQueue.send({app, method, params, nSign, mode})
+  gwSign = parseBool(gwSign);
+  requestQueue.send({app, method, params, nSign, mode, gwSign})
     .then(result=> {
       storeRequestLog({
         time: Date.now(),
         ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
         app,
         method,
+        params,
         mode,
+        gwSign,
         success: true,
         confirmed: result.confirmed,
         errorMessage: result.confirmed ? "" : "",
@@ -36,7 +40,9 @@ router.use('/', (req, res, next) => {
         ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
         app,
         method,
+        params,
         mode,
+        gwSign,
         success: false,
         confirmed: false,
         errorMessage: error.message || error.error,

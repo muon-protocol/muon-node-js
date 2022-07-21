@@ -47,7 +47,8 @@ class ContentApp extends CallablePlugin {
 
   @gatewayMethod('verify')
   async verifyContent(data){
-    let {cid} = data;
+    let cid = data.params.cid;
+
     let content = await this.muon.getPlugin('content').getContent(cid)
     let verifyPlugin = this.muon.getPlugin('content-verify');
     if(content){
@@ -75,7 +76,7 @@ class ContentApp extends CallablePlugin {
 
   @gatewayMethod('get_content')
   async responseToGatewayRequestData(data={}){
-    let {cid, format='string'} = data;
+    let {cid, format='string'} = data.params;
     let content = await Content.findOne({cid});
     if(content){
       return this.prepareOutput(content.content, format);

@@ -8,12 +8,6 @@ require('./global')
 const bootstrap = require('./bootstrap')
 const {utils: {sha3}} = require('web3')
 
-function getEnvBootstraps() {
-  return Object.keys(process.env)
-    .filter(key => key.startsWith('PEER_BOOTSTRAP_'))
-    .map(key => process.env[key]);
-}
-
 function getEnvPlugins() {
   let pluginsStr = process.env['MUON_PLUGINS']
   if (!pluginsStr)
@@ -101,19 +95,6 @@ async function start() {
     // if(nodeVersion[0] < '16')
     //   throw {message: `Node version most be >="16.0.0". current version is "${process.versions.node}"`}
     muon = new Muon({
-      // libp2p: {
-      //   // TODO: replace env.peerId with config.peerId
-      //   // nodeId: peerId,
-      //   nodeId: {
-      //     id: process.env.PEER_ID,
-      //     pubKey: process.env.PEER_PUBLIC_KEY,
-      //     privKey: process.env.PEER_PRIVATE_KEY
-      //   },
-      //   natIp: process.env.PEER_NAT_IP,
-      //   host: process.env.PEER_HOST || "0.0.0.0",
-      //   port: process.env.PEER_PORT,
-      //   bootstrap: getEnvBootstraps()
-      // },
       plugins: {
         'collateral': [require('./plugins/collateral-info'), {}],
         'remote-call': [require('./plugins/remote-call'), {}],
@@ -121,7 +102,6 @@ async function start() {
         'ipc': [require('./plugins/core-ipc-plugin'), {}],
         'ipc-handlers': [require('./plugins/core-ipc-handlers'), {}],
         'broadcast': [require('./plugins/broadcast'), {}],
-        // 'gw-log': [require('./plugins/gateway-log'), {}],
         // 'content-verify': [require('./plugins/content-verify-plugin'), {}],
         // 'content': [require('./plugins/content-app'), {}],
         'memory': [require('./plugins/memory-plugin'), {}],
@@ -131,7 +111,6 @@ async function start() {
         ...getEnvPlugins(),
         ...getCustomApps(),
         ...await getGeneralApps(),
-        'test-plugin': [require('./plugins/test-plugin'), {}],
       },
       net,
       account,

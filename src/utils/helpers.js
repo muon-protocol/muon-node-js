@@ -13,6 +13,11 @@ module.exports.floatToBN = (num, decimals) => {
   let n1 = n0.decimalPlaces(decimals).integerValue();
   return toBN(`0x${n1.toString(16)}`);
 }
+module.exports.parseBool = v => {
+  if(typeof v === 'string')
+    v = v.toLowerCase();
+  return v === '1' || v==='true' || v === true || v === 1;
+}
 
 const flattenObject = (obj, prefix="") => {
   let result = {}
