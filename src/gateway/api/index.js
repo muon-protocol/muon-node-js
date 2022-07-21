@@ -10,8 +10,8 @@ async function storeRequestLog(logData) {
   await log.save();
 }
 
-function reqLogInfo(req) {
-  return {
+function extraLogs(req, result) {
+  let logs = {
     time: Date.now(),
     ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress,
     extra: {
@@ -22,6 +22,14 @@ function reqLogInfo(req) {
       headers: req.headers,
     }
   }
+  if(result.confirmed) {
+    logs.extra = {
+      ... logs.extra,
+      nonce: result.data?.init?.nonceAddress,
+      reqHash: result.hash
+    }
+  }
+  return logs;
 }
 
 router.use('/', (req, res, next) => {
@@ -43,7 +51,7 @@ router.use('/', (req, res, next) => {
         success: true,
         confirmed: result.confirmed,
         errorMessage: result.confirmed ? "" : "",
-        ... reqLogInfo(req),
+        ... extraLogs(req, result),
       });
       res.json({success: true, result})
     })
@@ -57,7 +65,7 @@ router.use('/', (req, res, next) => {
         success: false,
         confirmed: false,
         errorMessage: error.message || error.error,
-        ... reqLogInfo(req),
+        ... extraLogs(req),
       });
       res.json({success: false, ...error})
     })
