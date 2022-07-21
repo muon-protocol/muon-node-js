@@ -96,7 +96,7 @@ class TssPlugin extends CallablePlugin {
       if(peerWallet) {
         if (!!this.tssParty) {
           if (peerWallet) {
-            console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
+            // console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
             this.tssParty.setWalletPeer(peerWallet, peerId);
           }
         } else {
@@ -181,9 +181,13 @@ class TssPlugin extends CallablePlugin {
     }
     else{
       console.log('waiting to leader be selected ...');
-      let leader = await this.leaderPlugin.waitToLeaderSelect();
+      let leader = await NetworkingIpc.getLeader();
+      let permitted = await NetworkingIpc.askClusterPermission('tss-key-creation', 20000)
+      if(!permitted)
+        return;
 
       if (leader === process.env.SIGN_WALLET_ADDRESS && await this.isNeedToCreateKey()) {
+        console.log(`[${process.pid}] got permission to create tss key`);
         let key = await this.tryToCreateTssKey();
         console.log(`TSS key generated with ${key.partners.length} partners`);
       }
@@ -284,7 +288,8 @@ class TssPlugin extends CallablePlugin {
             // online partners
             p.peer,
             RemoteMethods.recoverMyKey,
-            {nonce: nonce.id,}
+            {nonce: nonce.id},
+            {taskId: `keygen-${nonce.id}`}
           ).catch(e => null)
         }
       )
@@ -347,7 +352,8 @@ class TssPlugin extends CallablePlugin {
           {
             party: this.tssParty.id,
             key: key.id,
-          }
+          },
+          {taskId: `keygen-${key.id}`}
         ).catch(() => false);
       }))
       // console.log(`key save broadcast count: ${key.partners.length}`, callResult);
@@ -376,9 +382,6 @@ class TssPlugin extends CallablePlugin {
   async keyGen(party, options={}) {
     if(!party)
       party = this.tssParty;
-    if(!this.isReady){
-      throw {message: "Tss is not ready yet"}
-    }
     if(party.onlinePartners.length < this.TSS_THRESHOLD){
       throw {message: "No enough online node."}
     }
@@ -462,7 +465,7 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
     key.partners = partners.filter((p, i) => callResult[i]!=='error').map(p => p.wallet)
     if(key.partners.length < this.TSS_THRESHOLD){
-      throw {message: "Error in key creation"}
+      throw {message: "No enough partners for key creation"}
     }
     return key;
   }
@@ -690,7 +693,8 @@ class TssPlugin extends CallablePlugin {
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
       throw {message: 'TssPlugin.__storeTssKey: key not found.'};
-    if(await this.isNeedToCreateKey() && this.leaderPlugin.isLeader(callerInfo.wallet)) {
+    let leader = await NetworkingIpc.getLeader();
+    if(await this.isNeedToCreateKey() && leader === callerInfo.wallet) {
       await key.waitToFulfill()
       this.saveTssConfig(party, key);
       this.tssKey = key

@@ -62,6 +62,7 @@ class QueueProducer extends BaseMessageQueue {
       }
     }
     else{
+      console.log(`[${process.pid}] Result promise not found`, rawResponse);
       // TODO: what to do? it may timed out.
     }
   }

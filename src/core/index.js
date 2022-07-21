@@ -1,4 +1,5 @@
 const Muon = require('./muon');
+let mongoose = require('mongoose')
 const path = require('path');
 const fs = require('fs');
 const {dynamicExtend} = require('./utils')
@@ -82,6 +83,11 @@ function getGeneralApps() {
 var muon;
 
 async function start() {
+  await mongoose.connect(process.env.MONGODB_CS, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+
   let config = await bootstrap();
   let {
     net,

@@ -25,12 +25,16 @@ class BaseMessageBus extends Events{
     this.receiveRedis = this.createRedisClient();
   }
 
+  get channelPrefix() {
+    return `/muon/${process.env.SIGN_WALLET_ADDRESS}/${process.env.PEER_PORT}`
+  }
+
   get channelName () {
-    return `/muon/${process.env.SIGN_WALLET_ADDRESS}/ms/message/bus/${this.busName}`
+    return `${this.channelPrefix}/ms/message/bus/${this.busName}`
   }
 
   getProcessResponseChannel (pid=process.pid) {
-    return `/muon/${process.env.SIGN_WALLET_ADDRESS}/ms/response/bus/${pid}/${this.busName}`
+    return `${this.channelPrefix}/ms/response/bus/${pid}/${this.busName}`
   }
 
   wrapData(data, mix) {

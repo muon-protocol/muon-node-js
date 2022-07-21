@@ -82,10 +82,6 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async _checkStatus(){
-    console.log("GroupLeaderPlugin._checkStatus", {
-      time: parseInt(Date.now() / 100000),
-      onlinePartners: this.onlinePartners.length + 1
-    })
     let leader = await this.leaderAlreadySelected();
     if(!!leader && !this.leader){
       console.log(`leader already selected: `, leader)

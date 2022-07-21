@@ -35,10 +35,13 @@ class CollateralInfoPlugin extends BasePlugin{
         info = await networkingIpcCall(
           "get-collateral-info",
           {},
-          {timeout: 5000, timeoutMessage: "Retrieving collateral info timed out."},
+          {
+            timeout: 5000,
+            timeoutMessage: "Getting collateral info timed out"
+          },
         );
       }catch (e) {
-        console.log(e)
+        console.log(`[${process.pid}] CoreCollateralInfo._loadCollateralInfo`, e);
       }
     }
     const { groupInfo, networkInfo, peersWallet, walletsPeer } = info

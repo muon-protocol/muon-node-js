@@ -1,7 +1,7 @@
 const mkdirp = require('mkdirp')
 
 const getConfDir = () => {
-  let baseDir = `@root/config/`
+  let baseDir = `../../config/`
   return !!process.env.CONFIG_BASE_PATH ? baseDir + process.env.CONFIG_BASE_PATH : baseDir
 }
 
@@ -21,11 +21,11 @@ async function bootstrap(){
 
   let net, tss;
 
-  if(moduleExist(`@root/config/global/net.conf.json`)) {
-    net = require('@root/config/global/net.conf.json')
+  if(moduleExist(`../../config/global/net.conf.json`)) {
+    net = require('../../config/global/net.conf.json')
   }
   else {
-    net = require('@root/config/global/net.default.conf.json')
+    net = require('../../config/global/net.default.conf.json')
   }
   net.tss.threshold = parseInt(net.tss.threshold)
   net.tss.max = parseInt(net.tss.max)

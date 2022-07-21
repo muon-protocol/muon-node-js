@@ -16,7 +16,7 @@ class QueueConsumer extends BaseMessageQueue {
     while (true) {
       try {
         // let [queue, dataStr] = await blpopAsync(this.channelName, 0)
-        let [queue, dataStr] = await sendCommand("BLPOP", [this.channelName, `${this.channelName}@${process.pid}`, '0'])
+        let [queue, dataStr] = await sendCommand("BLPOP", [`${this.channelName}@${process.pid}`, this.channelName, '0'])
         this.onMessageReceived(queue, dataStr);
       } catch (e) {
         console.error(e)

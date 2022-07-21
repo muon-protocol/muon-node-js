@@ -11,7 +11,16 @@ let {
   QueueProducer,
   QueueConsumer
 } = require('./common/message-bus')
-const numCPUs = 4; //require('os').cpus().length;
+
+let clusterCount = 1;
+if(process.env.CLUSTER_MODE) {
+  if(process.env.CLUSTER_COUNT) {
+    clusterCount = parseInt(process.env.CLUSTER_COUNT);
+  }
+  else{
+    clusterCount = require('os').cpus().length;
+  }
+}
 
 const ON_CHILD_MESSAGE = message => {
   console.log({pid: process.pid, message});
@@ -36,22 +45,24 @@ async function boot() {
     })
 
     await Networking.start()
-
-    // /** Start core */
-    // require('./core').start();
-    /** Start application clusters */
-    for (let i = 0; i < numCPUs; i++) {
-      let child = runNewApplicationCluster();
-      await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
-    }
     //
     cluster.on("exit", async function (worker, code, signal) {
       console.log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
       delete applicationWorkers[worker.process.pid];
       await NetworkingIpc.reportClusterStatus(worker.process.pid, 'exit')
-      // console.log("Starting a new worker");
-      // runNewApplicationCluster();
+
+      console.log("Starting a new worker");
+      let child = runNewApplicationCluster();
+      await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
     });
+
+    // /** Start core */
+    // require('./core').start();
+    /** Start application clusters */
+    for (let i = 0; i < clusterCount; i++) {
+      let child = runNewApplicationCluster();
+      await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
+    }
     //
     // console.log(`Master thread PID:${process.pid}, starting clusters...`);
 

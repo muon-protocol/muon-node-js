@@ -19,9 +19,19 @@ function assignTask(taskId) {
   return call("assign-task", {taskId})
 }
 
+function getLeader() {
+  return call("get-leader")
+}
+
+function askClusterPermission(key, expireTime) {
+  return call("ask-cluster-permission", {key, expireTime})
+}
+
 module.exports = {
   call,
   forwardRemoteCall,
   reportClusterStatus,
   assignTask,
+  getLeader,
+  askClusterPermission,
 }

@@ -100,6 +100,9 @@ class BaseAppPlugin extends CallablePlugin {
     if(this.getNSign)
       nSign = this.getNSign(nSign)
 
+    if(!this.tssPlugin.isReady)
+      throw {message: "Tss not initialized"}
+
     let newRequest = new Request({
       hash: null,
       app: this.APP_NAME,

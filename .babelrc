@@ -10,8 +10,7 @@
       "root": ["./"],
       "serverSideRequirePath": true,
       "alias": {
-        "@src": "./src",
-        "@root": "."
+        "@src": "./src"
       }
     }]
   ]

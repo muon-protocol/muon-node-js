@@ -6,6 +6,7 @@ const chalk = require('chalk')
 const emoji = require('node-emoji')
 const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
 const coreIpc = require('../core/ipc')
+const { MessagePublisher } = require('../common/message-bus')
 
 class Network extends Events {
   configs
@@ -154,7 +155,24 @@ function getLibp2pBootstraps() {
     .map(key => process.env[key]);
 }
 
+function clearMessageBus(){
+  let mp = new MessagePublisher("temp")
+  const redis = mp.sendRedis;
+  return new Promise((resolve, reject) => {
+    redis.keys(`${mp.channelPrefix}*`, function(err, rows) {
+      if(err)
+        return reject(err);
+      for(var i = 0, j = rows.length; i < j; ++i) {
+        redis.del(rows[i])
+      }
+      resolve(true);
+    });
+  })
+}
+
 async function start() {
+  await clearMessageBus();
+
   let {
     net,
     peerId,

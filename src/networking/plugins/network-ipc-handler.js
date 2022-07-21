@@ -43,10 +43,9 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod("get-collateral-info")
   async __onIpcGetCollateralInfo(data={}, callerInfo) {
-    console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
+    // console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
     const collateralPlugin = this.network.getPlugin('collateral');
     await collateralPlugin.waitToLoad();
-    console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, "data is ready", callerInfo);
 
     let {groupInfo, networkInfo, peersWallet, walletsPeer} = collateralPlugin;
     return {groupInfo, networkInfo, peersWallet, walletsPeer}
@@ -97,6 +96,28 @@ class NetworkIpcHandler extends CallablePlugin {
         break;
     }
     // console.log("NetworkIpcHandler.__reportClusterStatus", this.clustersPids);
+  }
+
+  @ipcMethod('get-leader')
+  async __getLeader(data={}, callerInfo) {
+    let leaderPlugin = this.network.getPlugin('group-leader')
+    await leaderPlugin.waitToLeaderSelect();
+    return leaderPlugin.leader;
+  }
+
+  clusterPermissions = {};
+  @ipcMethod('ask-cluster-permission')
+  async __askClusterPermission(data={}, callerInfo) {
+    // every 20 seconds one process get permission to do election
+    if(
+      (!this.clusterPermissions[data.key])
+      || (Date.now() - this.clusterPermissions[data.key] > data.expireTime)
+    ){
+      this.clusterPermissions[data.key] = Date.now()
+      return true
+    }
+    else
+      return false;
   }
 
   /**
