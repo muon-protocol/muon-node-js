@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "help": "node help.js",
-    "start": "env-cmd babel-node ./index.js",
+    "start": "env-cmd babel-node ./src/index.js",
     "start.debug": "env-cmd --use-shell 'DEBUG=libp2p:noise babel-node ./index.js' ",
     "dev": "env-cmd nodemon --exec babel-node ./index.js",
     "devnet-init": "node devnet-generate-envs.js",
