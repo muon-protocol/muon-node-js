@@ -63,8 +63,11 @@ class CollateralInfoPlugin extends BasePlugin{
   getPeerWallet(peerId) {
     if(typeof peerId === "string")
       return this.peersWallet[peerId];
-    else
-      return this.peersWallet[peerId.toB58String()];
+    else {
+      console.log({peerId})
+      throw {message: "Invalid peerId "}
+    }
+      // return this.peersWallet[peerId.toB58String()];
   }
 
   getWalletPeerId(wallet) {
