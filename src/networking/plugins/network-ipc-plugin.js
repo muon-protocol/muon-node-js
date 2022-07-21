@@ -9,13 +9,10 @@ class NetworkIpcPlugin extends BaseNetworkingPlugin {
    */
   bus = null;
 
-  async onInit() {
+  async onStart() {
     const bus = new QueueConsumer(IPC_CHANNEL);
     bus.on("message", this.onMessageReceived.bind(this));
     this.bus = bus
-  }
-
-  async onStart() {
   }
 
   async onMessageReceived(message, callerInfo){

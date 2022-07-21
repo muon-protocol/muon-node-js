@@ -10,7 +10,7 @@ class BroadcastPlugin extends BasePlugin {
    */
   bus = null;
 
-  async onInit() {
+  async onStart() {
     const bus = new QueueConsumer(BROADCAST_CHANNEL);
     bus.on("message", this.onBroadcastReceived.bind(this));
     this.bus = bus

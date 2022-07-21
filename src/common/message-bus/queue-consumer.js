@@ -3,11 +3,21 @@ const { promisify } = require("util");
 
 class QueueConsumer extends BaseMessageQueue {
 
+  options = {}
+  _reading = false;
+
   constructor(busName, options={}) {
     super(busName);
 
     this.options = options;
-    this.readQueuedMessages();
+  }
+
+  on(eventName, listener) {
+    super.on(eventName, listener);
+    if(!this._reading){
+      this._reading = true;
+      this.readQueuedMessages();
+    }
   }
 
   async readQueuedMessages() {
