@@ -76,7 +76,7 @@ class Network extends Events {
     await this.libp2p.start()
 
     if (this.configs.libp2p.natIp) {
-      let {port, natIp} = this.configs
+      let {port, natIp} = this.configs.libp2p
       this.libp2p.addressManager.addObservedAddr(`/ip4/${natIp}/tcp/${port}/p2p/${this.peerId.toB58String()}`);
     }
 
