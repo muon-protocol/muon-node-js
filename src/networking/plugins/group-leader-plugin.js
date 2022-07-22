@@ -82,42 +82,44 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async _checkStatus(){
-    let leader = await this.leaderAlreadySelected();
-    if(!!leader && !this.leader){
-      console.log(`leader already selected: `, leader)
-      this.leader = leader;
-      this._leaderSelectPromise.resolve(leader);
-      return ;
-    }
-
-    try {
-      // console.log("GroupLeaderPlugin._checkStatus", Date.now()) // is failed: 000
-      let permitted = await this.isPermittedToDoElection();
-      if (permitted) {
-        let started = await this.electionStart();
-        if(started)
-          this._electionStartedAt = Date.now();
-        else
-          throw {message: "Election start failed."}
-
-        console.log(`** Got permission to do election **`);
-        // this.electionKey = await this.TssPlugin.keyGen(null, {timeout: 45000});
-        this.electionKey = await CoreIpc.generateTssKey();
-        let done = await this.informElectionReady();
-        if(done){
-          console.log(`Election complete successfully`);
-          this._electionComplete(this.electionKey);
-          return;
-        }
-        else{
-          console.log(`Election confirmation failed.`);
-        }
+    if(this.collateralPlugin.hasEnoughPartners()) {
+      let leader = await this.leaderAlreadySelected();
+      if (!!leader && !this.leader) {
+        console.log(`leader already selected: `, leader)
+        this.leader = leader;
+        this._leaderSelectPromise.resolve(leader);
+        return;
       }
-      else
-        console.log(`Not permitted to do election.`);
+
+      try {
+        // console.log("GroupLeaderPlugin._checkStatus", Date.now()) // is failed: 000
+        let permitted = await this.isPermittedToDoElection();
+        if (permitted) {
+          let started = await this.electionStart();
+          if (started)
+            this._electionStartedAt = Date.now();
+          else
+            throw {message: "Election start failed."}
+
+          console.log(`** Got permission to do election **`);
+          // this.electionKey = await this.TssPlugin.keyGen(null, {timeout: 45000});
+          this.electionKey = await CoreIpc.generateTssKey();
+          let done = await this.informElectionReady();
+          if (done) {
+            console.log(`Election complete successfully`);
+            this._electionComplete(this.electionKey);
+            return;
+          } else {
+            console.log(`Election confirmation failed.`);
+          }
+        } else
+          console.log(`Not permitted to do election.`);
+      } catch (e) {
+        console.log('GroupLeaderPlugin._checkStatus', 'error', e)
+      }
     }
-    catch (e) {
-      console.log('GroupLeaderPlugin._checkStatus', 'error', e)
+    else {
+      console.log(`No enough partners to find leader.`)
     }
     if(!this.leader)
       setTimeout(this._checkStatus.bind(this), 32000)

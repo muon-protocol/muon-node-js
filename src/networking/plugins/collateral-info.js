@@ -109,6 +109,13 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
     return this.networkInfo?.tssThreshold;
   }
 
+  hasEnoughPartners() {
+    /**
+     * onlinePartners not include current node
+     */
+    return Object.keys(this.onlinePeers).length + 1 >= this.TssThreshold
+  }
+
   get MinGroupSize(){
     return this.networkInfo?.minGroupSize;
   }
