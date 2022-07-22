@@ -138,11 +138,21 @@ class NetworkIpcHandler extends CallablePlugin {
     return 'Ok';
   }
 
+  /**
+   *
+   * @param data {Object}         - remote call arguments
+   * @param data.peer {String}    - PeerID of remote peer
+   * @param data.method {String}  - method to call
+   * @param data.params {Object}  - remote method arguments
+   * @param data.options {Object} - remote call options
+   * @returns {Promise<[any]>}
+   * @private
+   */
   @ipcMethod("remote-call")
   async __onRemoteCallRequest(data={}) {
     // console.log(`NetworkIpcHandler.__onRemoteCallRequest`, data);
     const peer = await this.findPeer(data.peer);
-    return await this.remoteCall(peer, "exec-ipc-remote-call", data, {timeout: 90000});
+    return await this.remoteCall(peer, "exec-ipc-remote-call", data, data.options);
   }
 
   /**
