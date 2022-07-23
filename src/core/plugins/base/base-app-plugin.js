@@ -303,6 +303,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
     let confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, aggregatedSign)
+    // TODO: check and detect nodes misbehavior if request not confirmed
 
     return [
       confirmed,
@@ -456,22 +457,22 @@ class BaseAppPlugin extends CallablePlugin {
       let request = this.requestManager.getRequest(sign.request)
       if (request) {
         // TODO: check response similarity
-        let signer = this.recoverSignature(request, sign)
-        if (signer && signer === sign.owner) {
+        // let signer = this.recoverSignature(request, sign)
+        // if (signer && signer === sign.owner) {
           if (!!memWrite) {
             // TODO: validate memWright signature
             sign.memWriteSignature = memWrite.signature
           }
           this.requestManager.addSignature(request.hash, sign.owner, sign)
-          // let newSignature = new Signature(sign)
-          // await newSignature.save()
-        } else {
-          console.log('signature mismatch', {
-            request: request.hash,
-            signer,
-            sigOwner: sign.owner
-          })
-        }
+          // // let newSignature = new Signature(sign)
+          // // await newSignature.save()
+        // } else {
+        //   console.log('signature mismatch', {
+        //     request: request.hash,
+        //     signer,
+        //     sigOwner: sign.owner
+        //   })
+        // }
       }
       else{
         console.log(`BaseAppPlugin.__onRemoteSignRequest >> Request not found id:${sign.request}`)
