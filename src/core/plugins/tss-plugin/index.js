@@ -445,6 +445,9 @@ class TssPlugin extends CallablePlugin {
       // partners = partners.slice(0, maxPartners);
     }
 
+    if(partners.length < this.TSS_THRESHOLD)
+      throw {message: "No enough partners for key creation"}
+
     let callResult = await Promise.all(
       partners
         .map(({peer, wallet}) => {
@@ -458,14 +461,15 @@ class TssPlugin extends CallablePlugin {
               key: key.id,
               partners: partners.map(({wallet}) => wallet)
             },
-            {taskId}
+            {taskId, timeout: 15000}
           ).catch(e => 'error')
         })
     )
     // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
     key.partners = partners.filter((p, i) => callResult[i]!=='error').map(p => p.wallet)
     if(key.partners.length < this.TSS_THRESHOLD){
-      throw {message: "No enough partners for key creation"}
+      console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
+      throw {message: "Error in key creation"}
     }
     return key;
   }
