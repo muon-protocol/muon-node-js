@@ -3,7 +3,7 @@ const TimeoutPromise = require('../timeout-promise')
 const NodeCache = require('node-cache');
 
 const callCache = new NodeCache({
-  stdTTL: 5*60, // Keep call in memory for 5 minutes
+  stdTTL: 15*60, // Keep call in memory for 15 minutes
   useClones: false,
 });
 
@@ -51,7 +51,7 @@ class QueueProducer extends BaseMessageQueue {
   async onResponseReceived(channel, strMessage) {
     const rawResponse = JSON.parse(strMessage);
     let {pid, uid, data: {error=undefined, response=undefined}} = rawResponse;
-    let {resultPromise=null, options={}} = callCache.get(uid);
+    let {resultPromise=null, options={}} = callCache.get(uid) || {};
     if(resultPromise) {
       if (!error) {
         resultPromise.resolve(options.rawResponse ? rawResponse : response)

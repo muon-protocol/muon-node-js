@@ -386,6 +386,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     this.requestManager.setPartnerCount(request.hash, partners.length + 1);
 
+    // TODO: remove async
     partners.map(async ({peerId, wallet}) => {
       return this.remoteCall(peerId, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT, taskId: `keygen-${nonce.id}`})
         .then(this.__onRemoteSignRequest.bind(this))
