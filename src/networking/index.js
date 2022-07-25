@@ -1,6 +1,6 @@
 const Events = require('events-async');
-const Libp2pBundle = require('../core/libp2p_bundle')
-const bootstrap = require('./bootstrap')
+const Libp2pBundle = require('./libp2p_bundle')
+const loadConfigs = require('./configurations')
 const PeerId = require('peer-id')
 const chalk = require('chalk')
 const emoji = require('node-emoji')
@@ -179,7 +179,7 @@ async function start() {
     account,
     tss,
     ... otherConfigs
-  } = await bootstrap();
+  } = await loadConfigs();
   let configs = {
     libp2p: {
       nodeId: {

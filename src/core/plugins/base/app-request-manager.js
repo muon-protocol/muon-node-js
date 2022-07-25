@@ -80,7 +80,7 @@ class AppRequestManager{
   }
 
   addError(reqHash, owner, error) {
-    console.log('request error', reqHash, owner, error);
+    // console.log('AppRequestManager.addError: request error', reqHash, owner, error);
     let item = this.getItem(reqHash);
     if(item.errors[owner] === undefined){
       item.errors[owner] = error

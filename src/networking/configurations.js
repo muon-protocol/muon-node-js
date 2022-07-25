@@ -1,7 +1,7 @@
 const mkdirp = require('mkdirp')
 
 const getConfDir = () => {
-  let baseDir = `${__dirname}/../../config/`
+  let baseDir = `../../config/`
   return !!process.env.CONFIG_BASE_PATH ? baseDir + process.env.CONFIG_BASE_PATH : baseDir
 }
 
@@ -15,7 +15,7 @@ const moduleExist = _module => {
   }
 }
 
-async function bootstrap(){
+async function configurations(){
   let configDir = getConfDir();
   mkdirp.sync(configDir);
 
@@ -40,4 +40,4 @@ async function bootstrap(){
   }
 }
 
-module.exports = bootstrap;
+module.exports = configurations;

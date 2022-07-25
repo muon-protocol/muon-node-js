@@ -5,7 +5,7 @@ const fs = require('fs');
 const {dynamicExtend} = require('./utils')
 const BaseApp = require('./plugins/base/base-app-plugin')
 require('./global')
-const bootstrap = require('./bootstrap')
+const loadConfigs = require('../networking/configurations')
 const {utils: {sha3}} = require('web3')
 
 function getEnvPlugins() {
@@ -82,7 +82,7 @@ async function start() {
     useUnifiedTopology: true
   })
 
-  let config = await bootstrap();
+  let config = await loadConfigs();
   let {
     net,
     peerId,

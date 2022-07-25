@@ -182,21 +182,21 @@ class RemoteCall extends BaseNetworkingPlugin {
   call(peer, method, params, options={}){
     // TODO: need more check
     if(!peer){
-      return Promise.reject({message: `RemoteCall.call: peer is null for method ${method}`})
+      return Promise.reject({message: `network.RemoteCall.call: peer is null for method ${method}`})
     }
     return this.getPeerConnection(peer)
       .then(connection => {
         if(!connection?.stream)
-          console.log('no stream call ... ')
+          console.log('network.RemoteCall.call: no stream call ... ')
         return this.callConnection(connection, peer, method, params, options)
       })
       .catch(e => {
         if(!options?.silent) {
-          console.error(`RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
+          console.error(`network.RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
         }
         this.emit("error", {peerId: peer.id, method, onRemoteSide: e.onRemoteSide})
           .catch(e => {
-            console.log("RemoteCall.call.error handler failed", e)
+            console.log("network.RemoteCall.call: error handler failed", e);
           })
         throw e;
       })
