@@ -1,3 +1,3 @@
 [submodule "apps"]
 	path = apps
-	url = https://github.com/muon-protocol/muon-apps.git
+	url = git@github.com:muon-protocol/muon-apps.git
