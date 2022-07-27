@@ -4,7 +4,7 @@ const PeerId = require('peer-id')
 const emoji = require('node-emoji')
 const fs = require('fs')
 const Web3 = require('web3')
-const parseArgv = require('./utils/parseArgv')
+const parseArgv = require('./src/utils/parseArgv')
 const web3 = new Web3()
 
 const createEnv = async () => {
