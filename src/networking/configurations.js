@@ -1,4 +1,5 @@
 const mkdirp = require('mkdirp')
+const path = require('path')
 
 const getConfDir = () => {
   let baseDir = `../../config/`
@@ -16,7 +17,7 @@ const moduleExist = _module => {
 }
 
 async function configurations(){
-  let configDir = getConfDir();
+  let configDir = path.join(__dirname, getConfDir());
   mkdirp.sync(configDir);
 
   let net, tss;

@@ -79,8 +79,8 @@ class Muon extends Events {
   }
 
   get configDir(){
-    let baseDir = `${process.env.PWD}/config/`;
-    return !!process.env.CONFIG_BASE_PATH ? `${baseDir}${process.env.CONFIG_BASE_PATH}/` : baseDir
+    let baseDir = `${process.env.PWD}/config`;
+    return !!process.env.CONFIG_BASE_PATH ? `${baseDir}/${process.env.CONFIG_BASE_PATH}/` : baseDir
   }
 
   saveConfig(data, fileName){
