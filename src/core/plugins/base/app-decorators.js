@@ -55,8 +55,11 @@ module.exports.broadcastHandler = function (target, property, descriptor) {
 }
 
 module.exports.remoteApp = function (constructor) {
-  if(!classNames(constructor).includes('CallablePlugin'))
-    throw {message: 'RemoteApp should be CallablePlugin.'}
+  if(!classNames(constructor).includes('CallablePlugin')) {
+    const error = {message: 'RemoteApp should be CallablePlugin.'}
+    console.error(error)
+    throw error;
+  }
   let extended = class extends constructor {
     async onStart(){
       await super.onStart();

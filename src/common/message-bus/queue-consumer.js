@@ -41,7 +41,7 @@ class QueueConsumer extends BaseMessageQueue {
       response = await this.emit("message", data, {pid, uid})
     } catch (e) {
       // console.log(`QueueConsumer.onMessageReceived`, e);
-      error = typeof e === "string" ? {message: e} : e;
+      error = {message: typeof e === "string" ? e : e.message};
     }
     this.responseTo(pid, uid, {response, error});
   }

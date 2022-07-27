@@ -45,7 +45,7 @@ class RemoteCall extends BaseNetworkingPlugin {
         return response
       })
       .catch(error => {
-        console.error("RemoteCall.handleCall", error)
+        //console.error("network.RemoteCall.handleCall", error, {method, params, callerWallet})
         if(typeof error === "string")
           error = {message: error};
         const {message: ___, ...otherErrorParts} = error;
@@ -79,7 +79,7 @@ class RemoteCall extends BaseNetworkingPlugin {
         // TODO: what to do?
       }
     }catch (e) {
-      console.error("RemoteCall.handleIncomingMessage", e);
+      console.error("network.RemoteCall.handleIncomingMessage", e);
     }
   }
 
@@ -98,7 +98,7 @@ class RemoteCall extends BaseNetworkingPlugin {
         await pipe([this.prepareSendData(response)], stream)
       }
     } catch (err) {
-      console.error("RemoteCall.handler", err)
+      console.error("network.RemoteCall.handler", err)
     }
     // finally {
     //   // Replies are done on new streams, so let's close this stream so we don't leak it
@@ -194,10 +194,12 @@ class RemoteCall extends BaseNetworkingPlugin {
         if(!options?.silent) {
           console.error(`network.RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
         }
-        this.emit("error", {peerId: peer.id, method, onRemoteSide: e.onRemoteSide})
-          .catch(e => {
-            console.log("network.RemoteCall.call: error handler failed", e);
-          })
+        if(this.listenerCount('error') > 0) {
+          this.emit({catch: true}, 'error', {peerId: peer.id, method, onRemoteSide: e.onRemoteSide})
+            .catch(e => {
+              console.log("network.RemoteCall.call: error handler failed", e);
+            })
+        }
         throw e;
       })
   }

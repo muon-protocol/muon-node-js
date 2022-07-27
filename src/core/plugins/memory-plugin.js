@@ -1,11 +1,13 @@
-const BasePlugin = require('./base/base-plugin')
+const CallablePlugin = require('./base/callable-plugin')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const crypto = require('../../utils/crypto')
 const {getTimestamp} = require('../../utils/helpers')
 const Memory = require('../../gateway/models/Memory')
+const { remoteApp, broadcastHandler } = require('./base/app-decorators')
 
-class MemoryPlugin extends BasePlugin {
+@remoteApp
+class MemoryPlugin extends CallablePlugin {
 
   broadcastWrite(memWrite) {
     this.broadcast({
@@ -15,6 +17,7 @@ class MemoryPlugin extends BasePlugin {
     })
   }
 
+  @broadcastHandler
   async onBroadcastReceived(data) {
     try {
       // let data = JSON.parse(uint8ArrayToString(msg.data));
