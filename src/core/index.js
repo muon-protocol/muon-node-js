@@ -103,7 +103,7 @@ async function start() {
         'ipc-handlers': [require('./plugins/core-ipc-handlers'), {}],
         'broadcast': [require('./plugins/broadcast'), {}],
         // 'content-verify': [require('./plugins/content-verify-plugin'), {}],
-        // 'content': [require('./plugins/content-app'), {}],
+        'content': [require('./plugins/content-app'), {}],
         'memory': [require('./plugins/memory-plugin'), {}],
         'tss-plugin': [require('./plugins/tss-plugin'), {}],
         'tss-party-search': [require('./plugins/tss-party-search'), {}],
