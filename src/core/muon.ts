@@ -1,5 +1,7 @@
 'use strict'
 /* eslint-disable no-console */
+import {CoreGlobalEvent} from "./ipc";
+
 const Events = require('events')
 const chalk = require('chalk')
 const emoji = require('node-emoji')
@@ -7,21 +9,32 @@ const fs = require('fs')
 const { MessagePublisher, MessageSubscriber } = require('../common/message-bus')
 const { GLOBAL_EVENT_CHANNEL, fireEvent } = require('./ipc')
 const { call: networkingIpcCall } = require('../networking/ipc')
+import MuonBasePlugin from './plugins/base/base-plugin';
 
+export interface MuonPlugin {
+  constructor(network: MuonBasePlugin, configs: MuonPluginConfigs);
+  onInit();
+  onStart();
+}
+
+export type MuonPluginConfigs = any
+
+export type MuonConfigs = {
+  plugins: {[index: string]: [MuonPlugin, MuonPluginConfigs]}
+}
 
 export default class Muon extends Events {
-  configs = {}
+  configs: MuonConfigs
   _plugins = {}
   _apps = {}
   globalEventBus = new MessageSubscriber(GLOBAL_EVENT_CHANNEL)
 
-  constructor(configs) {
+  constructor(configs: MuonConfigs) {
     super()
     this.configs = configs
   }
 
   async initialize() {
-    // @ts-ignore
     await this._initializePlugin(this.configs.plugins)
   }
 
@@ -56,7 +69,7 @@ export default class Muon extends Events {
       const peerIds = await networkingIpcCall("get-online-peers")
       if(peerIds.length > 0) {
         peerIds.forEach(peerId => {
-          fireEvent("peer:discovery", peerId)
+          fireEvent({type: "peer:discovery", data: peerId})
         })
       }
     }, 1000);
@@ -68,10 +81,9 @@ export default class Muon extends Events {
     }
   }
 
-  async onGlobalEventReceived(data={}) {
-    // console.log(`[${process.pid}] Muon.onGlobalEventReceived`, data)
-    // @ts-ignore
-    this.emit(data.type, ...data.args);
+  async onGlobalEventReceived(event: CoreGlobalEvent) {
+    // console.log(`[${process.pid}] core.Muon.onGlobalEventReceived`, event)
+    this.emit(event.type, event.data);
   }
 
   getSharedWalletPubKey() {

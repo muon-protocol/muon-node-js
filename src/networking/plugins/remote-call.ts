@@ -29,6 +29,12 @@ const callCache = new NodeCache({
 
 const PROTOCOL = '/muon/network/remote-call/1.0.0'
 
+export type RemoteCallOptions = {
+  silent?: boolean,
+  timeout?: number,
+  timeoutMessage?: string,
+}
+
 class RemoteCall extends BaseNetworkingPlugin {
 
   async onStart() {
@@ -179,7 +185,7 @@ class RemoteCall extends BaseNetworkingPlugin {
     return this.network.libp2p.dialProtocol(peer.id, [PROTOCOL])
   }
 
-  call(peer, method, params, options={}){
+  call(peer, method: string, params: any, options: RemoteCallOptions={}){
     // TODO: need more check
     if(!peer){
       return Promise.reject({message: `network.RemoteCall.call: peer is null for method ${method}`})
@@ -191,7 +197,6 @@ class RemoteCall extends BaseNetworkingPlugin {
         return this.callConnection(connection, peer, method, params, options)
       })
       .catch(e => {
-        // @ts-ignore
         if(!options?.silent) {
           console.error(`network.RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
         }
@@ -205,7 +210,7 @@ class RemoteCall extends BaseNetworkingPlugin {
       })
   }
 
-  callConnection(connection, peer, method, params, options){
+  callConnection(connection, peer, method: string, params: any, options: RemoteCallOptions){
     options = {
       silent: false,
       timeout: 5000,

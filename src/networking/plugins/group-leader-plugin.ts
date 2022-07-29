@@ -221,7 +221,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     this.electionKey = key;
     this.leader = this.extractLeaderFromKey(key);
     this.emit('leader-change', this.leader);
-    CoreIpc.fireEvent("leader:select", this.leader);
+    CoreIpc.fireEvent({type: "leader:select", data: this.leader});
     this._leaderSelectPromise.resolve(this.leader);
     if(this.leader === process.env.SIGN_WALLET_ADDRESS)
       console.log(`********* I am the leader now *********`);

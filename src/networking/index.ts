@@ -126,7 +126,7 @@ class Network extends Events {
       chalk.blue(` ${connection.remotePeer.toB58String()}`)
     )
     this.emit('peer:connect', connection.remotePeer)
-    coreIpc.fireEvent("peer:connect", connection.remotePeer.toB58String())
+    coreIpc.fireEvent({type: "peer:connect", data: connection.remotePeer.toB58String()})
   }
 
   // @ts-ignore
@@ -138,13 +138,13 @@ class Network extends Events {
       chalk.red(` ${connection.remotePeer.toB58String()}`)
     );
     this.emit('peer:disconnect', connection.remotePeer)
-    coreIpc.fireEvent("peer:disconnect", connection.remotePeer.toB58String())
+    coreIpc.fireEvent({type: "peer:disconnect", data: connection.remotePeer.toB58String()})
   }
 
   // @ts-ignore
   async onPeerDiscovery(peerId) {
     this.emit('peer:discovery', peerId)
-    coreIpc.fireEvent("peer:discovery", peerId.toB58String())
+    coreIpc.fireEvent({type: "peer:discovery", data: peerId.toB58String()})
     console.log('found peer');
     try {
       const peerInfo = await this.libp2p.peerRouting.findPeer(peerId)

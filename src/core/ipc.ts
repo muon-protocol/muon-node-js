@@ -9,6 +9,11 @@ const broadcastQueue = new QueueProducer(BROADCAST_CHANNEL)
 const GLOBAL_EVENT_CHANNEL = 'core-global-events'
 const coreGlobalEvents = new MessagePublisher(GLOBAL_EVENT_CHANNEL)
 
+export type CoreGlobalEvent = {
+  type: string,
+  data: any
+}
+
 /**
  * @param method {string} - ipc method name
  * @param params {Object} - params for ipc method
@@ -19,7 +24,7 @@ const coreGlobalEvents = new MessagePublisher(GLOBAL_EVENT_CHANNEL)
  * @param options.pid - define cluster PID to running ipc method
  * @returns {Promise<Object>}
  */
-function call(method, params, options) {
+function call(method: string, params: any, options: any) {
   return callQueue.send({method, params}, options);
 }
 
@@ -27,19 +32,19 @@ function broadcast(data, options) {
   return broadcastQueue.send(data, options)
 }
 
-function fireEvent(type, ...args) {
-  coreGlobalEvents.send({type, args})
+function fireEvent(event: CoreGlobalEvent) {
+  coreGlobalEvents.send(event)
 }
 
 async function generateTssKey(keyId) {
-  let key = await this.call('generate-tss-key', {keyId}, {});
+  let key = await call('generate-tss-key', {keyId}, {});
   // console.log("CoreIpc.generateTssKey", JSON.stringify(key,null, 2))
   // console.log("CoreIpc.generateTssKey", key.partners)
   return DistributedKey.load(null, key)
 }
 
 async function getTssKey(keyId, options={}) {
-  const key = await this.call('get-tss-key', {keyId}, options);
+  const key = await call('get-tss-key', {keyId}, options);
   return DistributedKey.load(null, key)
 }
 
