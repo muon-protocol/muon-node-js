@@ -1,4 +1,4 @@
-const CallablePlugin = require('../base/callable-plugin')
+import CallablePlugin from '../base/callable-plugin'
 const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
 const Party = require('./party')
@@ -45,6 +45,7 @@ class TssPlugin extends CallablePlugin {
   availablePeers = {}
 
   constructor(...params) {
+    // @ts-ignore
     super(...params)
   }
 
@@ -76,10 +77,13 @@ class TssPlugin extends CallablePlugin {
     // console.log(`[${process.pid}] peer disconnect`, peerId)
     delete this.availablePeers[disconnectedPeer];
     if(this.tssParty){
+      // @ts-ignore
       for(let wallet in this.tssParty.partners){
+        // @ts-ignore
         let {peerId} = this.tssParty.partners[wallet]
         if(peerId === disconnectedPeer){
           console.log(`TssPlugin: remove online peer ${peerId}`)
+          // @ts-ignore
           this.tssParty.setWalletPeer(wallet, null);
           return
         }
@@ -97,6 +101,7 @@ class TssPlugin extends CallablePlugin {
         if (!!this.tssParty) {
           if (peerWallet) {
             // console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
+            // @ts-ignore
             this.tssParty.setWalletPeer(peerWallet, peerId);
           }
         } else {
@@ -127,6 +132,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   get GroupAddress() {
+    // @ts-ignore
     return this.isReady ? this.tssKey.address : null;
   }
 
@@ -198,11 +204,15 @@ class TssPlugin extends CallablePlugin {
 
         while (!this.isReady) {
           await timeout(5000);
+          // @ts-ignore
           let onlinePartners = Object.values(this.tssParty.onlinePartners)
+          // @ts-ignore
             .filter(({wallet:w}) => w !== process.env.SIGN_WALLET_ADDRESS);
 
           let statuses = await Promise.all(onlinePartners.map(p => {
+            // @ts-ignore
             return this.remoteCall(
+                // @ts-ignore
               p.peer,
               RemoteMethods.checkTssStatus
             ).catch(e => 'error')
@@ -213,6 +223,7 @@ class TssPlugin extends CallablePlugin {
           statuses = statuses.filter((s, i) => filter[i]);
 
           if(statuses.length >= this.collateralPlugin.TssThreshold){
+            // @ts-ignore
             await this.tryToRecoverTssKey(onlinePartners.map(p => p.wallet));
           }
         }
@@ -222,9 +233,12 @@ class TssPlugin extends CallablePlugin {
 
   async isNeedToCreateKey(){
     let myWallet = process.env.SIGN_WALLET_ADDRESS;
+    // @ts-ignore
     let onlinePartners = Object.values(this.tssParty.onlinePartners).filter(p => (p.wallet !== myWallet))
     let statuses = await Promise.all(onlinePartners.map(p => {
+      // @ts-ignore
       return this.remoteCall(
+          // @ts-ignore
         p.peer,
         RemoteMethods.checkTssStatus
       ).catch(e => 'error')
@@ -232,6 +246,7 @@ class TssPlugin extends CallablePlugin {
 
     // TODO: is this ok?
     let numReadyNodes = statuses.map(s => (s.isReady?1:0))
+    // @ts-ignore
       .reduce((sum, r) => (sum+r), 0);
 
     return numReadyNodes < this.collateralPlugin.TssThreshold;
@@ -275,6 +290,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   async tryToRecoverTssKey(partners){
+    // @ts-ignore
     partners = partners.map(w => this.tssParty.partners[w]);
 
     if(partners.length < this.collateralPlugin.TssThreshold)
@@ -305,7 +321,9 @@ class TssPlugin extends CallablePlugin {
         }
       )
       .filter(s => !!s)
+    // @ts-ignore
     if (shares.length < this.tssParty.t) {
+      // @ts-ignore
       console.log(`Need's of ${this.tssParty.t} result to recover the Key, but received ${shares.n} result.`)
       return false;
     }
@@ -340,6 +358,7 @@ class TssPlugin extends CallablePlugin {
         key = await this.keyGen(this.tssParty)
       } while (tssModule.HALF_N.lt(key.getTotalPubKey().x));
 
+      // @ts-ignore
       let keyPartners = key.partners.map(wallet => this.tssParty.partners[wallet])
       let callResult = await Promise.all(keyPartners.map(({wallet, peer}) => {
         if (wallet === process.env.SIGN_WALLET_ADDRESS)
@@ -350,6 +369,7 @@ class TssPlugin extends CallablePlugin {
           peer,
           RemoteMethods.storeTssKey,
           {
+            // @ts-ignore
             party: this.tssParty.id,
             key: key.id,
           },
@@ -366,6 +386,7 @@ class TssPlugin extends CallablePlugin {
 
       return key;
     } catch (e) {
+      // @ts-ignore
       console.error('TssPlugin.tryToCreateTssKey', e, e.stack);
     }
   }
@@ -415,6 +436,7 @@ class TssPlugin extends CallablePlugin {
    * @returns {Promise<DistributedKey>}
    */
   async createKey(party, options={}) {
+    // @ts-ignore
     let {id, maxPartners, timeout=15} = options;
     // 1- create new key
     let key = new DKey(party, id, 15000)
@@ -434,9 +456,11 @@ class TssPlugin extends CallablePlugin {
 
     if(maxPartners && maxPartners > 0) {
       /** exclude current node and add it later */
+      // @ts-ignore
       partners = partners.filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS))
       partners = [
         /** self */
+        // @ts-ignore
         party.partners[process.env.SIGN_WALLET_ADDRESS],
         /** randomly select (maxPartners - 1) from others */
         ...shuffle(partners).slice(0, maxPartners - 1)
@@ -450,6 +474,7 @@ class TssPlugin extends CallablePlugin {
 
     let callResult = await Promise.all(
       partners
+      // @ts-ignore
         .map(({peer, wallet}) => {
           if(wallet === process.env.SIGN_WALLET_ADDRESS)
             return true;
@@ -459,6 +484,7 @@ class TssPlugin extends CallablePlugin {
             {
               party: party.id,
               key: key.id,
+              // @ts-ignore
               partners: partners.map(({wallet}) => wallet)
             },
             {taskId, timeout: 15000}
@@ -466,6 +492,7 @@ class TssPlugin extends CallablePlugin {
         })
     )
     // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
+    // @ts-ignore
     key.partners = partners.filter((p, i) => callResult[i]!=='error').map(p => p.wallet)
     if(key.partners.length < this.TSS_THRESHOLD){
       console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
@@ -517,7 +544,9 @@ class TssPlugin extends CallablePlugin {
   }
 
   getPartyPeers(party) {
+    // @ts-ignore
     let partners = Object.values(party.partners).filter(({peerId}) => peerId !== process.env.PEER_ID)
+    // @ts-ignore
     let peerIds = partners.map(({peerId}) => peerId)
     return Promise.all(peerIds.map(peerId => this.findPeer(peerId).catch(e => null)))
   }
@@ -540,7 +569,9 @@ class TssPlugin extends CallablePlugin {
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
         // TODO: is this message from 'wallet'
         if (!!this.tssParty) {
+          // @ts-ignore
           this.tssParty.setWalletPeer(callerInfo.wallet, peerId);
+          // @ts-ignore
           this.remoteCall(
             peerId,
             RemoteMethods.iAmHere
@@ -588,22 +619,29 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.__recoverMyKey', data, callerInfo.wallet)
     let {tssParty, tssKey} = this
 
+    // @ts-ignore
     if (!Object.keys(tssParty.partners).includes(callerInfo.wallet))
       return null;
 
+    // @ts-ignore
     let {nonce: nonceId} = data
+    // @ts-ignore
     if (!!tssKey && nonceId === tssKey.id)
       return null;
 
     let nonce = keysCache.get(nonceId);
     await nonce.waitToFulfill()
+    // @ts-ignore
     let keyPart = tssModule.addKeys(nonce.share, tssKey.share);
     return {
+      // @ts-ignore
       id: tssKey.id,
       recoveryShare: `0x${keyPart.toString(16)}`,
       // distributedKey public
+      // @ts-ignore
       publicKey: `${tssKey.publicKey.encode('hex')}`,
       // distributed key address
+      // @ts-ignore
       address: tssModule.pub2addr(tssKey.publicKey)
     }
   }
@@ -621,6 +659,7 @@ class TssPlugin extends CallablePlugin {
   async __createKey(data = {}) {
     // console.log('TssPlugin.__createKey', data)
     let {parties} = this
+    // @ts-ignore
     let {party, key: keyId} = data
     if (!parties[party]) {
       console.log('TssPlugin.__createKey>> party not fount on this node id: ' + party);
@@ -655,6 +694,7 @@ class TssPlugin extends CallablePlugin {
   async __distributeKey(data = {}, callerInfo) {
     // console.log('TssPlugin.__distributeKey', data)
     let {parties} = this
+    // @ts-ignore
     let {commitment, party, key: keyId, partners, pubKeys, f, h} = data
     if (!parties[party]) {
       console.log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party)
@@ -690,6 +730,7 @@ class TssPlugin extends CallablePlugin {
   async __storeTssKey(data = {}, callerInfo) {
     // TODO: problem condition: request arrive when tss is ready
     // console.log('TssPlugin.__storeTssKey', data)
+    // @ts-ignore
     let {party: partyId, key: keyId} = data
     let party = this.getParty(partyId)
     let key = this.getSharedKey(keyId);
@@ -715,6 +756,7 @@ class TssPlugin extends CallablePlugin {
   async __iAmHere(data={}, callerInfo) {
     // console.log('TssPlugin.__iAmHere', data)
     if (!!this.tssParty) {
+      // @ts-ignore
       this.tssParty.setWalletPeer(callerInfo.wallet, callerInfo.peerId)
     }
   }
@@ -723,9 +765,10 @@ class TssPlugin extends CallablePlugin {
   async __checkTssStatus(data={}, callerInfo) {
     return {
       isReady: this.isReady,
+      // @ts-ignore
       address: this.tssKey?.address,
     }
   }
 }
 
-module.exports = TssPlugin;
+export default TssPlugin;

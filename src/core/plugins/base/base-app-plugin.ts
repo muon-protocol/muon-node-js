@@ -1,4 +1,4 @@
-const CallablePlugin = require('./callable-plugin')
+import CallablePlugin from './callable-plugin'
 const Request = require('../../../gateway/models/Request')
 const {makeAppDependency} = require('./app-dependencies')
 const { getTimestamp, timeout } = require('../../../utils/helpers')
@@ -19,6 +19,7 @@ class BaseAppPlugin extends CallablePlugin {
   readOnlyMethods = []
 
   constructor(...args) {
+    // @ts-ignore
     super(...args)
 
     /**
@@ -31,6 +32,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
+    // @ts-ignore
     this.muon._apps[this.APP_NAME] = this;
 
     if(this.dependencies){
@@ -84,7 +86,7 @@ class BaseAppPlugin extends CallablePlugin {
   /**
    * Override BasePlugin BROADCAST_CHANNEL
    */
-  get BROADCAST_CHANNEL() {
+  protected get BROADCAST_CHANNEL() {
     // return this.APP_NAME ? `muon/${this.APP_NAME}/request/broadcast` : null
     return this.APP_NAME ? super.BROADCAST_CHANNEL : null
   }
@@ -93,12 +95,15 @@ class BaseAppPlugin extends CallablePlugin {
   async __onRequestArrived({method, params, nSign, mode, callId: gatewayCallId, gwSign}) {
     let t0 = Date.now()
     let startedAt = getTimestamp()
+    if(!nSign && !process.env.NUM_SIGN_TO_CONFIRM) {
+      throw 'nSign and NUM_SIGN_TO_CONFIRM is undefined';
+    }
     nSign = !!nSign
       ? parseInt(nSign)
-      : parseInt(process.env.NUM_SIGN_TO_CONFIRM)
+      : parseInt(process.env.NUM_SIGN_TO_CONFIRM || "0")
 
     if(this.getNSign)
-      nSign = this.getNSign(nSign)
+      nSign = this.getNSign()
 
     if(!this.tssPlugin.isReady)
       throw {message: "Tss not initialized"}
@@ -168,6 +173,7 @@ class BaseAppPlugin extends CallablePlugin {
 
         let sign = this.makeSignature(newRequest, result, resultHash)
         if (!!memWrite) {
+          // @ts-ignore
           sign.memWriteSignature = memWrite.signature
         }
         this.requestManager.addSignature(newRequest.hash, sign.owner, sign);
@@ -246,6 +252,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
+  // @ts-ignore
   getMemWrite(request, result) {
     if (this.hasOwnProperty('onMemWrite')) {
       let memPlugin = this.muon.getPlugin('memory');
@@ -382,17 +389,19 @@ class BaseAppPlugin extends CallablePlugin {
     let party = nonce.party;
 
     let partners = Object.values(party.partners)
+      // @ts-ignore
       .filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(wallet)))
 
     this.requestManager.setPartnerCount(request.hash, partners.length + 1);
 
     // TODO: remove async
+    // @ts-ignore
     partners.map(async ({peerId, wallet}) => {
       return this.remoteCall(peerId, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT, taskId: `keygen-${nonce.id}`})
         .then(this.__onRemoteSignRequest.bind(this))
         .catch(e => {
           // console.log('base-tss-app-plugin: on broadcast request error', e)
-          return this.__onRemoteSignRequest(null, {
+          return this.__onRemoteSignRequest({}, {
             request: request.hash,
             peerId,
             ...e
@@ -453,6 +462,7 @@ class BaseAppPlugin extends CallablePlugin {
       return;
     }
     try {
+      // @ts-ignore
       let {sign, memWrite} = data;
       // let request = await Request.findOne({_id: sign.request})
       let request = this.requestManager.getRequest(sign.request)
@@ -532,4 +542,4 @@ class BaseAppPlugin extends CallablePlugin {
   }
 }
 
-module.exports = BaseAppPlugin
+export default BaseAppPlugin;

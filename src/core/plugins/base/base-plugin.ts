@@ -4,8 +4,8 @@ const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const SharedMem = require('../../../common/shared-memory')
 
-module.exports = class BasePlugin extends Events{
-  muon = null;
+export default class BasePlugin extends Events{
+  muon;
   configs = {}
 
   constructor(muon, configs){
@@ -39,7 +39,7 @@ module.exports = class BasePlugin extends Events{
     return superClass.constructor.name
   }
 
-  get BROADCAST_CHANNEL(){
+  protected get BROADCAST_CHANNEL(){
     if(this.__broadcastHandlerMethod === undefined)
       return null;
     return `${this.ConstructorName}.${this.__broadcastHandlerMethod}`
@@ -49,7 +49,6 @@ module.exports = class BasePlugin extends Events{
     let broadcastChannel = this.BROADCAST_CHANNEL
     /*eslint no-undef: "error"*/
     if (broadcastChannel) {
-
       if(process.env.VERBOSE) {
         console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
       }
@@ -63,7 +62,11 @@ module.exports = class BasePlugin extends Events{
       let superClass = Object.getPrototypeOf(this);
       throw `${superClass.constructor.name} is not declared broadcast handler`;
     }
-    this.muon.getPlugin('broadcast').broadcast(this.BROADCAST_CHANNEL, data);
+    this.muon.getPlugin('broadcast')
+        .broadcastToChannel(this.BROADCAST_CHANNEL, data)
+        .catch(e => {
+          console.log(`${this.ConstructorName}.broadcast`, e)
+        })
   }
 
   sharedMemKey(key) {

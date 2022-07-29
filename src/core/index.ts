@@ -1,23 +1,22 @@
-const Muon = require('./muon');
+import Muon from './muon'
 let mongoose = require('mongoose')
 const path = require('path');
 const fs = require('fs');
 const {dynamicExtend} = require('./utils')
-const BaseApp = require('./plugins/base/base-app-plugin')
+import BaseApp from './plugins/base/base-app-plugin'
 require('./global')
 const loadConfigs = require('../networking/configurations')
 const {utils: {sha3}} = require('web3')
 
-function getEnvPlugins() {
+async function getEnvPlugins() {
   let pluginsStr = process.env['MUON_PLUGINS']
   if (!pluginsStr)
     return {}
-  return pluginsStr.split('|').reduce((res, key) => {
-    return {
-      ...res,
-      [`__${key}__`]: [require(`./plugins/${key}`), {}]
-    }
-  }, {})
+  let result = {};
+  pluginsStr.split('|').forEach(async key => {
+    result[`__${key}__`] = [(await import(`./plugins/${key}`)).default, {}]
+  })
+  return result
 }
 
 function prepareApp(app, fileName) {
@@ -96,20 +95,21 @@ async function start() {
     //   throw {message: `Node version most be >="16.0.0". current version is "${process.versions.node}"`}
     muon = new Muon({
       plugins: {
-        'collateral': [require('./plugins/collateral-info'), {}],
-        'remote-call': [require('./plugins/remote-call'), {}],
-        'gateway-interface': [require('./plugins/gateway-Interface'), {}],
-        'ipc': [require('./plugins/core-ipc-plugin'), {}],
-        'ipc-handlers': [require('./plugins/core-ipc-handlers'), {}],
-        'broadcast': [require('./plugins/broadcast'), {}],
+        'collateral': [(await import('./plugins/collateral-info')).default, {}],
+        'remote-call': [(await import('./plugins/remote-call')).default, {}],
+        'gateway-interface': [(await import('./plugins/gateway-Interface')).default, {}],
+        'ipc': [(await import('./plugins/core-ipc-plugin')).default, {}],
+        'ipc-handlers': [(await import('./plugins/core-ipc-handlers')).default, {}],
+        'broadcast': [(await import('./plugins/broadcast')).default, {}],
         // 'content-verify': [require('./plugins/content-verify-plugin'), {}],
-        'content': [require('./plugins/content-app'), {}],
-        'memory': [require('./plugins/memory-plugin'), {}],
-        'tss-plugin': [require('./plugins/tss-plugin'), {}],
-        'tss-party-search': [require('./plugins/tss-party-search'), {}],
-        'health-check': [require('./plugins/health-check'), {}],
-        ...getEnvPlugins(),
+        'content': [(await import('./plugins/content-app')).default, {}],
+        'memory': [(await import('./plugins/memory-plugin')).default, {}],
+        'tss-plugin': [(await import('./plugins/tss-plugin')).default, {}],
+        'tss-party-search': [(await import('./plugins/tss-party-search')).default, {}],
+        'health-check': [(await import('./plugins/health-check')).default, {}],
+        ...await getEnvPlugins(),
         ...getCustomApps(),
+        // @ts-ignore
         ...await getGeneralApps(),
       },
       net,

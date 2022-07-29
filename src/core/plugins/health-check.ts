@@ -1,4 +1,4 @@
-const CallablePlugin = require('./base/callable-plugin')
+import CallablePlugin from './base/callable-plugin'
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 const {timeout} = require('../../utils/helpers')
 const OS = require('os')
@@ -13,7 +13,7 @@ const RemoteMethods = {
 @remoteApp
 class HealthCheck extends CallablePlugin {
   APP_NAME="health"
-  healthCheckEndpoint = null;
+  healthCheckEndpoint: string;
   checkingTime = {}
 
   async onStart() {
@@ -70,24 +70,29 @@ class HealthCheck extends CallablePlugin {
     let tssPlugin = this.muon.getPlugin('tss-plugin')
 
     let partners = Object.values(tssPlugin.tssParty.partners)
+    // @ts-ignore
       .filter(({peer, wallet}) => (!!peer && wallet !== process.env.SIGN_WALLET_ADDRESS))
 
     let result = {
+      // @ts-ignore
       [process.env.SIGN_WALLET_ADDRESS]: {
         status: "CURRENT",
         ... await this.getNodeStatus()
       }
     }
 
+    // @ts-ignore
     const peerList = partners.map(({peer}) => peer)
 
     let calls = peerList.map(peer => {
+      // @ts-ignore
       return this.remoteCall(peer, RemoteMethods.CheckHealth, {log: true})
         .catch(e => null)
     });
     let responses = await Promise.all(calls)
 
     for(let i=0 ; i<responses.length ; i++){
+      // @ts-ignore
       result[partners[i].wallet] = responses[i];
     }
 
@@ -96,6 +101,7 @@ class HealthCheck extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.CheckHealth)
   async _onHealthCheck(data={}) {
+    // @ts-ignore
     if(data?.log)
       console.log(`===== HealthCheck._onHealthCheck =====`, new Date());
     return {
@@ -105,4 +111,4 @@ class HealthCheck extends CallablePlugin {
   }
 }
 
-module.exports = HealthCheck;
+export default HealthCheck;

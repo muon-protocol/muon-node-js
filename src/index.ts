@@ -53,8 +53,6 @@ async function boot() {
       await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
     });
 
-    // /** Start core */
-    // require('./core').start();
     /** Start application clusters */
     for (let i = 0; i < clusterCount; i++) {
       const child:Worker|null = runNewApplicationCluster();
@@ -66,7 +64,7 @@ async function boot() {
     }
   } else {
     console.log(`application cluster start pid:${process.pid}`)
-    // require('./core').start();
+    require('./core').start();
   }
 }
 

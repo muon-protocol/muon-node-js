@@ -1,7 +1,7 @@
-const BasePlugin = require('./base/base-plugin.js')
+import BasePlugin from'./base/base-plugin'
 const NetworkingIpc = require('../../networking/ipc')
 
-class RemoteCall extends BasePlugin {
+export default class RemoteCall extends BasePlugin {
   async handleCall(callId, method, params, callerWallet, responseStream, peerId){
     return await this.emit(`${method}`, params, {wallet: callerWallet, peerId})
   }
@@ -21,5 +21,3 @@ class RemoteCall extends BasePlugin {
     return NetworkingIpc.forwardRemoteCall(peer, method, params, options)
   }
 }
-
-module.exports = RemoteCall;

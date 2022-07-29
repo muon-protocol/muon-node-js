@@ -1,8 +1,8 @@
-const BasePlugin = require('./base/base-plugin')
+import BasePlugin from './base/base-plugin'
 const TimeoutPromise = require('../../common/timeout-promise');
 const { call: networkingIpcCall } = require('../../networking/ipc')
 
-class CollateralInfoPlugin extends BasePlugin{
+export default class CollateralInfoPlugin extends BasePlugin{
 
   groupInfo = null;
   networkInfo = null;
@@ -75,18 +75,22 @@ class CollateralInfoPlugin extends BasePlugin{
   }
 
   get GroupId(){
+    // @ts-ignore
     return this.groupInfo?.group;
   }
 
   get TssThreshold(){
+    // @ts-ignore
     return this.networkInfo?.tssThreshold;
   }
 
   get MinGroupSize(){
+    // @ts-ignore
     return this.networkInfo?.minGroupSize;
   }
 
   get MaxGroupSize(){
+    // @ts-ignore
     return this.networkInfo?.maxGroupSize;
   }
 
@@ -98,5 +102,3 @@ class CollateralInfoPlugin extends BasePlugin{
     return this.loading.isFulfilled;
   }
 }
-
-module.exports = CollateralInfoPlugin;

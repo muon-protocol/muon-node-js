@@ -5,6 +5,7 @@ import { base16 } from "multiformats/bases/base16"
 
 async function createCIDFromString(str) {
   const bytes = dagPB.encode({
+    // @ts-ignore
     Data: new TextEncoder('utf8').encode(`${str}`),
     Links: []
   })

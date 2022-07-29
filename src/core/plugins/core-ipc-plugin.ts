@@ -1,9 +1,9 @@
-const BasePlugin = require('./base/base-plugin')
+import BasePlugin from './base/base-plugin'
 const { QueueConsumer } = require('../../common/message-bus')
 
-const IPC_CHANNEL = '/muon/core/ipc';
+export const IPC_CHANNEL = '/muon/core/ipc';
 
-class CoreIpcPlugin extends BasePlugin {
+export default class CoreIpcPlugin extends BasePlugin {
   /**
    * @type {QueueConsumer}
    */
@@ -30,6 +30,3 @@ class CoreIpcPlugin extends BasePlugin {
     }
   }
 }
-
-module.exports = CoreIpcPlugin;
-module.exports.IPC_CHANNEL = IPC_CHANNEL

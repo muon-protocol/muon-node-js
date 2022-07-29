@@ -118,8 +118,7 @@ class Network extends Events {
   }
 
   // @ts-ignore
-  onPeerConnect(event) {
-    let connection = event.detail;
+  onPeerConnect(connection) {
     console.log(
       emoji.get('moon'),
       chalk.blue(' Node connected to '),
@@ -131,8 +130,7 @@ class Network extends Events {
   }
 
   // @ts-ignore
-  onPeerDisconnect(event) {
-    let connection = event.detail;
+  onPeerDisconnect(connection) {
     console.log(
       emoji.get('moon'),
       chalk.red(' Node disconnected'),
@@ -144,8 +142,7 @@ class Network extends Events {
   }
 
   // @ts-ignore
-  async onPeerDiscovery(event) {
-    let peerId = event.detail
+  async onPeerDiscovery(peerId) {
     this.emit('peer:discovery', peerId)
     coreIpc.fireEvent("peer:discovery", peerId.toB58String())
     console.log('found peer');

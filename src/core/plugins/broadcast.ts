@@ -1,10 +1,10 @@
-const BasePlugin = require('./base/base-plugin')
+import BasePlugin from './base/base-plugin'
 const { call: networkingIpcCall } = require('../../networking/ipc')
 const { QueueConsumer } = require('../../common/message-bus')
 
-const BROADCAST_CHANNEL = 'core-broadcast';
+export const BROADCAST_CHANNEL = 'core-broadcast';
 
-class BroadcastPlugin extends BasePlugin {
+export default class BroadcastPlugin extends BasePlugin {
   /**
    * @type {QueueConsumer}
    */
@@ -17,6 +17,7 @@ class BroadcastPlugin extends BasePlugin {
   }
 
   async onBroadcastReceived(broadcast={}){
+    // @ts-ignore
     const {data: {channel, message}, callerInfo}  = broadcast;
 
     if(!channel)
@@ -26,17 +27,14 @@ class BroadcastPlugin extends BasePlugin {
       return await this.emit(channel, message, callerInfo);
     }
     else {
-      throw {message: `broadcast channel "${method}" is not handled`}
+      throw {message: `broadcast channel "${channel}" is not handled`}
     }
   }
 
-  async broadcast(channel, message) {
+  async broadcastToChannel(channel, message) {
     if(channel===undefined || message===undefined)
       throw {message: "Broadcast channel/message must be defined"}
     let response = await networkingIpcCall("broadcast-message", {channel, message});
     // TODO: is need to check response is 'Ok' or not?
   }
 }
-
-module.exports = BroadcastPlugin;
-module.exports.BROADCAST_CHANNEL = BROADCAST_CHANNEL;

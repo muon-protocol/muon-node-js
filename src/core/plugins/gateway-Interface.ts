@@ -1,4 +1,4 @@
-const BasePlugin = require('./base/base-plugin')
+import BasePlugin from './base/base-plugin'
 const { QueueConsumer } = require('../../common/message-bus')
 const { promisify } = require("util");
 const Redis = require('redis');
@@ -25,9 +25,9 @@ responseRedis.on('error', function(error) {
   console.error(error);
 })
 
-let gatewayRequests = null
+let gatewayRequests;
 
-class GatewayInterface extends BasePlugin{
+export default class GatewayInterface extends BasePlugin{
 
   async __handleCallResponse(response){
     if(response.confirmed){
@@ -65,6 +65,7 @@ class GatewayInterface extends BasePlugin{
         e = {message: e};
       // console.error('gateway-interface error')
       // console.dir(e, {depth: null})
+      // @ts-ignore
       let {message, data: errorData} = e;
       return {
         error: message || "GatewayInterface: Unknown error occurred",
@@ -90,5 +91,3 @@ class GatewayInterface extends BasePlugin{
     }
   }
 }
-
-module.exports = GatewayInterface;

@@ -1,4 +1,4 @@
-const CallablePlugin = require('./base/callable-plugin')
+import CallablePlugin from './base/callable-plugin'
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const crypto = require('../../utils/crypto')
@@ -99,15 +99,13 @@ class MemoryPlugin extends CallablePlugin {
       ttl,
       nSign,
       data,
+      hash: '',
+      signatures: []
     }
-    let hash = this.hashMemWrite(memWrite)
-    let signatures = [crypto.sign(hash)]
+    memWrite.hash = this.hashMemWrite(memWrite)
+    // @ts-ignore
+    memWrite.signatures = [crypto.sign(memWrite.hash)]
 
-    memWrite = {
-      ...memWrite,
-      hash,
-      signatures,
-    }
     this.storeMemWrite(memWrite);
     this.broadcastWrite(memWrite);
   }
@@ -116,6 +114,7 @@ class MemoryPlugin extends CallablePlugin {
     let {timestamp, ttl} = memWrite;
     let expireAt = null;
     if(!!timestamp && !!ttl){
+      // @ts-ignore
       expireAt = (timestamp + ttl) * 1000;
     }
     let mem = new Memory({
@@ -126,10 +125,8 @@ class MemoryPlugin extends CallablePlugin {
   }
 
   async readAppMem(app, query, options={}) {
-    let {
-      multi=false,
-      distinct=null,
-    } = options;
+    // @ts-ignore
+    let {multi=false, distinct=null,} = options;
 
     if(!!distinct){
       return Memory.distinct(distinct, {...query, type: Memory.types.App, owner: app})
@@ -145,10 +142,8 @@ class MemoryPlugin extends CallablePlugin {
   }
 
   async readNodeMem(query, options={}) {
-    let {
-      multi=false,
-      distinct=null,
-    } = options
+    // @ts-ignore
+    let {multi=false, distinct=null,} = options
 
     if(!!distinct) {
       return Memory.distinct(distinct, query)
@@ -189,4 +184,4 @@ class MemoryPlugin extends CallablePlugin {
   }
 }
 
-module.exports = MemoryPlugin;
+export default MemoryPlugin;

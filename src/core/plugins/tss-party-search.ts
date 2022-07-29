@@ -1,4 +1,4 @@
-const CallablePlugin = require('./base/callable-plugin')
+import CallablePlugin from './base/callable-plugin'
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const {timeout} = require('../../utils/helpers')
@@ -12,14 +12,14 @@ const RemoteMethods = {
 }
 
 class Search {
-  id = null;
-  t = null;
-  max = null;
+  id: string;
+  t: number;
+  max: number;
   parties = {};
-  constructor(t, max){
+  constructor(t: number, max: number){
     this.t = t
     this.max = max;
-    this.id = `S-${Date.now()}-${parseInt(Math.random()*9999999)}`
+    this.id = `S-${Date.now()}-${Math.floor(Math.random()*9999999)}`
   }
 
   addResponse(response){
@@ -38,8 +38,10 @@ class Search {
     let {t: TSS_THRESHOLD} = this
     //
     return Object.entries(this.parties).map(([partyId, result]) => {
+      // @ts-ignore
       let {responses} = result
       let responders = Object.keys(responses)
+      // @ts-ignore
       if(responders.length < TSS_THRESHOLD)
         return null;
 
@@ -48,6 +50,7 @@ class Search {
       /**
        * Accumulate all partners from all responses
        */
+          // @ts-ignore
       let allPartners = Array.prototype.concat.apply([], Object.values(responses).map(r => r.partners));
 
       /**
@@ -65,16 +68,18 @@ class Search {
        * that partner will include in party
        */
       allPartners = allPartners.filter(_p => {
-        let agreement = Object.values(responses).reduce((acc, res) => {
+        let agreement = Object.values(responses).reduce((acc: number, res) => {
           /**
            * check this response contains partner [_p] pr not.
            */
+          // @ts-ignore
           for(let p of res.partners){
             if(p.wallet === _p.wallet)
               return acc+1;
           }
           return acc
         }, 0);
+        // @ts-ignore
         return agreement >= TSS_THRESHOLD;
       })
       // console.log({allPartners})
@@ -82,6 +87,7 @@ class Search {
       /**
        * check final partners length
        */
+      // @ts-ignore
       if(allPartners.length < TSS_THRESHOLD)
         return null;
 
@@ -93,7 +99,9 @@ class Search {
   }
 
   isFulfilled(){
+    // @ts-ignore
     let {t, responses} = this;
+    // @ts-ignore
     return Object.keys(responses).length >= t
   }
 
@@ -127,6 +135,7 @@ class TssPartySearchPlugin extends CallablePlugin {
         if(tssPlugin.isReady) {
           let {searchId, peerId} = msg;
           let {tssParty} = tssPlugin
+          // @ts-ignore
           await this.remoteCall(
             peerId,
             RemoteMethods.searchPartyResult,
@@ -138,6 +147,7 @@ class TssPartySearchPlugin extends CallablePlugin {
                 max: tssParty.max,
               },
               wallet: process.env.SIGN_WALLET_ADDRESS,
+              // @ts-ignore
               partners: Object.values(tssParty.partners).map(({wallet, peerId}) => ({wallet, peerId}))
             }
           )
@@ -176,6 +186,7 @@ class TssPartySearchPlugin extends CallablePlugin {
           return parties[0];
         }
       } catch (e) {
+        // @ts-ignore
         console.log('TsPlugin.searchParty', e, e.stack)
       }
       timeout(5000);
@@ -193,10 +204,11 @@ class TssPartySearchPlugin extends CallablePlugin {
   @remoteMethod(RemoteMethods.searchPartyResult)
   async __searchPartyResult(data={}){
     // console.log('TssPlugin.__searchPartyResult', data)
+    // @ts-ignore
     let {searchId, ...response} = data
     let search = this.searches[searchId]
     search.addResponse(response);
   }
 }
 
-module.exports = TssPartySearchPlugin;
+export default TssPartySearchPlugin;

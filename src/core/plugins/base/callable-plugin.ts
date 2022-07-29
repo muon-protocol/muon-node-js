@@ -1,6 +1,6 @@
-const BasePlugin = require('./base-plugin')
+import BasePlugin from './base-plugin'
 
-module.exports = class CallablePlugin extends BasePlugin {
+export default class CallablePlugin extends BasePlugin {
 
   remoteCall(peer, methodName, data, options){
     let remoteCall = this.muon.getPlugin('remote-call')
@@ -29,7 +29,7 @@ module.exports = class CallablePlugin extends BasePlugin {
     ipc.on(`call/${title}`, method)
   }
 
-  remoteMethodEndpoint(title) {
+  remoteMethodEndpoint(title): string {
     let superClass = Object.getPrototypeOf(this);
     return `${superClass.constructor.name}.${title}`
   }

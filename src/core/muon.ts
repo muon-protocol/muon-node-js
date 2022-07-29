@@ -9,7 +9,7 @@ const { GLOBAL_EVENT_CHANNEL, fireEvent } = require('./ipc')
 const { call: networkingIpcCall } = require('../networking/ipc')
 
 
-class Muon extends Events {
+export default class Muon extends Events {
   configs = {}
   _plugins = {}
   _apps = {}
@@ -21,6 +21,7 @@ class Muon extends Events {
   }
 
   async initialize() {
+    // @ts-ignore
     await this._initializePlugin(this.configs.plugins)
   }
 
@@ -69,6 +70,7 @@ class Muon extends Events {
 
   async onGlobalEventReceived(data={}) {
     // console.log(`[${process.pid}] Muon.onGlobalEventReceived`, data)
+    // @ts-ignore
     this.emit(data.type, ...data.args);
   }
 
@@ -94,5 +96,3 @@ class Muon extends Events {
     }
   }
 }
-
-module.exports = Muon

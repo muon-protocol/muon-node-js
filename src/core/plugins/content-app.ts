@@ -1,4 +1,4 @@
-const CallablePlugin = require('./base/callable-plugin')
+import CallablePlugin from './base/callable-plugin'
 const Content = require('../../gateway/models/Content')
 const all = require('it-all')
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
@@ -76,16 +76,19 @@ class ContentApp extends CallablePlugin {
 
   @gatewayMethod('get_content')
   async responseToGatewayRequestData(data={}){
+    // @ts-ignore
     let {cid, format='string'} = data.params;
     let content = await Content.findOne({cid});
     if(content){
       return this.prepareOutput(content.content, format);
     }else{
+      // @ts-ignore
       let cid = loadCID(data.cid);
       let providers = await all(this.muon.libp2p.contentRouting.findProviders(cid, {timeout: 5000}))
       for(let provider of providers){
         if(provider.id.toB58String() !== process.env.PEER_ID){
           let peer = await this.findPeer(provider.id);
+          // @ts-ignore
           let request = await this.remoteCall(peer, 'get_content', data)
           return this.prepareOutput(request, format)
         }
@@ -104,4 +107,4 @@ class ContentApp extends CallablePlugin {
   }
 }
 
-module.exports = ContentApp;
+export default ContentApp;
