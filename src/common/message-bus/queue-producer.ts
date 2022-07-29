@@ -1,4 +1,5 @@
 const BaseMessageQueue = require('./base-message-queue')
+import { RemoteCallConfig } from './types'
 const TimeoutPromise = require('../timeout-promise')
 const NodeCache = require('node-cache');
 
@@ -7,9 +8,9 @@ const callCache = new NodeCache({
   useClones: false,
 });
 
-class QueueProducer extends BaseMessageQueue {
+export default class QueueProducer extends BaseMessageQueue {
 
-  constructor(busName){
+  constructor(busName: string){
     super(busName)
 
     this.receiveRedis.subscribe(this.getProcessResponseChannel());
@@ -24,11 +25,10 @@ class QueueProducer extends BaseMessageQueue {
    * @param options.await - wait to end the event process and then run new one.
    * @returns {Promise<Object>}
    */
-  send(message, options={}){
+  send(message: any, options: RemoteCallConfig={}){
     options = {
       timeout: 0,
       timeoutMessage: "Queue request timeout!",
-      rawResponse: false,
       pid: -1,
       ...(!!options ? options : {})
     };
@@ -41,20 +41,20 @@ class QueueProducer extends BaseMessageQueue {
       options,
       resultPromise
     });
-    if(options.pid > -1)
+    if(options.pid && options.pid > -1)
       this.sendRedis.lpush(`${this.channelName}@${options.pid}`, JSON.stringify(wMsg));
     else
       this.sendRedis.lpush(this.channelName, JSON.stringify(wMsg));
     return resultPromise.promise;
   }
 
-  async onResponseReceived(channel, strMessage) {
+  async onResponseReceived(channel: string, strMessage: string) {
     const rawResponse = JSON.parse(strMessage);
     let {pid, uid, data: {error=undefined, response=undefined}} = rawResponse;
-    let {resultPromise=null, options={}} = callCache.get(uid) || {};
+    let {resultPromise=null} = callCache.get(uid) || {};
     if(resultPromise) {
       if (!error) {
-        resultPromise.resolve(options.rawResponse ? rawResponse : response)
+        resultPromise.resolve(response)
       }
       else {
         //console.log('QueueProducer.onResponseReceived', rawResponse.data);
@@ -67,5 +67,3 @@ class QueueProducer extends BaseMessageQueue {
     }
   }
 }
-
-module.exports = QueueProducer;

@@ -1,18 +1,19 @@
 const BaseMessageQueue = require('./base-message-queue')
+import { IpcCallConfig } from './types'
 const { promisify } = require("util");
 
-class QueueConsumer extends BaseMessageQueue {
+class QueueConsumer<MessageType> extends BaseMessageQueue {
 
   options = {}
   _reading = false;
 
-  constructor(busName, options={}) {
+  constructor(busName: string, options: IpcCallConfig={}) {
     super(busName);
 
     this.options = options;
   }
 
-  on(eventName, listener) {
+  on(eventName: string, listener: (arg:MessageType) => Promise<any>) {
     super.on(eventName, listener);
     if(!this._reading){
       this._reading = true;
@@ -34,13 +35,14 @@ class QueueConsumer extends BaseMessageQueue {
     }
   }
 
-  async onMessageReceived(channel, strMessage) {
+  async onMessageReceived(channel: string, strMessage: string) {
     let {pid, uid, data} = JSON.parse(strMessage)
     let response, error;
     try {
       response = await this.emit("message", data, {pid, uid})
     } catch (e) {
       // console.log(`QueueConsumer.onMessageReceived`, e);
+      // @ts-ignore
       error = {message: typeof e === "string" ? e : e.message};
     }
     this.responseTo(pid, uid, {response, error});
@@ -51,11 +53,11 @@ class QueueConsumer extends BaseMessageQueue {
    * @param {Object} options
    * @returns {Promise<void>}
    */
-  responseTo(pid, responseId, data, options={}){
+  responseTo(pid: number, responseId: number | string, data: any, options: IpcCallConfig={}){
     const receivingProcessChannel = this.getProcessResponseChannel(pid);
     let wMsg = this.wrapData(data, {uid: responseId});
     this.sendRedis.publish(receivingProcessChannel, JSON.stringify(wMsg));
   }
 }
 
-module.exports = QueueConsumer;
+export default QueueConsumer;

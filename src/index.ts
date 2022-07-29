@@ -1,4 +1,6 @@
-const cluster = require('cluster');
+import cluster, {Worker} from 'cluster'
+import * as os from 'os'
+
 const Gateway = require('./gateway')
 const Networking = require('./networking');
 const NetworkingIpc = require('./networking/ipc');
@@ -12,20 +14,24 @@ if(parseBool(process.env.CLUSTER_MODE)) {
     clusterCount = parseInt(process.env.CLUSTER_COUNT);
   }
   else{
-    clusterCount = require('os').cpus().length;
+    clusterCount = os.cpus().length;
   }
 }
 
-const applicationWorkers = {};
+type ApplicationDictionary = {[index: number]: Worker}
 
-function runNewApplicationCluster() {
-  let child = cluster.fork({MASTER_PROCESS_ID: process.pid});
+const applicationWorkers:ApplicationDictionary = {};
+
+function runNewApplicationCluster(): Worker {
+  const child:Worker = cluster.fork();//{MASTER_PROCESS_ID: process.pid}
+  // @ts-ignore
   applicationWorkers[child.process.pid] = child
   return child;
 }
 
 async function boot() {
-  if (cluster.isMaster) {
+  if (cluster.isPrimary) {
+    console.log(`Master cluster start at [${process.pid}]`)
     SharedMemory.startServer();
 
     /** Start gateway */
@@ -38,6 +44,7 @@ async function boot() {
     //
     cluster.on("exit", async function (worker, code, signal) {
       console.log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
+      // @ts-ignore
       delete applicationWorkers[worker.process.pid];
       await NetworkingIpc.reportClusterStatus(worker.process.pid, 'exit')
 
@@ -50,12 +57,16 @@ async function boot() {
     // require('./core').start();
     /** Start application clusters */
     for (let i = 0; i < clusterCount; i++) {
-      let child = runNewApplicationCluster();
+      const child:Worker|null = runNewApplicationCluster();
+      if(!child){
+        i--;
+        console.log(`child process fork failed. trying one more time`);
+      }
       await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
     }
   } else {
     console.log(`application cluster start pid:${process.pid}`)
-    require('./core').start();
+    // require('./core').start();
   }
 }
 

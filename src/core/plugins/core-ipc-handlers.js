@@ -1,6 +1,6 @@
 const CallablePlugin = require('./base/callable-plugin')
 const {remoteApp, remoteMethod, ipcMethod} = require('./base/app-decorators')
-const {timeout} = require('@src/utils/helpers')
+const {timeout} = require('../../utils/helpers')
 
 @remoteApp
 class CoreIpcHandlers extends CallablePlugin {

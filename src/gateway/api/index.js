@@ -3,7 +3,7 @@ const RequestLog = require('../models/RequestLog')
 const { QueueProducer } = require('../../common/message-bus')
 let NodeCaller = require('../node-caller')
 let requestQueue = new QueueProducer(`gateway-requests`);
-let { parseBool } = require('@src/utils/helpers')
+let { parseBool } = require('../../utils/helpers')
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)

@@ -1,23 +1,24 @@
+// @ts-ignore
 const Redis = require('redis');
-const redisConfig = require('./redis-config');
+import redisConfig from './redis-config'
 const Events = require('events-async')
-const {newCallId} = require('@src/utils/helpers')
+const {newCallId} = require('../../utils/helpers')
 
-class BaseMessageBus extends Events{
+export default class BaseMessageBus extends Events{
   /**
    * @type {String} - Bus name for transferring message between processes
    */
-  busName = null;
+  busName: string | null = null;
   /**
    * @type {RedisClient} - Redis instance for publishing messages to all other processes
    */
-  sendRedis = null;
+  sendRedis;
   /**
    * @type {RedisClient} -
    */
-  receiveRedis = null;
+  receiveRedis;
 
-  constructor(busName) {
+  constructor(busName: string) {
     super();
     this.busName = busName
 
@@ -37,7 +38,7 @@ class BaseMessageBus extends Events{
     return `${this.channelPrefix}/ms/response/bus/${pid}/${this.busName}`
   }
 
-  wrapData(data, mix) {
+  wrapData(data: any, mix?: object) {
     return {pid: process.pid, uid: newCallId(), data, ...mix};
   }
 
@@ -45,5 +46,3 @@ class BaseMessageBus extends Events{
     return Redis.createClient(redisConfig)
   }
 }
-
-module.exports = BaseMessageBus;

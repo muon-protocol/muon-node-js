@@ -1,6 +1,6 @@
 const CallablePlugin = require('./base/callable-plugin')
 const {remoteApp, remoteMethod, ipcMethod} = require('./base/app-decorators')
-const {timeout} = require('@src/utils/helpers')
+const {timeout} = require('../../utils/helpers')
 const NodeCache = require('node-cache');
 const coreIpc = require('../../core/ipc')
 
@@ -84,9 +84,9 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod('report-cluster-status')
-  async __reportClusterStatus(data={}) {
+  async __reportClusterStatus(data) {
     // console.log("NetworkIpcHandler.__reportClusterStatus", {data,callerInfo});
-    let {pid, status} = data
+    let {pid, status} = data || {}
     switch (status) {
       case "start":
         this.clustersPids[pid] = true
@@ -99,7 +99,7 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod('get-leader')
-  async __getLeader(data={}, callerInfo) {
+  async __getLeader(data, callerInfo) {
     let leaderPlugin = this.network.getPlugin('group-leader')
     await leaderPlugin.waitToLeaderSelect();
     return leaderPlugin.leader;
@@ -107,13 +107,13 @@ class NetworkIpcHandler extends CallablePlugin {
 
   clusterPermissions = {};
   @ipcMethod('ask-cluster-permission')
-  async __askClusterPermission(data={}, callerInfo) {
+  async __askClusterPermission(data, callerInfo) {
     // every 20 seconds one process get permission to do election
     if(
-      (!this.clusterPermissions[data.key])
-      || (Date.now() - this.clusterPermissions[data.key] > data.expireTime)
+      (!this.clusterPermissions[data?.key])
+      || (Date.now() - this.clusterPermissions[data?.key] > data.expireTime)
     ){
-      this.clusterPermissions[data.key] = Date.now()
+      this.clusterPermissions[data?.key] = Date.now()
       return true
     }
     else
@@ -131,10 +131,10 @@ class NetworkIpcHandler extends CallablePlugin {
    * @private
    */
   @ipcMethod('assign-task')
-  async __assignTaskToProcess(data={}, callerInfo) {
+  async __assignTaskToProcess(data, callerInfo) {
     if(Object.keys(this.clustersPids).length < 1)
       throw {message: "No any online cluster"}
-    this.assignTaskToProcess(data.taskId, callerInfo.pid);
+    this.assignTaskToProcess(data?.taskId, callerInfo.pid);
     return 'Ok';
   }
 
@@ -149,10 +149,10 @@ class NetworkIpcHandler extends CallablePlugin {
    * @private
    */
   @ipcMethod("remote-call")
-  async __onRemoteCallRequest(data={}) {
+  async __onRemoteCallRequest(data) {
     // console.log(`NetworkIpcHandler.__onRemoteCallRequest`, data);
-    const peer = await this.findPeer(data.peer);
-    return await this.remoteCall(peer, "exec-ipc-remote-call", data, data.options);
+    const peer = await this.findPeer(data?.peer);
+    return await this.remoteCall(peer, "exec-ipc-remote-call", data, data?.options);
   }
 
   /**
@@ -170,15 +170,17 @@ class NetworkIpcHandler extends CallablePlugin {
    * @private
    */
   @remoteMethod("exec-ipc-remote-call")
-  async __onIpcRemoteCallExec(data={}, callerInfo) {
+  async __onIpcRemoteCallExec(data, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcRemoteCallExec`, data);
     let taskId, options = {};
-    if(data.options?.taskId){
-      taskId = data.options.taskId;
+    if(data?.options?.taskId){
+      taskId = data?.options.taskId;
       if(tasksCache.has(taskId)) {
+        //@ts-ignore
         options.pid = tasksCache.get(data.options.taskId);
       }
       else{
+        //@ts-ignore
         options.pid = this.takeRandomProcess()
         this.assignTaskToProcess(taskId, options.pid);
       }

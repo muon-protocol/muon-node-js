@@ -1,16 +1,14 @@
-const BaseMessageBus = require('./base-message-bus')
+import BaseMessageBus from './base-message-bus'
 
-class MessagePublisher extends BaseMessageBus{
+export default class MessagePublisher extends BaseMessageBus{
 
   /**
    * @param {Object} message
    * @param {Object} options
    * @returns {Promise<void>}
    */
-  async send(message, options={}){
+  async send(message:any){
     const wMsg = this.wrapData(message)
     this.sendRedis.publish(this.channelName, JSON.stringify(wMsg));
   }
 }
-
-module.exports = MessagePublisher;
