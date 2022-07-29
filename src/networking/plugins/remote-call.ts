@@ -1,4 +1,4 @@
-const BaseNetworkingPlugin = require('./base/base-network-plugin')
+import BaseNetworkingPlugin from './base/base-network-plugin'
 const pipe = require('it-pipe')
 const {newCallId} = require('../../utils/helpers')
 const TimeoutPromise = require('../../common/timeout-promise')
@@ -191,6 +191,7 @@ class RemoteCall extends BaseNetworkingPlugin {
         return this.callConnection(connection, peer, method, params, options)
       })
       .catch(e => {
+        // @ts-ignore
         if(!options?.silent) {
           console.error(`network.RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
         }
@@ -227,4 +228,4 @@ class RemoteCall extends BaseNetworkingPlugin {
   }
 }
 
-module.exports = RemoteCall;
+export default RemoteCall;

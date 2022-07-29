@@ -3,7 +3,7 @@ const PeerId = require('peer-id')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 
-module.exports = class BaseNetworkingPlugin extends Events {
+export default class BaseNetworkingPlugin extends Events {
   network;
   configs = {}
 
@@ -62,7 +62,7 @@ module.exports = class BaseNetworkingPlugin extends Events {
         console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
       }
       await this.network.libp2p.pubsub.subscribe(broadcastChannel)
-      this.network.libp2p.pubsub.addEventListener('message', this.__onPluginBroadcastReceived.bind(this))
+      this.network.libp2p.pubsub.on(broadcastChannel, this.__onPluginBroadcastReceived.bind(this))
     }
   }
 

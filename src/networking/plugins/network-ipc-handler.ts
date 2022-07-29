@@ -1,4 +1,4 @@
-const CallablePlugin = require('./base/callable-plugin')
+import CallablePlugin from './base/callable-plugin'
 const {remoteApp, remoteMethod, ipcMethod} = require('./base/app-decorators')
 const {timeout} = require('../../utils/helpers')
 const NodeCache = require('node-cache');
@@ -182,6 +182,7 @@ class NetworkIpcHandler extends CallablePlugin {
       else{
         //@ts-ignore
         options.pid = this.takeRandomProcess()
+        //@ts-ignore
         this.assignTaskToProcess(taskId, options.pid);
       }
     }
@@ -198,4 +199,4 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 }
 
-module.exports = NetworkIpcHandler;
+export default NetworkIpcHandler;

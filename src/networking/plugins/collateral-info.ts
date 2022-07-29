@@ -1,7 +1,7 @@
-const BaseNetworkPlugin = require('./base/base-network-plugin')
+import BaseNetworkPlugin from './base/base-network-plugin'
 const TimeoutPromise = require('../../common/timeout-promise');
 
-class CollateralInfoPlugin extends BaseNetworkPlugin{
+export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   groupInfo = null;
   networkInfo = null;
@@ -56,6 +56,7 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   async _loadCollateralInfo(){
     let {tss, collateralWallets} = this.network.configs.net;
+    // @ts-ignore
     this.networkInfo = {
       tssThreshold: parseInt(tss.threshold),
       minGroupSize: parseInt(tss.min || tss.threshold),
@@ -66,6 +67,7 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
     if(parts.findIndex(p => p.length !== 2) >= 0) {
       throw "Invalid collateral wallet config located at config/global/net.conf.json"
     }
+    // @ts-ignore
     this.groupInfo = {
       isValid: true,
       group: "1",
@@ -102,10 +104,12 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   get GroupId(){
+    // @ts-ignore
     return this.groupInfo?.group;
   }
 
   get TssThreshold(){
+    // @ts-ignore
     return this.networkInfo?.tssThreshold;
   }
 
@@ -117,10 +121,12 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   get MinGroupSize(){
+    // @ts-ignore
     return this.networkInfo?.minGroupSize;
   }
 
   get MaxGroupSize(){
+    // @ts-ignore
     return this.networkInfo?.maxGroupSize;
   }
 
@@ -132,5 +138,3 @@ class CollateralInfoPlugin extends BaseNetworkPlugin{
     return this.loading.isFulfilled;
   }
 }
-
-module.exports = CollateralInfoPlugin;

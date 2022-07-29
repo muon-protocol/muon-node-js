@@ -1,6 +1,6 @@
-const BaseNetworkPlugin = require('./base-network-plugin')
+import BaseNetworkPlugin from './base-network-plugin';
 
-module.exports = class CallablePlugin extends BaseNetworkPlugin {
+export default class CallablePlugin extends BaseNetworkPlugin {
 
   remoteCall(peer, methodName, data, options){
     let remoteCall = this.network.getPlugin('remote-call')

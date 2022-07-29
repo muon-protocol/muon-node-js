@@ -1,4 +1,4 @@
-const CallablePlugin = require('./base/callable-plugin')
+import CallablePlugin from './base/callable-plugin'
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 const tssModule = require('../../utils/tss')
 const {timeout} = require('../../utils/helpers');
@@ -34,7 +34,7 @@ class GroupLeaderPlugin extends CallablePlugin {
    * Address of leader that win the election
    * @type {null}
    */
-  leader=null
+  leader: string | null = null;
   /**
    * Promise that fulfilled at the end of election.
    * @type {TimeoutPromise}
@@ -63,6 +63,7 @@ class GroupLeaderPlugin extends CallablePlugin {
         this.reselectLeader();
       }
       else{
+        // @ts-ignore
         let onlineNodes = this.onlinePartners.map(p => p.wallet).filter(w => w!==peerIdStr);
         if(onlineNodes.length+1 < this.collateralPlugin.TssThreshold){
           console.log(`No enough online nodes. The leader will be cleared to select it again.`)
@@ -126,6 +127,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async electionStart() {
+    // @ts-ignore
     let responses = await this.callParty(RemoteMethods.ElectionStart);
     // console.log(`GroupLeaderPlugin.electionStart electionStart responses:`, responses)
     let allDone = responses.findIndex(r => (r!==true)) < 0;
@@ -134,7 +136,8 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   // TODO: if all nodes except leader restart, then leader cannot be select
-  async leaderAlreadySelected(){
+  async leaderAlreadySelected(): Promise<string | null>{
+    // @ts-ignore
     let responses = await this.callParty(RemoteMethods.WhoIsLeader)
     let leaderCount = responses
       .filter(r => !!r?.leader)
@@ -165,6 +168,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async isPermittedToDoElection() {
+    // @ts-ignore
     let responses = await this.callParty(RemoteMethods.AskElectionPermission);
     console.log('Current executor:', this.currentExecutor)
     console.log(`election permission responses`, responses);
@@ -176,13 +180,18 @@ class GroupLeaderPlugin extends CallablePlugin {
     // let partners = this.electionKey.partners
     //   .map(w => this.TssPlugin.tssParty.onlinePartners[w])
     //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
+    if(this.electionKey === null)
+      throw {message: "Election key is null."}
+    // @ts-ignore
     let partners = this.electionKey.partners
       .filter(w => w !== process.env.SIGN_WALLET_ADDRESS)
       .map(w => this.collateralPlugin.getWalletPeerId(w))
       .map(peerId => this.collateralPlugin.onlinePeers[peerId])
 
+    // @ts-ignore
     let responses = await this.callParty(
       RemoteMethods.ElectionResultReady,
+        // @ts-ignore
       {electionKey: this.electionKey.id},
       partners
     )
@@ -229,15 +238,17 @@ class GroupLeaderPlugin extends CallablePlugin {
     //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
 
     return Object.values(this.collateralPlugin.onlinePeers)
+    // @ts-ignore
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
   }
 
   get currentExecutor() {
     let walletList = [
       process.env.SIGN_WALLET_ADDRESS,
+      // @ts-ignore
       ...this.onlinePartners.map(p =>p.wallet)
     ]
-    let time = parseInt(Date.now() / 100000)
+    let time = Math.floor(Date.now() / 100000)
     // let hashes = walletList.map(w => sha3(`${w.toLowerCase()}-${time}`));
     let hashes = walletList.map(w => soliditySha3({t:"address", v: w}, {t: 'uint32', v: time}));
     let minIndex = hashes.reduce((min, val, index, arr)=>(val<arr[min]?index:min), 0);
@@ -287,7 +298,9 @@ class GroupLeaderPlugin extends CallablePlugin {
     if(permitted){
       // let key = this.TssPlugin.getSharedKey(data.electionKey);
       // await key.waitToFulfill();
+      // @ts-ignore
       let pid = await this.network.getPlugin('ipc-handler').getTaskProcess(`keygen-${data.electionKey}`)
+      // @ts-ignore
       let key = await CoreIpc.getTssKey(data.electionKey, {pid});
       this._electionComplete(key);
       return true;
@@ -302,4 +315,4 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 }
 
-module.exports = GroupLeaderPlugin;
+export default GroupLeaderPlugin;

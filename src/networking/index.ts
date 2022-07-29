@@ -8,6 +8,12 @@ const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
 const coreIpc = require('../core/ipc')
 const { MessagePublisher } = require('../common/message-bus')
 
+import CollateralPlugin from './plugins/collateral-info';
+import GroupLeaderPlugin from './plugins/group-leader-plugin'
+import IpcHandlerPlugin from './plugins/network-ipc-handler'
+import IpcPlugin from './plugins/network-ipc-plugin'
+import RemoteCallPlugin from './plugins/remote-call'
+
 class Network extends Events {
   configs
   libp2p
@@ -19,10 +25,35 @@ class Network extends Events {
   }
 
   async _initializeLibp2p() {
-    const [peerId, libp2p] = await Libp2pBundle.create(this.configs.libp2p);
-    libp2p.connectionManager.addEventListener('peer:connect', this.onPeerConnect.bind(this))
-    libp2p.connectionManager.addEventListener('peer:disconnect', this.onPeerDisconnect.bind(this))
-    libp2p.addEventListener('peer:discovery', this.onPeerDiscovery.bind(this))
+    const configs = this.configs.libp2p;
+    let peerId = await PeerId.createFromJSON(configs.peerId)
+    let announceFilter = (multiaddrs) => multiaddrs.filter(m => !isPrivate(m));
+    if(process.env.DISABLE_ANNOUNCE_FILTER)
+      announceFilter = mas => mas
+
+    const libp2p = await Libp2pBundle.create({
+      peerId,
+      addresses: {
+        listen: [
+          `/ip4/${configs.host}/tcp/${configs.port}`,
+          // `/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`,
+          // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
+        ],
+        announceFilter
+      },
+      config: {
+        peerDiscovery: {
+          [Libp2pBundle.Bootstrap.tag]: {
+            list: [...configs.bootstrap],
+            interval: 5000, // default is 10 ms,
+            enabled: configs.bootstrap.length > 0
+          }
+        }
+      }
+    });
+    libp2p.connectionManager.on('peer:connect', this.onPeerConnect.bind(this))
+    libp2p.connectionManager.on('peer:disconnect', this.onPeerDisconnect.bind(this))
+    libp2p.on('peer:discovery', this.onPeerDiscovery.bind(this))
 
     this.peerId = peerId
     this.libp2p = libp2p
@@ -32,7 +63,7 @@ class Network extends Events {
     const { plugins } = this.configs
     for (let pluginName in plugins) {
       const [plugin, configs] = plugins[pluginName]
-      this._plugins[pluginName] = new plugin(this, configs)
+      this._plugins[pluginName] = new plugin(this, configs);
       this._plugins[pluginName].onInit();
     }
     // console.log('plugins initialized.')
@@ -64,7 +95,7 @@ class Network extends Events {
 
     // if(process.env.VERBOSE) {
     console.log("====================== Bindings ====================")
-    this.libp2p.getMultiaddrs().forEach((ma) => {
+    this.libp2p.multiaddrs.forEach((ma) => {
       console.log(ma.toString())
       // console.log(`${ma.toString()}/p2p/${this.libp2p.peerId.toB58String()}`)
     })
@@ -181,11 +212,11 @@ async function start() {
       bootstrap: getLibp2pBootstraps()
     },
     plugins: {
-      'collateral': [require('./plugins/collateral-info'), {}],
-      'remote-call': [require('./plugins/remote-call'), {}],
-      'ipc': [require('./plugins/network-ipc-plugin'), {}],
-      'ipc-handler': [require('./plugins/network-ipc-handler'), {}],
-      'group-leader': [require('./plugins/group-leader-plugin'), {}],
+      'collateral': [CollateralPlugin, {}],
+      'remote-call': [RemoteCallPlugin, {}],
+      'ipc': [IpcPlugin, {}],
+      'ipc-handler': [IpcHandlerPlugin, {}],
+      'group-leader': [GroupLeaderPlugin, {}],
     },
     net,
     // TODO: pass it into the tss-plugin
@@ -197,6 +228,6 @@ async function start() {
   await network.start();
 }
 
-module.exports = {
+export {
   start
 }
