@@ -1,23 +1,33 @@
 import BasePlugin from './base/base-plugin'
 const { call: networkingIpcCall } = require('../../networking/ipc')
-const { QueueConsumer } = require('../../common/message-bus')
+import QueueConsumer from '../../common/message-bus/queue-consumer'
 
 export const BROADCAST_CHANNEL = 'core-broadcast';
+
+export type CoreBroadcastMessage = {
+  data: {
+    channel: string,
+    message: any,
+  },
+  callerInfo: {
+    wallet: string,
+    peerId: string
+  }
+}
 
 export default class BroadcastPlugin extends BasePlugin {
   /**
    * @type {QueueConsumer}
    */
-  bus = null;
+  bus: QueueConsumer<CoreBroadcastMessage>;
 
   async onStart() {
-    const bus = new QueueConsumer(BROADCAST_CHANNEL);
+    const bus = new QueueConsumer<CoreBroadcastMessage>(BROADCAST_CHANNEL);
     bus.on("message", this.onBroadcastReceived.bind(this));
     this.bus = bus
   }
 
-  async onBroadcastReceived(broadcast={}){
-    // @ts-ignore
+  async onBroadcastReceived(broadcast){
     const {data: {channel, message}, callerInfo}  = broadcast;
 
     if(!channel)

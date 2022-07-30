@@ -2,7 +2,7 @@ const BaseMessageQueue = require('./base-message-queue')
 import { IpcCallConfig } from './types'
 const { promisify } = require("util");
 
-class QueueConsumer<MessageType> extends BaseMessageQueue {
+export default class QueueConsumer<MessageType> extends BaseMessageQueue {
 
   options = {}
   _reading = false;
@@ -58,5 +58,3 @@ class QueueConsumer<MessageType> extends BaseMessageQueue {
     this.sendRedis.publish(receivingProcessChannel, JSON.stringify(wMsg));
   }
 }
-
-export default QueueConsumer;

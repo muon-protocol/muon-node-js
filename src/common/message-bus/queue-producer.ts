@@ -8,7 +8,7 @@ const callCache = new NodeCache({
   useClones: false,
 });
 
-export default class QueueProducer extends BaseMessageQueue {
+export default class QueueProducer<MessageType> extends BaseMessageQueue {
 
   constructor(busName: string){
     super(busName)
@@ -25,7 +25,7 @@ export default class QueueProducer extends BaseMessageQueue {
    * @param options.await - wait to end the event process and then run new one.
    * @returns {Promise<Object>}
    */
-  send(message: any, options: RemoteCallConfig={}){
+  send(message: MessageType, options: RemoteCallConfig={}){
     options = {
       timeout: 0,
       timeoutMessage: "Queue request timeout!",
