@@ -282,7 +282,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async writeNodeMem(data, ttl=0) {
-    this.muon.getPlugin('memory').writeNodeMem({ttl, data})
+    await this.muon.getPlugin('memory').writeNodeMem({ttl, data})
   }
 
   async readNodeMem(query, options) {
