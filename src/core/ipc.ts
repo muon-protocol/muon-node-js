@@ -1,7 +1,7 @@
 const { QueueProducer, MessagePublisher } = require('../common/message-bus')
 const { BROADCAST_CHANNEL } = require('./plugins/broadcast')
 const { IPC_CHANNEL } = require('./plugins/core-ipc-plugin')
-const DistributedKey = require('./plugins/tss-plugin/distributed-key')
+import DistributedKey from './plugins/tss-plugin/distributed-key'
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 const broadcastQueue = new QueueProducer(BROADCAST_CHANNEL)

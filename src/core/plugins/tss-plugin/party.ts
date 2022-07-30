@@ -1,13 +1,15 @@
-const TimeoutPromise = require('../../../common/timeout-promise')
+import TimeoutPromise from '../../../common/timeout-promise'
 
-class TssParty {
-  t = 0
-  max = 0;
-  id = null;
-  partners = {}
-  timeoutPromise = null;
+export default class TssParty {
+  t: number = 0
+  max: number = 0;
+  id: string;
+  partners: {[index: string]: any} = {}
+  timeoutPromise: TimeoutPromise;
 
-  constructor(t, max, id, timeout){
+  constructor(t, max, id=null, timeout=0){
+    if(!process.env.SIGN_WALLET_ADDRESS)
+      throw {message: "process.env.SIGN_WALLET_ADDRESS has not valid data"}
     this.t = t;
     this.max = max;
     this.id = id || `P${Date.now()}${Math.floor(Math.random()*9999999)}`
@@ -127,5 +129,3 @@ class TssParty {
       }, {})
   }
 }
-
-module.exports = TssParty;

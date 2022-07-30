@@ -1,6 +1,6 @@
 const BaseMessageQueue = require('./base-message-queue')
 import { RemoteCallConfig } from './types'
-const TimeoutPromise = require('../timeout-promise')
+import TimeoutPromise from '../timeout-promise'
 const NodeCache = require('node-cache');
 
 const callCache = new NodeCache({

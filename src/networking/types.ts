@@ -1,4 +1,5 @@
 import { JSONPeerId } from 'peer-id'
+import {PeerInfo} from "@libp2p/interface-peer-info";
 
 export interface INetworkPlugin {
 
@@ -48,4 +49,10 @@ export type NetworkConfig = {
             address: string
         }
     }
+}
+
+export type OnlinePeerInfo = {
+    wallet: string,
+    peerId: string,
+    peer: PeerInfo,
 }

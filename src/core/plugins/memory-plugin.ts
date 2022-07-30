@@ -6,10 +6,28 @@ const {getTimestamp} = require('../../utils/helpers')
 const Memory = require('../../gateway/models/Memory')
 const { remoteApp, broadcastHandler } = require('./base/app-decorators')
 
+export type MemWriteType = 'app' | 'node'
+
+export type MemWrite = {
+  type: MemWriteType,
+  owner: string,
+  timestamp: number,
+  ttl: number,
+  nSign: number,
+  data: any,
+  hash: string,
+  signatures: string[]
+}
+
+export type MemReadOption = {
+  distinct?: boolean,
+  multi?: boolean
+}
+
 @remoteApp
 class MemoryPlugin extends CallablePlugin {
 
-  broadcastWrite(memWrite) {
+  broadcastWrite(memWrite: MemWrite) {
     this.broadcast({
       type: 'mem_write',
       peerId: process.env.PEER_ID,
@@ -54,7 +72,7 @@ class MemoryPlugin extends CallablePlugin {
     return true;
   }
 
-  hashMemWrite(memWrite) {
+  hashMemWrite(memWrite: MemWrite) {
     let {type, owner, timestamp, ttl, nSign, data} = memWrite;
     let ownerIsWallet = type === Memory.types.Node;
     return crypto.soliditySha3([
@@ -91,8 +109,9 @@ class MemoryPlugin extends CallablePlugin {
     let {ttl, data} = memory;
     let nSign=1,
       timestamp=getTimestamp();
-
-    let memWrite = {
+    if(!process.env.SIGN_WALLET_ADDRESS)
+      return ;
+    let memWrite: MemWrite = {
       type: Memory.types.Node,
       owner: process.env.SIGN_WALLET_ADDRESS,
       timestamp,
@@ -103,18 +122,16 @@ class MemoryPlugin extends CallablePlugin {
       signatures: []
     }
     memWrite.hash = this.hashMemWrite(memWrite)
-    // @ts-ignore
     memWrite.signatures = [crypto.sign(memWrite.hash)]
 
     this.storeMemWrite(memWrite);
     this.broadcastWrite(memWrite);
   }
 
-  storeMemWrite(memWrite){
+  storeMemWrite(memWrite: MemWrite){
     let {timestamp, ttl} = memWrite;
-    let expireAt = null;
+    let expireAt: null | number = null;
     if(!!timestamp && !!ttl){
-      // @ts-ignore
       expireAt = (timestamp + ttl) * 1000;
     }
     let mem = new Memory({
@@ -124,8 +141,7 @@ class MemoryPlugin extends CallablePlugin {
     mem.save();
   }
 
-  async readAppMem(app, query, options={}) {
-    // @ts-ignore
+  async readAppMem(app, query, options: MemReadOption={}) {
     let {multi=false, distinct=null,} = options;
 
     if(!!distinct){
@@ -141,8 +157,7 @@ class MemoryPlugin extends CallablePlugin {
     }
   }
 
-  async readNodeMem(query, options={}) {
-    // @ts-ignore
+  async readNodeMem(query, options: MemReadOption={}) {
     let {multi=false, distinct=null,} = options
 
     if(!!distinct) {

@@ -1,9 +1,13 @@
-const {range, toBN, BN} = require('./utils')
+const {range, toBN} = require('./utils')
+import BN from 'bn.js'
+import { BaseCurve, KeyPair } from './types'
 
 class Polynomial {
-  coefficients = []
+  t: number
+  curve: BaseCurve
+  coefficients: KeyPair[] = []
 
-  constructor(t, curve, key0){
+  constructor(t, curve, key0?: BN){
     if(key0 && !BN.isBN(key0))
       throw {message: "invalid key0 of polynomial"}
     this.curve = curve;
@@ -25,4 +29,4 @@ class Polynomial {
   }
 }
 
-module.exports = Polynomial;
+export default Polynomial;

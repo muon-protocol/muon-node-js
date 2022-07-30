@@ -6,7 +6,7 @@ const crypto = require('../../../utils/crypto')
 const tss = require('../../../utils/tss');
 const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
-const AppRequestManager = require('./app-request-manager');
+import AppRequestManager from './app-request-manager'
 const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))

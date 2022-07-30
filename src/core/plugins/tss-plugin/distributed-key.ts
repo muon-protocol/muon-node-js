@@ -1,29 +1,40 @@
-const Polynomial = require('../../../utils/tss/polynomial')
+import Polynomial from '../../../utils/tss/polynomial'
+import Party from './party'
+import BN from 'bn.js';
+import { PublicKey } from '../../../utils/tss/types'
 const tss = require('../../../utils/tss/index')
 const {utils:{toBN}} = require('web3')
-const TimeoutPromise = require('../../../common/timeout-promise')
+import TimeoutPromise from '../../../common/timeout-promise'
 const assert = require('assert')
 
 const random = () => Math.floor(Math.random()*9999999)
 
+export type KeyPart = {
+    f: BN,
+    h: BN,
+}
+
 class DistributedKey {
   /**
    * id of key
-   * @type {number}
+   * @type {string}
    */
-  id = 0;
+  id: string = "0";
   /**
    * party that this key created from.
    */
-  party = null;
+  party: Party | null = null;
   /**
    * partners of party, that cooperate to create this key
    */
   partners = [];
-  f_x = null
-  h_x = null;
+
+  f_x: Polynomial | null = null
+
+  h_x: Polynomial | null = null;
+
   // pedersen commitment
-  commitment = []
+  commitment: PublicKey[] = []
 
   /**
    * Key share from other key partners
@@ -32,7 +43,7 @@ class DistributedKey {
    *   ...
    * }}
    */
-  keyParts = {};
+  keyParts: {[index: string]: KeyPart} = {};
   /**
    * PublicKey of F_x of each partners
    * @type {{
@@ -40,25 +51,28 @@ class DistributedKey {
    *  ...
    * }}
    */
-  pubKeyParts = {};
+  pubKeyParts: {[index: string]: PublicKey} = {};
   commitmentParts = {};
   keyDistributed = false;
-  timeoutPromise = null;
+  timeoutPromise: TimeoutPromise;
 
   share = null;
   publicKey = null
   partnersPubKey = {}
   address = null
 
-  constructor(party, id, timeout){
+  constructor(party, id, timeout?: number){
     this.id = id || `K${Date.now()}${random()}`
     if(!!party) {
       this.party = party;
-      this.f_x = new Polynomial(party.t, tss.curve);
-      this.h_x = new Polynomial(party.t, tss.curve);
+
+      let fx = new Polynomial(party.t, tss.curve);
+      let hx = new Polynomial(party.t, tss.curve);
+      this.f_x = fx
+      this.h_x = hx
       // pedersen commitment
-      let fxCoefPubKeys = this.f_x.coefPubKeys();
-      let hxCoefPubKeys = this.h_x.coefficients.map(c => c.getPrivate()).map(b_k => tss.H.mul(b_k))
+      let fxCoefPubKeys = fx.coefPubKeys();
+      let hxCoefPubKeys = hx.coefficients.map(c => c.getPrivate()).map(b_k => tss.H.mul(b_k))
       this.commitment = fxCoefPubKeys.map((A, index) => tss.pointAdd(A, hxCoefPubKeys[index]));
     }
     this.timeoutPromise = new TimeoutPromise(timeout, "DistributedKey timeout")
@@ -83,6 +97,10 @@ class DistributedKey {
   }
 
   getFH(toIndex){
+    if(!this.f_x)
+      throw {message: "DistributedKey.f_x is not initialized"}
+    if(!this.h_x)
+      throw {message: "DistributedKey.h_x is not initialized"}
     return {
       f: this.f_x.calc(toIndex),
       h: this.h_x.calc(toIndex),
@@ -108,6 +126,8 @@ class DistributedKey {
   }
 
   setSelfShare(f, h, publicKeys) {
+    if(!process.env.SIGN_WALLET_ADDRESS)
+      throw {message: "process.env.SIGN_WALLET_ADDRESS is undefined"}
     const from = process.env.SIGN_WALLET_ADDRESS;
     this.keyParts[from] = {f:toBN(f), h: toBN(h)}
     this.pubKeyParts[from] = publicKeys
@@ -155,8 +175,8 @@ class DistributedKey {
   getTotalPubKey(){
     assert(
       // TODO: replace with this.partners.length
-      Object.keys(this.pubKeyParts).length >= this.party.t,
-      `DistributedKey is not completed for computing totalPubKey. {t: ${this.party.t}, n: ${Object.keys(this.pubKeyParts).length}}`
+      this.party && Object.keys(this.pubKeyParts).length >= this.party.t,
+      `DistributedKey is not completed for computing totalPubKey. {t: ${this?.party?.t}, n: ${Object.keys(this.pubKeyParts).length}}`
     )
     // calculate shared key
     let totalPubKey = null
@@ -167,9 +187,7 @@ class DistributedKey {
   }
 
   isKeyDistributed(){
-    let {pubKeyParts, party: {t, partners, onlinePartners}} = this
-    // All nodes must share their part of shared key.
-    // return Object.keys(pubKeyParts).length >= Object.keys(onlinePartners).length;
+    let {pubKeyParts} = this
     return Object.keys(pubKeyParts).length === this.partners.length;
   }
 
@@ -178,4 +196,4 @@ class DistributedKey {
   }
 }
 
-module.exports = DistributedKey;
+export default DistributedKey;

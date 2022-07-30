@@ -6,7 +6,7 @@
  *
  */
 
-const TimeoutPromise = require('../../../common/timeout-promise')
+import TimeoutPromise from '../../../common/timeout-promise'
 const NodeCache = require('node-cache');
 
 const requestCache = new NodeCache({
@@ -24,7 +24,7 @@ const requestCache = new NodeCache({
   useClones: false,
 });
 
-class AppRequestManager{
+export default class AppRequestManager{
 
   constructor(){
   }
@@ -136,5 +136,3 @@ class AppRequestManager{
     }
   }
 }
-
-module.exports = AppRequestManager;

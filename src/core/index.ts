@@ -53,24 +53,18 @@ function getCustomApps() {
 
 function getGeneralApps() {
   const appDir = path.join(__dirname, '../../apps/general');
-  return new Promise(function (resolve, reject) {
-    let result = {};
-    fs.readdir(appDir, function (err, files) {
-      if (err) {
-        reject(err)
+  let result = {};
+  let files = fs.readdirSync(appDir);
+  files.forEach((file) => {
+    let ext = file.split('.').pop();
+    if (ext.toLowerCase() === 'js') {
+      let app = require(`../../apps/general/${file}`)
+      if (!!app.APP_NAME) {
+        result[app.APP_NAME] = prepareApp(app, file)
       }
-      files.forEach(function (file) {
-        let ext = file.split('.').pop();
-        if (ext.toLowerCase() === 'js') {
-          let app = require(`../../apps/general/${file}`)
-          if (!!app.APP_NAME) {
-            result[app.APP_NAME] = prepareApp(app, file)
-          }
-        }
-      });
-      resolve(result)
-    });
-  })
+    }
+  });
+  return result
 }
 
 var muon;
@@ -109,8 +103,7 @@ async function start() {
         'health-check': [(await import('./plugins/health-check')).default, {}],
         ...await getEnvPlugins(),
         ...getCustomApps(),
-        // @ts-ignore
-        ...await getGeneralApps(),
+        ...getGeneralApps(),
       },
       net,
       account,

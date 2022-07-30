@@ -1,5 +1,4 @@
-// @ts-ignore
-const Redis = require('redis');
+import { createClient, RedisClient } from 'redis'
 import redisConfig from './redis-config'
 const Events = require('events-async')
 const {newCallId} = require('../../utils/helpers')
@@ -12,11 +11,11 @@ export default class BaseMessageBus extends Events{
   /**
    * @type {RedisClient} - Redis instance for publishing messages to all other processes
    */
-  sendRedis;
+  sendRedis: RedisClient;
   /**
    * @type {RedisClient} -
    */
-  receiveRedis;
+  receiveRedis: RedisClient;
 
   constructor(busName: string) {
     super();
@@ -43,6 +42,6 @@ export default class BaseMessageBus extends Events{
   }
 
   createRedisClient() {
-    return Redis.createClient(redisConfig)
+    return createClient(redisConfig)
   }
 }

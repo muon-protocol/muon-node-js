@@ -1,9 +1,10 @@
 import CallablePlugin from '../base/callable-plugin'
 const uint8ArrayFromString = require('uint8arrays/from-string')
 const uint8ArrayToString = require('uint8arrays/to-string')
-const Party = require('./party')
+import Party from './party'
+import DistributedKey from "./distributed-key";
 const {shuffle} = require('lodash')
-const DKey = require('./distributed-key')
+import DKey from './distributed-key'
 const tssModule = require('../../../utils/tss')
 const {utils:{toBN}} = require('web3')
 const path = require('path')
@@ -40,8 +41,8 @@ const RemoteMethods = {
 class TssPlugin extends CallablePlugin {
   isReady = false
   parties = {}
-  tssKey = null;
-  tssParty = null;
+  tssKey: DistributedKey | null = null;
+  tssParty: Party | null = null;
   availablePeers = {}
 
   constructor(...params) {

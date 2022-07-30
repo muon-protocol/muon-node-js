@@ -2,7 +2,7 @@ import CallablePlugin from './base/callable-plugin'
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const {timeout} = require('../../utils/helpers')
-const Party = require('./tss-plugin/party')
+import Party from './tss-plugin/party'
 const {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} = require('./base/app-decorators')
 
 const MSG_TYPE_PARTY_SEARCH_REQ = 'search_party_request'

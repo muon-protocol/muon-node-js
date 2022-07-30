@@ -1,13 +1,14 @@
 import BasePlugin from './base/base-plugin'
-const TimeoutPromise = require('../../common/timeout-promise');
+import TimeoutPromise from '../../common/timeout-promise'
 const { call: networkingIpcCall } = require('../../networking/ipc')
+import { GroupInfo, NetworkInfo } from '../../networking/plugins/collateral-info'
 
 export default class CollateralInfoPlugin extends BasePlugin{
 
-  groupInfo = null;
-  networkInfo = null;
-  peersWallet = {}
-  walletsPeer = {}
+  groupInfo: GroupInfo | null = null;
+  networkInfo: NetworkInfo | null = null;
+  peersWallet: {[index: string]: string} = {}
+  walletsPeer: {[index: string]: string} = {}
   /**
    * @type {TimeoutPromise}
    */
@@ -52,7 +53,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
     this.walletsPeer = walletsPeer;
 
     this.emit('loaded');
-    this.loading.resolve();
+    this.loading.resolve(true);
   }
 
   // TODO: not implemented
@@ -70,35 +71,34 @@ export default class CollateralInfoPlugin extends BasePlugin{
       // return this.peersWallet[peerId.toB58String()];
   }
 
-  getWalletPeerId(wallet) {
+  getWalletPeerId(wallet): string | undefined {
     return this.walletsPeer[wallet];
   }
 
-  get GroupId(){
-    // @ts-ignore
+  get GroupId(): string | undefined{
     return this.groupInfo?.group;
   }
 
-  get TssThreshold(){
-    // @ts-ignore
-    return this.networkInfo?.tssThreshold;
+  get TssThreshold(): number{
+    if(this.networkInfo)
+      return this.networkInfo?.tssThreshold;
+    else
+      return Infinity;
   }
 
   get MinGroupSize(){
-    // @ts-ignore
     return this.networkInfo?.minGroupSize;
   }
 
   get MaxGroupSize(){
-    // @ts-ignore
     return this.networkInfo?.maxGroupSize;
   }
 
-  waitToLoad(){
+  waitToLoad(): Promise<any>{
     return this.loading.promise;
   }
 
-  isLoaded(){
+  isLoaded(): boolean{
     return this.loading.isFulfilled;
   }
 }

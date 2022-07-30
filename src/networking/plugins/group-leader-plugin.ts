@@ -1,10 +1,13 @@
 import CallablePlugin from './base/callable-plugin'
+import DistributedKey from '../../core/plugins/tss-plugin/distributed-key'
 const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
 const tssModule = require('../../utils/tss')
 const {timeout} = require('../../utils/helpers');
-const TimeoutPromise = require('../../common/timeout-promise')
+import TimeoutPromise from '../../common/timeout-promise'
 const {utils:{soliditySha3}} = require('web3')
 const CoreIpc = require('../../core/ipc')
+import { OnlinePeerInfo } from '../types'
+import { RemoteCallOptions } from './remote-call'
 
 const RemoteMethods = {
   AskElectionPermission: "AskElectionPermission",
@@ -29,7 +32,7 @@ class GroupLeaderPlugin extends CallablePlugin {
    *
    * @type {null}
    */
-  electionKey = null
+  electionKey: DistributedKey | null = null
   /**
    * Address of leader that win the election
    * @type {null}
@@ -63,7 +66,7 @@ class GroupLeaderPlugin extends CallablePlugin {
         this.reselectLeader();
       }
       else{
-        // @ts-ignore
+        // @tss-ignore
         let onlineNodes = this.onlinePartners.map(p => p.wallet).filter(w => w!==peerIdStr);
         if(onlineNodes.length+1 < this.collateralPlugin.TssThreshold){
           console.log(`No enough online nodes. The leader will be cleared to select it again.`)
@@ -188,10 +191,8 @@ class GroupLeaderPlugin extends CallablePlugin {
       .map(w => this.collateralPlugin.getWalletPeerId(w))
       .map(peerId => this.collateralPlugin.onlinePeers[peerId])
 
-    // @ts-ignore
     let responses = await this.callParty(
       RemoteMethods.ElectionResultReady,
-        // @ts-ignore
       {electionKey: this.electionKey.id},
       partners
     )
@@ -233,10 +234,11 @@ class GroupLeaderPlugin extends CallablePlugin {
     return this._leaderSelectPromise.promise;
   }
 
-  get onlinePartners() {
+  get onlinePartners(): OnlinePeerInfo[] {
     // return Object.values(this.TssPlugin.tssParty.onlinePartners)
     //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
 
+    // @ts-ignore
     return Object.values(this.collateralPlugin.onlinePeers)
     // @ts-ignore
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
@@ -245,7 +247,6 @@ class GroupLeaderPlugin extends CallablePlugin {
   get currentExecutor() {
     let walletList = [
       process.env.SIGN_WALLET_ADDRESS,
-      // @ts-ignore
       ...this.onlinePartners.map(p =>p.wallet)
     ]
     let time = Math.floor(Date.now() / 100000)
@@ -255,7 +256,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     return walletList[minIndex]
   }
 
-  async callParty(method, data={}, partners, options){
+  async callParty(method, data={}, partners, options?:RemoteCallOptions){
     if(partners === undefined)
       partners = this.onlinePartners
     return Promise.all(partners.map(p => {

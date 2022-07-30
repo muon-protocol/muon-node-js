@@ -1,13 +1,27 @@
 import BaseNetworkPlugin from './base/base-network-plugin'
-const TimeoutPromise = require('../../common/timeout-promise');
+import { OnlinePeerInfo } from '../types';
+import TimeoutPromise from '../../common/timeout-promise'
+
+export type GroupInfo = {
+  isValid: boolean,
+  group: string,
+  sharedKey: string | null,
+  partners: string[]
+}
+
+export type NetworkInfo = {
+  tssThreshold: number,
+  minGroupSize: number,
+  maxGroupSize: number
+}
 
 export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
-  groupInfo = null;
-  networkInfo = null;
-  peersWallet = {}
-  walletsPeer = {}
-  onlinePeers = {}
+  groupInfo: GroupInfo | null = null;
+  networkInfo: NetworkInfo | null = null;
+  peersWallet: {[index: string]: string} = {}
+  walletsPeer: {[index: string]: string} = {}
+  onlinePeers: {[index: string]: OnlinePeerInfo} = {}
   /**
    * @type {TimeoutPromise}
    */
@@ -56,7 +70,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   async _loadCollateralInfo(){
     let {tss, collateralWallets} = this.network.configs.net;
-    // @ts-ignore
+
     this.networkInfo = {
       tssThreshold: parseInt(tss.threshold),
       minGroupSize: parseInt(tss.min || tss.threshold),
@@ -67,7 +81,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     if(parts.findIndex(p => p.length !== 2) >= 0) {
       throw "Invalid collateral wallet config located at config/global/net.conf.json"
     }
-    // @ts-ignore
+
     this.groupInfo = {
       isValid: true,
       group: "1",
@@ -84,7 +98,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     }
 
     this.emit('loaded');
-    this.loading.resolve();
+    this.loading.resolve(true);
   }
 
   // TODO: not implemented
@@ -104,13 +118,14 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   get GroupId(){
-    // @ts-ignore
     return this.groupInfo?.group;
   }
 
-  get TssThreshold(){
-    // @ts-ignore
-    return this.networkInfo?.tssThreshold;
+  get TssThreshold(): number{
+    if(!!this.networkInfo)
+      return this.networkInfo?.tssThreshold
+    else
+      return Infinity;
   }
 
   hasEnoughPartners() {
@@ -121,12 +136,10 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   get MinGroupSize(){
-    // @ts-ignore
     return this.networkInfo?.minGroupSize;
   }
 
   get MaxGroupSize(){
-    // @ts-ignore
     return this.networkInfo?.maxGroupSize;
   }
 
