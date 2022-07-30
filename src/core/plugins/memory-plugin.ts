@@ -4,7 +4,7 @@ const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const crypto = require('../../utils/crypto')
 const {getTimestamp} = require('../../utils/helpers')
 const Memory = require('../../gateway/models/Memory')
-const { remoteApp, broadcastHandler } = require('./base/app-decorators')
+import { remoteApp, broadcastHandler } from './base/app-decorators'
 
 export type MemWriteType = 'app' | 'node'
 

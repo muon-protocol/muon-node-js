@@ -1,7 +1,6 @@
-const CallablePlugin = require('./callable-plugin')
 
-function classNames(target){
-  let names = []
+function classNames(target): string[]{
+  let names: string[] = []
   let tmp = target
   while (!!tmp && !!tmp.name){
     names.push(tmp.name)
@@ -10,7 +9,7 @@ function classNames(target){
   return names;
 }
 
-module.exports.remoteMethod = function (title, options={}) {
+export function remoteMethod (title, options={}) {
   return function (target, property, descriptor) {
     if(!target.__remoteMethods)
       target.__remoteMethods = []
@@ -20,7 +19,7 @@ module.exports.remoteMethod = function (title, options={}) {
 }
 
 const ipcMethodDefined = {}
-module.exports.ipcMethod = function (title, options={}) {
+export function ipcMethod (title, options={}) {
   return function (target, property, descriptor) {
     if(ipcMethodDefined[title]) {
       const error = `IPC method [${title}] already defined.`
@@ -35,7 +34,7 @@ module.exports.ipcMethod = function (title, options={}) {
   }
 }
 
-module.exports.remoteApp = function (constructor) {
+export function remoteApp (constructor): any {
   if(!classNames(constructor).includes('CallablePlugin'))
     throw {message: 'RemoteApp should be CallablePlugin.'}
   let extended = class extends constructor {

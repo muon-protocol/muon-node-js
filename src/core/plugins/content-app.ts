@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin'
 const Content = require('../../gateway/models/Content')
 const all = require('it-all')
-const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
+import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
 const {loadCID} = require('../../utils/cid')
 const {timeout} = require('../../utils/helpers')
 

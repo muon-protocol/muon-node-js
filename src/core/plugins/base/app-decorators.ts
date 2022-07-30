@@ -1,7 +1,5 @@
-const CallablePlugin = require('./callable-plugin')
-
-function classNames(target){
-  let names = []
+function classNames(target): string[] {
+  let names: string[] = []
   let tmp = target
   while (!!tmp && !!tmp.name){
     names.push(tmp.name)
@@ -10,7 +8,7 @@ function classNames(target){
   return names;
 }
 
-module.exports.remoteMethod = function (title, options={}) {
+export function remoteMethod (title, options={}) {
   return function (target, property, descriptor) {
     if(!target.__remoteMethods)
       target.__remoteMethods = []
@@ -19,7 +17,7 @@ module.exports.remoteMethod = function (title, options={}) {
   }
 }
 
-module.exports.gatewayMethod = function (title, options={}) {
+export function gatewayMethod (title, options={}) {
   return function (target, property, descriptor) {
     if(!target.__gatewayMethods)
       target.__gatewayMethods = []
@@ -29,7 +27,7 @@ module.exports.gatewayMethod = function (title, options={}) {
 }
 
 const ipcMethodDefined = {}
-module.exports.ipcMethod = function (title, options={}) {
+export function ipcMethod (title, options={}) {
   return function (target, property, descriptor) {
     if(ipcMethodDefined[title]) {
       const error = `IPC method [${title}] already defined.`
@@ -44,7 +42,7 @@ module.exports.ipcMethod = function (title, options={}) {
   }
 }
 
-module.exports.broadcastHandler = function (target, property, descriptor) {
+export function broadcastHandler (target, property, descriptor) {
   if(target.__broadcastHandlerMethod !== undefined){
     const error = `Broadcast handler method already defined.`
     console.error({error})
@@ -54,7 +52,7 @@ module.exports.broadcastHandler = function (target, property, descriptor) {
   return descriptor
 }
 
-module.exports.remoteApp = function (constructor) {
+export function remoteApp (constructor): any {
   if(!classNames(constructor).includes('CallablePlugin')) {
     const error = {message: 'RemoteApp should be CallablePlugin.'}
     console.error(error)

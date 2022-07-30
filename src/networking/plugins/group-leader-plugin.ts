@@ -1,6 +1,6 @@
 import CallablePlugin from './base/callable-plugin'
 import DistributedKey from '../../core/plugins/tss-plugin/distributed-key'
-const {remoteApp, remoteMethod, gatewayMethod} = require('./base/app-decorators')
+import {remoteApp, remoteMethod} from './base/app-decorators'
 const tssModule = require('../../utils/tss')
 const {timeout} = require('../../utils/helpers');
 import TimeoutPromise from '../../common/timeout-promise'

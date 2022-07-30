@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin'
-const {remoteApp, remoteMethod, ipcMethod} = require('./base/app-decorators')
+import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
 const {timeout} = require('../../utils/helpers')
 
 @remoteApp

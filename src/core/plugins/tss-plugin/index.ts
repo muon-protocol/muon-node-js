@@ -9,7 +9,7 @@ const tssModule = require('../../../utils/tss')
 const {utils:{toBN}} = require('web3')
 const path = require('path')
 const {timeout} = require('../../../utils/helpers');
-const {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} = require('../base/app-decorators')
+import {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} from '../base/app-decorators'
 const NodeCache = require('node-cache');
 const NetworkingIpc = require('../../../networking/ipc')
 

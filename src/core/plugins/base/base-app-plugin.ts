@@ -7,7 +7,7 @@ const tss = require('../../../utils/tss');
 const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 import AppRequestManager from './app-request-manager'
-const {remoteApp, remoteMethod, gatewayMethod} = require('../base/app-decorators')
+import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
