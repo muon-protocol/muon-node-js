@@ -65,7 +65,6 @@ export default class GatewayInterface extends BasePlugin{
         e = {message: e};
       // console.error('gateway-interface error')
       // console.dir(e, {depth: null})
-      // @ts-ignore
       let {message, data: errorData} = e;
       return {
         error: message || "GatewayInterface: Unknown error occurred",

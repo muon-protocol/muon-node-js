@@ -8,8 +8,41 @@ const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 import AppRequestManager from './app-request-manager'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
+import { MemWrite } from '../memory-plugin'
+import {assertTSUndefinedKeyword} from "@babel/types";
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
+
+export type AppRequestSignature = {
+  /**
+   * Request hash
+   */
+  request: string,
+  /**
+   * Ethereum address of collateral wallet
+   */
+  owner: string,
+  /**
+   * Public key of nodes TSS shared
+   */
+  pubKey: string,
+  /**
+   * request timestamp
+   */
+  timestamp: number,
+  /**
+   * result of request
+   */
+  result: any,
+  /**
+   * Schnorr signature of request, signed by TSS share
+   */
+  signature: string
+  /**
+   * Schnorr signature of request memWrite, signed by collateral wallet
+   */
+  memWriteSignature?: string
+}
 
 @remoteApp
 class BaseAppPlugin extends CallablePlugin {
@@ -18,9 +51,8 @@ class BaseAppPlugin extends CallablePlugin {
   requestManager = new AppRequestManager();
   readOnlyMethods = []
 
-  constructor(...args) {
-    // @ts-ignore
-    super(...args)
+  constructor(muon, configs) {
+    super(muon, configs);
 
     /**
      * This is abstract class, so "new BaseAppPlugin()" is not allowed
@@ -32,8 +64,9 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
-    // @ts-ignore
-    this.muon._apps[this.APP_NAME] = this;
+    if(this.APP_NAME) {
+      this.muon._apps[this.APP_NAME] = this;
+    }
 
     if(this.dependencies){
       this.initializeDependencies();
@@ -173,8 +206,7 @@ class BaseAppPlugin extends CallablePlugin {
 
         let sign = this.makeSignature(newRequest, result, resultHash)
         if (!!memWrite) {
-          // @ts-ignore
-          sign.memWriteSignature = memWrite.signature
+          sign.memWriteSignature = memWrite.signatures[0]
         }
         this.requestManager.addSignature(newRequest.hash, sign.owner, sign);
         // new Signature(sign).save()
@@ -252,29 +284,36 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  // @ts-ignore
-  getMemWrite(request, result) {
+  getMemWrite(request, result): MemWrite | null {
     if (this.hasOwnProperty('onMemWrite')) {
       let memPlugin = this.muon.getPlugin('memory');
       let timestamp = request.startedAt
       let nSign = request.nSign
       let appMem = this.onMemWrite(request, result)
-      if (!appMem) return
+      if (!appMem)
+        return null;
       let { ttl, data } = appMem
 
-      let memWrite = {
+      if(!this.APP_NAME)
+        throw {message: `${this.ConstructorName}.getMemWrite: APP_NAME is not defined`}
+
+      let memWrite: MemWrite = {
         type: 'app',
         owner: this.APP_NAME,
         timestamp,
         ttl,
         nSign,
         data,
+        hash: "",
+        signatures: []
       }
 
-      let hash = memPlugin.hashMemWrite(memWrite);
-      let signature = crypto.sign(hash)
-      return { ...memWrite, hash, signature }
+      let hash: string = memPlugin.hashMemWrite(memWrite);
+      let memWriteSignature: string = crypto.sign(hash)
+      return { ...memWrite, hash, signatures: [memWriteSignature] }
     }
+    else
+      return null;
   }
 
   async memRead(query, options) {
@@ -421,7 +460,7 @@ class BaseAppPlugin extends CallablePlugin {
     return null
   }
 
-  makeSignature(request, result, resultHash) {
+  makeSignature(request, result, resultHash): AppRequestSignature {
     let signTimestamp = getTimestamp()
     // let signature = crypto.sign(resultHash)
 
@@ -435,12 +474,16 @@ class BaseAppPlugin extends CallablePlugin {
     // TODO: remove nonce after sign
     let signature = tss.schnorrSign(tssKey.share, k_i, K, resultHash)
 
+    if(!process.env.SIGN_WALLET_ADDRESS){
+      throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
+    }
+
     return {
       request: request.hash,
       // node stake wallet address
       owner: process.env.SIGN_WALLET_ADDRESS,
       // tss shared public key
-      pubKey: tss.keyFromPrivate(tssKey.share).getPublic().encode('hex'),
+      pubKey: tssKey.sharePubKey,
       timestamp: signTimestamp,
       result,
       signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`

@@ -91,7 +91,7 @@ class MemoryPlugin extends CallablePlugin {
 
     let {timestamp, ttl, nSign, data, hash} = request.data.memWrite;
     let signatures = request.signatures.map(sign => sign.memWriteSignature)
-    let memWrite = {
+    let memWrite: MemWrite = {
       type: Memory.types.App,
       owner: request.app,
       timestamp,

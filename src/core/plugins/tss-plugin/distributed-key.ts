@@ -57,6 +57,7 @@ class DistributedKey {
   timeoutPromise: TimeoutPromise;
 
   share = null;
+  sharePubKey = null;
   publicKey = null
   partnersPubKey = {}
   address = null
@@ -83,7 +84,8 @@ class DistributedKey {
     key.id = _key.id;
     key.f_x = null;
     key.h_x = null;
-    key.share = _key.share;
+    key.share = toBN(_key.share);
+    key.sharePubKey = tss.keyFromPrivate(_key.share).getPublic().encode('hex');
     key.publicKey = _key.publicKey
     if(_key.partners)
       key.partners = _key.partners;
@@ -139,6 +141,7 @@ class DistributedKey {
     if(this.isKeyDistributed()){
       let fh = this.getTotalFH()
       this.share = fh.f;
+      this.sharePubKey = tss.keyFromPrivate(fh.f).getPublic().encode('hex')
       this.publicKey = this.getTotalPubKey();
       this.timeoutPromise.resolve(this)
     }
