@@ -4,7 +4,6 @@ const uint8ArrayToString = require('uint8arrays/to-string')
 import Party from './party'
 import DistributedKey from "./distributed-key";
 const {shuffle} = require('lodash')
-import DKey from './distributed-key'
 const tssModule = require('../../../utils/tss')
 const {utils:{toBN}} = require('web3')
 const path = require('path')
@@ -180,7 +179,7 @@ class TssPlugin extends CallablePlugin {
         share: toBN(tssConfig.key.share),
         publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
       }
-      let key = DKey.load(this.tssParty, _key);
+      let key = DistributedKey.load(this.tssParty, _key);
       keysCache.set(key.id, key, 0);
       this.tssKey = key;
       this.isReady = true
@@ -336,7 +335,7 @@ class TssPlugin extends CallablePlugin {
     let myKey = tssModule.subKeys(reconstructed, nonce.share)
     // console.log({myKey: '0x'+myKey.toString(16)})
     // this.parties[party.id] = party
-    let tssKey = DKey.load(this.tssParty, {
+    let tssKey = DistributedKey.load(this.tssParty, {
       id: keyResults[0].id,
       i: myIndex,
       share: myKey,
@@ -440,7 +439,7 @@ class TssPlugin extends CallablePlugin {
     // @ts-ignore
     let {id, maxPartners, timeout=15} = options;
     // 1- create new key
-    let key = new DKey(party, id, 15000)
+    let key = new DistributedKey(party, id, 15000)
     let taskId = `keygen-${key.id}`;
     let assignResponse = await NetworkingIpc.assignTask(taskId);
     if(assignResponse !== 'Ok')
@@ -556,7 +555,7 @@ class TssPlugin extends CallablePlugin {
     return this.parties[id];
   }
 
-  getSharedKey(id) {
+  getSharedKey(id): DistributedKey | undefined {
     return keysCache.get(id);
   }
 
@@ -670,7 +669,7 @@ class TssPlugin extends CallablePlugin {
       console.log(`TssPlugin.__createKey>> key already exist [${keyId}]`);
       throw {message: `key already exist [${keyId}]`}
     }
-    keysCache.set(keyId, new DKey(parties[party], keyId));
+    keysCache.set(keyId, new DistributedKey(parties[party], keyId));
     return true;
   }
 

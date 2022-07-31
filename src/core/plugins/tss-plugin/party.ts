@@ -1,24 +1,22 @@
 import TimeoutPromise from '../../../common/timeout-promise'
+import { OnlinePeerInfo } from "../../../networking/types";
 
 export default class TssParty {
   t: number = 0
   max: number = 0;
   id: string;
-  partners: {[index: string]: any} = {}
+  partners: {[index: string]: OnlinePeerInfo} = {}
   timeoutPromise: TimeoutPromise;
 
   constructor(t, max, id=null, timeout=0){
-    if(!process.env.SIGN_WALLET_ADDRESS)
+    if(!process.env.SIGN_WALLET_ADDRESS || !process.env.PEER_ID)
       throw {message: "process.env.SIGN_WALLET_ADDRESS has not valid data"}
     this.t = t;
     this.max = max;
     this.id = id || `P${Date.now()}${Math.floor(Math.random()*9999999)}`
-    this.partners = {
-      [process.env.SIGN_WALLET_ADDRESS]: {
-        i: 1,
-        peerId: process.env.PEER_ID,
-        wallet: process.env.SIGN_WALLET_ADDRESS,
-      }
+    this.partners[process.env.SIGN_WALLET_ADDRESS] = {
+      peerId: process.env.PEER_ID,
+      wallet: process.env.SIGN_WALLET_ADDRESS,
     }
     this.timeoutPromise = new TimeoutPromise(timeout, "Party join timeout", {resolveOnTimeout: true})
   }
@@ -29,13 +27,6 @@ export default class TssParty {
     _party.partners.map(p => party.addPartner(p))
     party.timeoutPromise.resolve(party);
     return party;
-  }
-
-  cloneOnlinePart(){
-    let newParty = new TssParty(this.t, this.max)
-    newParty.partners = this.onlinePartners()
-    newParty.timeoutPromise.resolve(newParty);
-    return newParty;
   }
 
   /**
@@ -116,15 +107,6 @@ export default class TssParty {
       .filter(p => (!!p.peer || p.wallet===process.env.SIGN_WALLET_ADDRESS))
       .reduce((obj, p) => {
         obj[p.wallet] = p
-        return obj;
-      }, {})
-  }
-
-  get walletIndexes(){
-    let {partners} = this
-    return Object.values(partners)
-      .reduce((obj, p) => {
-        obj[p.wallet] = p.i
         return obj;
       }, {})
   }

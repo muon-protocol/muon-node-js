@@ -10,6 +10,8 @@ import AppRequestManager from './app-request-manager'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
 import { MemWrite } from '../memory-plugin'
 import {assertTSUndefinedKeyword} from "@babel/types";
+import DistributedKey from "../tss-plugin/distributed-key";
+import {OnlinePeerInfo} from "../../../networking/types";
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
@@ -424,23 +426,24 @@ class BaseAppPlugin extends CallablePlugin {
 
   broadcastNewRequest(request) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce = tssPlugin.getSharedKey(request.hash)
+    let nonce: DistributedKey = tssPlugin.getSharedKey(request.hash)
     let party = nonce.party;
-
-    let partners = Object.values(party.partners)
-      // @ts-ignore
-      .filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(wallet)))
+    if(!party)
+      throw {message: `${this.ConstructorName}.broadcastNewRequest: nonce.party has not value.`}
+    let partners: OnlinePeerInfo[] = Object.values(party.partners)
+      .filter((op: OnlinePeerInfo) => {
+        return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.wallet)
+      })
 
     this.requestManager.setPartnerCount(request.hash, partners.length + 1);
 
     // TODO: remove async
-    // @ts-ignore
     partners.map(async ({peerId, wallet}) => {
       return this.remoteCall(peerId, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT, taskId: `keygen-${nonce.id}`})
-        .then(this.__onRemoteSignRequest.bind(this))
+        .then(this.__onRemoteSignTheRequest.bind(this))
         .catch(e => {
           // console.log('base-tss-app-plugin: on broadcast request error', e)
-          return this.__onRemoteSignRequest({}, {
+          return this.__onRemoteSignTheRequest({}, {
             request: request.hash,
             peerId,
             ...e
@@ -490,8 +493,8 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async __onRemoteSignRequest(data = {}, error) {
-    // console.log('BaseAppPlugin.__onRemoteSignRequest', data)
+  async __onRemoteSignTheRequest(data = {}, error) {
+    // console.log('BaseAppPlugin.__onRemoteSignTheRequest', data)
     if(error){
       let collateralPlugin = this.muon.getPlugin('collateral');
       let {peerId, request: reqHash, ...otherParts} = error;
@@ -529,11 +532,11 @@ class BaseAppPlugin extends CallablePlugin {
         // }
       }
       else{
-        console.log(`BaseAppPlugin.__onRemoteSignRequest >> Request not found id:${sign.request}`)
+        console.log(`BaseAppPlugin.__onRemoteSignTheRequest >> Request not found id:${sign.request}`)
       }
     }
     catch (e) {
-      console.error('BaseAppPlugin.__onRemoteSignRequest', e);
+      console.error('BaseAppPlugin.__onRemoteSignTheRequest', e);
     }
   }
 

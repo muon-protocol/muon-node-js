@@ -27,7 +27,7 @@ class DistributedKey {
   /**
    * partners of party, that cooperate to create this key
    */
-  partners = [];
+  partners: string[] = [];
 
   f_x: Polynomial | null = null
 
