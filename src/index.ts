@@ -32,6 +32,10 @@ function runNewApplicationCluster(): Worker | null {
   return child;
 }
 
+async function refreshWorkersList() {
+  // TODO: try to find the process that stopped working and remove it from workers list
+}
+
 async function boot() {
   if (cluster.isPrimary) {
     console.log(`Master cluster start at [${process.pid}]`)
@@ -47,9 +51,14 @@ async function boot() {
     //
     cluster.on("exit", async function (worker, code, signal) {
       console.log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
-      // @ts-ignore
-      delete applicationWorkers[worker.process.pid];
-      await NetworkingIpc.reportClusterStatus(worker.process.pid, 'exit')
+      if(!worker.process.pid) {
+        console.log(`a worker with an unknown pid stopped working.`)
+        await refreshWorkersList();
+      }
+      else {
+        delete applicationWorkers[worker.process.pid];
+        await NetworkingIpc.reportClusterStatus(worker.process.pid, 'exit')
+      }
 
       await timeout(5000);
       console.log("Starting a new worker");
@@ -73,6 +82,8 @@ async function boot() {
     console.log(`application cluster start pid:${process.pid}`)
     require('./core').start();
   }
+
+  // require('./core').start();
 }
 
 boot();

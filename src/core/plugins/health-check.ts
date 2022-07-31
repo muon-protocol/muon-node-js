@@ -1,5 +1,7 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
+import {OnlinePeerInfo} from "../../networking/types";
+import TssPlugin from "./tss-plugin";
 const {timeout} = require('../../utils/helpers')
 const OS = require('os')
 const util = require('util');
@@ -67,32 +69,35 @@ class HealthCheck extends CallablePlugin {
 
   @gatewayMethod("list-nodes")
   async _onListNodes(data){
-    let tssPlugin = this.muon.getPlugin('tss-plugin')
+    let tssPlugin: TssPlugin = this.muon.getPlugin('tss-plugin')
 
-    let partners = Object.values(tssPlugin.tssParty.partners)
-    // @ts-ignore
-      .filter(({peer, wallet}) => (!!peer && wallet !== process.env.SIGN_WALLET_ADDRESS))
+    if(tssPlugin.tssParty === null)
+      throw `TSS module not loaded yet`
+
+    if(!process.env.SIGN_WALLET_ADDRESS)
+      throw `process.env.SIGN_WALLET_ADDRESS is not defined`
+
+    let partners: OnlinePeerInfo[] = Object.values(tssPlugin.tssParty.partners)
+      .filter((op: OnlinePeerInfo) => {
+        return !!op.peer && op.wallet !== process.env.SIGN_WALLET_ADDRESS
+      })
 
     let result = {
-      // @ts-ignore
       [process.env.SIGN_WALLET_ADDRESS]: {
         status: "CURRENT",
         ... await this.getNodeStatus()
       }
     }
 
-    // @ts-ignore
     const peerList = partners.map(({peer}) => peer)
 
     let calls = peerList.map(peer => {
-      // @ts-ignore
       return this.remoteCall(peer, RemoteMethods.CheckHealth, {log: true})
         .catch(e => null)
     });
     let responses = await Promise.all(calls)
 
     for(let i=0 ; i<responses.length ; i++){
-      // @ts-ignore
       result[partners[i].wallet] = responses[i];
     }
 
@@ -100,8 +105,7 @@ class HealthCheck extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.CheckHealth)
-  async _onHealthCheck(data={}) {
-    // @ts-ignore
+  async _onHealthCheck(data:{log?: any}={}) {
     if(data?.log)
       console.log(`===== HealthCheck._onHealthCheck =====`, new Date());
     return {

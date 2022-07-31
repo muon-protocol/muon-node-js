@@ -24,10 +24,7 @@ class CoreIpcHandlers extends CallablePlugin {
     // @ts-ignore
     let key = this.muon.getPlugin('tss-plugin').getSharedKey(data.keyId)
     await key.waitToFulfill()
-    Object.keys(key.pubKeyParts).forEach(w => {
-      key.pubKeyParts[w] = key.pubKeyParts[w].map(pubKey => pubKey.encode('hex'))
-    })
-    return key;
+    return key.toSerializable();
   }
 
   @ipcMethod("generate-tss-key")

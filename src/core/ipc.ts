@@ -48,7 +48,7 @@ async function getTssKey(keyId, options={}) {
   return DistributedKey.load(null, key)
 }
 
-module.exports = {
+export {
   call,
   broadcast,
   fireEvent,

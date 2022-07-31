@@ -2,7 +2,7 @@ import BasePlugin from './base-plugin'
 
 export default class CallablePlugin extends BasePlugin {
 
-  remoteCall(peer, methodName, data, options?){
+  remoteCall(peer, methodName, data?, options?){
     let remoteCall = this.muon.getPlugin('remote-call')
     let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
     if(Array.isArray(peer)){

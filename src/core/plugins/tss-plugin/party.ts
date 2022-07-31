@@ -10,7 +10,7 @@ export default class TssParty {
 
   constructor(t, max, id=null, timeout=0){
     if(!process.env.SIGN_WALLET_ADDRESS || !process.env.PEER_ID)
-      throw {message: "process.env.SIGN_WALLET_ADDRESS has not valid data"}
+      throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
     this.t = t;
     this.max = max;
     this.id = id || `P${Date.now()}${Math.floor(Math.random()*9999999)}`
@@ -101,7 +101,7 @@ export default class TssParty {
     return this.timeoutPromise.promise;
   }
 
-  get onlinePartners(){
+  get onlinePartners(): {[index: string]: OnlinePeerInfo}{
     let {partners} = this
     return Object.values(partners)
       .filter(p => (!!p.peer || p.wallet===process.env.SIGN_WALLET_ADDRESS))

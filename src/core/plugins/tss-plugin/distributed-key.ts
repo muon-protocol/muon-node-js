@@ -51,14 +51,14 @@ class DistributedKey {
    *  ...
    * }}
    */
-  pubKeyParts: {[index: string]: PublicKey} = {};
+  pubKeyParts: {[index: string]: PublicKey[]} = {};
   commitmentParts = {};
   keyDistributed = false;
   timeoutPromise: TimeoutPromise;
 
-  share = null;
+  share: BN | null = null;
   sharePubKey = null;
-  publicKey = null
+  publicKey: PublicKey | null = null
   partnersPubKey = {}
   address = null
 
@@ -86,7 +86,7 @@ class DistributedKey {
     key.h_x = null;
     key.share = toBN(_key.share);
     key.sharePubKey = tss.keyFromPrivate(_key.share).getPublic().encode('hex');
-    key.publicKey = _key.publicKey
+    key.publicKey = typeof _key.publicKey === 'string' ? tss.keyFromPublic(_key.publicKey) : _key.publicKey
     if(_key.partners)
       key.partners = _key.partners;
     if(_key.pubKeyParts && Object.keys(_key.pubKeyParts).length > 0){
@@ -96,6 +96,19 @@ class DistributedKey {
     }
     key.timeoutPromise.resolve(key);
     return key
+  }
+
+  toSerializable() {
+    return {
+      id: this.id,
+      share: !this.share ? null : this.share.toBuffer('be', 32).toString('hex'),
+      publicKey: !this.publicKey ? null : this.publicKey.encode('hex', true),
+      partners: [...this.partners],
+      pubKeyParts: Object.keys(this.pubKeyParts).reduce((res, partner) => {
+        res[partner] = this.pubKeyParts[partner].map(pubKey => pubKey.encode('hex', true))
+        return res;
+      }, {}),
+    }
   }
 
   getFH(toIndex){
@@ -129,7 +142,7 @@ class DistributedKey {
 
   setSelfShare(f, h, publicKeys) {
     if(!process.env.SIGN_WALLET_ADDRESS)
-      throw {message: "process.env.SIGN_WALLET_ADDRESS is undefined"}
+      throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
     const from = process.env.SIGN_WALLET_ADDRESS;
     this.keyParts[from] = {f:toBN(f), h: toBN(h)}
     this.pubKeyParts[from] = publicKeys

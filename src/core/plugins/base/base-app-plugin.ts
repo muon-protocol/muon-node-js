@@ -135,7 +135,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
     nSign = !!nSign
       ? parseInt(nSign)
-      : parseInt(process.env.NUM_SIGN_TO_CONFIRM || "0")
+      : parseInt(process.env.NUM_SIGN_TO_CONFIRM || "0");
 
     if(this.getNSign)
       nSign = this.getNSign()
