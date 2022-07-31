@@ -5,7 +5,7 @@ const Gateway = require('./gateway')
 const Networking = require('./networking');
 const NetworkingIpc = require('./networking/ipc');
 const SharedMemory = require('./common/shared-memory')
-const { parseBool } = require('./utils/helpers')
+const { parseBool, timeout } = require('./utils/helpers')
 
 
 let clusterCount = 1;
@@ -22,9 +22,12 @@ type ApplicationDictionary = {[index: number]: Worker}
 
 const applicationWorkers:ApplicationDictionary = {};
 
-function runNewApplicationCluster(): Worker {
+function runNewApplicationCluster(): Worker | null {
   const child:Worker = cluster.fork();//{MASTER_PROCESS_ID: process.pid}
-  // @ts-ignore
+  if(!child?.process?.pid){
+    console.log(`application cluster does not start correctly.`)
+    return null;
+  }
   applicationWorkers[child.process.pid] = child
   return child;
 }
@@ -48,19 +51,23 @@ async function boot() {
       delete applicationWorkers[worker.process.pid];
       await NetworkingIpc.reportClusterStatus(worker.process.pid, 'exit')
 
+      await timeout(5000);
       console.log("Starting a new worker");
       let child = runNewApplicationCluster();
+      if(!child){
+        return ;
+      }
       await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
     });
 
     /** Start application clusters */
     for (let i = 0; i < clusterCount; i++) {
       const child:Worker|null = runNewApplicationCluster();
-      if(!child){
+      if(child === null){
         i--;
         console.log(`child process fork failed. trying one more time`);
-      }
-      await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
+      }else
+        await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
     }
   } else {
     console.log(`application cluster start pid:${process.pid}`)
