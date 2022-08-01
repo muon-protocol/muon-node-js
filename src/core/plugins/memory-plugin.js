@@ -1,3 +1,24 @@
+/**
+ * This plugin provides some API for store and retrieving data in a shared memory on the Muon network.
+ * Writing Data is distributed and will write on the all nodes local database. Reading data is locally
+ * at the moment.
+ *
+ * There is Two type of Data can be store in shared memory.
+ *
+ * 1) node: The owner of this type of MemoryWrite is the `calling node`. The collateral wallet of
+ *          the Node will store in memory.  any other nodes can query for this data. This type of
+ *          memory write can be done immediately by calling because it needs only the calling nodes
+ *          signature.
+ *
+ * 2) app: The owner of this MemoryWrite is user Apps. The ID of the calling App will store in memory
+ *          as the owner of Memory data. This type of MemoryWrite can be stored in memory after that
+ *          all nodes (nodes that process the app request) sign the memory write. In the other word, Threshold Signature
+ *          needed for this MemoryWrite. Because of the threshold signature, this MemoryWrite only can
+ *          be stored when the request is processed successfully.
+ *
+ * Any node on the network can query for any type of data.
+ */
+
 const CallablePlugin = require('./base/callable-plugin')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
@@ -67,6 +88,12 @@ class MemoryPlugin extends CallablePlugin {
     ])
   }
 
+  /**
+   * Method for saving APPs data in memory. This method can be called after all nodes
+   * process the request. all nodes signature is needed to this data be saved.
+   * @param request
+   * @returns {Promise<void>}
+   */
   async writeAppMem(request) {
     if(!request.data.memWrite)
       return;
@@ -87,6 +114,12 @@ class MemoryPlugin extends CallablePlugin {
     this.broadcastWrite(memWrite);
   }
 
+  /**
+   * Any node can call this to save a data into the shared memory.
+   * only the node signature needed to this data be saved.
+   * @param memory
+   * @returns {Promise<void>}
+   */
   async writeNodeMem(memory) {
     let {ttl, data} = memory;
     let nSign=1,
