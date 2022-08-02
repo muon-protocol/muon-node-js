@@ -28,7 +28,9 @@ const _networksWeb3 = {
   43114: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_AVALANCHE_MAINNET || 'https://api.avax.network/ext/bc/C/rpc')),
   421611: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ARBITRUM_TESTNET || 'https://rinkeby.arbitrum.io/rpc')),
   42161: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ARBITRUM_MAINNET || 'https://arb1.arbitrum.io/rpc')),
-  1088: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_METIS || 'https://andromeda.metis.io/?owner=1088'))
+  1088: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_METIS || 'https://andromeda.metis.io/?owner=1088')),
+  10: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_OPTIMISM || 'https://rpc.ankr.com/optimism')),
+  420: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_OPTIMISM_TESTNET || 'https://rpc.ankr.com/optimism_testnet')),
 }
 
 const nameToChainIdMap = {
@@ -48,7 +50,9 @@ const nameToChainIdMap = {
   avax: 43114, // Avalanche Mainnet
   arbitrumTestnet: 421611, //Arbitrum Testnet
   arbitrum: 42161, // Arbitrum
-  metis: 1088 // Metis
+  metis: 1088, // Metis
+  optimism: 10, // Optimism
+  optimismTestnet: 420, // Optimism Testnet
 }
 
 function getWeb3(network) {
