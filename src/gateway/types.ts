@@ -1,10 +1,11 @@
 export type GatewayCallMode = 'sign' | 'view'
 
 export type GatewayMethodData = {
+    app: string,
     method: string,
     params: any,
-    nSign: number | undefined,
+    nSign?: number,
     mode: GatewayCallMode,
     callId: string,
-    gwSign: boolean | undefined
+    gwSign?: boolean
 }

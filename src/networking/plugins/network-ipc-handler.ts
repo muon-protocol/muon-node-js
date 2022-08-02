@@ -1,12 +1,15 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
 import {IpcCallOptions} from "../../common/types";
+const all = require('it-all')
+
 const {timeout} = require('../../utils/helpers')
+const {loadCID} = require('../../utils/cid')
 const NodeCache = require('node-cache');
 const coreIpc = require('../../core/ipc')
 
 const tasksCache = new NodeCache({
-  stdTTL: 6*60, // Keep distributed keys in memory for 6 minutes
+  stdTTL: 6 * 60, // Keep distributed keys in memory for 6 minutes
   // /**
   //  * (default: 600)
   //  * The period in seconds, as a number, used for the automatic delete check interval.
@@ -19,7 +22,7 @@ const tasksCache = new NodeCache({
 @remoteApp
 class NetworkIpcHandler extends CallablePlugin {
 
-  clustersPids: {[pid: string]: number} = {};
+  clustersPids: { [pid: string]: number } = {};
 
   async onStart() {
     super.onStart()
@@ -43,7 +46,7 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod("get-collateral-info")
-  async __onIpcGetCollateralInfo(data={}, callerInfo) {
+  async __onIpcGetCollateralInfo(data = {}, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
     const collateralPlugin = this.network.getPlugin('collateral');
     await collateralPlugin.waitToLoad();
@@ -59,7 +62,7 @@ class NetworkIpcHandler extends CallablePlugin {
     return "Ok"
   }
 
-  async onBroadcastReceived(data={}, callerInfo) {
+  async onBroadcastReceived(data = {}, callerInfo) {
     // console.log('NetworkIpcHandler.onBroadcastReceived', data, callerInfo);
     return await coreIpc.broadcast({
       data,
@@ -85,7 +88,7 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod('report-cluster-status')
-  async __reportClusterStatus(data: {pid: number, status: "start" | "exit"}) {
+  async __reportClusterStatus(data: { pid: number, status: "start" | "exit" }) {
     // console.log("NetworkIpcHandler.__reportClusterStatus", {data,callerInfo});
     let {pid, status} = data
     switch (status) {
@@ -107,17 +110,17 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   clusterPermissions = {};
+
   @ipcMethod('ask-cluster-permission')
   async __askClusterPermission(data, callerInfo) {
     // every 20 seconds one process get permission to do election
-    if(
+    if (
       (!this.clusterPermissions[data?.key])
       || (Date.now() - this.clusterPermissions[data?.key] > data.expireTime)
-    ){
+    ) {
       this.clusterPermissions[data?.key] = Date.now()
       return true
-    }
-    else
+    } else
       return false;
   }
 
@@ -133,7 +136,7 @@ class NetworkIpcHandler extends CallablePlugin {
    */
   @ipcMethod('assign-task')
   async __assignTaskToProcess(data, callerInfo) {
-    if(Object.keys(this.clustersPids).length < 1)
+    if (Object.keys(this.clustersPids).length < 1)
       throw {message: "No any online cluster"}
     this.assignTaskToProcess(data?.taskId, callerInfo.pid);
     return 'Ok';
@@ -174,12 +177,11 @@ class NetworkIpcHandler extends CallablePlugin {
   async __onIpcRemoteCallExec(data, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcRemoteCallExec`, data);
     let taskId, options: IpcCallOptions = {};
-    if(data?.options?.taskId){
+    if (data?.options?.taskId) {
       taskId = data?.options.taskId;
-      if(tasksCache.has(taskId)) {
+      if (tasksCache.has(taskId)) {
         options.pid = tasksCache.get(data.options.taskId);
-      }
-      else{
+      } else {
         options.pid = this.takeRandomProcess()
         this.assignTaskToProcess(taskId, options.pid);
       }
@@ -194,6 +196,21 @@ class NetworkIpcHandler extends CallablePlugin {
         }
       },
       options);
+  }
+
+  @ipcMethod("content-routing-provide")
+  async __onContentRoutingProvide(cids: string[], callerInfo) {
+    for (let cid of cids) {
+      console.log(`providing content ${cid}`)
+      await this.network.libp2p.contentRouting.provide(loadCID(cid));
+    }
+  }
+
+  @ipcMethod("content-routing-find")
+  async __onContentRoutingFind(cid: string, callerInfo) {
+    console.log(`NetworkIpcHandler.__onContentRoutingFind`, cid);
+    let providers = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
+    return providers.map(p => p.id._idB58String)
   }
 }
 

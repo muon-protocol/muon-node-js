@@ -29,9 +29,14 @@ let gatewayRequests;
 
 export default class GatewayInterface extends BasePlugin{
 
-  async __handleCallResponse(response){
-    if(response.confirmed){
-      await this.emit('confirmed', response)
+  async __handleCallResponse(callingArgs, response){
+    if(callingArgs.app === 'content')
+      return ;
+    if(response?.confirmed){
+      try {
+        await this.emit('confirmed', response)
+      }
+      catch (e) {}
     }
   }
 
@@ -43,21 +48,22 @@ export default class GatewayInterface extends BasePlugin{
         throw {message: `Invalid call mode: ${mode}`}
       }
       let response
+      const callingArgs = {app, method, params, nSign, mode, callId, gwSign}
       if(app){
         if(this.listenerCount(`call/${app}/${method}`) > 0){
-          response = await this.emit(`call/${app}/${method}`, {method, params, nSign, mode, callId, gwSign})
+          response = await this.emit(`call/${app}/${method}`, callingArgs)
         }
         else if(this.listenerCount(`call/${app}/request`) > 0){
-          response = await this.emit(`call/${app}/request`, {method, params, nSign, mode, callId, gwSign})
+          response = await this.emit(`call/${app}/request`, callingArgs)
         }
         else{
           throw {message: `app:[${app}] method:[${method}] handler not defined`}
         }
       }
       else{
-        response = await this.emit(`call/muon/${method}`, {method, params, nSign, mode, callId})
+        response = await this.emit(`call/muon/${method}`, callingArgs)
       }
-      await this.__handleCallResponse(response);
+      await this.__handleCallResponse(callingArgs, response);
       return response
     }
     catch (e) {

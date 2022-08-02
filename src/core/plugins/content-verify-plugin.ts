@@ -1,5 +1,5 @@
-const BasePlugin = require('./base/base-plugin')
-const {createCIDFromString} = require('../../utils/cid')
+import BasePlugin from './base/base-plugin'
+const {createCIDFromString, cid2str} = require('../../utils/cid')
 const Violation = require('../../gateway/models/Violation')
 const { subscribeLogEvent } = require('../../utils/eth')
 const muonAbi = require('../../utils/muon-abi')
@@ -8,7 +8,7 @@ const unique = (value, index, self) => {
   return self.indexOf(value) === index
 }
 
-class ContentVerifyPlugin extends BasePlugin {
+export default class ContentVerifyPlugin extends BasePlugin {
   async onStart() {
     let subscribes = []
 
@@ -74,14 +74,13 @@ class ContentVerifyPlugin extends BasePlugin {
       verified = false,
       expectedResult,
       actualResult
-    let actualCid = (await createCIDFromString(content)).toString()
+    let actualCid = cid2str(await createCIDFromString(content))
     if (cid.toLowerCase() === actualCid.toLowerCase()) {
       request = JSON.parse(content)
       let app = this.muon.getAppByName(request.app)
       if (app) {
         if (app.isVerifiedRequest !== undefined) {
-          ;[verified, expectedResult, actualResult] =
-            await app.isVerifiedRequest(request)
+          [verified, expectedResult, actualResult] = await app.isVerifiedRequest(request)
         } else {
           description = `app.isVerifiedRequest not implemented for [${request.app}]`
         }
@@ -89,6 +88,10 @@ class ContentVerifyPlugin extends BasePlugin {
         description = 'unknown app'
       }
     } else {
+      console.log({
+        cid,
+        actualCid
+      })
       description = 'cid mismatch'
     }
     return [verified, description, expectedResult, actualResult]
@@ -104,5 +107,3 @@ class ContentVerifyPlugin extends BasePlugin {
       }, {})
   }
 }
-
-module.exports = ContentVerifyPlugin

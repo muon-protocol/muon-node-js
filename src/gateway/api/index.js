@@ -22,7 +22,7 @@ function extraLogs(req, result) {
       headers: req.headers,
     }
   }
-  if(result.confirmed) {
+  if(result?.confirmed) {
     logs.extra = {
       ... logs.extra,
       nonce: result.data?.init?.nonceAddress,
@@ -49,8 +49,8 @@ router.use('/', (req, res, next) => {
         mode,
         gwSign,
         success: true,
-        confirmed: result.confirmed,
-        errorMessage: result.confirmed ? "" : "",
+        confirmed: result?.confirmed,
+        errorMessage: result?.confirmed ? "" : "",
         ... extraLogs(req, result),
       });
       res.json({success: true, result})

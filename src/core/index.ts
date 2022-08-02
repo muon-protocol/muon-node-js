@@ -95,7 +95,7 @@ async function start() {
         'ipc': [(await import('./plugins/core-ipc-plugin')).default, {}],
         'ipc-handlers': [(await import('./plugins/core-ipc-handlers')).default, {}],
         'broadcast': [(await import('./plugins/broadcast')).default, {}],
-        // 'content-verify': [require('./plugins/content-verify-plugin'), {}],
+        'content-verify': [(await import('./plugins/content-verify-plugin')).default, {}],
         'content': [(await import('./plugins/content-app')).default, {}],
         'memory': [(await import('./plugins/memory-plugin')).default, {}],
         'tss-plugin': [(await import('./plugins/tss-plugin')).default, {}],
