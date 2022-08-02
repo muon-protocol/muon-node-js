@@ -142,11 +142,9 @@ class MemoryPlugin extends CallablePlugin {
     let {ttl, data} = memory;
     let nSign=1,
       timestamp=getTimestamp();
-    if(!process.env.SIGN_WALLET_ADDRESS)
-      return ;
     let memWrite: MemWrite = {
       type: Memory.types.Node,
-      owner: process.env.SIGN_WALLET_ADDRESS,
+      owner: process.env.SIGN_WALLET_ADDRESS!,
       timestamp,
       ttl,
       nSign,

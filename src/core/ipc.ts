@@ -1,3 +1,4 @@
+import {IpcCallOptions} from "../common/types";
 const { QueueProducer, MessagePublisher } = require('../common/message-bus')
 const { BROADCAST_CHANNEL } = require('./plugins/broadcast')
 const { IPC_CHANNEL } = require('./plugins/core-ipc-plugin')
@@ -20,15 +21,14 @@ export type CoreGlobalEvent = {
  * @param options - ipc call options
  * @param options.timeout - if response not receive after this timeout, call result will reject
  * @param options.timeoutMessage - define promise reject message
- * @param options.rawResponse - will return ipc call raw response instead of ipc method returning value
  * @param options.pid - define cluster PID to running ipc method
  * @returns {Promise<Object>}
  */
-function call(method: string, params: any, options: any) {
+function call(method: string, params: any, options: IpcCallOptions={}) {
   return callQueue.send({method, params}, options);
 }
 
-function broadcast(data, options) {
+function broadcast(data: any, options: IpcCallOptions) {
   return broadcastQueue.send(data, options)
 }
 
@@ -36,14 +36,14 @@ function fireEvent(event: CoreGlobalEvent) {
   coreGlobalEvents.send(event)
 }
 
-async function generateTssKey(keyId) {
-  let key = await call('generate-tss-key', {keyId}, {});
+async function generateTssKey(keyId: string) {
+  let key = await call('generate-tss-key', {keyId});
   // console.log("CoreIpc.generateTssKey", JSON.stringify(key,null, 2))
   // console.log("CoreIpc.generateTssKey", key.partners)
   return DistributedKey.load(null, key)
 }
 
-async function getTssKey(keyId, options={}) {
+async function getTssKey(keyId: string, options: IpcCallOptions) {
   const key = await call('get-tss-key', {keyId}, options);
   return DistributedKey.load(null, key)
 }

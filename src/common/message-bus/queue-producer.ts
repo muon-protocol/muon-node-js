@@ -1,5 +1,5 @@
 const BaseMessageQueue = require('./base-message-queue')
-import { RemoteCallConfig } from './types'
+import { IpcCallOptions } from "../types";
 import TimeoutPromise from '../timeout-promise'
 const NodeCache = require('node-cache');
 
@@ -25,7 +25,7 @@ export default class QueueProducer<MessageType> extends BaseMessageQueue {
    * @param options.await - wait to end the event process and then run new one.
    * @returns {Promise<Object>}
    */
-  send(message: MessageType, options: RemoteCallConfig={}){
+  send(message: MessageType, options: IpcCallOptions={}){
     options = {
       timeout: 0,
       timeoutMessage: "Queue request timeout!",

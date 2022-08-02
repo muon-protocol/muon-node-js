@@ -443,7 +443,7 @@ class BaseAppPlugin extends CallablePlugin {
         .then(this.__onRemoteSignTheRequest.bind(this))
         .catch(e => {
           // console.log('base-tss-app-plugin: on broadcast request error', e)
-          return this.__onRemoteSignTheRequest({}, {
+          return this.__onRemoteSignTheRequest(null, {
             request: request.hash,
             peerId,
             ...e
@@ -493,7 +493,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async __onRemoteSignTheRequest(data = {}, error) {
+  async __onRemoteSignTheRequest(data: {sign: AppRequestSignature} | null, error) {
     // console.log('BaseAppPlugin.__onRemoteSignTheRequest', data)
     if(error){
       let collateralPlugin = this.muon.getPlugin('collateral');
@@ -508,18 +508,13 @@ class BaseAppPlugin extends CallablePlugin {
       return;
     }
     try {
-      // @ts-ignore
-      let {sign, memWrite} = data;
+      let {sign} = data!;
       // let request = await Request.findOne({_id: sign.request})
       let request = this.requestManager.getRequest(sign.request)
       if (request) {
         // TODO: check response similarity
         // let signer = this.recoverSignature(request, sign)
         // if (signer && signer === sign.owner) {
-          if (!!memWrite) {
-            // TODO: validate memWright signature
-            sign.memWriteSignature = memWrite.signature
-          }
           this.requestManager.addSignature(request.hash, sign.owner, sign)
           // // let newSignature = new Signature(sign)
           // // await newSignature.save()
@@ -583,8 +578,11 @@ class BaseAppPlugin extends CallablePlugin {
 
     let sign = this.makeSignature(request, result, hash2)
     let memWrite = this.getMemWrite(request, result)
+    if(memWrite){
+      sign.memWriteSignature = memWrite.signatures[0]
+    }
 
-    return { sign, memWrite }
+    return { sign }
   }
 }
 

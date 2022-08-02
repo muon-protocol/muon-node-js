@@ -1,5 +1,6 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
+import {IpcCallOptions} from "../../common/types";
 const {timeout} = require('../../utils/helpers')
 const NodeCache = require('node-cache');
 const coreIpc = require('../../core/ipc')
@@ -18,7 +19,7 @@ const tasksCache = new NodeCache({
 @remoteApp
 class NetworkIpcHandler extends CallablePlugin {
 
-  clustersPids = {};
+  clustersPids: {[pid: string]: number} = {};
 
   async onStart() {
     super.onStart()
@@ -69,27 +70,27 @@ class NetworkIpcHandler extends CallablePlugin {
     })
   }
 
-  assignTaskToProcess(taskId, pid) {
-    tasksCache.set(taskId, pid)
+  assignTaskToProcess(taskId: string, pid: number) {
+    tasksCache.set(taskId, pid);
   }
 
-  takeRandomProcess() {
-    let pList = Object.keys(this.clustersPids);
+  takeRandomProcess(): number {
+    let pList = Object.values(this.clustersPids);
     const index = Math.floor(Math.random() * pList.length)
     return pList[index]
   }
 
-  getTaskProcess(taskId) {
+  getTaskProcess(taskId: string): number {
     return tasksCache.get(taskId);
   }
 
   @ipcMethod('report-cluster-status')
-  async __reportClusterStatus(data) {
+  async __reportClusterStatus(data: {pid: number, status: "start" | "exit"}) {
     // console.log("NetworkIpcHandler.__reportClusterStatus", {data,callerInfo});
-    let {pid, status} = data || {}
+    let {pid, status} = data
     switch (status) {
       case "start":
-        this.clustersPids[pid] = true
+        this.clustersPids[pid] = pid
         break;
       case "exit":
         delete this.clustersPids[pid];
@@ -99,7 +100,7 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod('get-leader')
-  async __getLeader(data, callerInfo) {
+  async __getLeader(data: any, callerInfo) {
     let leaderPlugin = this.network.getPlugin('group-leader')
     await leaderPlugin.waitToLeaderSelect();
     return leaderPlugin.leader;
@@ -172,17 +173,14 @@ class NetworkIpcHandler extends CallablePlugin {
   @remoteMethod("exec-ipc-remote-call")
   async __onIpcRemoteCallExec(data, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcRemoteCallExec`, data);
-    let taskId, options = {};
+    let taskId, options: IpcCallOptions = {};
     if(data?.options?.taskId){
       taskId = data?.options.taskId;
       if(tasksCache.has(taskId)) {
-        //@ts-ignore
         options.pid = tasksCache.get(data.options.taskId);
       }
       else{
-        //@ts-ignore
         options.pid = this.takeRandomProcess()
-        //@ts-ignore
         this.assignTaskToProcess(taskId, options.pid);
       }
     }
