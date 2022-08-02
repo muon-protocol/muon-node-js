@@ -99,7 +99,6 @@ async function start() {
         'content': [(await import('./plugins/content-app')).default, {}],
         'memory': [(await import('./plugins/memory-plugin')).default, {}],
         'tss-plugin': [(await import('./plugins/tss-plugin')).default, {}],
-        'tss-party-search': [(await import('./plugins/tss-party-search')).default, {}],
         'health-check': [(await import('./plugins/health-check')).default, {}],
         ...await getEnvPlugins(),
         ...getCustomApps(),
