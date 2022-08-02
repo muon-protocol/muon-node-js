@@ -147,7 +147,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     return this.loading.promise;
   }
 
-  isLoaded(){
+  isLoaded(): boolean{
     return this.loading.isFulfilled;
   }
 }

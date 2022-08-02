@@ -8,6 +8,7 @@ const {utils:{soliditySha3}} = require('web3')
 const CoreIpc = require('../../core/ipc')
 import { OnlinePeerInfo } from '../types'
 import { RemoteCallOptions } from './remote-call'
+import CollateralInfoPlugin from "./collateral-info";
 
 const RemoteMethods = {
   AskElectionPermission: "AskElectionPermission",
@@ -48,7 +49,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   async onStart() {
     super.onStart();
 
-    if(this.collateralPlugin.isLoaded){
+    if(this.collateralPlugin.isLoaded()){
       this._checkStatus();
     }
     else{
@@ -66,7 +67,6 @@ class GroupLeaderPlugin extends CallablePlugin {
         this.reselectLeader();
       }
       else{
-        // @tss-ignore
         let onlineNodes = this.onlinePartners.map(p => p.wallet).filter(w => w!==peerIdStr);
         if(onlineNodes.length+1 < this.collateralPlugin.TssThreshold){
           console.log(`No enough online nodes. The leader will be cleared to select it again.`)
@@ -81,7 +81,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     setTimeout(this._checkStatus.bind(this), 5000);
   }
 
-  get collateralPlugin(){
+  get collateralPlugin(): CollateralInfoPlugin{
     return this.network.getPlugin('collateral');
   }
 
@@ -130,7 +130,6 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async electionStart() {
-    // @ts-ignore
     let responses = await this.callParty(RemoteMethods.ElectionStart);
     // console.log(`GroupLeaderPlugin.electionStart electionStart responses:`, responses)
     let allDone = responses.findIndex(r => (r!==true)) < 0;
@@ -140,7 +139,6 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   // TODO: if all nodes except leader restart, then leader cannot be select
   async leaderAlreadySelected(): Promise<string | null>{
-    // @ts-ignore
     let responses = await this.callParty(RemoteMethods.WhoIsLeader)
     let leaderCount = responses
       .filter(r => !!r?.leader)
@@ -171,7 +169,6 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async isPermittedToDoElection() {
-    // @ts-ignore
     let responses = await this.callParty(RemoteMethods.AskElectionPermission);
     console.log('Current executor:', this.currentExecutor)
     console.log(`election permission responses`, responses);
@@ -185,7 +182,6 @@ class GroupLeaderPlugin extends CallablePlugin {
     //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
     if(this.electionKey === null)
       throw {message: "Election key is null."}
-    // @ts-ignore
     let partners = this.electionKey.partners
       .filter(w => w !== process.env.SIGN_WALLET_ADDRESS)
       .map(w => this.collateralPlugin.getWalletPeerId(w))
@@ -238,9 +234,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     // return Object.values(this.TssPlugin.tssParty.onlinePartners)
     //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
 
-    // @ts-ignore
     return Object.values(this.collateralPlugin.onlinePeers)
-    // @ts-ignore
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
   }
 
@@ -256,7 +250,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     return walletList[minIndex]
   }
 
-  async callParty(method, data={}, partners, options?:RemoteCallOptions){
+  async callParty(method, data?, partners?, options?:RemoteCallOptions){
     if(partners === undefined)
       partners = this.onlinePartners
     return Promise.all(partners.map(p => {
@@ -293,15 +287,13 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.ElectionResultReady)
-  async _electionResultReady(data={}, callerInfo) {
+  async _electionResultReady(data:{electionKey: string}, callerInfo) {
     // console.log('GroupLeaderPlugin.ElectionResultReady', {data, callerInfo});
     let permitted = this.isWalletPermittedToElect(callerInfo.wallet);
     if(permitted){
       // let key = this.TssPlugin.getSharedKey(data.electionKey);
       // await key.waitToFulfill();
-      // @ts-ignore
       let pid = await this.network.getPlugin('ipc-handler').getTaskProcess(`keygen-${data.electionKey}`)
-      // @ts-ignore
       let key = await CoreIpc.getTssKey(data.electionKey, {pid});
       this._electionComplete(key);
       return true;

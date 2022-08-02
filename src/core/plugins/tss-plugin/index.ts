@@ -227,8 +227,7 @@ class TssPlugin extends CallablePlugin {
 
   async isNeedToCreateKey(){
     let myWallet = process.env.SIGN_WALLET_ADDRESS;
-    // @ts-ignore
-    let onlinePartners = Object.values(this.tssParty.onlinePartners).filter(p => (p.wallet !== myWallet))
+    let onlinePartners = Object.values(this.tssParty!.onlinePartners).filter(p => (p.wallet !== myWallet))
     let statuses = await Promise.all(onlinePartners.map(p => {
       return this.remoteCall(
         p.peer,
@@ -288,8 +287,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   async tryToRecoverTssKey(partners){
-    // @ts-ignore
-    partners = partners.map(w => this.tssParty.partners[w]);
+    partners = partners.map(w => this.tssParty!.partners[w]);
 
     if(partners.length < this.collateralPlugin.TssThreshold)
       throw {message: "No enough online partners to recover key."};
@@ -319,10 +317,8 @@ class TssPlugin extends CallablePlugin {
         }
       )
       .filter(s => !!s)
-    // @ts-ignore
-    if (shares.length < this.tssParty.t) {
-      // @ts-ignore
-      console.log(`Need's of ${this.tssParty.t} result to recover the Key, but received ${shares.n} result.`)
+    if (shares.length < this.tssParty!.t) {
+      console.log(`Need's of ${this.tssParty!.t} result to recover the Key, but received ${shares.n} result.`)
       return false;
     }
 
@@ -357,8 +353,7 @@ class TssPlugin extends CallablePlugin {
         key = await this.keyGen(this.tssParty)
       } while (tssModule.HALF_N.lt(key.getTotalPubKey().x));
 
-      // @ts-ignore
-      let keyPartners = key.partners.map(wallet => this.tssParty.partners[wallet])
+      let keyPartners = key.partners.map(wallet => this.tssParty!.partners[wallet])
       let callResult = await Promise.all(keyPartners.map(({wallet, peer}) => {
         if (wallet === process.env.SIGN_WALLET_ADDRESS)
           return Promise.resolve(true);
@@ -368,8 +363,7 @@ class TssPlugin extends CallablePlugin {
           peer,
           RemoteMethods.storeTssKey,
           {
-            // @ts-ignore
-            party: this.tssParty.id,
+            party: this.tssParty!.id,
             key: key.id,
           },
           {taskId: `keygen-${key.id}`}
@@ -457,8 +451,7 @@ class TssPlugin extends CallablePlugin {
       partners = partners.filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS))
       partners = [
         /** self */
-        // @ts-ignore
-        party.partners[process.env.SIGN_WALLET_ADDRESS],
+        party.partners[process.env.SIGN_WALLET_ADDRESS!],
         /** randomly select (maxPartners - 1) from others */
         ...shuffle(partners).slice(0, maxPartners - 1)
       ];

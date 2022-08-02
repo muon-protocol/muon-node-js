@@ -82,7 +82,6 @@ class Network extends Events {
 
     if (this.configs.libp2p.natIp) {
       let {port, natIp} = this.configs.libp2p
-      // @ts-ignore
       this.libp2p.addressManager.addObservedAddr(`/ip4/${natIp}/tcp/${port}/p2p/${this.peerId.toB58String()}`);
     }
 
@@ -117,7 +116,6 @@ class Network extends Events {
     }
   }
 
-  // @ts-ignore
   onPeerConnect(connection) {
     console.log(
       emoji.get('moon'),
@@ -129,7 +127,6 @@ class Network extends Events {
     coreIpc.fireEvent({type: "peer:connect", data: connection.remotePeer.toB58String()})
   }
 
-  // @ts-ignore
   onPeerDisconnect(connection) {
     console.log(
       emoji.get('moon'),
@@ -141,7 +138,6 @@ class Network extends Events {
     coreIpc.fireEvent({type: "peer:disconnect", data: connection.remotePeer.toB58String()})
   }
 
-  // @ts-ignore
   async onPeerDiscovery(peerId) {
     this.emit('peer:discovery', peerId)
     coreIpc.fireEvent({type: "peer:discovery", data: peerId.toB58String()})
@@ -160,7 +156,6 @@ class Network extends Events {
 }
 
 function getLibp2pBootstraps(){
-  // @ts-ignore
   return Object.keys(process.env)
     .filter(key => key.startsWith('PEER_BOOTSTRAP_'))
     .map(key => process.env[key])

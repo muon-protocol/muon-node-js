@@ -38,7 +38,6 @@ export default class BaseNetworkingPlugin extends Events {
     catch (e) {
       // TODO: what to do?
       // if(process.env.VERBOSE)
-        // @ts-ignore
         console.error("BaseNetworkPlugin.findPeer", peerId.toB58String(), e.stack)
       return null;
     }

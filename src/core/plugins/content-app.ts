@@ -2,6 +2,7 @@ import CallablePlugin from './base/callable-plugin'
 const Content = require('../../gateway/models/Content')
 const all = require('it-all')
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
+import {GatewayMethodData} from "../../gateway/types";
 const {loadCID} = require('../../utils/cid')
 const {timeout} = require('../../utils/helpers')
 
@@ -42,7 +43,7 @@ class ContentApp extends CallablePlugin {
   }
 
   async getContent(cid){
-    return this.responseToGatewayRequestData({cid})
+    // return this.responseToGatewayRequestData({cid})
   }
 
   @gatewayMethod('verify')
@@ -75,23 +76,21 @@ class ContentApp extends CallablePlugin {
   }
 
   @gatewayMethod('get_content')
-  async responseToGatewayRequestData(data={}){
-    // @ts-ignore
+  async responseToGatewayRequestData(data: GatewayMethodData){
     let {cid, format='string'} = data.params;
     let content = await Content.findOne({cid});
     if(content){
       return this.prepareOutput(content.content, format);
     }else{
-      // @ts-ignore
-      let cid = loadCID(data.cid);
-      let providers = await all(this.muon.libp2p.contentRouting.findProviders(cid, {timeout: 5000}))
-      for(let provider of providers){
-        if(provider.id.toB58String() !== process.env.PEER_ID){
-          let peer = await this.findPeer(provider.id);
-          let request = await this.remoteCall(peer, 'get_content', data)
-          return this.prepareOutput(request, format)
-        }
-      }
+      // let cid = loadCID(cidStr);
+      // let providers = await all(this.muon.libp2p.contentRouting.findProviders(cid, {timeout: 5000}))
+      // for(let provider of providers){
+      //   if(provider.id.toB58String() !== process.env.PEER_ID){
+      //     let peer = await this.findPeer(provider.id);
+      //     let request = await this.remoteCall(peer, 'get_content', data)
+      //     return this.prepareOutput(request, format)
+      //   }
+      // }
       return null
     }
   }
