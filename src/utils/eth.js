@@ -20,17 +20,15 @@ const _networksWeb3 = {
   97: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSCTEST)),
   250: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTM)),
   4002: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTMTEST)),
-  100: new Web3(new HttpProvider('https://rpc.xdaichain.com/')),
-  77: new Web3(new HttpProvider('https://sokol.poa.network')),
+  100: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_XDAI_MAINNET || 'https://rpc.xdaichain.com/')),
+  77: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_XDAI_SOKOL_TESTNET || 'https://sokol.poa.network')),
   137: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_POLYGON)),
   80001: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_MUMBAI)),
-  43113: new Web3(
-    new HttpProvider('https://api.avax-test.network/ext/bc/C/rpc')
-  ),
-  43114: new Web3(new HttpProvider('https://api.avax.network/ext/bc/C/rpc')),
-  421611: new Web3(new HttpProvider('https://rinkeby.arbitrum.io/rpc')),
-  42161: new Web3(new HttpProvider('https://arb1.arbitrum.io/rpc')),
-  1088: new Web3(new HttpProvider(' https://andromeda.metis.io/?owner=1088'))
+  43113: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_AVALANCHE_FUJI_TESTNET || 'https://api.avax-test.network/ext/bc/C/rpc')),
+  43114: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_AVALANCHE_MAINNET || 'https://api.avax.network/ext/bc/C/rpc')),
+  421611: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ARBITRUM_TESTNET || 'https://rinkeby.arbitrum.io/rpc')),
+  42161: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ARBITRUM_MAINNET || 'https://arb1.arbitrum.io/rpc')),
+  1088: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_METIS || 'https://andromeda.metis.io/?owner=1088'))
 }
 
 const nameToChainIdMap = {
