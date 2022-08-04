@@ -1,5 +1,5 @@
 const CallablePlugin = require('./base/callable-plugin')
-const {remoteApp, remoteMethod, ipcMethod} = require('./base/app-decorators')
+const {remoteApp, remoteMethod, ipcMethod, broadcastHandler} = require('./base/app-decorators')
 const {timeout} = require('@src/utils/helpers')
 const NodeCache = require('node-cache');
 const coreIpc = require('../../core/ipc')
@@ -58,15 +58,10 @@ class NetworkIpcHandler extends CallablePlugin {
     return "Ok"
   }
 
+  @broadcastHandler
   async onBroadcastReceived(data={}, callerInfo) {
     // console.log('NetworkIpcHandler.onBroadcastReceived', data, callerInfo);
-    return await coreIpc.broadcast({
-      data,
-      callerInfo: {
-        wallet: callerInfo.wallet,
-        peerId: callerInfo.peerId._idB58String
-      }
-    })
+    return await coreIpc.broadcast({data, callerInfo})
   }
 
   assignTaskToProcess(taskId, pid) {

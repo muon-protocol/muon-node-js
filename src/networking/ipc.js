@@ -7,6 +7,10 @@ function call(method, params, options) {
   return callQueue.send({method, params}, options);
 }
 
+function broadcastToChannel(channel, message) {
+  return call("broadcast-message", {channel, message})
+}
+
 function forwardRemoteCall(peer, method, params, options) {
   return call("remote-call", {peer, method, params, options})
 }
@@ -29,6 +33,7 @@ function askClusterPermission(key, expireTime) {
 
 module.exports = {
   call,
+  broadcastToChannel,
   forwardRemoteCall,
   reportClusterStatus,
   assignTask,
