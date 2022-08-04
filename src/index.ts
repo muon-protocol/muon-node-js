@@ -37,7 +37,7 @@ async function refreshWorkersList() {
 }
 
 async function boot() {
-  if (cluster.isPrimary) {
+  if (cluster.isMaster) {
     console.log(`Master cluster start at [${process.pid}]`)
     SharedMemory.startServer();
 
