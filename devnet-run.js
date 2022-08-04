@@ -11,8 +11,8 @@ function runMuonNode(node_n) {
       const result = spawn('./node_modules/.bin/env-cmd', [
         '-f',
         `./dev-chain/dev-node-${i}.env`,
-        'babel-node',
-        './src/index.js'
+        'ts-node',
+        './src/index.ts'
       ])
       result.stdout.on('data', (data) => {
         console.log(data.toString())
