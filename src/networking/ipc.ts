@@ -12,6 +12,10 @@ function getOnlinePeers(): Promise<string[]> {
   return call("get-online-peers");
 }
 
+function broadcastToChannel(channel, message) {
+  return call("broadcast-message", {channel, message})
+}
+
 function forwardRemoteCall(peer, method, params, options) {
   return call("remote-call", {peer, method, params, options})
 }
@@ -43,6 +47,7 @@ function findContent(cid: string): Promise<any> {
 export {
   call,
   getOnlinePeers,
+  broadcastToChannel,
   forwardRemoteCall,
   reportClusterStatus,
   assignTask,

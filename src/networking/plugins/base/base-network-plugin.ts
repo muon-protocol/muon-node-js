@@ -47,15 +47,21 @@ export default class BaseNetworkingPlugin extends Events {
     return this.network.peerId;
   }
 
-  get BROADCAST_CHANNEL(){
+  get ConstructorName() {
     let superClass = Object.getPrototypeOf(this);
-    return `muon/plugin/${superClass.constructor.name}/broadcast`
+    return superClass.constructor.name
+  }
+
+  get BROADCAST_CHANNEL(){
+    if(this.__broadcastHandlerMethod === undefined)
+      return null;
+    return `muon/network/plugin/${this.ConstructorName}/broadcast`
   }
 
   async registerBroadcastHandler(){
     let broadcastChannel = this.BROADCAST_CHANNEL
     /*eslint no-undef: "error"*/
-    if (broadcastChannel && this.onBroadcastReceived) {
+    if (broadcastChannel) {
 
       if(process.env.VERBOSE) {
         console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
@@ -67,36 +73,34 @@ export default class BaseNetworkingPlugin extends Events {
 
   broadcast(data){
     let broadcastChannel = this.BROADCAST_CHANNEL
-    if (!broadcastChannel || !this.onBroadcastReceived) {
-      let currentPlugin = Object.getPrototypeOf(this);
-      console.log(`Broadcast not available for plugin ${currentPlugin.constructor.name}`)
+    if (!broadcastChannel) {
+      console.log(`Broadcast not available for plugin ${this.ConstructorName}`)
       return;
     }
     let dataStr = JSON.stringify(data)
     this.network.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(dataStr))
   }
 
-  async __onPluginBroadcastReceived(event){
-    // TODO: correct function body
-    console.log(`BaseNetworkPlugin.__onPluginBroadcastReceived`, event)
-    // const rawData = event.detail
-    // const topic = message.topic
-    // try{
-    //   let strData = uint8ArrayToString(rawData)
-    //   let data = JSON.parse(strData);
-    //   let collateralPlugin = this.network.getPlugin('collateral');
-    //
-    //   let senderWallet = collateralPlugin.getPeerWallet(from);
-    //   if(!senderWallet){
-    //     throw {message: `Unrecognized broadcast owner ${senderWallet}`, data: strData}
-    //   }
-    //
-    //   /*eslint no-undef: "error"*/
-    //   await this.onBroadcastReceived(data, {wallet: senderWallet, peerId: from});
-    // }
-    // catch (e) {
-    //   console.log('BasePlugin.__onPluginBroadcastReceived', e)
-    //   throw e;
-    // }
+  async __onPluginBroadcastReceived({data: rawData, from, ...otherItems}){
+    try{
+      let strData = uint8ArrayToString(rawData)
+      let data = JSON.parse(strData);
+      let collateralPlugin = this.network.getPlugin('collateral');
+
+      let senderWallet = collateralPlugin.getPeerWallet(from);
+      if(!senderWallet){
+        throw {message: `Unrecognized broadcast owner ${senderWallet}`, data: strData}
+      }
+
+      /*eslint no-undef: "error"*/
+      let broadcastHandler = this[this.__broadcastHandlerMethod].bind(this);
+      if(typeof from != "string")
+        from = from.peerId._idB58String
+      await broadcastHandler(data, {wallet: senderWallet, peerId: from});
+    }
+    catch (e) {
+      console.log('BasePlugin.__onPluginBroadcastReceived', e)
+      throw e;
+    }
   }
 }

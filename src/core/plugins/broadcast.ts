@@ -1,5 +1,5 @@
 import BasePlugin from './base/base-plugin'
-const { call: networkingIpcCall } = require('../../networking/ipc')
+import * as NetworkingIpc from '../../networking/ipc'
 import QueueConsumer from '../../common/message-bus/queue-consumer'
 
 export const BROADCAST_CHANNEL = 'core-broadcast';
@@ -44,7 +44,7 @@ export default class BroadcastPlugin extends BasePlugin {
   async broadcastToChannel(channel, message) {
     if(channel===undefined || message===undefined)
       throw {message: "Broadcast channel/message must be defined"}
-    let response = await networkingIpcCall("broadcast-message", {channel, message});
+    let response = await NetworkingIpc.broadcastToChannel(channel, message);
     // TODO: is need to check response is 'Ok' or not?
   }
 }

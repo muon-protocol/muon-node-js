@@ -26,6 +26,7 @@ const crypto = require('../../utils/crypto')
 const {getTimestamp} = require('../../utils/helpers')
 const Memory = require('../../gateway/models/Memory')
 import { remoteApp, broadcastHandler } from './base/app-decorators'
+import CollateralInfoPlugin from "./collateral-info";
 
 export type MemWriteType = 'app' | 'node'
 
@@ -58,8 +59,8 @@ class MemoryPlugin extends CallablePlugin {
 
   @broadcastHandler
   async onBroadcastReceived(data) {
+    console.log("MemoryPlugin.onBroadcastReceived", data)
     try {
-      // let data = JSON.parse(uint8ArrayToString(msg.data));
       if (data && data.type === 'mem_write' && !!data.memWrite) {
         if(this.checkSignature(data.memWrite)){
           this.storeMemWrite(data.memWrite);
@@ -73,24 +74,40 @@ class MemoryPlugin extends CallablePlugin {
     }
   }
 
-  checkSignature(memWrite){
-    let collateralPlugin = this.muon.getPlugin('collateral');
+  checkSignature(memWrite: MemWrite){
+    let collateralPlugin: CollateralInfoPlugin = this.muon.getPlugin('collateral');
 
     let {signatures} = memWrite;
+
     let hash = this.hashMemWrite(memWrite)
     if(hash !== memWrite.hash) {
       console.log('hash mismatch', [hash, memWrite.hash])
       return false
     }
-    let allowedList = collateralPlugin.getWallets();
-    let sigOwners = signatures.map(sig => crypto.recover(hash, sig));
-    for(const address of sigOwners){
-      let index = allowedList.findIndex(addr => (addr.toLowerCase()===address.toLowerCase()))
-      if(index < 0) {
-        return false
+
+    let allowedList = collateralPlugin.getWallets().map(addr => addr.toLowerCase());
+
+    switch (memWrite.type) {
+      case "app": {
+        if(signatures.length < collateralPlugin.TssThreshold)
+          throw "Insufficient MemWrite signature";
+        let sigOwners: string[] = signatures.map(sig => crypto.recover(hash, sig).toLowerCase())
+        console.log({sigOwners})
+        let ownerIsValid: number[] = sigOwners.map(owner => (allowedList.indexOf(owner) >= 0 ? 1 : 0))
+        let validCount: number = ownerIsValid.reduce((sum, curr) => (sum + curr), 0)
+        return validCount >= collateralPlugin.TssThreshold;
       }
+      case "node": {
+        if(signatures.length !== 1){
+          throw `Node MemWrite must have one signature. currently has ${signatures.length}.`;
+        }
+        const owner = crypto.recover(hash, signatures[0]).toLowerCase()
+        console.log({owner})
+        return allowedList.indexOf(owner) >= 0;
+      }
+      default:
+        throw `Unknown MemWrite type: ${memWrite.type}`
     }
-    return true;
   }
 
   hashMemWrite(memWrite: MemWrite) {

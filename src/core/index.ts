@@ -12,10 +12,10 @@ async function getEnvPlugins() {
   let pluginsStr = process.env['MUON_PLUGINS']
   if (!pluginsStr)
     return {}
-  let result = {};
-  pluginsStr.split('|').forEach(async key => {
+  let result: {[index: string]: any} = {};
+  for (let key of pluginsStr.split('|')) {
     result[`__${key}__`] = [(await import(`./plugins/${key}`)).default, {}]
-  })
+  }
   return result
 }
 

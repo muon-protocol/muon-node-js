@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin'
-import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
+import {remoteApp, remoteMethod, ipcMethod, broadcastHandler} from './base/app-decorators'
 import {IpcCallOptions} from "../../common/types";
 const all = require('it-all')
 
@@ -62,15 +62,11 @@ class NetworkIpcHandler extends CallablePlugin {
     return "Ok"
   }
 
-  async onBroadcastReceived(data = {}, callerInfo) {
+
+  @broadcastHandler
+  async onBroadcastReceived(data={}, callerInfo) {
     // console.log('NetworkIpcHandler.onBroadcastReceived', data, callerInfo);
-    return await coreIpc.broadcast({
-      data,
-      callerInfo: {
-        wallet: callerInfo.wallet,
-        peerId: callerInfo.peerId._idB58String
-      }
-    })
+    return await coreIpc.broadcast({data, callerInfo})
   }
 
   assignTaskToProcess(taskId: string, pid: number) {
