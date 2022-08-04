@@ -1,6 +1,6 @@
 import BasePlugin from './base/base-plugin'
 import TimeoutPromise from '../../common/timeout-promise'
-const { call: networkingIpcCall } = require('../../networking/ipc')
+import * as NetworkingIpc from '../../networking/ipc'
 import { GroupInfo, NetworkInfo } from '../../networking/plugins/collateral-info'
 
 export default class CollateralInfoPlugin extends BasePlugin{
@@ -33,7 +33,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
     let info;
     while(!info) {
       try {
-        info = await networkingIpcCall(
+        info = await NetworkingIpc.call(
           "get-collateral-info",
           {},
           {
