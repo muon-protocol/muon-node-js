@@ -3,7 +3,7 @@ dotenv.config()
 const fs = require('fs')
 const emoji = require('node-emoji')
 const { spawn } = require('child_process')
-const parseArgv = require('./utils/parseArgv')
+const parseArgv = require('./src/utils/parseArgv')
 
 function runMuonNode(node_n) {
   try {
@@ -11,8 +11,8 @@ function runMuonNode(node_n) {
       const result = spawn('./node_modules/.bin/env-cmd', [
         '-f',
         `./dev-chain/dev-node-${i}.env`,
-        'babel-node',
-        'index.js'
+        'ts-node',
+        './src/index.ts'
       ])
       result.stdout.on('data', (data) => {
         console.log(data.toString())
