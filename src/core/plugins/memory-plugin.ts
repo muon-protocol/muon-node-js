@@ -59,7 +59,7 @@ class MemoryPlugin extends CallablePlugin {
 
   @broadcastHandler
   async onBroadcastReceived(data) {
-    console.log("MemoryPlugin.onBroadcastReceived", data)
+    // console.log("MemoryPlugin.onBroadcastReceived", data)
     try {
       if (data && data.type === 'mem_write' && !!data.memWrite) {
         if(this.checkSignature(data.memWrite)){
@@ -102,7 +102,6 @@ class MemoryPlugin extends CallablePlugin {
           throw `Node MemWrite must have one signature. currently has ${signatures.length}.`;
         }
         const owner = crypto.recover(hash, signatures[0]).toLowerCase()
-        console.log({owner})
         return allowedList.indexOf(owner) >= 0;
       }
       default:

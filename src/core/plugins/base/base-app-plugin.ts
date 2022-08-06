@@ -162,12 +162,18 @@ class BaseAppPlugin extends CallablePlugin {
 
     /** view mode */
     if(mode === "view"){
+      if(this.validateRequest){
+        await this.validateRequest(clone(newRequest))
+      }
       let result = await this.onRequest(clone(newRequest))
       newRequest.data.result = result
       return omit(newRequest._doc, ['__v'])
     }
     /** sign mode */
     else{
+      if(this.validateRequest){
+        await this.validateRequest(clone(newRequest))
+      }
       if(this.onArrive){
         newRequest.data.init = await this.onArrive(clone(newRequest))
       }
@@ -548,6 +554,12 @@ class BaseAppPlugin extends CallablePlugin {
      */
     if(getTimestamp() - request.data.timestamp > 40) {
       throw "Request timestamp expired to sign."
+    }
+    /**
+     * validate request
+     */
+    if(this.validateRequest){
+      await this.validateRequest(clone(request))
     }
     /**
      * Check request result to be same.
