@@ -8,7 +8,7 @@ const emoji = require('node-emoji')
 const fs = require('fs')
 const { MessagePublisher, MessageSubscriber } = require('../common/message-bus')
 const { GLOBAL_EVENT_CHANNEL, fireEvent } = require('./ipc')
-const { call: networkingIpcCall } = require('../networking/ipc')
+import * as NetworkIpc from '../networking/ipc'
 import MuonBasePlugin from './plugins/base/base-plugin';
 
 export interface MuonPlugin {
@@ -66,7 +66,7 @@ export default class Muon extends Events {
     this._onceStarted();
 
     setTimeout(async () => {
-      const peerIds = await networkingIpcCall("get-online-peers")
+      const peerIds = await NetworkIpc.getOnlinePeers()
       if(peerIds.length > 0) {
         peerIds.forEach(peerId => {
           fireEvent({type: "peer:discovery", data: peerId})
