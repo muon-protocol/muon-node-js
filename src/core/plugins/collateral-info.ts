@@ -33,14 +33,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
     let info;
     while(!info) {
       try {
-        info = await NetworkingIpc.call(
-          "get-collateral-info",
-          {},
-          {
-            timeout: 5000,
-            timeoutMessage: "Getting collateral info timed out"
-          },
-        );
+        info = await NetworkingIpc.getCollateralInfo();
       }catch (e) {
         console.log(`[${process.pid}] CoreCollateralInfo._loadCollateralInfo`, e);
       }

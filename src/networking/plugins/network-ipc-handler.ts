@@ -1,6 +1,7 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, ipcMethod, broadcastHandler} from './base/app-decorators'
 import {IpcCallOptions} from "../../common/types";
+import CollateralInfoPlugin from "./collateral-info";
 const all = require('it-all')
 
 const {timeout} = require('../../utils/helpers')
@@ -19,6 +20,26 @@ const tasksCache = new NodeCache({
   useClones: false,
 });
 
+export const IpcMethods = {
+  GetOnlinePeers: "get-online-peers",
+  GetCollateralInfo: "get-collateral-info",
+  BroadcastMessage: "broadcast-message",
+  ReportClusterStatus: "report-cluster-status",
+  GetLeader: "get-leader",
+  AskClusterPermission: "ask-cluster-permission",
+  AssignTask: "assign-task",
+  RemoteCall: "remote-call",
+  ContentRoutingProvide: "content-routing-provide",
+  ContentRoutingFind: "content-routing-find",
+} as const;
+
+export const RemoteMethods = {
+  ExexIpcRemoteCall: "exec-ipc-remote-call",
+}
+
+type IpcKeys = keyof typeof IpcMethods;
+export type NetworkIpcMethod = typeof IpcMethods[IpcKeys];
+
 @remoteApp
 class NetworkIpcHandler extends CallablePlugin {
 
@@ -32,7 +53,7 @@ class NetworkIpcHandler extends CallablePlugin {
     })
   }
 
-  get collateralPlugin() {
+  get collateralPlugin(): CollateralInfoPlugin {
     return this.network.getPlugin('collateral');
   }
 
@@ -40,12 +61,12 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.network.getPlugin('remote-call');
   }
 
-  @ipcMethod("get-online-peers")
+  @ipcMethod(IpcMethods.GetOnlinePeers)
   async __onGetOnlinePeers() {
     return Object.keys(this.collateralPlugin.onlinePeers);
   }
 
-  @ipcMethod("get-collateral-info")
+  @ipcMethod(IpcMethods.GetCollateralInfo)
   async __onIpcGetCollateralInfo(data = {}, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
     const collateralPlugin = this.network.getPlugin('collateral');
@@ -55,7 +76,7 @@ class NetworkIpcHandler extends CallablePlugin {
     return {groupInfo, networkInfo, peersWallet, walletsPeer}
   }
 
-  @ipcMethod("broadcast-message")
+  @ipcMethod(IpcMethods.BroadcastMessage)
   async __onBroadcastMessage(data) {
     // console.log("NetworkIpcHandler.__onBroadcastMessage", data);
     this.broadcast(data);
@@ -83,7 +104,7 @@ class NetworkIpcHandler extends CallablePlugin {
     return tasksCache.get(taskId);
   }
 
-  @ipcMethod('report-cluster-status')
+  @ipcMethod(IpcMethods.ReportClusterStatus)
   async __reportClusterStatus(data: { pid: number, status: "start" | "exit" }) {
     // console.log("NetworkIpcHandler.__reportClusterStatus", {data,callerInfo});
     let {pid, status} = data
@@ -98,7 +119,7 @@ class NetworkIpcHandler extends CallablePlugin {
     // console.log("NetworkIpcHandler.__reportClusterStatus", this.clustersPids);
   }
 
-  @ipcMethod('get-leader')
+  @ipcMethod(IpcMethods.GetLeader)
   async __getLeader(data: any, callerInfo) {
     let leaderPlugin = this.network.getPlugin('group-leader')
     await leaderPlugin.waitToLeaderSelect();
@@ -107,7 +128,7 @@ class NetworkIpcHandler extends CallablePlugin {
 
   clusterPermissions = {};
 
-  @ipcMethod('ask-cluster-permission')
+  @ipcMethod(IpcMethods.AskClusterPermission)
   async __askClusterPermission(data, callerInfo) {
     // every 20 seconds one process get permission to do election
     if (
@@ -130,7 +151,7 @@ class NetworkIpcHandler extends CallablePlugin {
    * @returns {Promise<string>}
    * @private
    */
-  @ipcMethod('assign-task')
+  @ipcMethod(IpcMethods.AssignTask)
   async __assignTaskToProcess(data, callerInfo) {
     if (Object.keys(this.clustersPids).length < 1)
       throw {message: "No any online cluster"}
@@ -148,7 +169,7 @@ class NetworkIpcHandler extends CallablePlugin {
    * @returns {Promise<[any]>}
    * @private
    */
-  @ipcMethod("remote-call")
+  @ipcMethod(IpcMethods.RemoteCall)
   async __onRemoteCallRequest(data) {
     // console.log(`NetworkIpcHandler.__onRemoteCallRequest`, data);
     const peer = await this.findPeer(data?.peer);
@@ -169,7 +190,7 @@ class NetworkIpcHandler extends CallablePlugin {
    * @returns {Promise<*>}
    * @private
    */
-  @remoteMethod("exec-ipc-remote-call")
+  @remoteMethod(RemoteMethods.ExexIpcRemoteCall)
   async __onIpcRemoteCallExec(data, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcRemoteCallExec`, data);
     let taskId, options: IpcCallOptions = {};
@@ -194,7 +215,7 @@ class NetworkIpcHandler extends CallablePlugin {
       options);
   }
 
-  @ipcMethod("content-routing-provide")
+  @ipcMethod(IpcMethods.ContentRoutingProvide)
   async __onContentRoutingProvide(cids: string[], callerInfo) {
     for (let cid of cids) {
       console.log(`providing content ${cid}`)
@@ -202,7 +223,7 @@ class NetworkIpcHandler extends CallablePlugin {
     }
   }
 
-  @ipcMethod("content-routing-find")
+  @ipcMethod(IpcMethods.ContentRoutingFind)
   async __onContentRoutingFind(cid: string, callerInfo) {
     console.log(`NetworkIpcHandler.__onContentRoutingFind`, cid);
     let providers = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
