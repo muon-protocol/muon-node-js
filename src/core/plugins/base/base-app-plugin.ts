@@ -12,6 +12,8 @@ import { MemWrite } from '../memory-plugin'
 import {assertTSUndefinedKeyword} from "@babel/types";
 import DistributedKey from "../tss-plugin/distributed-key";
 import {OnlinePeerInfo} from "../../../networking/types";
+const Ajv = require("ajv")
+const ajv = new Ajv()
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
@@ -142,6 +144,14 @@ class BaseAppPlugin extends CallablePlugin {
 
     if(!this.tssPlugin.isReady)
       throw {message: "Tss not initialized"}
+
+    if(this.METHOD_PARAMS_SCHEMA){
+      if(this.METHOD_PARAMS_SCHEMA[method]){
+        if(!ajv.validate(this.APP_METHOD_PARAMS_SCHEMA[method], params)){
+          throw ajv.errors.map(e => e.message).join("\n");
+        }
+      }
+    }
 
     let newRequest = new Request({
       hash: null,
