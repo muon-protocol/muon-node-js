@@ -9,7 +9,7 @@ const { omit } = require('lodash')
 import AppRequestManager from './app-request-manager'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
 import { MemWrite } from '../memory-plugin'
-import {assertTSUndefinedKeyword} from "@babel/types";
+const { isArrowFn } = require('../../../utils/helpers')
 import DistributedKey from "../tss-plugin/distributed-key";
 import {OnlinePeerInfo} from "../../../networking/types";
 const Ajv = require("ajv")
@@ -64,13 +64,30 @@ class BaseAppPlugin extends CallablePlugin {
     // if (new.target === BaseAppPlugin) {
     //   throw new TypeError("Cannot construct abstract BaseAppPlugin instances directly");
     // }
+  }
 
+  warnArrowFunctions(methods: Array<string> = []) {
+    methods.forEach(method => {
+      if(isArrowFn(this[method])){
+        console.error(`WARNING !!!: ${method} of '${this.APP_NAME}' app defined as arrow function. Don't use any arrow function inside any app.`)
+      }
+    })
   }
 
   async onInit() {
     if(this.APP_NAME) {
       this.muon._apps[this.APP_NAME] = this;
     }
+
+    this.warnArrowFunctions([
+      "onArrive",
+      "onAppInit",
+      "validateRequest",
+      "onRequest",
+      "hashRequestResult",
+      "onMemWrite"
+    ])
+    this.warnArrowFunctions(this.readOnlyMethods);
 
     if(this.dependencies){
       this.initializeDependencies();
