@@ -3,13 +3,14 @@ const Request = require('../../../gateway/models/Request')
 const {makeAppDependency} = require('./app-dependencies')
 const { getTimestamp, timeout } = require('../../../utils/helpers')
 const crypto = require('../../../utils/crypto')
+const soliditySha3 = require('../../../utils/soliditySha3')
 const tss = require('../../../utils/tss');
 const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 import AppRequestManager from './app-request-manager'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
 import { MemWrite } from '../memory-plugin'
-const { isArrowFn } = require('../../../utils/helpers')
+const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 import DistributedKey from "../tss-plugin/distributed-key";
 import {OnlinePeerInfo} from "../../../networking/types";
 const chalk = require('chalk')
@@ -67,6 +68,10 @@ class BaseAppPlugin extends CallablePlugin {
     // }
   }
 
+  isV3(){
+    return !!this.signParams;
+  }
+
   warnArrowFunctions(methods: Array<string> = []) {
     methods.forEach(method => {
       if(isArrowFn(this[method])){
@@ -86,6 +91,7 @@ class BaseAppPlugin extends CallablePlugin {
       "validateRequest",
       "onRequest",
       "hashRequestResult",
+      "signParams",
       "onMemWrite"
     ])
     this.warnArrowFunctions(this.readOnlyMethods);
@@ -172,13 +178,13 @@ class BaseAppPlugin extends CallablePlugin {
     }
 
     let newRequest = new Request({
-      hash: null,
+      reqId: null,
       app: this.APP_NAME,
       appId: this.APP_ID,
       method: method,
       nSign,
-      owner: process.env.SIGN_WALLET_ADDRESS,
-      peerId: process.env.PEER_ID,
+      [this.isV3() ? 'gwAddress' : 'owner']: process.env.SIGN_WALLET_ADDRESS,
+      // peerId: process.env.PEER_ID,
       data: {
         uid: gatewayCallId,
         params,
@@ -211,13 +217,24 @@ class BaseAppPlugin extends CallablePlugin {
       newRequest.data.result = result
       let t3 = Date.now()
 
-      let resultHash = this.hashRequestResult(newRequest, result)
-      newRequest.hash = this.calculateRequestHash(newRequest, resultHash);
+      let resultHash;
+
+      if(this.isV3()){
+        const appSignParams = this.signParams(newRequest, result)
+        const resultHashWithoutSecurityParams = this.hashAppSignParams(newRequest, appSignParams, false);
+        newRequest.reqId = this.calculateRequestId(newRequest, resultHashWithoutSecurityParams)
+        newRequest.data.signParams = this.appendSecurityParams(newRequest, appSignParams)
+        resultHash = this.hashAppSignParams(newRequest, appSignParams)
+      }
+      else {
+        resultHash = this.hashRequestResult(newRequest, result)
+        newRequest.reqId = this.calculateRequestId(newRequest, resultHash);
+      }
 
       let isDuplicateRequest = false;
-      if(this.requestManager.hasRequest(newRequest.hash)){
+      if(this.requestManager.hasRequest(newRequest.reqId)){
         isDuplicateRequest = true;
-        newRequest = this.requestManager.getRequest(newRequest.hash);
+        newRequest = this.requestManager.getRequest(newRequest.reqId);
       }
       else {
         /**
@@ -244,7 +261,7 @@ class BaseAppPlugin extends CallablePlugin {
         if (!!memWrite) {
           sign.memWriteSignature = memWrite.signatures[0]
         }
-        this.requestManager.addSignature(newRequest.hash, sign.owner, sign);
+        this.requestManager.addSignature(newRequest.reqId, sign.owner, sign);
         // new Signature(sign).save()
 
         this.broadcastNewRequest(newRequest)
@@ -270,7 +287,8 @@ class BaseAppPlugin extends CallablePlugin {
       let requestData = {
         confirmed,
         ...omit(newRequest._doc, [
-          '__v'
+          '__v',
+          '_id'
           // 'data.memWrite'
         ]),
         ...((confirmed && gwSign) ? {gwSignature: crypto.sign(resultHash)} : {}),
@@ -286,12 +304,12 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  calculateRequestHash(request, resultHash) {
+  calculateRequestId(request, resultHash) {
     return crypto.soliditySha3([
-      {type: "address", value: request.owner},
+      {type: "address", value: this.isV3() ? request.gwAddress : request.owner},
       {type: "uint256", value: crypto.soliditySha3(request.data.uid)},
       {type: "uint32", value: request.data.timestamp},
-      {type: "string", value: request.app}, // TODO: APP_ID instead of name
+      {type: this.isV3() ? "uint256" : "uint32", value: request.appId},
       {type: "string", value: crypto.soliditySha3(request.method)},
       {type: "uint256", value: resultHash},
     ]);
@@ -309,7 +327,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     let nonce = await tssPlugin.keyGen(party, {
-      id: request.hash,
+      id: request.reqId,
       maxPartners: nonceParticipantsCount
     })
 
@@ -367,11 +385,11 @@ class BaseAppPlugin extends CallablePlugin {
   async isOtherNodesConfirmed(newRequest) {
     let signers = {}
 
-    let party = this.tssPlugin.getSharedKey(newRequest.hash).party
+    let party = this.tssPlugin.getSharedKey(newRequest.reqId).party
     let masterWalletPubKey = this.muon.getSharedWalletPubKey()
     let signersIndices;
 
-    signers = await this.requestManager.onRequestSignFullFilled(newRequest.hash)
+    signers = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
 
     let owners = Object.keys(signers)
     let allSignatures = owners.map(w => signers[w]);
@@ -381,7 +399,14 @@ class BaseAppPlugin extends CallablePlugin {
       return {s, e};
     })
     let aggregatedSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, owners)
-    let resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
+    let resultHash;
+    if(this.isV3()) {
+      // security params already appended to newRequest.data.signParams
+      resultHash = this.hashAppSignParams(newRequest, newRequest.data.signParams, false)
+    }
+    else {
+      resultHash = this.hashRequestResult(newRequest, newRequest.data.result);
+    }
 
     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
     let confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, aggregatedSign)
@@ -415,6 +440,8 @@ class BaseAppPlugin extends CallablePlugin {
    * @returns {Promise<*[isVerified, expectedResult, actualResult]>}
    */
   async isVerifiedRequest(request) {
+    // TODO: change hashRequestResult to hashSignParams after V3 enabled completely
+    throw {message: "Only compatible on V3"}
     let actualResult
     try {
       let {
@@ -447,7 +474,7 @@ class BaseAppPlugin extends CallablePlugin {
     // let sig = {s, e}
     //
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce = tssPlugin.getSharedKey(request.hash)
+    let nonce = tssPlugin.getSharedKey(request.reqId)
 
     let idx = owner;
     let Z_i = pubKey;
@@ -460,7 +487,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   broadcastNewRequest(request) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce: DistributedKey = tssPlugin.getSharedKey(request.hash)
+    let nonce: DistributedKey = tssPlugin.getSharedKey(request.reqId)
     let party = nonce.party;
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: nonce.party has not value.`}
@@ -469,7 +496,7 @@ class BaseAppPlugin extends CallablePlugin {
         return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.wallet)
       })
 
-    this.requestManager.setPartnerCount(request.hash, partners.length + 1);
+    this.requestManager.setPartnerCount(request.reqId, partners.length + 1);
 
     // TODO: remove async
     partners.map(async ({peerId, wallet}) => {
@@ -478,7 +505,7 @@ class BaseAppPlugin extends CallablePlugin {
         .catch(e => {
           // console.log('base-tss-app-plugin: on broadcast request error', e)
           return this.__onRemoteSignTheRequest(null, {
-            request: request.hash,
+            request: request.reqId,
             peerId,
             ...e
           });
@@ -497,13 +524,28 @@ class BaseAppPlugin extends CallablePlugin {
     return null
   }
 
+  appendSecurityParams(request, signParams) {
+    return [
+      { name: "reqId", type: 'uint256', value: request.reqId },
+      { name: "appId", type: 'uint256', value: this.APP_ID },
+      ...signParams
+    ]
+  }
+
+  hashAppSignParams(request, signParams, withSecurityParams=true) {
+    if(withSecurityParams) {
+      signParams = this.appendSecurityParams(request, signParams);
+    }
+    return soliditySha3(signParams)
+  }
+
   makeSignature(request, result, resultHash): AppRequestSignature {
     let signTimestamp = getTimestamp()
     // let signature = crypto.sign(resultHash)
 
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let {hash: requestHash} = request;
-    let nonce = tssPlugin.getSharedKey(requestHash)
+    let {reqId} = request;
+    let nonce = tssPlugin.getSharedKey(reqId)
 
     let tssKey = tssPlugin.tssKey;
     let k_i = nonce.share
@@ -516,7 +558,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
 
     return {
-      request: request.hash,
+      request: request.reqId,
       // node stake wallet address
       owner: process.env.SIGN_WALLET_ADDRESS,
       // tss shared public key
@@ -531,12 +573,12 @@ class BaseAppPlugin extends CallablePlugin {
     // console.log('BaseAppPlugin.__onRemoteSignTheRequest', data)
     if(error){
       let collateralPlugin = this.muon.getPlugin('collateral');
-      let {peerId, request: reqHash, ...otherParts} = error;
-      let request = this.requestManager.getRequest(reqHash);
+      let {peerId, request: reqId, ...otherParts} = error;
+      let request = this.requestManager.getRequest(reqId);
       if(request) {
         const owner = collateralPlugin.getPeerWallet(peerId);
         if(owner) {
-          this.requestManager.addError(reqHash, owner, otherParts);
+          this.requestManager.addError(reqId, owner, otherParts);
         }
       }
       return;
@@ -549,7 +591,7 @@ class BaseAppPlugin extends CallablePlugin {
         // TODO: check response similarity
         // let signer = this.recoverSignature(request, sign)
         // if (signer && signer === sign.owner) {
-          this.requestManager.addSignature(request.hash, sign.owner, sign)
+          this.requestManager.addSignature(request.reqId, sign.owner, sign)
           // // let newSignature = new Signature(sign)
           // // await newSignature.save()
         // } else {
@@ -571,10 +613,11 @@ class BaseAppPlugin extends CallablePlugin {
 
   @remoteMethod('wantSign')
   async __onRemoteWantSign(request, callerInfo) {
+    deepFreeze(request);
     /**
      * Check request owner
      */
-    if(request.owner !== callerInfo.wallet){
+    if((this.isV3() ? request.gwAddress : request.owner) !== callerInfo.wallet){
       throw "Only request owner can want signature."
     }
     /**
@@ -587,32 +630,39 @@ class BaseAppPlugin extends CallablePlugin {
      * validate request
      */
     if(this.validateRequest){
-      await this.validateRequest(clone(request))
+      await this.validateRequest(request)
     }
     /**
      * Check request result to be same.
      */
-    let result = await this.onRequest(clone(request))
+    let result = await this.onRequest(request)
 
-    let hash1 = await this.hashRequestResult(request, request.data.result)
-    let hash2 = await this.hashRequestResult(request, result)
+    let hash1, hash2, reqId;
 
+    if(this.isV3()) {
+      const appSignParams = this.signParams(request, result)
+      const resultHashWithoutSecurityParams = this.hashAppSignParams(request, appSignParams, false)
+      reqId = this.calculateRequestId(request, resultHashWithoutSecurityParams);
+
+      hash1 = this.hashAppSignParams(request, request.data.signParams, false)
+      hash2 = this.hashAppSignParams(request, appSignParams)
+    }
+    else {
+      hash1 = await this.hashRequestResult(request, request.data.result)
+      hash2 = await this.hashRequestResult(request, result)
+      reqId = this.calculateRequestId(request, hash1);
+    }
     if (hash1 !== hash2) {
       throw {
         message: `Request result is not the same as the first node's result.`,
         result
       }
     }
-
-    let requestHash = this.calculateRequestHash(request, hash1);
-    if(requestHash !== request.hash) {
-      throw {
-        message: `Request hash mismatch.`,
-        result
-      }
+    if(request.reqId !== reqId) {
+      throw {message: `Request ID mismatch.`, result}
     }
 
-    let nonce = this.tssPlugin.getSharedKey(request.hash);
+    let nonce = this.tssPlugin.getSharedKey(request.reqId);
     // wait for nonce broadcast complete
     await nonce.waitToFulfill()
 

@@ -4,7 +4,7 @@ const {createCIDFromString, cid2str} = require('../../utils/cid')
 
 var modelSchema = mongoose.Schema({
   cid: {type: String, required: true},
-  hash: {type: String, /**required: true*/},
+  reqId: {type: String, /**required: true*/},
   content: {type: String, required: true},
   data: {type: Object},
 }, {timestamps: true});
@@ -18,7 +18,7 @@ module.exports.create = async data => {
 
   return new Model({
     cid: cid2str(cid),
-    hash: data.hash,
+    reqId: data.reqId,
     content,
     data
   })

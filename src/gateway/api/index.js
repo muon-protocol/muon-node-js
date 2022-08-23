@@ -26,7 +26,7 @@ function extraLogs(req, result) {
     logs.extra = {
       ... logs.extra,
       nonce: result.data?.init?.nonceAddress,
-      reqHash: result.hash
+      reqHash: result.reqId
     }
   }
   return logs;

@@ -5,7 +5,6 @@
 const axios = require('axios')
 const Web3 = require('web3')
 const tron = require('../utils/tron')
-const web3Instance = new Web3()
 const { flatten, groupBy } = require('lodash')
 const { BigNumber } = require('bignumber.js')
 
@@ -25,12 +24,10 @@ const {
   hashCallOutput: ethHashCallOutput
 } = require('../utils/eth')
 
+const soliditySha3 = require('../utils/soliditySha3');
+
 const { multiCall } = require('../utils/multicall')
 const { BNSqrt } = require('../utils/bn-sqrt')
-
-function soliditySha3(params) {
-  return web3Instance.utils.soliditySha3(...params)
-}
 
 global.MuonAppUtils = {
   axios,

@@ -7,6 +7,7 @@ import BaseApp from './plugins/base/base-app-plugin'
 require('./global')
 const loadConfigs = require('../networking/configurations')
 const {utils: {sha3}} = require('web3')
+const chalk = require('chalk')
 
 async function getEnvPlugins() {
   let pluginsStr = process.env['MUON_PLUGINS']
@@ -19,9 +20,19 @@ async function getEnvPlugins() {
   return result
 }
 
+function isV3(app) {
+  return !!app.signParams;
+}
+
 function prepareApp(app, fileName) {
   if(!app.APP_ID) {
-    app.APP_ID = '0x' + sha3(fileName).slice(-8);
+    if(isV3(app)) {
+      app.APP_ID = sha3(fileName);
+    }
+    else {
+      console.log(chalk.yellow(`Deprecated app version: ${app.APP_NAME} app has old version and need to upgrade to v3.`))
+      app.APP_ID = '0x' + sha3(fileName).slice(-8);
+    }
   }
   return [dynamicExtend(BaseApp, app), {}]
 }

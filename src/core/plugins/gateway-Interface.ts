@@ -69,8 +69,10 @@ export default class GatewayInterface extends BasePlugin{
     catch (e) {
       if(typeof e === 'string')
         e = {message: e};
-      // console.error('gateway-interface error')
-      // console.dir(e, {depth: null})
+      if(process.env.VERBOSE) {
+        console.error('gateway-interface error')
+        console.dir(e, {depth: null})
+      }
       let {message, data: errorData} = e;
       return {
         error: message || "GatewayInterface: Unknown error occurred",
