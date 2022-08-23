@@ -12,6 +12,7 @@ import { MemWrite } from '../memory-plugin'
 const { isArrowFn } = require('../../../utils/helpers')
 import DistributedKey from "../tss-plugin/distributed-key";
 import {OnlinePeerInfo} from "../../../networking/types";
+const chalk = require('chalk')
 const Ajv = require("ajv")
 const ajv = new Ajv()
 
@@ -69,7 +70,7 @@ class BaseAppPlugin extends CallablePlugin {
   warnArrowFunctions(methods: Array<string> = []) {
     methods.forEach(method => {
       if(isArrowFn(this[method])){
-        console.error(`WARNING !!!: ${method} of '${this.APP_NAME}' app defined as arrow function. Don't use any arrow function inside any app.`)
+        console.log(chalk.red(`WARNING !!!: ${method} of '${this.APP_NAME}' app defined as arrow function. Don't use arrow function as an app method.`))
       }
     })
   }
