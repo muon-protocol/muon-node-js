@@ -61,5 +61,5 @@ elif [[ "$action" == "update" ]]
 then
     check_for_update;
 else
-    log "no action defined";
+    log "no action defined.";
 fi
