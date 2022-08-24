@@ -29,6 +29,7 @@ setup (){
 
 check_for_update (){
     current_branch=`git rev-parse --abbrev-ref HEAD`
+    `git checkout package-lock.json`
 
     if git pull --recurse-submodules origin "$current_branch" | grep -q 'Already up to date'; then
 #        log "Node: [`which node`]    PM2: [`which pm2`]";
