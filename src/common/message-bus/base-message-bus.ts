@@ -21,8 +21,19 @@ export default class BaseMessageBus extends Events{
     super();
     this.busName = busName
 
-    this.sendRedis = this.createRedisClient();
-    this.receiveRedis = this.createRedisClient();
+    const sendRedis = this.createRedisClient();
+    const receiveRedis = this.createRedisClient();
+
+    sendRedis.on("error", function(error) {
+      console.error(`BaseMessageBus.sendRedis[${busName}] error`, error);
+    });
+
+    receiveRedis.on("error", function(error) {
+      console.error(`BaseMessageBus.receiveRedis[${busName}] error`, error);
+    });
+
+    this.sendRedis = sendRedis
+    this.receiveRedis = receiveRedis
   }
 
   get channelPrefix() {

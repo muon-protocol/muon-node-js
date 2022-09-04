@@ -524,7 +524,10 @@ class TssPlugin extends CallablePlugin {
           },
           {taskId: `keygen-${key.id}`}
         )
-          .catch(e => 'error');
+          .catch(e => {
+            console.error(`TssPlugin.broadcast to ${peer} Error`, e)
+            return 'error'
+          });
       }))
     // console.log('TssPlugin.broadcastKey', {distKeyResult})
     return distKeyResult;
