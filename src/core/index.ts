@@ -62,6 +62,22 @@ function getCustomApps() {
   }, {})
 }
 
+function getBuiltInApps() {
+  const appDir = path.join(__dirname, '../built-in-apps');
+  let result = {};
+  let files = fs.readdirSync(appDir);
+  files.forEach((file) => {
+    let ext = file.split('.').pop();
+    if (ext.toLowerCase() === 'js') {
+      let app = require(`../built-in-apps/${file}`)
+      if (!!app.APP_NAME) {
+        result[app.APP_NAME] = prepareApp(app, file)
+      }
+    }
+  });
+  return result
+}
+
 function getGeneralApps() {
   const appDir = path.join(__dirname, '../../apps/general');
   let result = {};
@@ -111,10 +127,11 @@ async function start() {
         'memory': [(await import('./plugins/memory-plugin')).default, {}],
         'tss-plugin': [(await import('./plugins/tss-plugin')).default, {}],
         'health-check': [(await import('./plugins/health-check')).default, {}],
-        'system': [(await import('./plugins/system-app')).default, {}],
+        // 'system': [(await import('./plugins/system-app')).default, {}],
         ...await getEnvPlugins(),
         ...getCustomApps(),
         ...getGeneralApps(),
+        ...getBuiltInApps(),
       },
       net,
       account,

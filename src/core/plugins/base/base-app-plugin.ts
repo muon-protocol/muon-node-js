@@ -52,7 +52,7 @@ export type AppRequestSignature = {
 
 @remoteApp
 class BaseAppPlugin extends CallablePlugin {
-  APP_NAME = null
+  APP_NAME: string | null = null
   REMOTE_CALL_TIMEOUT = 15000
   requestManager = new AppRequestManager();
   readOnlyMethods = []
@@ -483,6 +483,11 @@ class BaseAppPlugin extends CallablePlugin {
     let p1 = tss.pointAdd(K_i, Z_i.mul(e.neg())).encode('hex')
     let p2 = tss.curve.g.mul(s).encode('hex');
     return p1 === p2 ? owner : null;
+  }
+
+  verify(hash: string, signature: string, nonceAddress: string): boolean {
+    const signingPubKey = this.tssPlugin.tssKey.publicKey;
+    return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey);
   }
 
   broadcastNewRequest(request) {

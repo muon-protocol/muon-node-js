@@ -1,3 +1,4 @@
+const ethJsUtil = require('ethereumjs-util')
 const {BN, toBN, keccak256, range} = require('./utils')
 const assert = require('assert')
 const elliptic = require('elliptic');
@@ -358,6 +359,35 @@ function schnorrVerify(pubKey, msg, sig) {
   return toBN(e_v).eq(sig.e);
 }
 
+function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey) {
+  nonceAddress = nonceAddress.toLowerCase();
+  const nonce = toBN(nonceAddress)
+  hash = toBN(hash)
+  signature = toBN(signature)
+
+  if(!signature.lt(curve.n))
+    throw "signature must be reduced modulo N"
+
+  if(nonce.isZero() || signature.isZero() || hash.isZero())
+    throw `no zero inputs allowed`
+
+  const e = toBN(keccak256(Buffer.concat([
+      nonce.toBuffer('be', 20),
+      hash.toBuffer('be', 32)
+  ])))
+
+  let recoveredPubKey = ethJsUtil.ecrecover(
+      curve.n.sub(signingPubKey.getX().mul(signature).umod(curve.n)).toBuffer('be', 32),
+      signingPubKey.getY().isEven() ? 27 : 28,
+      signingPubKey.getX().toBuffer('be', 32),
+      e.mul(signingPubKey.getX()).umod(curve.n).toBuffer('be', 32)
+  );
+  const addrBuf = ethJsUtil.pubToAddress(recoveredPubKey);
+  const addr    = ethJsUtil.bufferToHex(addrBuf);
+
+  return nonceAddress === addr;
+}
+
 function schnorrAggregateSigs(t, sigs, indices){
   assert(sigs.length >= t);
   let ts = toBN(0)
@@ -390,6 +420,7 @@ module.exports = {
   schnorrHash,
   schnorrSign,
   schnorrVerify,
+  schnorrVerifyWithNonceAddress,
   schnorrAggregateSigs,
   // use
   H,

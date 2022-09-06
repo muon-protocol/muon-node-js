@@ -37,7 +37,7 @@ router.use('/', (req, res, next) => {
     ...req.query,
     ...req.body,
   }
-  let {app, method, params, nSign, mode="sign", gwSign} = mixed
+  let {app, method, params={}, nSign, mode="sign", gwSign} = mixed
   // NodeCaller.appCall(app, method, params, nSign, mode)
   gwSign = parseBool(gwSign);
   requestQueue.send({app, method, params, nSign, mode, gwSign})
