@@ -616,6 +616,11 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
+  callPlugin(pluginName, method, ...otherArgs) {
+    let plugin = this.muon.getPlugin(pluginName);
+    return plugin[method](...otherArgs)
+  }
+
   @remoteMethod('wantSign')
   async __onRemoteWantSign(request, callerInfo) {
     deepFreeze(request);

@@ -127,7 +127,7 @@ async function start() {
         'memory': [(await import('./plugins/memory-plugin')).default, {}],
         'tss-plugin': [(await import('./plugins/tss-plugin')).default, {}],
         'health-check': [(await import('./plugins/health-check')).default, {}],
-        // 'system': [(await import('./plugins/system-app')).default, {}],
+        'system': [(await import('./plugins/system')).default, {}],
         ...await getEnvPlugins(),
         ...getCustomApps(),
         ...getGeneralApps(),

@@ -29,7 +29,8 @@ module.exports = {
                 const hash = this.hashAppSignParams(randomSeedRequest, seedSignParams)
                 if(!this.verify(hash, seed, nonce))
                     throw `seed not verified`
-                return seed
+
+                return this.callPlugin("system", "selectRandomNodes", seed, 2);
             }
             default:
                 throw "Unknown method"
@@ -44,9 +45,7 @@ module.exports = {
                     {type: "uint256", value: result.previous}
                 ];
             case Methods.Deploy:
-                return [
-                    {type: "uint256", value: result}
-                ]
+                return result.map(v => ({t: "address", v}))
             default:
                 throw "Unknown method"
         }
