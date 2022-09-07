@@ -526,8 +526,8 @@ class BaseAppPlugin extends CallablePlugin {
 
   appendSecurityParams(request, signParams) {
     return [
-      { name: "reqId", type: 'uint256', value: request.reqId },
       { name: "appId", type: 'uint256', value: this.APP_ID },
+      { name: "reqId", type: 'uint256', value: request.reqId },
       ...signParams
     ]
   }
