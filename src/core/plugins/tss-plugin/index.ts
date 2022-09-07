@@ -393,7 +393,7 @@ class TssPlugin extends CallablePlugin {
    * @param options.timeout: time need for distributed key generation.
    * @returns {Promise<DistributedKey>}
    */
-  async keyGen(party, options: KeyGenOptions={}) {
+  async keyGen(party, options: KeyGenOptions={}): Promise<DistributedKey> {
     if(!party)
       party = this.tssParty;
     if(party.onlinePartners.length < this.TSS_THRESHOLD){
@@ -524,7 +524,10 @@ class TssPlugin extends CallablePlugin {
           },
           {taskId: `keygen-${key.id}`}
         )
-          .catch(e => 'error');
+          .catch(e => {
+            console.error(`TssPlugin.broadcast to ${peer} Error`, e)
+            return 'error'
+          });
       }))
     // console.log('TssPlugin.broadcastKey', {distKeyResult})
     return distKeyResult;

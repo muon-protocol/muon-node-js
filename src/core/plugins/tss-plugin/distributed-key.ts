@@ -10,8 +10,8 @@ const assert = require('assert')
 const random = () => Math.floor(Math.random()*9999999)
 
 export type KeyPart = {
-    f: BN,
-    h: BN,
+  f: BN,
+  h: BN,
 }
 
 class DistributedKey {
@@ -79,6 +79,15 @@ class DistributedKey {
     this.timeoutPromise = new TimeoutPromise(timeout, "DistributedKey timeout")
   }
 
+  static loadPubKey(publicKey) {
+    if(typeof publicKey === "string")
+      return tss.keyFromPublic(publicKey)
+    else if(Array.isArray(publicKey))
+      return tss.keyFromPublic({x: publicKey[0], y: publicKey[1]})
+    else
+      return publicKey
+  }
+
   static load(party, _key){
     let key = new DistributedKey(party, _key.id);
     key.id = _key.id;
@@ -86,7 +95,8 @@ class DistributedKey {
     key.h_x = null;
     key.share = toBN(_key.share);
     key.sharePubKey = tss.keyFromPrivate(_key.share).getPublic().encode('hex');
-    key.publicKey = typeof _key.publicKey === 'string' ? tss.keyFromPublic(_key.publicKey) : _key.publicKey
+    key.publicKey = this.loadPubKey(_key.publicKey)
+    key.address = tss.pub2addr(key.publicKey)
     if(_key.partners)
       key.partners = _key.partners;
     if(_key.pubKeyParts && Object.keys(_key.pubKeyParts).length > 0){
@@ -156,6 +166,7 @@ class DistributedKey {
       this.share = fh.f;
       this.sharePubKey = tss.keyFromPrivate(fh.f).getPublic().encode('hex')
       this.publicKey = this.getTotalPubKey();
+      this.address = tss.pub2addr(this.publicKey)
       this.timeoutPromise.resolve(this)
     }
   }
