@@ -111,6 +111,7 @@ class DistributedKey {
   toSerializable() {
     return {
       id: this.id,
+      party: this.party?.id,
       share: !this.share ? null : this.share.toBuffer('be', 32).toString('hex'),
       publicKey: !this.publicKey ? null : this.publicKey.encode('hex', true),
       partners: [...this.partners],

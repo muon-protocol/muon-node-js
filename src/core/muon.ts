@@ -81,9 +81,9 @@ export default class Muon extends Events {
     }
   }
 
-  async onGlobalEventReceived(event: CoreGlobalEvent) {
+  async onGlobalEventReceived(event: CoreGlobalEvent, info) {
     // console.log(`[${process.pid}] core.Muon.onGlobalEventReceived`, event)
-    this.emit(event.type, event.data);
+    this.emit(event.type, event.data, info);
   }
 
   getSharedWalletPubKey() {

@@ -56,6 +56,10 @@ function findContent(cid: string): Promise<any> {
   return call(IpcMethods.ContentRoutingFind, cid)
 }
 
+function getGroupExecutor(walletList: string[], task: string): Promise<string> {
+  return call(IpcMethods.GetGroupExecutor, {walletList, task})
+}
+
 export {
   call,
   getCollateralInfo,
@@ -68,4 +72,5 @@ export {
   askClusterPermission,
   provideContent,
   findContent,
+  getGroupExecutor,
 }

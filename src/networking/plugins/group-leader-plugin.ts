@@ -170,7 +170,7 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   async isPermittedToDoElection() {
     let responses = await this.callParty(RemoteMethods.AskElectionPermission);
-    console.log('Current executor:', this.currentExecutor)
+    console.log('Main executor:', this.mainExecutor)
     console.log(`election permission responses`, responses);
     return responses.length+1 >= this.collateralPlugin.TssThreshold && responses.findIndex(res => res !== 'YES') < 0;
   }
@@ -211,7 +211,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   isWalletPermittedToElect(wallet) {
-    return !this.leader && this.currentExecutor === wallet;
+    return !this.leader && this.mainExecutor === wallet;
   }
 
   _electionComplete(key) {
@@ -238,14 +238,21 @@ class GroupLeaderPlugin extends CallablePlugin {
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
   }
 
-  get currentExecutor() {
+  get mainExecutor() {
     let walletList = [
-      process.env.SIGN_WALLET_ADDRESS,
+      process.env.SIGN_WALLET_ADDRESS!,
       ...this.onlinePartners.map(p =>p.wallet)
     ]
+    return this.getGroupExecutor(walletList, "leader-election")
+  }
+
+  getGroupExecutor(walletList: string[], taskToExec: string): string {
     let time = Math.floor(Date.now() / 100000)
-    // let hashes = walletList.map(w => sha3(`${w.toLowerCase()}-${time}`));
-    let hashes = walletList.map(w => soliditySha3({t:"address", v: w}, {t: 'uint32', v: time}));
+    let hashes = walletList.map(w => soliditySha3(
+      {t:"address", v: w},
+      {t: 'uint32', v: time},
+      {t: 'string', v: taskToExec},
+    ));
     let minIndex = hashes.reduce((min, val, index, arr)=>(val<arr[min]?index:min), 0);
     return walletList[minIndex]
   }

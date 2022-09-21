@@ -13,6 +13,7 @@ import { MemWrite } from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 import DistributedKey from "../tss-plugin/distributed-key";
 import {OnlinePeerInfo} from "../../../networking/types";
+import TssPlugin from "../tss-plugin";
 const chalk = require('chalk')
 const Ajv = require("ajv")
 const ajv = new Ajv()
@@ -48,6 +49,11 @@ export type AppRequestSignature = {
    * Schnorr signature of request memWrite, signed by collateral wallet
    */
   memWriteSignature?: string
+}
+
+const RemoteMethods = {
+  WantSign: 'wantSign',
+  InformRequestConfirmation: 'InformReqConfirmation'
 }
 
 @remoteApp
@@ -127,7 +133,7 @@ class BaseAppPlugin extends CallablePlugin {
   getNSign () {
     if(!this.tssPlugin.isReady)
       throw {message: 'Tss not initialized'};
-    return this.tssPlugin.tssKey.party.t;
+    return this.tssPlugin.tssKey!.party!.t;
   }
 
   get tssWalletAddress(){
@@ -135,7 +141,7 @@ class BaseAppPlugin extends CallablePlugin {
     return tss.pub2addr(tssPlugin.tssKey.publicKey)
   }
 
-  get tssPlugin(){
+  get tssPlugin(): TssPlugin{
     return this.muon.getPlugin('tss-plugin');
   }
 
@@ -296,12 +302,48 @@ class BaseAppPlugin extends CallablePlugin {
       }
 
       if (confirmed && !isDuplicateRequest) {
+        if(!!this.onConfirm) {
+          await this.informRequestConfirmation(requestData);
+        }
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
       }
 
       return requestData
     }
+  }
+
+  async informRequestConfirmation(request) {
+    // await this.onConfirm(request)
+    let collateralPlugin = this.muon.getPlugin('collateral');
+    let nonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!;
+    const partnersWallet = nonce.partners
+
+    const responses: string[] = await Promise.all(partnersWallet.map(wallet => {
+      if(wallet === process.env.SIGN_WALLET_ADDRESS) {
+        const callerInfo = {
+          wallet: process.env.SIGN_WALLET_ADDRESS,
+          peerId: process.env.PEER_ID
+        }
+        return this.__onRequestConfirmation(request, callerInfo)
+      }
+      else {
+        const peerId = collateralPlugin.getWalletPeerId(wallet);
+        return this.remoteCall(
+          peerId,
+          RemoteMethods.InformRequestConfirmation,
+          request,
+          {taskId: `keygen-${nonce.id}`}
+        )
+          .catch(e => {
+            console.log(`BaseAppPlugin.informRequestConfirmation`, e)
+            return 'error'
+          })
+      }
+    }))
+    const successResponses = responses.filter(r => (r === 'OK'))
+    if(successResponses.length < this.tssPlugin.TSS_THRESHOLD)
+      throw `Error when informing request confirmation.`
   }
 
   calculateRequestId(request, resultHash) {
@@ -385,7 +427,7 @@ class BaseAppPlugin extends CallablePlugin {
   async isOtherNodesConfirmed(newRequest) {
     let signers = {}
 
-    let party = this.tssPlugin.getSharedKey(newRequest.reqId).party
+    let party = this.tssPlugin.getSharedKey(newRequest.reqId)!.party
     let masterWalletPubKey = this.muon.getSharedWalletPubKey()
     let signersIndices;
 
@@ -398,7 +440,7 @@ class BaseAppPlugin extends CallablePlugin {
       let [s, e] = signature.split(',').map(toBN)
       return {s, e};
     })
-    let aggregatedSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, owners)
+    let aggregatedSign = tss.schnorrAggregateSigs(party!.t, schnorrSigns, owners)
     let resultHash;
     if(this.isV3()) {
       // security params already appended to newRequest.data.signParams
@@ -486,7 +528,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   verify(hash: string, signature: string, nonceAddress: string): boolean {
-    const signingPubKey = this.tssPlugin.tssKey.publicKey;
+    const signingPubKey = this.tssPlugin.tssKey!.publicKey;
     return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey);
   }
 
@@ -618,18 +660,12 @@ class BaseAppPlugin extends CallablePlugin {
 
   callPlugin(pluginName, method, ...otherArgs) {
     let plugin = this.muon.getPlugin(pluginName);
+    if(!plugin.__appApiExports[method])
+      throw `Method ${pluginName}.${method} not exported as API method.`
     return plugin[method](...otherArgs)
   }
 
-  @remoteMethod('wantSign')
-  async __onRemoteWantSign(request, callerInfo) {
-    deepFreeze(request);
-    /**
-     * Check request owner
-     */
-    if((this.isV3() ? request.gwAddress : request.owner) !== callerInfo.wallet){
-      throw "Only request owner can want signature."
-    }
+  async preProcessRemoteRequest(request) {
     /**
      * Check request timestamp
      */
@@ -672,17 +708,73 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: `Request ID mismatch.`, result}
     }
 
+    return [result, hash1]
+  }
+
+  async verifyRequestSignature(_request) {
+    const request = clone(_request)
+    deepFreeze(request);
+
+    const [result, hash] = await this.preProcessRemoteRequest(request);
+
+    request.signatures.forEach(sign => {
+      if(!this.verify(hash, sign.signature, request.data.init.nonceAddress)) {
+        throw `TSS signature not verified`
+      }
+    })
+  }
+
+  @remoteMethod(RemoteMethods.WantSign)
+  async __onRemoteWantSign(request, callerInfo) {
+    deepFreeze(request);
+    /**
+     * Check request owner
+     */
+    if((this.isV3() ? request.gwAddress : request.owner) !== callerInfo.wallet){
+      throw "Only request owner can want signature."
+    }
+
+    const [result, hash] = await this.preProcessRemoteRequest(request);
+
     let nonce = this.tssPlugin.getSharedKey(request.reqId);
     // wait for nonce broadcast complete
-    await nonce.waitToFulfill()
+    await nonce!.waitToFulfill()
 
-    let sign = this.makeSignature(request, result, hash2)
+    let sign = this.makeSignature(request, result, hash)
     let memWrite = this.getMemWrite(request, result)
     if(memWrite){
       sign.memWriteSignature = memWrite.signatures[0]
     }
 
     return { sign }
+  }
+
+  @remoteMethod(RemoteMethods.InformRequestConfirmation)
+  async __onRequestConfirmation(request, callerInfo) {
+    if(!this.onConfirm)
+      return `onConfirm not defined for this app`;
+
+    deepFreeze(request);
+    /**
+     * Check request owner
+     */
+    if((this.isV3() ? request.gwAddress : request.owner) !== callerInfo.wallet){
+      throw "Only request owner can inform confirmation."
+    }
+
+    const [result, hash] = await this.preProcessRemoteRequest(request);
+
+    let nonce = this.tssPlugin.getSharedKey(request.reqId);
+
+    request.signatures.forEach(sign => {
+      if(!this.verify(hash, sign.signature, nonce!.address!)) {
+        throw `TSS signature not verified`
+      }
+    })
+
+    await this.onConfirm(request, result, request.signatures);
+
+    return `OK`;
   }
 }
 

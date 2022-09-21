@@ -3,6 +3,7 @@ const { QueueProducer, MessagePublisher } = require('../common/message-bus')
 const { BROADCAST_CHANNEL } = require('./plugins/broadcast')
 const { IPC_CHANNEL } = require('./plugins/core-ipc-plugin')
 import DistributedKey from './plugins/tss-plugin/distributed-key'
+import {MessageOptions} from "../common/message-bus/msg-publisher";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 const broadcastQueue = new QueueProducer(BROADCAST_CHANNEL)
@@ -32,8 +33,8 @@ function broadcast(data: any, options: IpcCallOptions) {
   return broadcastQueue.send(data, options)
 }
 
-function fireEvent(event: CoreGlobalEvent) {
-  coreGlobalEvents.send(event)
+function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
+  coreGlobalEvents.send(event, options)
 }
 
 async function generateTssKey(keyId: string) {

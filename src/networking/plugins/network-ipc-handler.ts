@@ -2,6 +2,7 @@ import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, ipcMethod, broadcastHandler} from './base/app-decorators'
 import {IpcCallOptions} from "../../common/types";
 import CollateralInfoPlugin from "./collateral-info";
+import GroupLeaderPlugin from "./group-leader-plugin";
 const all = require('it-all')
 
 const {timeout} = require('../../utils/helpers')
@@ -31,6 +32,7 @@ export const IpcMethods = {
   RemoteCall: "remote-call",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
+  GetGroupExecutor: "get-group-executor",
 } as const;
 
 export const RemoteMethods = {
@@ -55,6 +57,10 @@ class NetworkIpcHandler extends CallablePlugin {
 
   get collateralPlugin(): CollateralInfoPlugin {
     return this.network.getPlugin('collateral');
+  }
+
+  get groupLeaderPlugin(): GroupLeaderPlugin {
+    return this.network.getPlugin('group-leader');
   }
 
   get remoteCallPlugin() {
@@ -82,7 +88,6 @@ class NetworkIpcHandler extends CallablePlugin {
     this.broadcast(data);
     return "Ok"
   }
-
 
   @broadcastHandler
   async onBroadcastReceived(data={}, callerInfo) {
@@ -228,6 +233,11 @@ class NetworkIpcHandler extends CallablePlugin {
     console.log(`NetworkIpcHandler.__onContentRoutingFind`, cid);
     let providers = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
     return providers.map(p => p.id._idB58String)
+  }
+
+  @ipcMethod(IpcMethods.GetGroupExecutor)
+  async __getGroupExecutor(data:{walletList: string[], task: string}, callerInfo) {
+    return this.groupLeaderPlugin.getGroupExecutor(data.walletList, data.task);
   }
 }
 
