@@ -81,7 +81,7 @@ class DistributedKey {
 
   static loadPubKey(publicKey) {
     if(typeof publicKey === "string")
-      return tss.keyFromPublic(publicKey)
+      return tss.keyFromPublic(publicKey.replace("0x", ""), "hex")
     else if(Array.isArray(publicKey))
       return tss.keyFromPublic({x: publicKey[0], y: publicKey[1]})
     else

@@ -24,7 +24,7 @@ function isV3(app) {
   return !!app.signParams;
 }
 
-function prepareApp(app, fileName) {
+function prepareApp(app, fileName, isBuiltInApp=false) {
   if(!app.APP_ID) {
     if(isV3(app)) {
       app.APP_ID = sha3(fileName);
@@ -34,6 +34,9 @@ function prepareApp(app, fileName) {
       app.APP_ID = '0x' + sha3(fileName).slice(-8);
     }
   }
+
+  app.APP_ID = BigInt(app.APP_ID).toString(10);
+  app.isBuiltInApp = isBuiltInApp;
   return [dynamicExtend(BaseApp, app), {}]
 }
 
@@ -71,7 +74,7 @@ function getBuiltInApps() {
     if (ext.toLowerCase() === 'js') {
       let app = require(`../built-in-apps/${file}`)
       if (!!app.APP_NAME) {
-        result[app.APP_NAME] = prepareApp(app, file)
+        result[app.APP_NAME] = prepareApp(app, file, true)
       }
     }
   });
@@ -117,6 +120,7 @@ async function start() {
     muon = new Muon({
       plugins: {
         'collateral': [(await import('./plugins/collateral-info')).default, {}],
+        'app-manager': [(await import('./plugins/app-manager')).default, {}],
         'remote-call': [(await import('./plugins/remote-call')).default, {}],
         'gateway-interface': [(await import('./plugins/gateway-Interface')).default, {}],
         'ipc': [(await import('./plugins/core-ipc-plugin')).default, {}],

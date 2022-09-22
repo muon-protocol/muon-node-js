@@ -26,6 +26,13 @@ var modelSchema = mongoose.Schema({
     reShareTime: {type: Date},
 }, {timestamps: true});
 
+modelSchema.pre('save', function(next) {
+    /** force appId to be hex string */
+    this.appId = BigInt(this.appId).toString(10);
+
+    next();
+})
+
 modelSchema.virtual('hash').get(function() {
     return soliditySha3([
         {t: 'uint256', v: this.appId},

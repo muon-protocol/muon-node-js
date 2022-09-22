@@ -4,8 +4,8 @@ import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {MuonNodeInfo} from "../../common/types";
 const soliditySha3 = require('../../utils/soliditySha3');
-const AppContext = require("../../gateway/models/AppContext")
-const AppTssConfig = require("../../gateway/models/AppTssConfig")
+const AppContext = require("../../common/db-models/AppContext")
+const AppTssConfig = require("../../common/db-models/AppTssConfig")
 import * as NetworkIpc from '../../networking/ipc'
 import DistributedKey from "./tss-plugin/distributed-key";
 const { timeout } = require('../../utils/helpers')
@@ -85,17 +85,6 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async newAppTss(appId, partners: MuonNodeInfo[], t, seed) {
-    const partyId = `app-${appId}-party`;
-    await this.TssPlugin.createParty({id: partyId, t, partners});
-    let party = this.TssPlugin.parties[partyId];
-    if(!party)
-      throw `Party not created`
-    let key = await this.TssPlugin.keyGen(party, {id: this.getAppTssKeyId(appId, seed)})
-    return key
-  }
-
-  @appApiMethod({})
   async genAppTss(appId, seed) {
     const context = await AppContext.findOne({appId, seed}).exec();
     if(!context)
@@ -111,17 +100,6 @@ class System extends CallablePlugin {
         {appId, seed}
       )
     }
-  }
-
-  @appApiMethod({})
-  async appDKGen(appId, partners: MuonNodeInfo[], t, seed) {
-    const partyId = `app-${appId}-party`;
-    await this.TssPlugin.createParty({id: partyId, t, partners});
-    let party = this.TssPlugin.parties[partyId];
-    if(!party)
-      throw `Party not created`
-    let key = await this.TssPlugin.keyGen(party, {id: this.getAppTssKeyId(appId, seed)})
-    return key
   }
 
   @appApiMethod({})
@@ -221,7 +199,6 @@ class System extends CallablePlugin {
     const id = this.getAppTssKeyId(appId, seed);
     let key: DistributedKey = this.TssPlugin.getSharedKey(id)!
     const tssConfig = new AppTssConfig({
-      owner: process.env.SIGN_WALLET_ADDRESS,
       context: context._id,
       publicKey: {
         address: key.address,
@@ -283,7 +260,7 @@ class System extends CallablePlugin {
     }).exec();
     if(oldTssKey)
       throw `App tss key already generated`
-    const partyId = `app-${appId}-party`;
+    const partyId = this.TssPlugin.getAppPartyId(context.appId, context.version)
     console.log("========= creating party ... =========")
     await this.TssPlugin.createParty({
       id: partyId,

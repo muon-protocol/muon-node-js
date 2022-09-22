@@ -1,5 +1,5 @@
 import CallablePlugin from './callable-plugin'
-const Request = require('../../../gateway/models/Request')
+const Request = require('../../../common/db-models/Request')
 const {makeAppDependency} = require('./app-dependencies')
 const { getTimestamp, timeout } = require('../../../utils/helpers')
 const crypto = require('../../../utils/crypto')
@@ -14,6 +14,8 @@ const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 import DistributedKey from "../tss-plugin/distributed-key";
 import {OnlinePeerInfo} from "../../../networking/types";
 import TssPlugin from "../tss-plugin";
+import AppManager from "../app-manager";
+import TssParty from "../tss-plugin/party";
 const chalk = require('chalk')
 const Ajv = require("ajv")
 const ajv = new Ajv()
@@ -62,6 +64,8 @@ class BaseAppPlugin extends CallablePlugin {
   REMOTE_CALL_TIMEOUT = 15000
   requestManager = new AppRequestManager();
   readOnlyMethods = []
+  /** initialize when loading */
+  isBuiltInApp: boolean
 
   constructor(muon, configs) {
     super(muon, configs);
@@ -128,6 +132,13 @@ class BaseAppPlugin extends CallablePlugin {
         gateway.registerAppCall(this.APP_NAME, method, this[method].bind(this))
       })
     }
+
+    /** load app party on start */
+    await this.appManager.waitToLoad();
+    const appParty = this.tssPlugin.getAppParty(this.APP_ID);
+    if(process.env.VERBOSE && appParty) {
+      console.log(`App party loaded`, appParty.id)
+    }
   }
 
   getNSign () {
@@ -145,6 +156,10 @@ class BaseAppPlugin extends CallablePlugin {
     return this.muon.getPlugin('tss-plugin');
   }
 
+  get appManager(): AppManager {
+    return this.muon.getPlugin('app-manager');
+  }
+
   async invoke(appName, method, params) {
     let result = await this.muon._apps[appName][method](params);
     return result;
@@ -156,6 +171,14 @@ class BaseAppPlugin extends CallablePlugin {
   protected get BROADCAST_CHANNEL() {
     // return this.APP_NAME ? `muon/${this.APP_NAME}/request/broadcast` : null
     return this.APP_NAME ? super.BROADCAST_CHANNEL : null
+  }
+
+  private get appParty(): TssParty | null | undefined {
+    return this.appTss?.party;
+  }
+
+  private get appTss(): DistributedKey | null {
+    return this.isBuiltInApp ? this.tssPlugin.tssKey : this.tssPlugin.getAppTssKey(this.APP_ID)
   }
 
   @gatewayMethod("request")
@@ -172,8 +195,16 @@ class BaseAppPlugin extends CallablePlugin {
     if(this.getNSign)
       nSign = this.getNSign()
 
-    if(!this.tssPlugin.isReady)
-      throw {message: "Tss not initialized"}
+    if(this.isBuiltInApp) {
+      if (!this.tssPlugin.isReady)
+        throw {message: "Tss not initialized"}
+    }
+    else{
+      if(!this.appManager.appIsDeployed(this.APP_ID))
+        throw `App ${this.APP_ID} not deployed`;
+      if(!this.appManager.appHasTssKey(this.APP_ID))
+        throw `App ${this.APP_ID} tss not initialized`
+    }
 
     if(this.METHOD_PARAMS_SCHEMA){
       if(this.METHOD_PARAMS_SCHEMA[method]){
@@ -362,10 +393,10 @@ class BaseAppPlugin extends CallablePlugin {
     if(!tssPlugin.isReady){
       throw {message: 'Tss not initialized'};
     }
-    let party = tssPlugin.tssKey.party;
-    // console.log('party generation done.')
+
+    let party = this.appParty;
     if(!party)
-      throw {message: 'party not generated'}
+      throw {message: 'App party not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     let nonce = await tssPlugin.keyGen(party, {
@@ -427,8 +458,9 @@ class BaseAppPlugin extends CallablePlugin {
   async isOtherNodesConfirmed(newRequest) {
     let signers = {}
 
-    let party = this.tssPlugin.getSharedKey(newRequest.reqId)!.party
-    let masterWalletPubKey = this.muon.getSharedWalletPubKey()
+    // let party = this.tssPlugin.getSharedKey(newRequest.reqId)!.party
+    let party = this.appParty
+    let verifyingPubKey = this.appTss?.publicKey!
     let signersIndices;
 
     signers = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
@@ -451,16 +483,16 @@ class BaseAppPlugin extends CallablePlugin {
     }
 
     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
-    let confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, aggregatedSign)
+    let confirmed = tss.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
     // TODO: check and detect nodes misbehavior if request not confirmed
 
     return [
       confirmed,
       confirmed ? [{
-        owner: tss.pub2addr(masterWalletPubKey),
+        owner: tss.pub2addr(verifyingPubKey),
         ownerPubKey: {
-          x: '0x' + masterWalletPubKey.x.toBuffer('be', 32).toString('hex'),
-          yParity: masterWalletPubKey.y.mod(toBN(2)).toString(),
+          x: '0x' + verifyingPubKey.getX().toBuffer('be', 32).toString('hex'),
+          yParity: verifyingPubKey.getY().mod(toBN(2)).toString(),
         },
         // signers: signersIndices,
         timestamp: getTimestamp(),
@@ -528,7 +560,8 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   verify(hash: string, signature: string, nonceAddress: string): boolean {
-    const signingPubKey = this.tssPlugin.tssKey!.publicKey;
+    let tssKey = this.appTss;
+    const signingPubKey = tssKey!.publicKey;
     return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey);
   }
 
@@ -594,7 +627,8 @@ class BaseAppPlugin extends CallablePlugin {
     let {reqId} = request;
     let nonce = tssPlugin.getSharedKey(reqId)
 
-    let tssKey = tssPlugin.tssKey;
+    // let tssKey = this.isBuiltInApp ? tssPlugin.tssKey : tssPlugin.getAppTssKey(this.APP_ID);
+    let tssKey = this.appTss!;
     let k_i = nonce.share
     let K = nonce.publicKey;
     // TODO: remove nonce after sign
@@ -609,7 +643,7 @@ class BaseAppPlugin extends CallablePlugin {
       // node stake wallet address
       owner: process.env.SIGN_WALLET_ADDRESS,
       // tss shared public key
-      pubKey: tssKey.sharePubKey,
+      pubKey: tssKey.sharePubKey!,
       timestamp: signTimestamp,
       result,
       signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`

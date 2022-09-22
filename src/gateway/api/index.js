@@ -1,5 +1,5 @@
 let router = require('express').Router();
-const RequestLog = require('../models/RequestLog')
+const RequestLog = require('../../common/db-models/RequestLog')
 const { QueueProducer } = require('../../common/message-bus')
 let NodeCaller = require('../node-caller')
 let requestQueue = new QueueProducer(`gateway-requests`);

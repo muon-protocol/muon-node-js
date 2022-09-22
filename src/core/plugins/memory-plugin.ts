@@ -24,7 +24,7 @@ const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const crypto = require('../../utils/crypto')
 const {getTimestamp} = require('../../utils/helpers')
-const Memory = require('../../gateway/models/Memory')
+const Memory = require('../../common/db-models/Memory')
 import { remoteApp, broadcastHandler } from './base/app-decorators'
 import CollateralInfoPlugin from "./collateral-info";
 

@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin'
-const Content = require('../../gateway/models/Content')
+const Content = require('../../common/db-models/Content')
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
 import {GatewayMethodData} from "../../gateway/types";
 const {loadCID} = require('../../utils/cid')

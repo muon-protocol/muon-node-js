@@ -86,12 +86,6 @@ export default class Muon extends Events {
     this.emit(event.type, event.data, info);
   }
 
-  getSharedWalletPubKey() {
-    // return this.sharedWalletPubKey
-    let tssPlugin = this.getPlugin('tss-plugin')
-    return tssPlugin.tssKey.publicKey
-  }
-
   get configDir(){
     let baseDir = `${process.env.PWD}/config`;
     return !!process.env.CONFIG_BASE_PATH ? `${baseDir}/${process.env.CONFIG_BASE_PATH}/` : baseDir

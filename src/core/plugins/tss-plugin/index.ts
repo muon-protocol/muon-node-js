@@ -12,6 +12,8 @@ const NodeCache = require('node-cache');
 const NetworkingIpc = require('../../../networking/ipc')
 import * as CoreIpc from '../../ipc'
 import {MuonNodeInfo} from "../../../common/types";
+import AppManager from "../app-manager";
+import {returnStatement} from "@babel/types";
 
 const keysCache = new NodeCache({
   stdTTL: 6*60, // Keep distributed keys in memory for 6 minutes
@@ -109,16 +111,12 @@ class TssPlugin extends CallablePlugin {
   onPeerDisconnect(disconnectedPeer) {
     // console.log(`[${process.pid}] peer disconnect`, peerId)
     delete this.availablePeers[disconnectedPeer];
-    if(this.tssParty){
-      for(let wallet in this.tssParty.partners){
-        let {peerId} = this.tssParty.partners[wallet]
-        if(peerId === disconnectedPeer){
-          console.log(`TssPlugin: remove online peer ${peerId}`)
-          this.tssParty.setWalletPeer(wallet, null);
-          return
-        }
-      }
-    }
+    const disconnectedWallet = this.collateralPlugin.getPeerWallet(disconnectedPeer)
+    console.log(`TssPlugin: remove online peer ${disconnectedWallet}@${disconnectedPeer}`)
+    Object.keys(this.parties).forEach(partyId => {
+      const party = this.parties[partyId]
+      party.setWalletPeer(disconnectedWallet, null);
+    })
   }
 
   async findPeerInfo(peerId){
@@ -131,7 +129,9 @@ class TssPlugin extends CallablePlugin {
         if (!!this.tssParty) {
           if (peerWallet) {
             // console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
-            this.tssParty.setWalletPeer(peerWallet, peerId);
+            Object.keys(this.parties).forEach(partyId => {
+              this.parties[partyId].setWalletPeer(peerWallet, peerId);
+            })
           }
         } else {
           console.log(`[${process.pid}] There is no tss party`);
@@ -154,6 +154,10 @@ class TssPlugin extends CallablePlugin {
 
   get collateralPlugin(): CollateralInfoPlugin {
     return this.muon.getPlugin('collateral')
+  }
+
+  get appManager(): AppManager {
+    return this.muon.getPlugin('app-manager');
   }
 
   get GroupAddress(): string | null {
@@ -260,7 +264,52 @@ class TssPlugin extends CallablePlugin {
   }
 
   getAppTssKey(appId: string): DistributedKey {
+    if(!this.appTss[appId]) {
+      const context = this.appManager.getAppContext(appId)
+      const _key = this.appManager.getAppTssKey(appId)
+      let party = this.getAppParty(appId)
+      const key = DistributedKey.load(party, {
+        id: `app-${appId}`,
+        share: _key.keyShare,
+        publicKey: _key.publicKey.encoded,
+        partners: context.party.partners
+      })
+      this.appTss[appId] = key;
+    }
     return this.appTss[appId];
+  }
+
+  getAppPartyId(appId, version) {
+    return `app-${appId}-${version}-party`;
+  }
+
+  getAppParty(appId: string) {
+    const _context = this.appManager.getAppContext(appId)
+    /** is app deployed? return if not. */
+    if(!_context)
+      return undefined;
+
+    const partyId = this.getAppPartyId(appId, _context.version);
+
+    if(!this.parties[partyId]) {
+
+      let party = Party.load({
+        id: partyId,
+        t: _context.party.t,
+        max: _context.party.max,
+        partners: _context.party.partners.map(wallet => {
+          const peerId = this.collateralPlugin.getWalletPeerId(wallet)!
+          return {
+            wallet,
+            peerId,
+            /** peer property exist, if partner is online */
+            ... (this.availablePeers[peerId] ? {peer: peerId} : {})
+          }
+        })
+      })
+      this.parties[partyId] = party;
+    }
+    return this.parties[partyId];
   }
 
   async isNeedToCreateKey(){
@@ -568,8 +617,9 @@ class TssPlugin extends CallablePlugin {
       // partners = partners.slice(0, maxPartners);
     }
 
-    if(partners.length < party.t)
+    if(partners.length < party.t) {
       throw {message: "No enough partners for key creation."}
+    }
 
     let callResult = await Promise.all(
       partners

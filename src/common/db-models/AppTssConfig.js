@@ -12,13 +12,12 @@ const TssPublicKeyInfo = mongoose.Schema({
 },{_id: false})
 
 var modelSchema = mongoose.Schema({
-    owner: {type: String, required: true},
     context: {
         type: mongoose.Schema.Types.ObjectId,
         ref: MODEL_APP_CONTEXT,
     },
     publicKey: {type: TssPublicKeyInfo, required: true},
-    keyShare: {type: String},
+    keyShare: {type: String, required: true},
 }, {timestamps: true});
 
 module.exports = mongoose.model(MODEL_APP_TSS_CONFIG, modelSchema);
