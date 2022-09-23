@@ -34,6 +34,12 @@ class CoreIpcHandlers extends CallablePlugin {
     })
     return key;
   }
+
+  @ipcMethod("get-app-id")
+  async __onGetAppId(data: {appName: string}, callerInfo): Promise<string> {
+    const app = this.muon._apps[data.appName]
+    return !!app ? app.APP_ID : "0";
+  }
 }
 
 export default CoreIpcHandlers

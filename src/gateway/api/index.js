@@ -4,6 +4,7 @@ const { QueueProducer } = require('../../common/message-bus')
 let NodeCaller = require('../node-caller')
 let requestQueue = new QueueProducer(`gateway-requests`);
 let { parseBool } = require('../../utils/helpers')
+const CoreIpc = require('../../core/ipc')
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)
@@ -38,6 +39,10 @@ router.use('/', (req, res, next) => {
     ...req.body,
   }
   let {app, method, params={}, nSign, mode="sign", gwSign} = mixed
+
+  if(!["sign", "view"].includes(mode)) {
+    return res.json({success: false, error: {message: "Request mode is invalid"}})
+  }
   // NodeCaller.appCall(app, method, params, nSign, mode)
   gwSign = parseBool(gwSign);
   requestQueue.send({app, method, params, nSign, mode, gwSign})
@@ -55,7 +60,13 @@ router.use('/', (req, res, next) => {
       });
       res.json({success: true, result})
     })
-    .catch(error => {
+    .catch(async error => {
+      let appId
+      try {
+        appId = await CoreIpc.getAppId(app);
+      }catch (e) {
+        console.log("gateway.api", e)
+      }
       storeRequestLog({
         app,
         method,
@@ -67,7 +78,7 @@ router.use('/', (req, res, next) => {
         errorMessage: error.message || error.error,
         ... extraLogs(req),
       });
-      res.json({success: false, ...error})
+      res.json({success: false, appId, error})
     })
 })
 

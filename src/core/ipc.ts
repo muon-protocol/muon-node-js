@@ -49,11 +49,16 @@ async function getTssKey(keyId: string, options: IpcCallOptions) {
   return DistributedKey.load(null, key)
 }
 
+async function getAppId(appName: string): Promise<string> {
+  return await call('get-app-id', {appName})
+}
+
 export {
   call,
   broadcast,
   fireEvent,
   generateTssKey,
   getTssKey,
+  getAppId,
   GLOBAL_EVENT_CHANNEL,
 }
