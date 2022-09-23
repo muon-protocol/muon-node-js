@@ -8,6 +8,7 @@ const appTssConfigEventEmitter = AppTssConfig.watch()
 
 export default class AppManager extends BasePlugin {
   private appContexts: {[index: string]: any} = {}
+  private contextIdToAppIdMap: {[index: string]: string}={}
   private appTssConfigs: {[index: string]: any} = {}
   private loading: TimeoutPromise = new TimeoutPromise();
 
@@ -20,17 +21,16 @@ export default class AppManager extends BasePlugin {
 
   async loadAppsInfo() {
     try {
-      const contextMap: {[index: string]: any} = {}
       const allAppContexts = await AppContext.find({});
       allAppContexts.forEach(ac => {
         this.appContexts[ac.appId] = ac;
-        contextMap[ac._id] = ac
+        this.contextIdToAppIdMap[ac._id] = ac.appId
       })
 
       const allTssKeys = await AppTssConfig.find({});
       allTssKeys.forEach(key => {
-        const ac = contextMap[key.context];
-        this.appTssConfigs[ac.appId] = key;
+        const appId = this.contextIdToAppIdMap[key.context];
+        this.appTssConfigs[appId] = key;
       })
 
       this.loading.resolve(true);
@@ -40,17 +40,20 @@ export default class AppManager extends BasePlugin {
   }
 
   async onAppContextChange(change) {
-    console.log("====== AppContext:change ======", JSON.stringify(change))
+    // console.log("====== AppContext:change ======", JSON.stringify(change))
     switch (change.operationType) {
       case "insert": {
+        const doc = change.fullDocument;
+        this.appContexts[doc.appId] = doc;
+        this.contextIdToAppIdMap[doc._id] = doc.appId
         break
       }
-      case "replace": {
-        break
-      }
-      case "delete": {
-        break
-      }
+      // case "replace": {
+      //   break
+      // }
+      // case "delete": {
+      //   break
+      // }
       default:
         console.log(`AppManager.onAppContextChange`, change)
     }
@@ -60,15 +63,36 @@ export default class AppManager extends BasePlugin {
     // console.log("====== AppTssConfig:change ======", JSON.stringify(change))
     switch (change.operationType) {
       case "insert": {
+        const doc = change.fullDocument;
+        const appId = this.contextIdToAppIdMap[doc.context];
+        this.appTssConfigs[appId] = doc;
         break
       }
       case "replace": {
+        const doc = change.fullDocument;
+        const appId = this.contextIdToAppIdMap[doc.context];
+        this.appTssConfigs[appId] = doc;
+
+        try {
+          /** TssPlugin needs to refresh tss key info */
+          await this.emit("app-tss:delete", appId, doc)
+        }
+        catch (e) {
+          console.log(`AppManager.onAppTssConfigChange`, e);
+        }
         break
       }
       case "delete": {
-        let documentId = change.documentKey._id;
+        let documentId = change.documentKey._id.toString();
         try {
-          await this.emit("app-tss:delete", documentId)
+          const appId = Object.keys(this.appTssConfigs).find(appId => (this.appTssConfigs[appId]._id.toString() === documentId))
+          if(!appId) {
+            console.error(`AppTssConfig deleted but appId not found`, change)
+            return
+          }
+          const appTssConfig = this.appTssConfigs[appId]
+          delete this.appTssConfigs[appId]
+          await this.emit("app-tss:delete", appId, appTssConfig)
         }
         catch (e) {
           console.log(`AppManager.onAppTssConfigChange`, e);
@@ -76,7 +100,7 @@ export default class AppManager extends BasePlugin {
         break
       }
       default:
-        console.log(`AppManager.onAppContextChange`, change)
+        console.log(`AppManager.onAppContextChange`, JSON.stringify(change))
     }
   }
 
@@ -85,7 +109,7 @@ export default class AppManager extends BasePlugin {
   }
 
   getAppContext(appId: string) {
-    return this.appContexts[appId]
+    return this.appContexts[appId];
   }
 
   appHasTssKey(appId: string): boolean {

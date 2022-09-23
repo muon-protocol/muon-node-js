@@ -201,9 +201,9 @@ class BaseAppPlugin extends CallablePlugin {
     }
     else{
       if(!this.appManager.appIsDeployed(this.APP_ID))
-        throw `App ${this.APP_ID} not deployed`;
+        throw `App not deployed`;
       if(!this.appManager.appHasTssKey(this.APP_ID))
-        throw `App ${this.APP_ID} tss not initialized`
+        throw `App tss not initialized`
     }
 
     if(this.METHOD_PARAMS_SCHEMA){
@@ -629,6 +629,8 @@ class BaseAppPlugin extends CallablePlugin {
 
     // let tssKey = this.isBuiltInApp ? tssPlugin.tssKey : tssPlugin.getAppTssKey(this.APP_ID);
     let tssKey = this.appTss!;
+    if(!tssKey)
+      throw `App TSS key not found`;
     let k_i = nonce.share
     let K = nonce.publicKey;
     // TODO: remove nonce after sign

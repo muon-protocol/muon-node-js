@@ -91,6 +91,8 @@ class TssPlugin extends CallablePlugin {
     this.muon.on('key:generate', this.onDKeyGenerate.bind(this));
     this.muon.on('party:generate', this.loadParty.bind(this));
 
+    this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
+
     await this.collateralPlugin.waitToLoad()
     this.loadTssInfo();
 
@@ -263,10 +265,14 @@ class TssPlugin extends CallablePlugin {
     return !!this.appTss[appId]
   }
 
-  getAppTssKey(appId: string): DistributedKey {
+  getAppTssKey(appId: string): DistributedKey | null {
     if(!this.appTss[appId]) {
       const context = this.appManager.getAppContext(appId)
+      if(!context)
+        return null
       const _key = this.appManager.getAppTssKey(appId)
+      if(!_key)
+        return null
       let party = this.getAppParty(appId)
       const key = DistributedKey.load(party, {
         id: `app-${appId}`,
@@ -277,6 +283,11 @@ class TssPlugin extends CallablePlugin {
       this.appTss[appId] = key;
     }
     return this.appTss[appId];
+  }
+
+  async onAppTssDelete(appId, appTssConfig) {
+    // console.log(`AppTss delete from db`, appId, appTssConfig)
+    delete this.appTss[appId]
   }
 
   getAppPartyId(appId, version) {
