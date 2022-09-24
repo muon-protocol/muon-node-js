@@ -348,7 +348,7 @@ class BaseAppPlugin extends CallablePlugin {
     // await this.onConfirm(request)
     let collateralPlugin = this.muon.getPlugin('collateral');
     let nonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!;
-    const partnersWallet = nonce.partners
+    const partnersWallet: string[] = Object.values(nonce?.party!.partners).filter(n => !!n.peer).map(n => n.wallet)
 
     const responses: string[] = await Promise.all(partnersWallet.map(wallet => {
       if(wallet === process.env.SIGN_WALLET_ADDRESS) {
@@ -802,10 +802,8 @@ class BaseAppPlugin extends CallablePlugin {
 
     const [result, hash] = await this.preProcessRemoteRequest(request);
 
-    let nonce = this.tssPlugin.getSharedKey(request.reqId);
-
     request.signatures.forEach(sign => {
-      if(!this.verify(hash, sign.signature, nonce!.address!)) {
+      if(!this.verify(hash, sign.signature, request.data.init.nonceAddress)) {
         throw `TSS signature not verified`
       }
     })

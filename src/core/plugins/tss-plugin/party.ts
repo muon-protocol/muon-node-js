@@ -7,6 +7,7 @@ export default class TssParty {
   t: number = 0
   max: number = 0;
   id: string;
+  /** map node wallet to OnlinePeerInfo */
   partners: {[index: string]: OnlinePeerInfo} = {}
   timeoutPromise: TimeoutPromise;
 
