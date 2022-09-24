@@ -695,6 +695,8 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   callPlugin(pluginName, method, ...otherArgs) {
+    if(!this.isBuiltInApp)
+      throw `Only built-in apps can call plugins.`
     let plugin = this.muon.getPlugin(pluginName);
     if(!plugin.__appApiExports[method])
       throw `Method ${pluginName}.${method} not exported as API method.`
