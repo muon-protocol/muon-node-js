@@ -2,12 +2,13 @@ import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
-import {MuonNodeInfo} from "../../common/types";
+import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
 const soliditySha3 = require('../../utils/soliditySha3');
 const AppContext = require("../../common/db-models/AppContext")
 const AppTssConfig = require("../../common/db-models/AppTssConfig")
 import * as NetworkIpc from '../../networking/ipc'
 import DistributedKey from "./tss-plugin/distributed-key";
+import AppManager from "./app-manager";
 const { timeout } = require('../../utils/helpers')
 const { promisify } = require("util");
 
@@ -25,12 +26,16 @@ class System extends CallablePlugin {
     return this.muon.getPlugin('collateral');
   }
 
-  get TssPlugin(): TssPlugin{
+  get tssPlugin(): TssPlugin{
     return this.muon.getPlugin('tss-plugin');
   }
 
+  get appManager(): AppManager{
+    return this.muon.getPlugin('app-manager');
+  }
+
   getAvailableNodes(): MuonNodeInfo[] {
-    const peerIds = Object.keys(this.TssPlugin.availablePeers)
+    const peerIds = Object.keys(this.tssPlugin.availablePeers)
     return [
       {
         wallet: process.env.SIGN_WALLET_ADDRESS!,
@@ -68,8 +73,8 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async getAppStatus(appId) {
-    const remoteNodes = Object.values(this.TssPlugin.tssParty!.onlinePartners);
+  async getAppStatus(appId): Promise<AppDeploymentStatus> {
+    const remoteNodes = Object.values(this.tssPlugin.tssParty!.onlinePartners);
     const callResult = await Promise.all(remoteNodes.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
         return this.__returnAppStatus(appId)
@@ -81,7 +86,19 @@ class System extends CallablePlugin {
       )
         .catch(e => "error")
     }));
-    return callResult
+    const threshold = this.tssPlugin.TSS_THRESHOLD;
+    const count = {
+      'not-deployed': 0,
+      'deployed': 0,
+      'tss-ready': 0
+    }
+    callResult.forEach(status => count[status]++)
+    if(count["tss-ready"] >= threshold)
+      return "tss-ready"
+    else if(count['deployed'] >= threshold)
+      return 'deployed'
+    else
+      return 'not-deployed';
   }
 
   @appApiMethod({})
@@ -105,7 +122,7 @@ class System extends CallablePlugin {
   @appApiMethod({})
   async getAppTss(appId, seed) {
     const id = this.getAppTssKeyId(appId, seed)
-    let key = this.TssPlugin.getSharedKey(id)
+    let key = this.tssPlugin.getSharedKey(id)
     return key
   }
 
@@ -141,9 +158,9 @@ class System extends CallablePlugin {
     let {appId, seed} = request.data.params
     const partners = result.selectedNodes
     const context = await this.writeAppContextIntoDb(request, result);
-    const allOnlineNodes = Object.values(this.TssPlugin.tssParty?.onlinePartners!);
+    const allOnlineNodes = Object.values(this.tssPlugin.tssParty?.onlinePartners!);
 
-    let requestNonce: DistributedKey = this.TssPlugin.getSharedKey(request.reqId)!
+    let requestNonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!
 
     // TODO: replace leader returned wallet with request owner. request owner most inform other parties.
     let informer = await NetworkIpc.getGroupExecutor(requestNonce.partners, "inform-app-deployment")
@@ -197,7 +214,7 @@ class System extends CallablePlugin {
 
     /** store tss key */
     const id = this.getAppTssKeyId(appId, seed);
-    let key: DistributedKey = this.TssPlugin.getSharedKey(id)!
+    let key: DistributedKey = this.tssPlugin.getSharedKey(id)!
     const tssConfig = new AppTssConfig({
       context: context._id,
       publicKey: {
@@ -225,10 +242,12 @@ class System extends CallablePlugin {
    */
 
   @remoteMethod(RemoteMethods.AppStatus)
-  async __returnAppStatus(appId) {
-    if(!this.TssPlugin.appHasTssKey(appId))
-      return "NotDeployed"
-    return "Deployed"
+  async __returnAppStatus(appId): Promise<AppDeploymentStatus> {
+    if(!this.appManager.appIsDeployed(appId))
+      return "not-deployed"
+    if(!this.appManager.appHasTssKey(appId))
+      return "deployed"
+    return "tss-ready"
   }
 
   @remoteMethod(RemoteMethods.InformAppDeployed)
@@ -260,21 +279,21 @@ class System extends CallablePlugin {
     }).exec();
     if(oldTssKey)
       throw `App tss key already generated`
-    const partyId = this.TssPlugin.getAppPartyId(context.appId, context.version)
+    const partyId = this.tssPlugin.getAppPartyId(context.appId, context.version)
     console.log("========= creating party ... =========")
-    await this.TssPlugin.createParty({
+    await this.tssPlugin.createParty({
       id: partyId,
-      t: this.TssPlugin.TSS_THRESHOLD,
+      t: this.tssPlugin.TSS_THRESHOLD,
       partners: context.party.partners.map(wallet => ({
         wallet,
         peerId: this.CollateralPlugin.getWalletPeerId(wallet)
       }))
     });
-    let party = this.TssPlugin.parties[partyId];
+    let party = this.tssPlugin.parties[partyId];
     if(!party)
       throw `Party not created`
     console.log("========= creating Distributed key ... =========")
-    let key = await this.TssPlugin.keyGen(party, {id: this.getAppTssKeyId(appId, seed)})
+    let key = await this.tssPlugin.keyGen(party, {id: this.getAppTssKeyId(appId, seed)})
     console.log("key generated", key)
     return {
       address: key.address,

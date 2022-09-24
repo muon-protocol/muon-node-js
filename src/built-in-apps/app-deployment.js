@@ -18,6 +18,12 @@ module.exports = {
             data: { params }
         } = request
         switch (method) {
+            case Methods.RandomSeed: {
+                const {appId} = params
+                const status = await this.callPlugin('system', "getAppStatus", appId)
+                if(status !== 'not-deployed')
+                    throw `App already deployed`
+            }
             case Methods.Deploy: {
                 const {seed, nonce, reqId} = params
                 const randomSeedRequest = {...request, method: Methods.RandomSeed, reqId}
