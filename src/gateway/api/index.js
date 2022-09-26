@@ -5,6 +5,7 @@ let NodeCaller = require('../node-caller')
 let requestQueue = new QueueProducer(`gateway-requests`);
 let { parseBool } = require('../../utils/helpers')
 const CoreIpc = require('../../core/ipc')
+const NetworkIpc = require('../../networking/ipc')
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)
@@ -45,7 +46,24 @@ router.use('/', (req, res, next) => {
   }
   // NodeCaller.appCall(app, method, params, nSign, mode)
   gwSign = parseBool(gwSign);
-  requestQueue.send({app, method, params, nSign, mode, gwSign})
+  const requestData = {app, method, params, nSign, mode, gwSign}
+  requestQueue.send(requestData)
+    /** some errors may need to be handled */
+    .catch(async error => {
+      if(error.message === "App not deployed") {
+        // find deployment info
+        let context = await CoreIpc.queryAppContext(app)
+        let partners = context.party.partners
+        if(context) {
+          const randomIndex = Math.floor(Math.random() * partners.length);
+          console.log(`forwarding request to ${partners[randomIndex]} ...`);
+          return await NetworkIpc.forwardRequest(partners[randomIndex], requestData)
+        }
+        // forward request to app group
+      }
+      /** forward error to next catch and prepare response */
+      throw error
+    })
     .then(result=> {
       storeRequestLog({
         app,

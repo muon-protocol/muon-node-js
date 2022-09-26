@@ -1,22 +1,38 @@
-import BasePlugin from './base/base-plugin'
+import CallablePlugin from './base/callable-plugin'
+import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators'
 import TimeoutPromise from "../../common/timeout-promise";
+import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
+import TssPlugin from "./tss-plugin";
 const AppContext = require("../../common/db-models/AppContext")
 const AppTssConfig = require("../../common/db-models/AppTssConfig")
 
 const appContextEventEmitter = AppContext.watch()
 const appTssConfigEventEmitter = AppTssConfig.watch()
 
-export default class AppManager extends BasePlugin {
+const RemoteMethods = {
+  AppStatus: "app-status",
+  AppDeploymentInquiry: "app-deployment-inquiry",
+  AppDeploymentInfo: "app-deployment-info",
+}
+
+@remoteApp
+export default class AppManager extends CallablePlugin {
   private appContexts: {[index: string]: any} = {}
   private contextIdToAppIdMap: {[index: string]: string}={}
   private appTssConfigs: {[index: string]: any} = {}
   private loading: TimeoutPromise = new TimeoutPromise();
 
   async onStart() {
+    await super.onStart()
+
     this.loadAppsInfo()
 
     appContextEventEmitter.on('change', this.onAppContextChange.bind(this))
     appTssConfigEventEmitter.on('change', this.onAppTssConfigChange.bind(this))
+  }
+
+  get tssPlugin(): TssPlugin {
+    return this.muon.getPlugin('tss-plugin');
   }
 
   async loadAppsInfo() {
@@ -57,6 +73,103 @@ export default class AppManager extends BasePlugin {
       default:
         console.log(`AppManager.onAppContextChange`, change)
     }
+  }
+
+  async loadAppContextFromNetwork(holders: MuonNodeInfo[], status: AppDeploymentStatus) {
+    for(let i=0 ; i<holders.length ; i++) {
+      let data = await this.remoteCall(
+        holders[i].peerId,
+        RemoteMethods.AppDeploymentInfo,
+        status.appId
+      )
+      if(data) {
+        try {
+          const context = new AppContext(data);
+          await context.save();
+          return context;
+        }catch (e) {}
+      }
+    }
+  }
+
+  async getAppStatus(appId: string): Promise<AppDeploymentStatus> {
+    if(!this.appIsDeployed(appId))
+      return {appId, deployed: false}
+    if(!this.appHasTssKey(appId))
+      return {appId, deployed: true, version: -1}
+    const context = this.getAppContext(appId)
+    return {
+      appId,
+      deployed: true,
+      version: context.version,
+      reqId: context.deploymentRequest.reqId,
+    }
+  }
+
+  appQueryResult = {}
+  async queryAndLoadAppContext(appId) {
+    /** cache for 5 minutes */
+    if(this.appQueryResult[appId]){
+      if(Date.now() - this.appQueryResult[appId].time < 5*60*60*1000)
+        return this.appQueryResult[appId].result;
+    }
+    /** refresh result */
+    const remoteNodes = Object.values(this.tssPlugin.tssParty!.onlinePartners);
+    let callResult = await Promise.all(remoteNodes.map(node => {
+      if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
+        return this.getAppStatus(appId)
+      return this.remoteCall(
+        node.peerId,
+        RemoteMethods.AppStatus,
+        appId,
+        {timeout: 15000}
+      )
+        .catch(e => "error")
+    }));
+    const threshold = this.tssPlugin.TSS_THRESHOLD;
+    const trueCallResult = callResult.filter(r => r?.deployed)
+    if(trueCallResult.length < threshold)
+      return {appId, deployed: false};
+
+    const versionCounts = {'-1': 0}
+    trueCallResult.forEach(({version, reqId}) => {
+      const idx = `${version}@${reqId}`
+      if(versionCounts[idx] === undefined)
+        versionCounts[idx] = 1
+      else
+        versionCounts[idx] ++;
+    })
+    let maxVersion = '-1'
+    Object.keys(versionCounts).forEach(version => {
+      if(version != '-1' && versionCounts[version] >= threshold && versionCounts[version] > versionCounts[maxVersion])
+        maxVersion = version
+    })
+    if(versionCounts[maxVersion] < threshold)
+      return {appId, deployed: false}
+    const [version, reqId] = maxVersion.split('@')
+
+    const result = {
+      appId,
+      deployed: true,
+      reqId,
+      version: parseInt(version)
+    }
+    this.appQueryResult[appId] = {
+      time: Date.now(),
+      result
+    }
+
+    // @ts-ignore
+    let holders: MuonNodeInfo[] = callResult
+      .map((r, i) => {
+        if(r.deployed && r.version===result.version)
+          return remoteNodes[i]
+        else
+          return null;
+      })
+      .filter(h => !!h)
+    const context = await this.loadAppContextFromNetwork(holders, result)
+    return context
   }
 
   async onAppTssConfigChange(change) {
@@ -126,5 +239,24 @@ export default class AppManager extends BasePlugin {
 
   waitToLoad() {
     return this.loading.promise;
+  }
+
+  /**
+   * Remote methods
+   */
+
+  @remoteMethod(RemoteMethods.AppStatus)
+  async __returnAppStatus(appId): Promise<AppDeploymentStatus> {
+    return this.getAppStatus(appId);
+  }
+
+  @remoteMethod(RemoteMethods.AppDeploymentInquiry)
+  async __appDeploymentInquiry(appId, callerInfo) {
+    return this.appIsDeployed(appId) ? "yes" : 'no';
+  }
+
+  @remoteMethod(RemoteMethods.AppDeploymentInfo)
+  async __appDeploymentData(appId, callerInfo) {
+    return this.getAppContext(appId)
   }
 }

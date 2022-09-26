@@ -60,6 +60,10 @@ function getGroupExecutor(walletList: string[], task: string): Promise<string> {
   return call(IpcMethods.GetGroupExecutor, {walletList, task})
 }
 
+function forwardRequest(wallet, requestData) {
+  return call(IpcMethods.ForwardGatewayRequest, {wallet, requestData});
+}
+
 export {
   call,
   getCollateralInfo,
@@ -73,4 +77,5 @@ export {
   provideContent,
   findContent,
   getGroupExecutor,
+  forwardRequest,
 }

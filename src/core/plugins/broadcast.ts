@@ -37,7 +37,7 @@ export default class BroadcastPlugin extends BasePlugin {
       return await this.emit(channel, message, callerInfo);
     }
     else {
-      throw {message: `broadcast channel "${channel}" is not handled`}
+      console.error({message: `core.Broadcast.onBroadcastReceived: broadcast channel "${channel}" is not handled`})
     }
   }
 

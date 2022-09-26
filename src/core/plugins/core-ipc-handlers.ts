@@ -1,5 +1,7 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
+import System from "./system";
+import AppManager from "./app-manager";
 const {timeout} = require('../../utils/helpers')
 
 @remoteApp
@@ -7,6 +9,14 @@ class CoreIpcHandlers extends CallablePlugin {
 
   get remoteCallPlugin() {
     return this.muon.getPlugin('remote-call');
+  }
+
+  get systemPlugin(): System {
+    return this.muon.getPlugin('system');
+  }
+
+  get appManager(): AppManager {
+    return this.muon.getPlugin('app-manager');
   }
 
   @ipcMethod("forward-remote-call")
@@ -36,9 +46,21 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   @ipcMethod("get-app-id")
-  async __onGetAppId(data: {appName: string}, callerInfo): Promise<string> {
+  async __onGetAppId(data: {appName: string}): Promise<string> {
     const app = this.muon._apps[data.appName]
     return !!app ? app.APP_ID : "0";
+  }
+
+  @ipcMethod("query-app-context")
+  async __queryAppContext(appName: string) {
+    const appId = await this.__onGetAppId({appName})
+    if(appId === '0')
+      return null;
+    return await this.appManager.queryAndLoadAppContext(appId)
+  }
+
+  @ipcMethod("find-app-deployment-info")
+  async __findAppDeploymentInfo(appId: string) {
   }
 }
 

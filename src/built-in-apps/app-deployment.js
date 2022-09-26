@@ -20,9 +20,10 @@ module.exports = {
         switch (method) {
             case Methods.RandomSeed: {
                 const {appId} = params
-                const status = await this.callPlugin('system', "getAppStatus", appId)
-                if(status !== 'not-deployed')
+                const {deployed} = await this.callPlugin('system', "getAppStatus", appId)
+                if(deployed)
                     throw `App already deployed`
+                break;
             }
             case Methods.Deploy: {
                 const {seed, nonce, reqId} = params
@@ -32,6 +33,7 @@ module.exports = {
                 const hash = this.hashAppSignParams(randomSeedRequest, seedSignParams)
                 if(!this.verify(hash, seed, nonce))
                     throw `seed not verified`
+                break;
             }
         }
     },
@@ -98,13 +100,23 @@ module.exports = {
     signParams: function(request, result) {
         switch (request.method) {
             case Methods.Check: {
-                return [
-                    {t: "uint8", v: 128}
-                ]
+                const { deployed, version } = result
+                if(!deployed || version < 0) {
+                    return [
+                        {t: "bool", v: deployed},
+                    ]
+                }
+                else {
+                    return [
+                        {t: "bool", v: deployed},
+                        {t: "uint64", v: version},
+                    ]
+                }
             }
             case Methods.RandomSeed:
                 return [
-                    {type: "uint256", value: result.previous}
+                    {type: "uint256", value: result.previous},
+                    {type: "uint256", value: result.appId},
                 ];
             case Methods.Deploy: {
                 const {seed} = request.data.params

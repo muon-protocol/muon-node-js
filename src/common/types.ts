@@ -23,4 +23,12 @@ export type MuonNodeInfo = {
     peer?: any
 }
 
-export type AppDeploymentStatus = "not-deployed" | "deployed" | "tss-ready";
+export type AppDeploymentStatus = {
+    appId: string,
+    /** Is app deployed? */
+    deployed: boolean,
+    /** reqId of confirmed deployment request signed by global tss group */
+    reqId?: string,
+    /** context version */
+    version?: number,
+};

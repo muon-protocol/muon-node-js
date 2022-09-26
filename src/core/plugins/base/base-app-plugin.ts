@@ -348,15 +348,20 @@ class BaseAppPlugin extends CallablePlugin {
     // await this.onConfirm(request)
     let collateralPlugin = this.muon.getPlugin('collateral');
     let nonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!;
-    const partnersWallet: string[] = Object.values(nonce?.party!.partners).filter(n => !!n.peer).map(n => n.wallet)
+    const partnersWallet: string[] = [
+      /** self */
+      process.env.SIGN_WALLET_ADDRESS!,
+      /** all other online partners */
+      ...Object.values(nonce?.party!.partners).filter(n => !!n.peer).map(n => n.wallet),
+    ]
 
-    const responses: string[] = await Promise.all(partnersWallet.map(wallet => {
+    const responses: string[] = await Promise.all(partnersWallet.map(async wallet => {
       if(wallet === process.env.SIGN_WALLET_ADDRESS) {
         const callerInfo = {
           wallet: process.env.SIGN_WALLET_ADDRESS,
           peerId: process.env.PEER_ID
         }
-        return this.__onRequestConfirmation(request, callerInfo)
+        return await this.__onRequestConfirmation(request, callerInfo)
       }
       else {
         const peerId = collateralPlugin.getWalletPeerId(wallet);
@@ -616,7 +621,17 @@ class BaseAppPlugin extends CallablePlugin {
     if(withSecurityParams) {
       signParams = this.appendSecurityParams(request, signParams);
     }
-    return soliditySha3(signParams)
+    try {
+      return soliditySha3(signParams)
+    }
+    catch (e) {
+      const {message, ...otherProps} = e;
+      throw {
+        message: `Failed to hash signParams: ${e.message}`,
+        ...otherProps,
+        signParams
+      }
+    }
   }
 
   makeSignature(request, result, resultHash): AppRequestSignature {

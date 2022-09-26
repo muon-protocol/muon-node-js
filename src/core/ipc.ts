@@ -53,6 +53,10 @@ async function getAppId(appName: string): Promise<string> {
   return await call('get-app-id', {appName})
 }
 
+async function queryAppContext(appName) {
+  return await call('query-app-context', appName)
+}
+
 export {
   call,
   broadcast,
@@ -60,5 +64,6 @@ export {
   generateTssKey,
   getTssKey,
   getAppId,
+  queryAppContext,
   GLOBAL_EVENT_CHANNEL,
 }

@@ -13,7 +13,6 @@ const { timeout } = require('../../utils/helpers')
 const { promisify } = require("util");
 
 const RemoteMethods = {
-  AppStatus: "appStatus",
   InformAppDeployed: "informAppDeployed",
   GenerateAppTss: "generateAppTss",
 }
@@ -73,32 +72,18 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async getAppStatus(appId): Promise<AppDeploymentStatus> {
-    const remoteNodes = Object.values(this.tssPlugin.tssParty!.onlinePartners);
-    const callResult = await Promise.all(remoteNodes.map(node => {
-      if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
-        return this.__returnAppStatus(appId)
-      return this.remoteCall(
-        node.peerId,
-        RemoteMethods.AppStatus,
-        appId,
-        {timeout: 15000}
-      )
-        .catch(e => "error")
-    }));
-    const threshold = this.tssPlugin.TSS_THRESHOLD;
-    const count = {
-      'not-deployed': 0,
-      'deployed': 0,
-      'tss-ready': 0
+  async getAppStatus(appId: string): Promise<AppDeploymentStatus> {
+    if(!this.appManager.appIsDeployed(appId))
+      return {appId, deployed: false}
+    if(!this.appManager.appHasTssKey(appId))
+      return {appId, deployed: true, version: -1}
+    const context = this.appManager.getAppContext(appId)
+    return {
+      appId,
+      deployed: true,
+      version: context.version,
+      reqId: context.deploymentRequest.reqId,
     }
-    callResult.forEach(status => count[status]++)
-    if(count["tss-ready"] >= threshold)
-      return "tss-ready"
-    else if(count['deployed'] >= threshold)
-      return 'deployed'
-    else
-      return 'not-deployed';
   }
 
   @appApiMethod({})
@@ -144,6 +129,7 @@ class System extends CallablePlugin {
         max: partners.length,
         partners
       },
+      deploymentRequest: request,
       deployTime
     },{
       upsert: true,
@@ -240,15 +226,6 @@ class System extends CallablePlugin {
   /**
    * Remote methods
    */
-
-  @remoteMethod(RemoteMethods.AppStatus)
-  async __returnAppStatus(appId): Promise<AppDeploymentStatus> {
-    if(!this.appManager.appIsDeployed(appId))
-      return "not-deployed"
-    if(!this.appManager.appHasTssKey(appId))
-      return "deployed"
-    return "tss-ready"
-  }
 
   @remoteMethod(RemoteMethods.InformAppDeployed)
   async __informAppDeployed(request, callerInfo) {

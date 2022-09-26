@@ -20,6 +20,7 @@ var modelSchema = mongoose.Schema({
     appId: {type: String, required: true},
     seed: {type: String, required: true},
     party: {type: TssPartyInfo},
+    deploymentRequest: {type: Object, required: true},
     publicKey: {type: TssPublicKeyInfo},
     keyShare: {type: String},
     deployTime: {type: Date, required: true},
