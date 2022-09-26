@@ -257,7 +257,7 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.ExecGateWayRequest)
   async __execGatewayRequest(data, callerInfo) {
-    console.log(`NetworkIpcHandler.__execGatewayRequest`, data)
+    // console.log(`NetworkIpcHandler.__execGatewayRequest`, data)
     return await requestQueue.send(data)
   }
 }

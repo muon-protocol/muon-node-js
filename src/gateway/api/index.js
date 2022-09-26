@@ -36,21 +36,16 @@ function extraLogs(req, result) {
 
 async function callProperNode(requestData) {
   let context = await CoreIpc.getAppContext(requestData.app);
-  console.log("context found locally")
   if (!context) {
     context = await CoreIpc.queryAppContext(requestData.app)
-    console.log("context found on muon network")
   }
   if (!context)
     throw `App not deployed`;
   const {partners} = context.party
-  console.log({partners})
   if (partners.includes(process.env.SIGN_WALLET_ADDRESS)) {
-    console.log(`node in app party`)
     return await requestQueue.send(requestData)
   } else {
     const randomIndex = Math.floor(Math.random() * partners.length);
-    console.log(`forwarding request to ${partners[randomIndex]} ...`);
     return await NetworkIpc.forwardRequest(partners[randomIndex], requestData)
   }
 }
@@ -65,7 +60,7 @@ router.use('/', async (req, res, next) => {
   if (!["sign", "view"].includes(mode)) {
     return res.json({success: false, error: {message: "Request mode is invalid"}})
   }
-  // NodeCaller.appCall(app, method, params, nSign, mode)
+
   gwSign = parseBool(gwSign);
   const requestData = {app, method, params, nSign, mode, gwSign}
   callProperNode(requestData)
