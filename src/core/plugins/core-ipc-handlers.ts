@@ -51,6 +51,22 @@ class CoreIpcHandlers extends CallablePlugin {
     return !!app ? app.APP_ID : "0";
   }
 
+  /**
+   * Return local app context
+   * @param appName
+   */
+  @ipcMethod("get-app-context")
+  async __getAppContext(appName: string) {
+    const appId = await this.__onGetAppId({appName})
+    if(appId === '0')
+      return null;
+    return await this.appManager.getAppContext(appId)
+  }
+
+  /**
+   * If app context not found locally, it's need to query muon network to find it.
+   * @param appName
+   */
   @ipcMethod("query-app-context")
   async __queryAppContext(appName: string) {
     const appId = await this.__onGetAppId({appName})

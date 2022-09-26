@@ -3,6 +3,8 @@ import {remoteApp, remoteMethod, ipcMethod, broadcastHandler} from './base/app-d
 import {IpcCallOptions} from "../../common/types";
 import CollateralInfoPlugin from "./collateral-info";
 import GroupLeaderPlugin from "./group-leader-plugin";
+import QueueProducer from "../../common/message-bus/queue-producer";
+let requestQueue = new QueueProducer(`gateway-requests`);
 const all = require('it-all')
 
 const {timeout} = require('../../utils/helpers')
@@ -256,7 +258,7 @@ class NetworkIpcHandler extends CallablePlugin {
   @remoteMethod(RemoteMethods.ExecGateWayRequest)
   async __execGatewayRequest(data, callerInfo) {
     console.log(`NetworkIpcHandler.__execGatewayRequest`, data)
-    return data;
+    return await requestQueue.send(data)
   }
 }
 

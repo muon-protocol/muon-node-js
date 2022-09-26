@@ -53,6 +53,18 @@ async function getAppId(appName: string): Promise<string> {
   return await call('get-app-id', {appName})
 }
 
+/**
+ * Return local app context
+ * @param appName
+ */
+async function getAppContext(appName) {
+  return await call('get-app-context', appName)
+}
+
+/**
+ * If app context not found locally, it's need to query muon network to find it.
+ * @param appName
+ */
 async function queryAppContext(appName) {
   return await call('query-app-context', appName)
 }
@@ -64,6 +76,7 @@ export {
   generateTssKey,
   getTssKey,
   getAppId,
+  getAppContext,
   queryAppContext,
   GLOBAL_EVENT_CHANNEL,
 }
