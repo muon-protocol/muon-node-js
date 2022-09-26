@@ -3,6 +3,8 @@ import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/ap
 import TimeoutPromise from "../../common/timeout-promise";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
 import TssPlugin from "./tss-plugin";
+import BaseAppPlugin from "./base/base-app-plugin";
+import CollateralInfoPlugin from "./collateral-info";
 const AppContext = require("../../common/db-models/AppContext")
 const AppTssConfig = require("../../common/db-models/AppTssConfig")
 
@@ -18,6 +20,7 @@ const RemoteMethods = {
 @remoteApp
 export default class AppManager extends CallablePlugin {
   private appContexts: {[index: string]: any} = {}
+  private globalContext;
   private contextIdToAppIdMap: {[index: string]: string}={}
   private appTssConfigs: {[index: string]: any} = {}
   private loading: TimeoutPromise = new TimeoutPromise();
@@ -29,10 +32,27 @@ export default class AppManager extends CallablePlugin {
 
     appContextEventEmitter.on('change', this.onAppContextChange.bind(this))
     appTssConfigEventEmitter.on('change', this.onAppTssConfigChange.bind(this))
+
+    await this.collateralPlugin.waitToLoad();
+
+    this.globalContext = {
+      deployed: true,
+      appId: 0,
+      version: 1,
+      party: {
+        partners: this.collateralPlugin.groupInfo?.partners,
+        t: this.collateralPlugin.networkInfo?.tssThreshold,
+        max: this.collateralPlugin.networkInfo?.maxGroupSize,
+      }
+    }
   }
 
   get tssPlugin(): TssPlugin {
     return this.muon.getPlugin('tss-plugin');
+  }
+
+  get collateralPlugin(): CollateralInfoPlugin {
+    return this.muon.getPlugin('collateral');
   }
 
   async loadAppsInfo() {
@@ -221,8 +241,17 @@ export default class AppManager extends CallablePlugin {
     return !!this.appContexts[appId]
   }
 
+  appIsBuiltIn(appName: string): boolean {
+    const app: BaseAppPlugin = this.muon._apps[appName]
+    return app.isBuiltInApp;
+  }
+
   getAppContext(appId: string) {
     return this.appContexts[appId];
+  }
+
+  getGlobalContext() {
+    return this.globalContext;
   }
 
   appHasTssKey(appId: string): boolean {

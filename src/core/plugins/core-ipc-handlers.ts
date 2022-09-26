@@ -57,6 +57,9 @@ class CoreIpcHandlers extends CallablePlugin {
    */
   @ipcMethod("get-app-context")
   async __getAppContext(appName: string) {
+    if(this.appManager.appIsBuiltIn(appName)) {
+      return this.appManager.getGlobalContext();
+    }
     const appId = await this.__onGetAppId({appName})
     if(appId === '0')
       return null;
