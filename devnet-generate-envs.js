@@ -107,7 +107,7 @@ const createEnv = async () => {
     GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8000 + index}\n
     CONFIG_BASE_PATH = dev-node-${index + 1}\n
 
-    MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}_${i+1}\n
+    MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}_${index+1}\n
     # ============ LibP2P Configs ==============
     SIGN_WALLET_ADDRESS = ${account.address}\n
     SIGN_WALLET_PRIVATE_KEY = ${account.privateKey.substr(2)}
