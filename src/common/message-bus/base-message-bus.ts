@@ -1,5 +1,5 @@
 import { createClient, RedisClient } from 'redis'
-import redisConfig from './redis-config'
+import redisConfig from '../redis-config'
 const Events = require('events-async')
 const {newCallId} = require('../../utils/helpers')
 

@@ -11,15 +11,17 @@ import AppRequestManager from './app-request-manager'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
 import { MemWrite } from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
+const Web3 = require('web3')
 import DistributedKey from "../tss-plugin/distributed-key";
 import {OnlinePeerInfo} from "../../../networking/types";
 import TssPlugin from "../tss-plugin";
 import AppManager from "../app-manager";
 import TssParty from "../tss-plugin/party";
+import CollateralInfoPlugin from "../collateral-info";
 const chalk = require('chalk')
 const Ajv = require("ajv")
 const ajv = new Ajv()
-
+const web3 = new Web3();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
 export type AppRequestSignature = {
@@ -55,7 +57,8 @@ export type AppRequestSignature = {
 
 const RemoteMethods = {
   WantSign: 'wantSign',
-  InformRequestConfirmation: 'InformReqConfirmation'
+  InformRequestConfirmation: 'InformReqConfirmation',
+  AppTssKeyGen: "appTssKeyGen",
 }
 
 @remoteApp
@@ -154,6 +157,10 @@ class BaseAppPlugin extends CallablePlugin {
 
   get tssPlugin(): TssPlugin{
     return this.muon.getPlugin('tss-plugin');
+  }
+
+  get collateralPlugin(): CollateralInfoPlugin{
+    return this.muon.getPlugin('collateral');
   }
 
   get appManager(): AppManager {
@@ -341,6 +348,67 @@ class BaseAppPlugin extends CallablePlugin {
       }
 
       return requestData
+    }
+  }
+
+  @gatewayMethod("__info")
+  async __getAppInfo({method, params}) {
+    return {
+      name: this.APP_NAME,
+      id: this.APP_ID,
+      deployed: this.isBuiltInApp ? true : this.appManager.appIsDeployed(this.APP_ID),
+      hasTss: this.appManager.appHasTssKey(this.APP_ID)
+    }
+  }
+
+  @gatewayMethod("tss-keygen")
+  async __onTssKeygen({method, params}) {
+    let {timestamp, signature} = params
+    if(!timestamp)
+      throw `timestamp missing`
+    if(!signature)
+      throw `signature missing`
+    let owners, partners;
+    if(!this.isBuiltInApp && !this.appManager.appIsDeployed(this.APP_ID))
+      throw `App is not deployed`
+    if(this.appManager.appHasTssKey(this.APP_ID))
+      throw `App already has tss key`;
+    owners = this.owners || []
+    if(this.isBuiltInApp) {
+      partners = this.collateralPlugin.groupInfo?.partners
+    }
+    else {
+      let context = this.appManager.getAppContext(this.APP_ID)
+      partners = context.party.partners
+    }
+    let signatureHash = soliditySha3([
+      {t: 'uint256', v: this.APP_ID},
+      {t: 'string', v: method},
+      {t: 'uint64', v: timestamp},
+    ])
+    let signatureVerified = owners.includes(web3.eth.accounts.recover(signatureHash, signature))
+    if(!signatureVerified) {
+      throw `Signature not verified. only owners can call this method.`
+    }
+
+    const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
+        .filter(n => n.wallet!==process.env.SIGN_WALLET_ADDRESS)
+    const callResult = await Promise.all(
+        nodesToInform.map(n => {
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.AppTssKeyGen,
+            {
+              timestamp,
+              signature,
+            }
+          )
+        })
+    )
+    return {
+      done: true,
+      owners,
+      partners,
     }
   }
 
@@ -826,6 +894,11 @@ class BaseAppPlugin extends CallablePlugin {
     await this.onConfirm(request, result, request.signatures);
 
     return `OK`;
+  }
+
+  @remoteMethod(RemoteMethods.AppTssKeyGen)
+  async __appTssKeyGen(data, callerInfo) {
+    console.log(`BaseAppPlugin.__appTssKeyGen`, data, callerInfo);
   }
 }
 
