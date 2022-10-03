@@ -49,10 +49,18 @@ class System extends CallablePlugin {
     ]
   }
 
+  @appApiMethod()
+  getNetworkInfo() {
+    return {
+      tssThreshold: this.CollateralPlugin.networkInfo?.tssThreshold!,
+      maxGroupSize: this.CollateralPlugin.networkInfo?.maxGroupSize!,
+    }
+  }
+
   @appApiMethod({})
-  selectRandomNodes(seed, n): MuonNodeInfo[] {
+  selectRandomNodes(seed, t, n): MuonNodeInfo[] {
     const availableNodes = this.getAvailableNodes();
-    if(availableNodes.length < n)
+    if(availableNodes.length < t)
       throw `No enough nodes to select n subset`
     let nodesHash = availableNodes.map(node => {
       return {
@@ -125,8 +133,8 @@ class System extends CallablePlugin {
       appId,
       seed,
       party: {
-        t: this.CollateralPlugin.TssThreshold,
-        max: partners.length,
+        t: result.tssThreshold,
+        max: result.maxGroupSize,
         partners
       },
       deploymentRequest: request,

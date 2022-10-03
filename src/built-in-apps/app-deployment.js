@@ -8,9 +8,14 @@ const Methods = {
     TssReshare: "tss-reshare"
 }
 
+const owners = [
+  "0x340C978265378998D589B41F1f51F137c344C22a"
+]
+
 module.exports = {
     APP_NAME: "deployment",
     APP_ID: 1,
+    owners,
 
     validateRequest: async function(request) {
         let {
@@ -73,10 +78,13 @@ module.exports = {
             }
             case Methods.Deploy: {
                 const {seed, appId} = params
+                const { tssThreshold, maxGroupSize } = await this.callPlugin("system", "getNetworkInfo");
                 return {
                     timestamp: request.data.timestamp,
                     seed,
-                    selectedNodes: this.callPlugin("system", "selectRandomNodes", seed, 2)
+                    tssThreshold,
+                    maxGroupSize,
+                    selectedNodes: this.callPlugin("system", "selectRandomNodes", seed, tssThreshold, maxGroupSize)
                         .map(node => node.wallet)
                 };
             }
