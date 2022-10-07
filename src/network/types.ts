@@ -34,7 +34,10 @@ export type NetworkConfig = {
             threshold: number,
             max: number,
         },
-        collateralWallets: [string]
+        nodeManager: {
+            network: string,
+            address: string
+        }
     },
     tss: {
         party: {

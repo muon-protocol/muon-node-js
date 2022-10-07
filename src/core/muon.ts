@@ -36,7 +36,10 @@ export type MuonConfigs = {
       threshold: number,
       max: number
     },
-    collateralWallets: string[]
+    nodeManager: {
+      network: string,
+      address: string
+    }
   },
 }
 

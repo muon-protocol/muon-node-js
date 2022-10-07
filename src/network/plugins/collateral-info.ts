@@ -1,6 +1,8 @@
 import BaseNetworkPlugin from './base/base-network-plugin'
 import { OnlinePeerInfo } from '../types';
 import TimeoutPromise from '../../common/timeout-promise'
+const eth = require('../../utils/eth')
+import NodeManagerAbi from '../../data/NodeManager-ABI.json'
 
 export type GroupInfo = {
   isValid: boolean,
@@ -55,9 +57,19 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   async onPeerConnect(peerId) {
+    await this.waitToLoad();
+
     // console.log("peer connected", peerId)
+    const wallet = this.getPeerWallet(peerId._idB58String)
+    if(!wallet) {
+      if(process.env.VERBOSE) {
+        console.log(`Unknown peer ${peerId} connected to network and ignored.`)
+      }
+      return;
+    }
+
     this.onlinePeers[peerId._idB58String] = {
-      wallet: this.getPeerWallet(peerId._idB58String),
+      wallet,
       peerId,
       peer: await this.findPeer(peerId),
     }
@@ -69,7 +81,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   async _loadCollateralInfo(){
-    let {tss, collateralWallets} = this.network.configs.net;
+    let {tss, nodeManager} = this.network.configs.net;
 
     this.networkInfo = {
       tssThreshold: parseInt(tss.threshold),
@@ -77,20 +89,19 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       maxGroupSize: parseInt(tss.max)
     }
 
-    let parts = collateralWallets.map(cw => cw.split('@'))
-    if(parts.findIndex(p => p.length !== 2) >= 0) {
-      throw "Invalid collateral wallet config located at config/global/net.conf.json"
-    }
+    let nodes = await this.loadNetworkNodes(nodeManager);
+    // console.log(nodes)
+    nodes = nodes.filter(n => n.active);
 
     this.groupInfo = {
       isValid: true,
       group: "1",
       sharedKey: null,
-      partners: parts.map(item => item[0])
+      partners: nodes.map(n => n.nodeAddress)
     }
-    parts.forEach(([wallet, peerId]) => {
-      this.peersWallet[peerId] = wallet
-      this.walletsPeer[wallet] = peerId
+    nodes.forEach(n => {
+      this.peersWallet[n.peerId] = n.nodeAddress
+      this.walletsPeer[n.nodeAddress] = n.peerId
     })
 
     if(process.env.VERBOSE) {
@@ -99,6 +110,12 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
     this.emit('loaded');
     this.loading.resolve(true);
+  }
+
+  async loadNetworkNodes(nodeManagerInfo) {
+    const {address, network} = nodeManagerInfo;
+    const result = await eth.call(address, 'getAllNodes', [], NodeManagerAbi, network)
+    return result;
   }
 
   // TODO: not implemented
