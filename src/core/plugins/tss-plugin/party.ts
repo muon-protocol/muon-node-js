@@ -1,5 +1,5 @@
 import TimeoutPromise from '../../../common/timeout-promise'
-import { OnlinePeerInfo } from "../../../networking/types";
+import { OnlinePeerInfo } from "../../../network/types";
 import {returnStatement} from "@babel/types";
 import {MuonNodeInfo} from "../../../common/types";
 

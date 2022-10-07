@@ -1,5 +1,5 @@
 import BasePlugin from'./base/base-plugin'
-const NetworkingIpc = require('../../networking/ipc')
+const NetworkIpc = require('../../network/ipc')
 
 export default class RemoteCall extends BasePlugin {
   async handleCall(callId, method, params, callerWallet, responseStream, peerId){
@@ -18,6 +18,6 @@ export default class RemoteCall extends BasePlugin {
    */
 
   call(peer, method, params, options={}){
-    return NetworkingIpc.forwardRemoteCall(peer, method, params, options)
+    return NetworkIpc.forwardRemoteCall(peer, method, params, options)
   }
 }

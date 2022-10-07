@@ -1,6 +1,6 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
-import {OnlinePeerInfo} from "../../networking/types";
+import {OnlinePeerInfo} from "../../network/types";
 import TssPlugin from "./tss-plugin";
 const {timeout} = require('../../utils/helpers')
 const OS = require('os')

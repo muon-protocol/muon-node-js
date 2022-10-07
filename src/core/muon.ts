@@ -8,7 +8,7 @@ const emoji = require('node-emoji')
 const fs = require('fs')
 const { MessagePublisher, MessageSubscriber } = require('../common/message-bus')
 const { GLOBAL_EVENT_CHANNEL, fireEvent } = require('./ipc')
-import * as NetworkIpc from '../networking/ipc'
+import * as NetworkIpc from '../network/ipc'
 import MuonBasePlugin from './plugins/base/base-plugin';
 import BaseAppPlugin from "./plugins/base/base-app-plugin";
 import BasePlugin from "./plugins/base/base-plugin";

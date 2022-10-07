@@ -4,7 +4,7 @@ const {QueueProducer} = require('../../common/message-bus')
 let requestQueue = new QueueProducer(`gateway-requests`);
 let {parseBool} = require('../../utils/helpers')
 const CoreIpc = require('../../core/ipc')
-const NetworkIpc = require('../../networking/ipc')
+const NetworkIpc = require('../../network/ipc')
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)

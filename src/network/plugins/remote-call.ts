@@ -1,4 +1,4 @@
-import BaseNetworkingPlugin from './base/base-network-plugin'
+import BaseNetworkPlugin from './base/base-network-plugin'
 const pipe = require('it-pipe')
 const {newCallId} = require('../../utils/helpers')
 import TimeoutPromise from '../../common/timeout-promise'
@@ -35,7 +35,7 @@ export type RemoteCallOptions = {
   timeoutMessage?: string,
 }
 
-class RemoteCall extends BaseNetworkingPlugin {
+class RemoteCall extends BaseNetworkPlugin {
 
   async onStart() {
     this.network.libp2p.handle(PROTOCOL, this.handler.bind(this))

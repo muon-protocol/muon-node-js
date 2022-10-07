@@ -5,7 +5,7 @@ const fs = require('fs');
 const {dynamicExtend} = require('./utils')
 import BaseApp from './plugins/base/base-app-plugin'
 require('./global')
-const loadConfigs = require('../networking/configurations')
+const loadConfigs = require('../network/configurations')
 const {utils: {sha3}} = require('web3')
 const chalk = require('chalk')
 

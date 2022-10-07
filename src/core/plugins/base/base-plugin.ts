@@ -36,7 +36,7 @@ export default class BasePlugin extends Events{
   }
 
   get peerId(){
-    throw "peerId moved to networking module"
+    throw "peerId moved to network module"
     // return this.muon.peerId;
   }
 

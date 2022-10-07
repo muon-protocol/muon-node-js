@@ -2,8 +2,8 @@ import cluster, {Worker} from 'cluster'
 import * as os from 'os'
 
 const Gateway = require('./gateway')
-const Networking = require('./networking');
-const NetworkingIpc = require('./networking/ipc');
+const Network = require('./network');
+const NetworkIpc = require('./network/ipc');
 const SharedMemory = require('./common/shared-memory')
 const { parseBool, timeout } = require('./utils/helpers')
 
@@ -47,7 +47,7 @@ async function boot() {
       port: process.env.GATEWAY_PORT,
     })
 
-    await Networking.start()
+    await Network.start()
     //
     cluster.on("exit", async function (worker, code, signal) {
       console.log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
@@ -57,7 +57,7 @@ async function boot() {
       }
       else {
         delete applicationWorkers[worker.process.pid];
-        await NetworkingIpc.reportClusterStatus(worker.process.pid, 'exit')
+        await NetworkIpc.reportClusterStatus(worker.process.pid, 'exit')
       }
 
       await timeout(5000);
@@ -66,7 +66,7 @@ async function boot() {
       if(!child){
         return ;
       }
-      await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
+      await NetworkIpc.reportClusterStatus(child.process.pid, 'start')
     });
 
     /** Start application clusters */
@@ -76,7 +76,7 @@ async function boot() {
         i--;
         console.log(`child process fork failed. trying one more time`);
       }else
-        await NetworkingIpc.reportClusterStatus(child.process.pid, 'start')
+        await NetworkIpc.reportClusterStatus(child.process.pid, 'start')
     }
   } else {
     console.log(`application cluster start pid:${process.pid}`)

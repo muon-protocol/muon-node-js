@@ -6,7 +6,7 @@ import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
 const soliditySha3 = require('../../utils/soliditySha3');
 const AppContext = require("../../common/db-models/AppContext")
 const AppTssConfig = require("../../common/db-models/AppTssConfig")
-import * as NetworkIpc from '../../networking/ipc'
+import * as NetworkIpc from '../../network/ipc'
 import DistributedKey from "./tss-plugin/distributed-key";
 import AppManager from "./app-manager";
 const { timeout } = require('../../utils/helpers')

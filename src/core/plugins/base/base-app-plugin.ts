@@ -15,7 +15,7 @@ import { MemWrite } from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 const Web3 = require('web3')
 import DistributedKey from "../tss-plugin/distributed-key";
-import {OnlinePeerInfo} from "../../../networking/types";
+import {OnlinePeerInfo} from "../../../network/types";
 import TssPlugin from "../tss-plugin";
 import AppManager from "../app-manager";
 import TssParty from "../tss-plugin/party";

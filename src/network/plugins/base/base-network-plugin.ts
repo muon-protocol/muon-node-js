@@ -3,7 +3,7 @@ const PeerId = require('peer-id')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 
-export default class BaseNetworkingPlugin extends Events {
+export default class BaseNetworkPlugin extends Events {
   network;
   configs = {}
 
@@ -21,7 +21,7 @@ export default class BaseNetworkingPlugin extends Events {
   }
 
   /**
-   * This method will call immediately after Networking start.
+   * This method will call immediately after Network start.
    * @returns {Promise<void>}
    */
   async onStart(){

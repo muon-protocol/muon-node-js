@@ -1,9 +1,9 @@
-import BaseNetworkingPlugin from './base/base-network-plugin'
+import BaseNetworkPlugin from './base/base-network-plugin'
 const { QueueConsumer } = require('../../common/message-bus')
 
 export const IPC_CHANNEL = '/muon/network/ipc';
 
-export default class NetworkIpcPlugin extends BaseNetworkingPlugin {
+export default class NetworkIpcPlugin extends BaseNetworkPlugin {
   /**
    * @type {QueueConsumer}
    */

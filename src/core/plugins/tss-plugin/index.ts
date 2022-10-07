@@ -7,9 +7,9 @@ const {utils:{toBN}} = require('web3')
 const {timeout} = require('../../../utils/helpers');
 import {remoteApp, remoteMethod, broadcastHandler} from '../base/app-decorators'
 import CollateralInfoPlugin from "../collateral-info";
-import {OnlinePeerInfo} from "../../../networking/types";
+import {OnlinePeerInfo} from "../../../network/types";
 const NodeCache = require('node-cache');
-const NetworkingIpc = require('../../../networking/ipc')
+const NetworkIpc = require('../../../network/ipc')
 import * as CoreIpc from '../../ipc'
 import {MuonNodeInfo} from "../../../common/types";
 import AppManager from "../app-manager";
@@ -220,8 +220,8 @@ class TssPlugin extends CallablePlugin {
     }
     else{
       console.log('waiting to leader be selected ...');
-      let leader = await NetworkingIpc.getLeader();
-      let permitted = await NetworkingIpc.askClusterPermission('tss-key-creation', 20000)
+      let leader = await NetworkIpc.getLeader();
+      let permitted = await NetworkIpc.askClusterPermission('tss-key-creation', 20000)
       if(!permitted)
         return;
 
@@ -602,7 +602,7 @@ class TssPlugin extends CallablePlugin {
     // 1- create new key
     let key = new DistributedKey(party, id, 15000)
     let taskId = `keygen-${key.id}`;
-    let assignResponse = await NetworkingIpc.assignTask(taskId);
+    let assignResponse = await NetworkIpc.assignTask(taskId);
     if(assignResponse !== 'Ok')
       throw "Cannot assign DKG task to itself."
     /**
@@ -904,7 +904,7 @@ class TssPlugin extends CallablePlugin {
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
       throw {message: 'TssPlugin.__storeTssKey: key not found.'};
-    let leader = await NetworkingIpc.getLeader();
+    let leader = await NetworkIpc.getLeader();
     if(await this.isNeedToCreateKey() && leader === callerInfo.wallet) {
       await key.waitToFulfill()
       this.saveTssConfig(party, key);
