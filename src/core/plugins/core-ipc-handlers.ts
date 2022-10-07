@@ -47,8 +47,8 @@ class CoreIpcHandlers extends CallablePlugin {
 
   @ipcMethod("get-app-id")
   async __onGetAppId(data: {appName: string}): Promise<string> {
-    const app = this.muon._apps[data.appName]
-    return !!app ? app.APP_ID : "0";
+    const appId = this.muon.getAppIdByName(data.appName)
+    return appId || "0";
   }
 
   /**
@@ -57,10 +57,7 @@ class CoreIpcHandlers extends CallablePlugin {
    */
   @ipcMethod("get-app-context")
   async __getAppContext(appName: string) {
-    if(this.appManager.appIsBuiltIn(appName)) {
-      return this.appManager.getGlobalContext();
-    }
-    const appId = await this.__onGetAppId({appName})
+    const appId = await this.muon.getAppIdByName(appName)
     if(appId === '0')
       return null;
     return await this.appManager.getAppContext(appId)

@@ -1,6 +1,8 @@
 export type RemoteCallOptions = {
 }
 
+export type Constructor<T> = new (...args: any[]) => T;
+
 export type IpcCallOptions = {
     /**
      * If response not receive after this timeout, call result will reject.
@@ -31,4 +33,6 @@ export type AppDeploymentStatus = {
     reqId?: string,
     /** context version */
     version?: number,
+    /** hash of context */
+    contextHash?: string,
 };

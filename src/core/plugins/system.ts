@@ -95,26 +95,29 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async genAppTss(appId, seed) {
-    const context = await AppContext.findOne({appId, seed}).exec();
+  async genAppTss(appId) {
+    const context = this.appManager.getAppContext(appId);
     if(!context)
       throw `App deployment info not found.`
     if(context.party.partners[0] === process.env.SIGN_WALLET_ADDRESS){
-      return await this.__generateAppTss({appId, seed}, null);
+      return await this.__generateAppTss({appId}, null);
     }
     else {
       const peerId = this.CollateralPlugin.getWalletPeerId(context.party.partners[0])
       return await this.remoteCall(
         peerId,
         RemoteMethods.GenerateAppTss,
-        {appId, seed}
+        {appId}
       )
     }
   }
 
   @appApiMethod({})
-  async getAppTss(appId, seed) {
-    const id = this.getAppTssKeyId(appId, seed)
+  async getAppTss(appId) {
+    const context = await AppContext.findOne({appId}).exec();
+    if(!context)
+      throw `App deployment info not found.`
+    const id = this.getAppTssKeyId(appId, context.seed)
     let key = this.tssPlugin.getSharedKey(id)
     return key
   }
@@ -131,6 +134,8 @@ class System extends CallablePlugin {
     },{
       version, // TODO: version definition
       appId,
+      appName: this.muon.getAppNameById(appId),
+      isBuiltIn: this.appManager.appIsBuiltIn(appId),
       seed,
       party: {
         t: result.tssThreshold,
@@ -210,7 +215,8 @@ class System extends CallablePlugin {
     const id = this.getAppTssKeyId(appId, seed);
     let key: DistributedKey = this.tssPlugin.getSharedKey(id)!
     const tssConfig = new AppTssConfig({
-      context: context._id,
+      version: context.version,
+      appId: appId,
       publicKey: {
         address: key.address,
         encoded: '0x' + key.publicKey?.encodeCompressed('hex'),
@@ -243,8 +249,8 @@ class System extends CallablePlugin {
       throw `Invalid deployment request`
     }
 
-    const muonApp = this.muon._apps['deployment']
-    await muonApp.verifyRequestSignature(request);
+    const developmentApp = this.muon.getAppByName("deployment")
+    await developmentApp.verifyRequestSignature(request);
 
     await this.writeAppContextIntoDb(request, request.data.result);
 
@@ -252,10 +258,10 @@ class System extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.GenerateAppTss)
-  async __generateAppTss({appId, seed}, callerInfo) {
-    console.log(`System.__generateAppTss`, {appId, seed});
+  async __generateAppTss({appId}, callerInfo) {
+    console.log(`System.__generateAppTss`, {appId});
 
-    const context = await AppContext.findOne({appId, seed}).exec();
+    const context = await AppContext.findOne({appId}).exec();
     if(!context)
       throw `App deployment info not found.`
     const oldTssKey = await AppTssConfig.findOne({
@@ -278,7 +284,7 @@ class System extends CallablePlugin {
     if(!party)
       throw `Party not created`
     console.log("========= creating Distributed key ... =========")
-    let key = await this.tssPlugin.keyGen(party, {id: this.getAppTssKeyId(appId, seed)})
+    let key = await this.tssPlugin.keyGen(party, {id: this.getAppTssKeyId(appId, context.seed)})
     console.log("key generated", key)
     return {
       address: key.address,

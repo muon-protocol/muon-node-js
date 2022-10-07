@@ -1,5 +1,7 @@
 import CallablePlugin from './callable-plugin'
 const Request = require('../../../common/db-models/Request')
+const AppContext = require("../../../common/db-models/AppContext")
+const AppTssConfig = require("../../../common/db-models/AppTssConfig")
 const {makeAppDependency} = require('./app-dependencies')
 const { getTimestamp, timeout } = require('../../../utils/helpers')
 const crypto = require('../../../utils/crypto')
@@ -58,7 +60,9 @@ export type AppRequestSignature = {
 const RemoteMethods = {
   WantSign: 'wantSign',
   InformRequestConfirmation: 'InformReqConfirmation',
-  AppTssKeyGen: "appTssKeyGen",
+  AppDeploy: "appDeploy",
+  AppTssKeyGenStep1: "AppTssKeyGenStep1",
+  AppTssKeyGenStep2: "AppTssKeyGenStep2",
 }
 
 @remoteApp
@@ -94,10 +98,6 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
-    if(this.APP_NAME) {
-      this.muon._apps[this.APP_NAME] = this;
-    }
-
     this.warnArrowFunctions([
       "onArrive",
       "onAppInit",
@@ -168,7 +168,8 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async invoke(appName, method, params) {
-    let result = await this.muon._apps[appName][method](params);
+    const app = this.muon.getAppByName(appName)
+    let result = await app[method](params);
     return result;
   }
 
@@ -361,54 +362,128 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  @gatewayMethod("tss-keygen")
-  async __onTssKeygen({method, params}) {
+  @gatewayMethod("__deploy")
+  async qwOnAppDeploy({method, params}) {
     let {timestamp, signature} = params
-    if(!timestamp)
-      throw `timestamp missing`
-    if(!signature)
-      throw `signature missing`
-    let owners, partners;
-    if(!this.isBuiltInApp && !this.appManager.appIsDeployed(this.APP_ID))
-      throw `App is not deployed`
-    if(this.appManager.appHasTssKey(this.APP_ID))
-      throw `App already has tss key`;
-    owners = this.owners || []
-    if(this.isBuiltInApp) {
-      partners = this.collateralPlugin.groupInfo?.partners
-    }
-    else {
-      let context = this.appManager.getAppContext(this.APP_ID)
-      partners = context.party.partners
-    }
-    let signatureHash = soliditySha3([
-      {t: 'uint256', v: this.APP_ID},
-      {t: 'string', v: method},
-      {t: 'uint64', v: timestamp},
-    ])
-    let signatureVerified = owners.includes(web3.eth.accounts.recover(signatureHash, signature))
-    if(!signatureVerified) {
-      throw `Signature not verified. only owners can call this method.`
-    }
 
     const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
-        .filter(n => n.wallet!==process.env.SIGN_WALLET_ADDRESS)
-    const callResult = await Promise.all(
+      .filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
+
+    let callResult = [
+      /**
+       * current node call
+       * if current node return successfully, then other nodes will be called.
+       */
+      await this.__onAppDeploy({timestamp, signature}, null),
+      /**
+       * other nodes call
+       */
+      ... await Promise.all(
         nodesToInform.map(n => {
           return this.remoteCall(
             n.peerId,
-            RemoteMethods.AppTssKeyGen,
+            RemoteMethods.AppDeploy,
             {
               timestamp,
               signature,
             }
           )
         })
-    )
+      )
+    ]
+
+    if(callResult.filter(r => r === "OK").length < this.collateralPlugin.TssThreshold)
+      throw {message: `Deploy failed`, nodesResponses: callResult}
+
     return {
       done: true,
-      owners,
-      partners,
+      partners: this.collateralPlugin.groupInfo?.partners,
+    }
+  }
+
+  @gatewayMethod("__keygen")
+  async gwOnTssKeygen({method, params}) {
+    let {timestamp, signature} = params
+
+    const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
+        .filter(n => n.wallet!==process.env.SIGN_WALLET_ADDRESS)
+    /**
+     * KeyGen Step 1
+     * check that key gen is ok or not
+     */
+    const callResult = [
+      /**
+       * current node call
+       * if current node return successfully, then other nodes will be called.
+       */
+      await this.__onAppKeyGenStep1({timestamp, signature}, null),
+      /**
+       * other nodes call
+       */
+      ... await Promise.all(
+        nodesToInform.map(n => {
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.AppTssKeyGenStep1,
+            {
+              timestamp,
+              signature,
+            }
+          )
+        })
+      )
+    ]
+    if(callResult.filter(r => r === "OK").length < this.collateralPlugin.TssThreshold)
+      throw {message: `KeyGen creation failed`, nodesCheckResult: callResult}
+
+    /**
+     * Generate a Distributed Key
+     */
+    const context = this.appManager.getAppContext(this.APP_ID);
+    const contextHash = AppContext.hash(context);
+    const keyId = `app-tss-key-${contextHash}-${signature}`
+
+    const party = this.tssPlugin.getAppParty(this.APP_ID);
+    const key = await this.tssPlugin.keyGen(party, {id: keyId})
+
+    /**
+     * KeyGen Step 2
+     * save tss key data
+     */
+    const callResult2 = [
+      /**
+       * current node call
+       * if current node return successfully, then other nodes will be called.
+       */
+      await this.__onAppKeyGenStep2({timestamp, signature}, null),
+      /**
+       * other nodes call
+       */
+      ... await Promise.all(
+        nodesToInform.map(n => {
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.AppTssKeyGenStep2,
+            {
+              timestamp,
+              signature,
+            }
+          )
+        })
+      )
+    ]
+
+    if(callResult2.filter(r => r==="OK").length < this.collateralPlugin.TssThreshold)
+      throw `KeyGen failed on step 2`;
+
+    return {
+      done: true,
+      publicKey: {
+        address: key.address,
+        encoded: key.publicKey?.encodeCompressed("hex"),
+        x: key.publicKey?.getX().toBuffer('be', 32).toString('hex'),
+        yParity: key.publicKey?.getY().isEven() ? 0 : 1
+      },
     }
   }
 
@@ -896,9 +971,136 @@ class BaseAppPlugin extends CallablePlugin {
     return `OK`;
   }
 
-  @remoteMethod(RemoteMethods.AppTssKeyGen)
-  async __appTssKeyGen(data, callerInfo) {
-    console.log(`BaseAppPlugin.__appTssKeyGen`, data, callerInfo);
+  @remoteMethod(RemoteMethods.AppDeploy)
+  async __onAppDeploy(data:{timestamp: number, signature: string}, callerInfo) {
+    // console.log(`BaseAppPlugin.__onAppDeploy`, data)
+    const {timestamp, signature} = data
+    if(!timestamp)
+      throw `timestamp missing`
+    if(!signature)
+      throw `signature missing`
+    if(this.appManager.appIsDeployed(this.APP_ID))
+      throw `App already deployed`
+    /**
+     * Only built-in apps can be deployed using this method.
+     * Client's Apps needs random seed to be deployed
+     */
+    if(!this.appManager.appIsBuiltIn(this.APP_ID))
+      throw `Only builtin apps can deploy with this method. use deployment app to deploy your app.`
+
+    const owners = this.owners || []
+    let signatureHash = soliditySha3([
+      {t: 'uint256', v: this.APP_ID},
+      {t: 'string', v: '__deploy'},
+      {t: 'uint64', v: timestamp},
+    ])
+    const signer = web3.eth.accounts.recover(signatureHash, signature)
+    let signatureVerified = owners.includes(signer)
+    if(!signatureVerified) {
+      throw `Signature not verified. only owners can call this method.`
+    }
+
+    const partners = this.collateralPlugin.groupInfo?.partners
+    const version = 0;
+    const deployTime = timestamp * 1000
+
+    await AppContext.findOneAndUpdate({
+      version,
+      appId: this.APP_ID,
+    },{
+      version, // TODO: version definition
+      appId: this.APP_ID,
+      appName: this.APP_NAME,
+      isBuiltIn: true,
+      party: {
+        t: this.collateralPlugin.networkInfo?.tssThreshold!,
+        max: this.collateralPlugin.networkInfo?.maxGroupSize!,
+        partners,
+      },
+      deploymentRequest: {
+        signer,
+        timestamp,
+        signature,
+      },
+      deployTime
+    },{
+      upsert: true,
+      useFindAndModify: false,
+    })
+
+    return "OK"
+  }
+
+  private _validateRemoteKeygenRequest(timestamp, signature) {
+    if(!timestamp)
+      throw `timestamp missing`
+    if(!signature)
+      throw `signature missing`
+    if(!this.appManager.appIsDeployed(this.APP_ID))
+      throw `App is not deployed`
+    /**
+     * Only built-in apps can be deployed using this method.
+     * Client's Apps needs random seed to be deployed
+     */
+    if(!this.appManager.appIsBuiltIn(this.APP_ID))
+      throw `Only builtin apps can deploy with this method. use deployment app to deploy your app.`
+
+    if(this.appManager.appHasTssKey(this.APP_ID))
+      throw `App already has tss key`;
+
+    let signatureHash = soliditySha3([
+      {t: 'uint256', v: this.APP_ID},
+      {t: 'string', v: "__keygen"},
+      {t: 'uint64', v: timestamp},
+    ])
+
+    const signer = web3.eth.accounts.recover(signatureHash, signature);
+    const owners = this.owners || [];
+    let signatureVerified = owners.includes(signer)
+    if(!signatureVerified) {
+      throw `Signature not verified. only owners can call this method.`
+    }
+  }
+
+  @remoteMethod(RemoteMethods.AppTssKeyGenStep1)
+  async __onAppKeyGenStep1(data: {timestamp: number, signature: string}, callerInfo) {
+    // console.log(`BaseAppPlugin.__onAppKeyGenStep1`, data);
+    let {timestamp, signature} = data
+    this._validateRemoteKeygenRequest(timestamp, signature);
+
+    return "OK"
+  }
+
+  @remoteMethod(RemoteMethods.AppTssKeyGenStep2)
+  async __onAppKeyGenStep2(data: {timestamp: number, signature: string}, callerInfo) {
+    // console.log(`BaseAppPlugin.__onAppKeyGenStep2`, data);
+    let {timestamp, signature} = data
+    this._validateRemoteKeygenRequest(timestamp, signature);
+
+    let context = this.appManager.getAppContext(this.APP_ID)
+    const contextHash = AppContext.hash(context);
+    const keyId = `app-tss-key-${contextHash}-${signature}`
+
+    const key = this.tssPlugin.getSharedKey(keyId);
+    if(!key)
+      throw `DistributedKey not generated.`
+    await key.waitToFulfill();
+
+    const tssConfig = new AppTssConfig({
+      version: context.version,
+      appId: this.APP_ID,
+      publicKey: {
+        address: key.address,
+        encoded: '0x' + key.publicKey?.encodeCompressed('hex'),
+        x: '0x' + key.publicKey?.getX().toBuffer('be',32).toString('hex'),
+        yParity: key.publicKey?.getY().isEven() ? 0 : 1,
+      },
+      keyShare: key.share?.toBuffer('be', 32).toString('hex'),
+    })
+
+    await tssConfig.save();
+
+    return "OK"
   }
 }
 

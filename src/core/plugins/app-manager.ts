@@ -60,13 +60,11 @@ export default class AppManager extends CallablePlugin {
       const allAppContexts = await AppContext.find({});
       allAppContexts.forEach(ac => {
         this.appContexts[ac.appId] = ac;
-        this.contextIdToAppIdMap[ac._id] = ac.appId
       })
 
       const allTssKeys = await AppTssConfig.find({});
       allTssKeys.forEach(key => {
-        const appId = this.contextIdToAppIdMap[key.context];
-        this.appTssConfigs[appId] = key;
+        this.appTssConfigs[key.appId] = key;
       })
 
       this.loading.resolve(true);
@@ -87,20 +85,34 @@ export default class AppManager extends CallablePlugin {
       // case "replace": {
       //   break
       // }
-      // case "delete": {
-      //   break
-      // }
+      case "delete": {
+        let documentId = change.documentKey._id.toString();
+        try {
+          const contextId = Object.keys(this.appContexts).find(contextId => (this.appContexts[contextId]._id.toString() === documentId))
+          if(!contextId) {
+            console.error(`AppContext deleted but contextId not found`, change)
+            return
+          }
+          const appContext = this.appContexts[contextId]
+          delete this.appContexts[contextId]
+          await this.emit("app-context:delete", contextId, appContext)
+        }
+        catch (e) {
+          console.log(`AppManager.onAppContextChange`, e);
+        }
+        break
+      }
       default:
         console.log(`AppManager.onAppContextChange`, change)
     }
   }
 
-  async loadAppContextFromNetwork(holders: MuonNodeInfo[], status: AppDeploymentStatus) {
+  async loadAppContextFromNetwork(holders: MuonNodeInfo[], appId: string) {
     for(let i=0 ; i<holders.length ; i++) {
       let data = await this.remoteCall(
         holders[i].peerId,
         RemoteMethods.AppDeploymentInfo,
-        status.appId
+        appId
       )
       if(data) {
         try {
@@ -123,6 +135,7 @@ export default class AppManager extends CallablePlugin {
       deployed: true,
       version: context.version,
       reqId: context.deploymentRequest.reqId,
+      contextHash: AppContext.hash(context),
     }
   }
 
@@ -148,47 +161,53 @@ export default class AppManager extends CallablePlugin {
     }));
     const threshold = this.tssPlugin.TSS_THRESHOLD;
     const trueCallResult = callResult.filter(r => r?.deployed)
-    if(trueCallResult.length < threshold)
-      return {appId, deployed: false};
+    if(trueCallResult.length < threshold) {
+      this.appQueryResult[appId] = {
+        time: Date.now(),
+        result: null
+      }
+      return null;
+    }
 
-    const versionCounts = {'-1': 0}
-    trueCallResult.forEach(({version, reqId}) => {
-      const idx = `${version}@${reqId}`
-      if(versionCounts[idx] === undefined)
-        versionCounts[idx] = 1
+    const hashCounts = {}
+    trueCallResult.forEach(({contextHash: hash}) => {
+      if(hashCounts[hash] === undefined)
+        hashCounts[hash] = 1
       else
-        versionCounts[idx] ++;
+        hashCounts[hash] ++;
     })
-    let maxVersion = '-1'
-    Object.keys(versionCounts).forEach(version => {
-      if(version != '-1' && versionCounts[version] >= threshold && versionCounts[version] > versionCounts[maxVersion])
-        maxVersion = version
+    let maxHash = ''
+    Object.keys(hashCounts).forEach(hash => {
+      if(!maxHash)
+        maxHash = hash
+      else if(hashCounts[hash] > hashCounts[maxHash])
+        maxHash = hash
     })
-    if(versionCounts[maxVersion] < threshold)
-      return {appId, deployed: false}
-    const [version, reqId] = maxVersion.split('@')
-
-    const result = {
-      appId,
-      deployed: true,
-      reqId,
-      version: parseInt(version)
-    }
-    this.appQueryResult[appId] = {
-      time: Date.now(),
-      result
+    if(hashCounts[maxHash] < threshold){
+      this.appQueryResult[appId] = {
+        time: Date.now(),
+        result: null
+      }
+      return null;
     }
 
+    /**
+     * the nodes, who has the app context data.
+     */
     // @ts-ignore
     let holders: MuonNodeInfo[] = callResult
       .map((r, i) => {
-        if(r.deployed && r.version===result.version)
+        if(r.deployed && r.contextHash===maxHash)
           return remoteNodes[i]
         else
           return null;
       })
       .filter(h => !!h)
-    const context = await this.loadAppContextFromNetwork(holders, result)
+    const context = await this.loadAppContextFromNetwork(holders, appId)
+    this.appQueryResult[appId] = {
+      time: Date.now(),
+      result: context || null
+    }
     return context
   }
 
@@ -197,18 +216,16 @@ export default class AppManager extends CallablePlugin {
     switch (change.operationType) {
       case "insert": {
         const doc = change.fullDocument;
-        const appId = this.contextIdToAppIdMap[doc.context];
-        this.appTssConfigs[appId] = doc;
+        this.appTssConfigs[doc.appId] = doc;
         break
       }
       case "replace": {
         const doc = change.fullDocument;
-        const appId = this.contextIdToAppIdMap[doc.context];
-        this.appTssConfigs[appId] = doc;
+        this.appTssConfigs[doc.appId] = doc;
 
         try {
           /** TssPlugin needs to refresh tss key info */
-          await this.emit("app-tss:delete", appId, doc)
+          await this.emit("app-tss:delete", doc.appId, doc)
         }
         catch (e) {
           console.log(`AppManager.onAppTssConfigChange`, e);
@@ -241,13 +258,13 @@ export default class AppManager extends CallablePlugin {
     return !!this.appContexts[appId]
   }
 
-  appIsBuiltIn(appName: string): boolean {
-    const app: BaseAppPlugin = this.muon._apps[appName]
+  appIsBuiltIn(appId: string): boolean {
+    const app: BaseAppPlugin = this.muon.getAppById(appId)
     return app.isBuiltInApp;
   }
 
   getAppContext(appId: string) {
-    return this.appContexts[appId];
+      return this.appContexts[appId];
   }
 
   getGlobalContext() {

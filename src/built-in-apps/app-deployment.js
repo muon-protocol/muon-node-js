@@ -50,10 +50,10 @@ module.exports = {
         } = request
         switch (method) {
             case Methods.TssKeyGen: {
-                const { appId, seed } = params
+                const { appId } = params
                 // await this.callPlugin('system', "newAppTss", appId)
                 return {
-                    publicKey: await this.callPlugin('system', "genAppTss", appId, seed)
+                    publicKey: await this.callPlugin('system', "genAppTss", appId)
                 }
             }
         }
@@ -89,8 +89,8 @@ module.exports = {
                 };
             }
             case Methods.TssKeyGen: {
-                const {seed, appId} = params
-                let key = await this.callPlugin('system', "getAppTss", appId, seed)
+                const {appId} = params
+                let key = await this.callPlugin('system', "getAppTss", appId)
                 if(!key)
                     throw `App new tss key not found`;
                 return {
@@ -162,8 +162,8 @@ module.exports = {
                 break
             }
             case Methods.TssKeyGen: {
-                const {seed, appId} = params
-                await this.callPlugin('system', "storeAppTss", appId, seed)
+                const {appId} = params
+                await this.callPlugin('system', "storeAppTss", appId)
             }
         }
     }

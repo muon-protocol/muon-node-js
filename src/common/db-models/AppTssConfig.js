@@ -12,10 +12,8 @@ const TssPublicKeyInfo = mongoose.Schema({
 },{_id: false})
 
 var modelSchema = mongoose.Schema({
-    context: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: MODEL_APP_CONTEXT,
-    },
+    version: {type: Number},
+    appId: {type: String, required: true},
     publicKey: {type: TssPublicKeyInfo, required: true},
     keyShare: {type: String, required: true},
 }, {timestamps: true});

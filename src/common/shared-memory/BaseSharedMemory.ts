@@ -3,9 +3,7 @@ import {createClient, RedisClient} from 'redis'
 import redisConfig from '../redis-config'
 import ISharedData from "./ISharedData";
 const {promisify} = require("util");
-
-
-type Constructor<T> = new (...args: any[]) => T;
+import {Constructor} from '../types'
 
 export default class BaseSharedMemory<T extends ISharedData> extends Events {
 

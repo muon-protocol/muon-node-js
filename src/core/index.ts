@@ -108,10 +108,7 @@ async function start() {
   let config = await loadConfigs();
   let {
     net,
-    peerId,
-    account,
     tss,
-    ... otherConfigs
   } = config
   try {
     // const nodeVersion = process.versions.node.split('.');
@@ -138,10 +135,8 @@ async function start() {
         ...getBuiltInApps(),
       },
       net,
-      account,
       // TODO: pass it into the tss-plugin
       tss,
-      ...otherConfigs,
     })
 
     await muon.initialize();

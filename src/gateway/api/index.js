@@ -34,8 +34,11 @@ function extraLogs(req, result) {
 }
 
 async function callProperNode(requestData) {
+  if(['__info', '__deploy'].includes(requestData.method))
+    return await requestQueue.send(requestData)
   let context = await CoreIpc.getAppContext(requestData.app);
   if (!context) {
+    console.log("context not found. query the network for context.")
     context = await CoreIpc.queryAppContext(requestData.app)
   }
   if (!context)
@@ -78,6 +81,8 @@ router.use('/', async (req, res, next) => {
       res.json({success: true, result})
     })
     .catch(async error => {
+      if(typeof error === "string")
+        error = {message: error}
       let appId
       try {
         appId = await CoreIpc.getAppId(app);
