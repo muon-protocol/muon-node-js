@@ -71,8 +71,12 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.network.getPlugin('remote-call');
   }
 
+  /**
+   * @private
+   * @ returns {Promise<string[]>} - list of online peers peerId
+   */
   @ipcMethod(IpcMethods.GetOnlinePeers)
-  async __onGetOnlinePeers() {
+  async __onGetOnlinePeers(): Promise<string[]> {
     return Object.keys(this.collateralPlugin.onlinePeers);
   }
 

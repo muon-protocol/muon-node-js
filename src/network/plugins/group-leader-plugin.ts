@@ -9,6 +9,7 @@ const CoreIpc = require('../../core/ipc')
 import { OnlinePeerInfo } from '../types'
 import { RemoteCallOptions } from './remote-call'
 import CollateralInfoPlugin from "./collateral-info";
+import {MuonNodeInfo} from "../../common/types";
 
 const RemoteMethods = {
   AskElectionPermission: "AskElectionPermission",
@@ -184,10 +185,11 @@ class GroupLeaderPlugin extends CallablePlugin {
     //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
     if(this.electionKey === null)
       throw {message: "Election key is null."}
-    let partners = this.electionKey.partners
+
+    let partners: MuonNodeInfo[] = this.electionKey.partners
       .filter(w => w !== process.env.SIGN_WALLET_ADDRESS)
-      .map(w => this.collateralPlugin.getNodeInfo(w)!.peerId)
-      .map(peerId => this.collateralPlugin.onlinePeers[peerId])
+      .map(w => this.collateralPlugin.getNodeInfo(w)!)
+      .filter(n => !!n)
 
     let responses = await this.callParty(
       RemoteMethods.ElectionResultReady,
@@ -235,18 +237,19 @@ class GroupLeaderPlugin extends CallablePlugin {
     return this._leaderSelectPromise.promise;
   }
 
-  get onlinePartners(): OnlinePeerInfo[] {
-    // return Object.values(this.TssPlugin.tssParty.onlinePartners)
-    //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
-
-    return Object.values(this.collateralPlugin.onlinePeers)
+  private get onlinePartners(): MuonNodeInfo[] {
+    return this.collateralPlugin.onlinePeersInfo
       .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
   }
 
   get mainExecutor() {
     let walletList = [
       process.env.SIGN_WALLET_ADDRESS!,
-      ...this.onlinePartners.map(p =>p.wallet)
+      ...Object.keys(this.collateralPlugin.onlinePeers)
+        .map(peerId => this.collateralPlugin.getNodeInfo(peerId)!)
+        .filter(n => !!n)
+        .map(n => n.wallet)
+        .filter(w => w !== process.env.SIGN_WALLET_ADDRESS)
     ]
     return this.getGroupExecutor(walletList, "leader-election")
   }
@@ -262,7 +265,7 @@ class GroupLeaderPlugin extends CallablePlugin {
     return walletList[minIndex]
   }
 
-  async callParty(method, data?, partners?, options?:RemoteCallOptions){
+  async callParty(method, data?, partners?: MuonNodeInfo[], options?:RemoteCallOptions){
     if(partners === undefined)
       partners = this.onlinePartners
     return Promise.all(partners.map(p => {

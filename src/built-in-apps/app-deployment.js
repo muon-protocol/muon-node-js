@@ -31,7 +31,12 @@ module.exports = {
                 break;
             }
             case Methods.Deploy: {
-                const {seed, nonce, reqId} = params
+                const {appId, seed, nonce, reqId} = params
+                const context = await this.callPlugin('system', "getAppContext", appId)
+                if(!!context) {
+                    throw `App already deployed`;
+                }
+
                 const randomSeedRequest = {...request, method: Methods.RandomSeed, reqId}
                 const seedResult = await this.onRequest(randomSeedRequest)
                 const seedSignParams = this.signParams(randomSeedRequest, seedResult)

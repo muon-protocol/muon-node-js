@@ -228,9 +228,9 @@ class System extends CallablePlugin {
   @appApiMethod({})
   async getAppContext(appId) {
     let contexts = await AppContext.find({
-      owner: process.env.SIGN_WALLET_ADDRESS,
       appId
     });
+    return contexts[0]
   }
 
   /**
@@ -267,7 +267,7 @@ class System extends CallablePlugin {
     if(oldTssKey)
       throw `App tss key already generated`
     const partyId = this.tssPlugin.getAppPartyId(context.appId, context.version)
-    console.log("========= creating party ... =========")
+
     await this.tssPlugin.createParty({
       id: partyId,
       t: this.tssPlugin.TSS_THRESHOLD,
@@ -279,9 +279,9 @@ class System extends CallablePlugin {
     let party = this.tssPlugin.parties[partyId];
     if(!party)
       throw `Party not created`
-    console.log("========= creating Distributed key ... =========")
+
     let key = await this.tssPlugin.keyGen(party, {id: this.getAppTssKeyId(appId, context.seed)})
-    console.log("key generated", key)
+
     return {
       address: key.address,
       encoded: key.publicKey?.encodeCompressed("hex"),

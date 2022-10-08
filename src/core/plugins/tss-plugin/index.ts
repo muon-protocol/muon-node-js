@@ -707,12 +707,6 @@ class TssPlugin extends CallablePlugin {
     return distKeyResult;
   }
 
-  getPartyPeers(party: Party) {
-    let partners: OnlinePeerInfo[] = Object.values(party.partners).filter(({peerId}) => peerId !== process.env.PEER_ID)
-    let peerIds = partners.map(({peerId}) => peerId)
-    return Promise.all(peerIds.map(peerId => this.findPeer(peerId).catch(e => null)))
-  }
-
   getParty(id) {
     return this.parties[id];
   }

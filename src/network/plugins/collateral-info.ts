@@ -1,5 +1,4 @@
 import BaseNetworkPlugin from './base/base-network-plugin'
-import { OnlinePeerInfo } from '../types';
 import TimeoutPromise from '../../common/timeout-promise'
 const eth = require('../../utils/eth')
 const {stackTrace} = require('../../utils/helpers')
@@ -24,7 +23,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   groupInfo: GroupInfo | null = null;
   networkInfo: NetworkInfo | null = null;
-  onlinePeers: {[index: string]: OnlinePeerInfo} = {}
+  onlinePeers: {[index: string]: boolean} = {}
 
   private _nodesList: MuonNodeInfo;
   private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
@@ -51,6 +50,12 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     // })
   }
 
+  get onlinePeersInfo(): MuonNodeInfo[] {
+    return Object.keys(this.onlinePeers)
+      .map(peerId => this.getNodeInfo(peerId)!)
+      .filter(info => !!info)
+  }
+
   async onPeerDiscovery(peerId) {
     // console.log("peer available", peerId)
     await this.waitToLoad();
@@ -60,11 +65,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       console.log(`network.CollateralInfo.onPeerDiscovery`, "Unknown peer connect", peerId);
       return;
     }
-    this.onlinePeers[peerId._idB58String] = {
-      wallet: nodeInfo.wallet,
-      peerId,
-      peer: await this.findPeer(peerId),
-    }
+    this.onlinePeers[peerId._idB58String] = true;
+    nodeInfo.peer = await this.findPeer(peerId)
   }
 
   async onPeerConnect(peerId) {
@@ -79,16 +81,17 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       return;
     }
 
-    this.onlinePeers[peerId._idB58String] = {
-      wallet: nodeInfo.wallet,
-      peerId,
-      peer: await this.findPeer(peerId),
-    }
+    this.onlinePeers[peerId._idB58String] = true
+    nodeInfo.peer = await this.findPeer(peerId)
   }
 
   onPeerDisconnect(disconnectedPeer) {
     // console.log("peer not available", peerId)
     delete this.onlinePeers[disconnectedPeer._idB58String];
+    const nodeInfo = this.getNodeInfo(disconnectedPeer._idB58String)
+    if(nodeInfo) {
+      delete nodeInfo.peer
+    }
   }
 
   async _loadCollateralInfo(){
