@@ -188,7 +188,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   private get appTss(): DistributedKey | null {
-    return this.isBuiltInApp ? this.tssPlugin.tssKey : this.tssPlugin.getAppTssKey(this.APP_ID)
+    return this.tssPlugin.getAppTssKey(this.APP_ID)
   }
 
   @gatewayMethod("request")
@@ -611,7 +611,6 @@ class BaseAppPlugin extends CallablePlugin {
     // let party = this.tssPlugin.getSharedKey(newRequest.reqId)!.party
     let party = this.appParty
     let verifyingPubKey = this.appTss?.publicKey!
-    let signersIndices;
 
     signers = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
 
@@ -622,7 +621,9 @@ class BaseAppPlugin extends CallablePlugin {
       let [s, e] = signature.split(',').map(toBN)
       return {s, e};
     })
-    let aggregatedSign = tss.schnorrAggregateSigs(party!.t, schnorrSigns, owners)
+
+    const ownersIndex = owners.map(wallet => this.collateralPlugin.getNodeInfo(wallet)!.id);
+    let aggregatedSign = tss.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
     let resultHash;
     if(this.isV3()) {
       // security params already appended to newRequest.data.signParams
@@ -700,7 +701,7 @@ class BaseAppPlugin extends CallablePlugin {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let nonce = tssPlugin.getSharedKey(request.reqId)
 
-    let idx = owner;
+    let idx = this.collateralPlugin.getNodeInfo(owner)!.id;
     let Z_i = pubKey;
     let K_i = nonce.getPubKey(idx);
 
@@ -1069,6 +1070,11 @@ class BaseAppPlugin extends CallablePlugin {
     // console.log(`BaseAppPlugin.__onAppKeyGenStep1`, data);
     let {timestamp, signature} = data
     this._validateRemoteKeygenRequest(timestamp, signature);
+
+    /**
+     * ensure app party loaded
+     */
+    this.tssPlugin.getAppParty(this.APP_ID);
 
     return "OK"
   }

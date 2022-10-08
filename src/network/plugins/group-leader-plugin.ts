@@ -201,7 +201,10 @@ class GroupLeaderPlugin extends CallablePlugin {
   extractLeaderFromKey(key) {
     let partners = key.partners;
     let sharedAddress = partners
-      .map(w => key.getPubKey(w))
+      .map(w => {
+        const index = this.collateralPlugin.getNodeInfo(w)!.id;
+        return key.getPubKey(index)
+      })
       .map(point => tssModule.pub2addr(point))
       .map(address => address.toLowerCase());
     let leaderIndex = sharedAddress.reduce((max, val, i, arr) => (val > arr[max] ? i : max), 0);

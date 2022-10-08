@@ -98,19 +98,19 @@ class TssPlugin extends CallablePlugin {
 
   }
 
-  async onPeerDiscovery(peerId) {
+  async onPeerDiscovery(peerId: string) {
     // console.log(`[${process.pid}] peer available`, peerId);
     this.availablePeers[peerId] = true
     this.findPeerInfo(peerId);
   }
 
-  async onPeerConnect(peerId) {
+  async onPeerConnect(peerId: string) {
     // console.log(`[${process.pid}] peer connected`, peerId)
     this.availablePeers[peerId] = true
     this.findPeerInfo(peerId)
   }
 
-  onPeerDisconnect(disconnectedPeer) {
+  onPeerDisconnect(disconnectedPeer: string) {
     // console.log(`[${process.pid}] peer disconnect`, peerId)
     delete this.availablePeers[disconnectedPeer];
     const nodeInfo = this.collateralPlugin.getNodeInfo(disconnectedPeer)
@@ -156,16 +156,12 @@ class TssPlugin extends CallablePlugin {
     return this.muon.configs.net.tss.max;
   }
 
-  get collateralPlugin(): CollateralInfoPlugin {
+  private get collateralPlugin(): CollateralInfoPlugin {
     return this.muon.getPlugin('collateral')
   }
 
-  get appManager(): AppManager {
+  private get appManager(): AppManager {
     return this.muon.getPlugin('app-manager');
-  }
-
-  get GroupAddress(): string | null {
-    return (this.isReady && this.tssKey) ? this.tssKey.address : null;
   }
 
   getTssConfig(){
@@ -384,7 +380,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   async loadParty(party) {
-    console.log(`TssPlugin.loadParty`, party)
+    // console.log(`TssPlugin.loadParty`, party)
     try {
       let p = Party.load(party)
       Object.keys(this.availablePeers).forEach(peerId => {
@@ -394,7 +390,7 @@ class TssPlugin extends CallablePlugin {
       this.parties[p.id] = p
     }
     catch (e) {
-      console.log(`TssPlugin.loadParty`, e)
+      console.log(`TssPlugin.loadParty ERROR:`, e)
     }
   }
 
@@ -440,8 +436,9 @@ class TssPlugin extends CallablePlugin {
       .map((p, j) => {
           if (!keyResults[j])
             return null
+          const index = this.collateralPlugin.getNodeInfo(p.wallet)!.id;
           return {
-            i: p.wallet,
+            i: index,
             key: tssModule.keyFromPrivate(keyResults[j].recoveryShare)
           }
         }
@@ -670,10 +667,10 @@ class TssPlugin extends CallablePlugin {
     let {party} = key;
 
     // set key self FH
-    let selfWalletIndex = process.env.SIGN_WALLET_ADDRESS
+    let selfWalletIndex = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!.id;
     let selfFH = key.getFH(selfWalletIndex)
     let A_ik = key.f_x.coefPubKeys()
-    key.setSelfShare(selfFH.f, selfFH.h, A_ik);
+    key.setSelfShare(selfWalletIndex, selfFH.f, selfFH.h, A_ik);
 
     let keyPartners = key.partners.map(w => party.partners[w]);
     let distKeyResult = await Promise.all(
@@ -687,6 +684,7 @@ class TssPlugin extends CallablePlugin {
         // if(!peer){
         //   console.log({wallet, peerId, peer})
         // }
+        const destinationNodeInfo = this.collateralPlugin.getNodeInfo(wallet)!;
         return this.remoteCall(
           peer,
           RemoteMethods.distributeKey,
@@ -696,7 +694,7 @@ class TssPlugin extends CallablePlugin {
             partners: key.partners,
             commitment: key.commitment.map(c => c.encode('hex')),
             pubKeys: A_ik.map(pubKey => pubKey.encode('hex')),
-            ...key.getFH(wallet),
+            ...key.getFH(destinationNodeInfo.id),
           },
           {taskId: `keygen-${key.id}`}
         )
@@ -807,7 +805,7 @@ class TssPlugin extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.createParty)
   async __createParty(data, callerInfo) {
-    console.log('TssPlugin.__createParty', data)
+    // console.log('TssPlugin.__createParty', data)
     CoreIpc.fireEvent({
       type: "party:generate",
       data
@@ -876,7 +874,10 @@ class TssPlugin extends CallablePlugin {
     let key: DistributedKey = keysCache.get(keyId);
     pubKeys = pubKeys.map(pub => tssModule.curve.keyFromPublic(pub, 'hex').getPublic())
     commitment = commitment.map(item => tssModule.keyFromPublic(item));
-    key.setPartnerShare(callerInfo.wallet, partners, f, h, pubKeys, commitment);
+
+    const currentNodeIndex = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!.id;
+    const callerIndex = this.collateralPlugin.getNodeInfo(callerInfo.wallet)!.id;
+    key.setPartnerShare(currentNodeIndex, callerIndex, partners, f, h, pubKeys, commitment);
 
     if (!key.keyDistributed) {
       this.broadcastKey(key).catch(console.error);

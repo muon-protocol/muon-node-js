@@ -41,7 +41,7 @@ function assignTask(taskId) {
   return call(IpcMethods.AssignTask, {taskId})
 }
 
-function getLeader() {
+function getLeader(): Promise<String | null> {
   return call(IpcMethods.GetLeader)
 }
 

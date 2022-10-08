@@ -191,24 +191,24 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async storeAppTss(appId, seed) {
-    console.log(`System.storeAppTss`, {appId, seed})
+  async storeAppTss(appId) {
+    // console.log(`System.storeAppTss`, {appId})
 
     /** check context exist */
-    const context = await AppContext.findOne({appId, seed}).exec();
+    const context = await AppContext.findOne({appId}).exec();
     if(!context)
       throw `App deployment info not found.`
 
     /** check key not created before */
     const oldTssKey = await AppTssConfig.findOne({
-      owner: process.env.SIGN_WALLET_ADDRESS,
-      context: context._id,
+      appId: appId,
+      version: context.version,
     }).exec();
     if(oldTssKey)
       throw `App tss key already generated`
 
     /** store tss key */
-    const id = this.getAppTssKeyId(appId, seed);
+    const id = this.getAppTssKeyId(appId, context.seed);
     let key: DistributedKey = this.tssPlugin.getSharedKey(id)!
     const tssConfig = new AppTssConfig({
       version: context.version,
