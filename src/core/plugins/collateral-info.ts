@@ -2,13 +2,16 @@ import BasePlugin from './base/base-plugin'
 import TimeoutPromise from '../../common/timeout-promise'
 import * as NetworkIpc from '../../network/ipc'
 import { GroupInfo, NetworkInfo } from '../../network/plugins/collateral-info'
+import {MuonNodeInfo} from "../../common/types";
 
 export default class CollateralInfoPlugin extends BasePlugin{
 
   groupInfo: GroupInfo | null = null;
   networkInfo: NetworkInfo | null = null;
-  peersWallet: {[index: string]: string} = {}
-  walletsPeer: {[index: string]: string} = {}
+  private allowedWallets: string[] = []
+
+  private _nodesList: MuonNodeInfo;
+  private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
   /**
    * @type {TimeoutPromise}
    */
@@ -33,43 +36,39 @@ export default class CollateralInfoPlugin extends BasePlugin{
     let info;
     while(!info) {
       try {
-        info = await NetworkIpc.getCollateralInfo();
+        info = await NetworkIpc.getCollateralInfo({timeout: 0});
       }catch (e) {
         console.log(`[${process.pid}] CoreCollateralInfo._loadCollateralInfo`, e);
       }
     }
-    const { groupInfo, networkInfo, peersWallet, walletsPeer } = info
+    const { groupInfo, networkInfo, nodesList } = info
 
     this.groupInfo = groupInfo;
     this.networkInfo = networkInfo;
-    this.peersWallet = peersWallet;
-    this.walletsPeer = walletsPeer;
+
+    this._nodesList = nodesList;
+    nodesList.forEach(n => {
+      this._nodesMap
+        .set(n.id, n)
+        .set(n.wallet, n)
+        .set(n.peerId, n)
+      this.allowedWallets.push(n.wallet);
+    })
 
     this.emit('loaded');
     this.loading.resolve(true);
   }
 
   // TODO: not implemented
-  getWallets(){
-    return Object.keys(this.walletsPeer);
+  getAllowedWallets(){
+    return this.allowedWallets;
   }
 
-  getPeerWallet(peerId) {
-    if(typeof peerId === "string")
-      return this.peersWallet[peerId];
-    else {
-      console.log("core.CollateralInfo.etPeerWallet", "PeerId is not string", {peerId})
-      throw {message: "Invalid peerId "}
-    }
-      // return this.peersWallet[peerId.toB58String()];
-  }
-
-  getWalletPeerId(wallet): string | undefined {
-    return this.walletsPeer[wallet];
-  }
-
-  get GroupId(): string | undefined{
-    return this.groupInfo?.group;
+  /**
+   * @param index {string} - id/wallet/peerId of node
+   */
+  getNodeInfo(index: string): MuonNodeInfo|undefined {
+    return this._nodesMap.get(index);
   }
 
   get TssThreshold(): number{

@@ -85,7 +85,7 @@ class MemoryPlugin extends CallablePlugin {
       return false
     }
 
-    let allowedList = collateralPlugin.getWallets().map(addr => addr.toLowerCase());
+    let allowedList = collateralPlugin.getAllowedWallets().map(addr => addr.toLowerCase());
 
     switch (memWrite.type) {
       case "app": {

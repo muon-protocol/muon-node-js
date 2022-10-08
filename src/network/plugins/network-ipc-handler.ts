@@ -79,11 +79,15 @@ class NetworkIpcHandler extends CallablePlugin {
   @ipcMethod(IpcMethods.GetCollateralInfo)
   async __onIpcGetCollateralInfo(data = {}, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
-    const collateralPlugin = this.network.getPlugin('collateral');
+    const collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
     await collateralPlugin.waitToLoad();
 
-    let {groupInfo, networkInfo, peersWallet, walletsPeer} = collateralPlugin;
-    return {groupInfo, networkInfo, peersWallet, walletsPeer}
+    let {groupInfo, networkInfo} = collateralPlugin;
+    return {
+      groupInfo,
+      networkInfo,
+      nodesList: await collateralPlugin.getNodesList()
+    }
   }
 
   @ipcMethod(IpcMethods.BroadcastMessage)
@@ -208,8 +212,11 @@ class NetworkIpcHandler extends CallablePlugin {
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
   async __forwardGateWayRequest(data: {wallet: string, requestData: Object}) {
     console.log(`NetworkIpcHandler.__forwardGateWayRequest`, data);
-    const peerId = this.collateralPlugin.getWalletPeerId(data.wallet)
-    const peer = await this.findPeer(peerId);
+    const nodeInfo = this.collateralPlugin.getNodeInfo(data.wallet)
+    if(!nodeInfo) {
+      throw `Unknown wallet ${data.wallet}`
+    }
+    const peer = await this.findPeer(nodeInfo.peerId);
     return await this.remoteCall(peer, RemoteMethods.ExecGateWayRequest, data.requestData);
   }
 

@@ -138,6 +138,8 @@ class BaseAppPlugin extends CallablePlugin {
 
     /** load app party on start */
     await this.appManager.waitToLoad();
+    await this.collateralPlugin.waitToLoad();
+
     const appParty = this.tssPlugin.getAppParty(this.APP_ID);
     if(process.env.VERBOSE && appParty) {
       console.log(`App party loaded`, appParty.id)
@@ -489,7 +491,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async informRequestConfirmation(request) {
     // await this.onConfirm(request)
-    let collateralPlugin = this.muon.getPlugin('collateral');
+    let collateralPlugin: CollateralInfoPlugin = this.muon.getPlugin('collateral');
     let nonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!;
     const partnersWallet: string[] = [
       /** self */
@@ -507,7 +509,7 @@ class BaseAppPlugin extends CallablePlugin {
         return await this.__onRequestConfirmation(request, callerInfo)
       }
       else {
-        const peerId = collateralPlugin.getWalletPeerId(wallet);
+        const peerId = collateralPlugin.getNodeInfo(wallet)!.peerId;
         return this.remoteCall(
           peerId,
           RemoteMethods.InformRequestConfirmation,
@@ -813,13 +815,13 @@ class BaseAppPlugin extends CallablePlugin {
   async __onRemoteSignTheRequest(data: {sign: AppRequestSignature} | null, error) {
     // console.log('BaseAppPlugin.__onRemoteSignTheRequest', data)
     if(error){
-      let collateralPlugin = this.muon.getPlugin('collateral');
+      let collateralPlugin:CollateralInfoPlugin = this.muon.getPlugin('collateral');
       let {peerId, request: reqId, ...otherParts} = error;
       let request = this.requestManager.getRequest(reqId);
       if(request) {
-        const owner = collateralPlugin.getPeerWallet(peerId);
-        if(owner) {
-          this.requestManager.addError(reqId, owner, otherParts);
+        const ownerInfo = collateralPlugin.getNodeInfo(peerId);
+        if(ownerInfo) {
+          this.requestManager.addError(reqId, ownerInfo.wallet, otherParts);
         }
       }
       return;

@@ -35,16 +35,11 @@ class System extends CallablePlugin {
 
   getAvailableNodes(): MuonNodeInfo[] {
     const peerIds = Object.keys(this.tssPlugin.availablePeers)
+    const currentNodeInfo = this.CollateralPlugin.getNodeInfo(process.env.PEER_ID!)
     return [
-      {
-        wallet: process.env.SIGN_WALLET_ADDRESS!,
-        peerId: process.env.PEER_ID!
-      },
+      currentNodeInfo!,
       ...peerIds.map(peerId => {
-        return {
-          wallet: this.CollateralPlugin.getPeerWallet(peerId),
-          peerId
-        }
+        return this.CollateralPlugin.getNodeInfo(peerId)!
       })
     ]
   }
@@ -103,9 +98,10 @@ class System extends CallablePlugin {
       return await this.__generateAppTss({appId}, null);
     }
     else {
-      const peerId = this.CollateralPlugin.getWalletPeerId(context.party.partners[0])
+      const nodeInfo = this.CollateralPlugin.getNodeInfo(context.party.partners[0])!
+      // TODO: if nodeInfo not exist of partner is not online?
       return await this.remoteCall(
-        peerId,
+        nodeInfo.peerId,
         RemoteMethods.GenerateAppTss,
         {appId}
       )
@@ -179,7 +175,7 @@ class System extends CallablePlugin {
             });
         // else
         return this.remoteCall(
-          this.CollateralPlugin.getWalletPeerId(wallet),
+          this.CollateralPlugin.getNodeInfo(wallet)!.peerId,
           RemoteMethods.InformAppDeployed,
           request,
         )
@@ -277,7 +273,7 @@ class System extends CallablePlugin {
       t: this.tssPlugin.TSS_THRESHOLD,
       partners: context.party.partners.map(wallet => ({
         wallet,
-        peerId: this.CollateralPlugin.getWalletPeerId(wallet)
+        peerId: this.CollateralPlugin.getNodeInfo(wallet)!.peerId
       }))
     });
     let party = this.tssPlugin.parties[partyId];

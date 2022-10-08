@@ -221,5 +221,6 @@ async function start() {
 }
 
 export {
+  Network,
   start
 }

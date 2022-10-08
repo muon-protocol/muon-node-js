@@ -2,7 +2,10 @@ import BaseNetworkPlugin from './base/base-network-plugin'
 import { OnlinePeerInfo } from '../types';
 import TimeoutPromise from '../../common/timeout-promise'
 const eth = require('../../utils/eth')
+const {stackTrace} = require('../../utils/helpers')
 import NodeManagerAbi from '../../data/NodeManager-ABI.json'
+import {MuonNodeInfo} from "../../common/types";
+const _ = require('lodash')
 
 export type GroupInfo = {
   isValid: boolean,
@@ -21,9 +24,10 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   groupInfo: GroupInfo | null = null;
   networkInfo: NetworkInfo | null = null;
-  peersWallet: {[index: string]: string} = {}
-  walletsPeer: {[index: string]: string} = {}
   onlinePeers: {[index: string]: OnlinePeerInfo} = {}
+
+  private _nodesList: MuonNodeInfo;
+  private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
   /**
    * @type {TimeoutPromise}
    */
@@ -49,8 +53,15 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   async onPeerDiscovery(peerId) {
     // console.log("peer available", peerId)
+    await this.waitToLoad();
+
+    let nodeInfo = this.getNodeInfo(peerId._idB58String)
+    if(!nodeInfo) {
+      console.log(`network.CollateralInfo.onPeerDiscovery`, "Unknown peer connect", peerId);
+      return;
+    }
     this.onlinePeers[peerId._idB58String] = {
-      wallet: this.getPeerWallet(peerId._idB58String),
+      wallet: nodeInfo.wallet,
       peerId,
       peer: await this.findPeer(peerId),
     }
@@ -60,8 +71,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     await this.waitToLoad();
 
     // console.log("peer connected", peerId)
-    const wallet = this.getPeerWallet(peerId._idB58String)
-    if(!wallet) {
+    const nodeInfo = this.getNodeInfo(peerId._idB58String)
+    if(!nodeInfo) {
       if(process.env.VERBOSE) {
         console.log(`Unknown peer ${peerId} connected to network and ignored.`)
       }
@@ -69,7 +80,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     }
 
     this.onlinePeers[peerId._idB58String] = {
-      wallet,
+      wallet: nodeInfo.wallet,
       peerId,
       peer: await this.findPeer(peerId),
     }
@@ -90,19 +101,29 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     }
 
     let nodes = await this.loadNetworkNodes(nodeManager);
-    // console.log(nodes)
-    nodes = nodes.filter(n => n.active);
+    nodes = nodes
+      .filter(n => n.active)
+      .map(n => ({
+        id: n.id,
+        wallet: n.nodeAddress,
+        peerId: n.peerId
+      }))
+    console.log(nodes)
+
+    this._nodesList = nodes;
+    nodes.forEach(n => {
+      this._nodesMap
+        .set(n.id, n)
+        .set(n.wallet, n)
+        .set(n.peerId, n)
+    })
 
     this.groupInfo = {
       isValid: true,
       group: "1",
       sharedKey: null,
-      partners: nodes.map(n => n.nodeAddress)
+      partners: nodes.map(n => n.wallet)
     }
-    nodes.forEach(n => {
-      this.peersWallet[n.peerId] = n.nodeAddress
-      this.walletsPeer[n.nodeAddress] = n.peerId
-    })
 
     if(process.env.VERBOSE) {
       console.log('CollateralInfo._loadCollateralInfo: Info loaded.');
@@ -118,24 +139,16 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     return result;
   }
 
-  // TODO: not implemented
-  getWallets(){
-    return Object.keys(this.walletsPeer);
-  }
-
-  getPeerWallet(peerId) {
-    if(typeof peerId === "string")
-      return this.peersWallet[peerId];
-    else
-      return this.peersWallet[peerId.toB58String()];
-  }
-
-  getWalletPeerId(wallet) {
-    return this.walletsPeer[wallet];
-  }
-
-  get GroupId(){
-    return this.groupInfo?.group;
+  /**
+   * @param index {string} - id/wallet/peerId of node
+   */
+  getNodeInfo(index: string): MuonNodeInfo|undefined {
+    if(typeof index !== 'string') {
+      console.log(`Expected string index but got non-string`, index);
+      stackTrace();
+      throw `Expected string index but got non-string`
+    }
+    return this._nodesMap.get(index);
   }
 
   get TssThreshold(): number{
@@ -158,6 +171,11 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   get MaxGroupSize(){
     return this.networkInfo?.maxGroupSize;
+  }
+
+  async getNodesList() {
+    await this.waitToLoad();
+    return this._nodesList;
   }
 
   waitToLoad(){

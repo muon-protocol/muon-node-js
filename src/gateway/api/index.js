@@ -34,7 +34,7 @@ function extraLogs(req, result) {
 }
 
 async function callProperNode(requestData) {
-  if(['__info', '__deploy'].includes(requestData.method))
+  if(requestData.method !== 'request')
     return await requestQueue.send(requestData)
   let context = await CoreIpc.getAppContext(requestData.app);
   if (!context) {

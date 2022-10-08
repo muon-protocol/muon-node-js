@@ -2,6 +2,7 @@ import BaseNetworkPlugin from './base/base-network-plugin'
 const pipe = require('it-pipe')
 const {newCallId} = require('../../utils/helpers')
 import TimeoutPromise from '../../common/timeout-promise'
+import CollateralInfoPlugin from "./collateral-info";
 const NodeCache = require('node-cache');
 
 const callCache = new NodeCache({
@@ -67,11 +68,11 @@ class RemoteCall extends BaseNetworkPlugin {
   }
 
   async handleIncomingMessage(signAndMessage, stream, peerId){
-    let collateralPlugin = this.network.getPlugin('collateral');
+    let collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
     try {
       let message = signAndMessage.toString()
-      let peerWallet = collateralPlugin.getPeerWallet(peerId)
-      if(!peerWallet){
+      let nodeInfo = collateralPlugin.getNodeInfo(peerId._idB58String)
+      if(!nodeInfo){
         throw {message: `Unrecognized request owner`}
       }
 
@@ -79,13 +80,13 @@ class RemoteCall extends BaseNetworkPlugin {
 
       if('method' in data) {
         let {callId, method, params={}} = data;
-        return await this.handleCall(callId, method, params, peerWallet, stream, peerId);
+        return await this.handleCall(callId, method, params, nodeInfo.wallet, stream, peerId);
       }
       else{
         // TODO: what to do?
       }
     }catch (e) {
-      console.error("network.RemoteCall.handleIncomingMessage", e);
+      console.error("network.RemoteCall.handleIncomingMessage", e, peerId._idB58String, signAndMessage);
     }
   }
 
@@ -143,12 +144,12 @@ class RemoteCall extends BaseNetworkPlugin {
   }
 
   async handleSendResponse(signAndMessage, peerId){
-    let collateralPlugin = this.network.getPlugin('collateral');
+    let collateralPlugin:CollateralInfoPlugin = this.network.getPlugin('collateral');
     try {
       let message = signAndMessage.toString()
 
-      let peerWallet = collateralPlugin.getPeerWallet(peerId)
-      if(!peerWallet){
+      let nodeInfo = collateralPlugin.getNodeInfo(peerId._idB58String)
+      if(!nodeInfo){
         throw {message: `Unrecognized message owner`}
         // let {responseId} = data;
         // let remoteResult = this._calls[responseId]

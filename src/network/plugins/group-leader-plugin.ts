@@ -61,8 +61,10 @@ class GroupLeaderPlugin extends CallablePlugin {
   onPeerDisconnect(peerId) {
     let peerIdStr = peerId.toB58String()
     if(!!this.leader){
-      let leaderPeerIdStr = this.collateralPlugin.getWalletPeerId(this.leader);
-      if(peerIdStr === leaderPeerIdStr){
+      let nodeInfo = this.collateralPlugin.getNodeInfo(this.leader);
+      if(!nodeInfo)
+        return;
+      if(peerIdStr === nodeInfo.peerId){
         console.log(`Leader disconnect and need to reselect another leader.`)
         this.reselectLeader();
       }
@@ -184,7 +186,7 @@ class GroupLeaderPlugin extends CallablePlugin {
       throw {message: "Election key is null."}
     let partners = this.electionKey.partners
       .filter(w => w !== process.env.SIGN_WALLET_ADDRESS)
-      .map(w => this.collateralPlugin.getWalletPeerId(w))
+      .map(w => this.collateralPlugin.getNodeInfo(w)!.peerId)
       .map(peerId => this.collateralPlugin.onlinePeers[peerId])
 
     let responses = await this.callParty(

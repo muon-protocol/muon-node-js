@@ -113,11 +113,13 @@ class TssPlugin extends CallablePlugin {
   onPeerDisconnect(disconnectedPeer) {
     // console.log(`[${process.pid}] peer disconnect`, peerId)
     delete this.availablePeers[disconnectedPeer];
-    const disconnectedWallet = this.collateralPlugin.getPeerWallet(disconnectedPeer)
-    console.log(`TssPlugin: remove online peer ${disconnectedWallet}@${disconnectedPeer}`)
+    const nodeInfo = this.collateralPlugin.getNodeInfo(disconnectedPeer)
+    if(!nodeInfo)
+      return;
+    console.log(`TssPlugin: remove online peer ${nodeInfo.wallet}@${disconnectedPeer}`)
     Object.keys(this.parties).forEach(partyId => {
       const party = this.parties[partyId]
-      party.setWalletPeer(disconnectedWallet, null);
+      party.setWalletPeer(nodeInfo.wallet, null);
     })
   }
 
@@ -126,13 +128,13 @@ class TssPlugin extends CallablePlugin {
       return ;
     }
     try {
-      let peerWallet = this.collateralPlugin.getPeerWallet(peerId);
-      if(peerWallet) {
+      let nodeInfo = this.collateralPlugin.getNodeInfo(peerId);
+      if(nodeInfo) {
         if (!!this.tssParty) {
-          if (peerWallet) {
+          if (nodeInfo.wallet) {
             // console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
             Object.keys(this.parties).forEach(partyId => {
-              this.parties[partyId].setWalletPeer(peerWallet, peerId);
+              this.parties[partyId].setWalletPeer(nodeInfo!.wallet, peerId);
             })
           }
         } else {
@@ -190,7 +192,7 @@ class TssPlugin extends CallablePlugin {
       id: group,
       t: networkInfo.tssThreshold,
       max: networkInfo.maxGroupSize,
-      partners: partners.map(wallet => ({wallet, peerId: this.collateralPlugin.getWalletPeerId(wallet)}))
+      partners: partners.map(wallet => ({wallet, peerId: this.collateralPlugin.getNodeInfo(wallet)!.peerId}))
     });
     this.parties[party.id] = party
     this.tssParty = party;
@@ -303,13 +305,17 @@ class TssPlugin extends CallablePlugin {
     const partyId = this.getAppPartyId(appId, _context.version);
 
     if(!this.parties[partyId]) {
-
       let party = Party.load({
         id: partyId,
         t: _context.party.t,
         max: _context.party.max,
         partners: _context.party.partners.map(wallet => {
-          const peerId = this.collateralPlugin.getWalletPeerId(wallet)!
+          const nodeInfo = this.collateralPlugin.getNodeInfo(wallet)!;
+          /**
+           * TODO: if nodeInfo not found
+           * this will happen when node remove from network and exist in context partners.
+            */
+          const peerId = nodeInfo.peerId
           return {
             wallet,
             peerId,
@@ -382,7 +388,7 @@ class TssPlugin extends CallablePlugin {
     try {
       let p = Party.load(party)
       Object.keys(this.availablePeers).forEach(peerId => {
-        const wallet = this.collateralPlugin.getPeerWallet(peerId);
+        const wallet = this.collateralPlugin.getNodeInfo(peerId)!.wallet;
         p.setWalletPeer(wallet, peerId)
       })
       this.parties[p.id] = p

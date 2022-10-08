@@ -10,13 +10,14 @@ function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions) {
   return callQueue.send({method, params}, options);
 }
 
-function getCollateralInfo() {
+function getCollateralInfo(options?: IpcCallOptions) {
   return call(
     IpcMethods.GetCollateralInfo,
     {},
     {
       timeout: 5000,
-      timeoutMessage: "Getting collateral info timed out"
+      timeoutMessage: "Getting collateral info timed out",
+      ...options
     })
 }
 

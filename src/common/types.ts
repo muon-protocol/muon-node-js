@@ -20,6 +20,7 @@ export type IpcCallOptions = {
 }
 
 export type MuonNodeInfo = {
+    id: string,
     wallet: string,
     peerId: string,
     peer?: any
