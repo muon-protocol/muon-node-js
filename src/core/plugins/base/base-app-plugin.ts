@@ -439,9 +439,20 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: `KeyGen creation failed`, nodesCheckResult: callResult}
 
     /**
+     * Creating APP party
+     */
+    const context = this.appManager.getAppContext(this.APP_ID)
+    const partyId = this.tssPlugin.getAppPartyId(context.appId, context.version)
+    await this.tssPlugin.createParty({
+      id: partyId,
+      t: this.tssPlugin.TSS_THRESHOLD,
+      partners: context.party.partners
+        .map(wallet => this.collateralPlugin.getNodeInfo(wallet))
+    });
+
+    /**
      * Generate a Distributed Key
      */
-    const context = this.appManager.getAppContext(this.APP_ID);
     const contextHash = AppContext.hash(context);
     const keyId = `app-tss-key-${contextHash}-${signature}`
 
@@ -1071,12 +1082,7 @@ class BaseAppPlugin extends CallablePlugin {
     let {timestamp, signature} = data
     this._validateRemoteKeygenRequest(timestamp, signature);
 
-    /**
-     * ensure app party loaded
-     */
-    this.tssPlugin.getAppParty(this.APP_ID);
-
-    return "OK"
+    return "OK";
   }
 
   @remoteMethod(RemoteMethods.AppTssKeyGenStep2)

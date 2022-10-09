@@ -20,7 +20,6 @@ const RemoteMethods = {
 @remoteApp
 export default class AppManager extends CallablePlugin {
   private appContexts: {[index: string]: any} = {}
-  private globalContext;
   private contextIdToAppIdMap: {[index: string]: string}={}
   private appTssConfigs: {[index: string]: any} = {}
   private loading: TimeoutPromise = new TimeoutPromise();
@@ -34,17 +33,6 @@ export default class AppManager extends CallablePlugin {
     appTssConfigEventEmitter.on('change', this.onAppTssConfigChange.bind(this))
 
     await this.collateralPlugin.waitToLoad();
-
-    this.globalContext = {
-      deployed: true,
-      appId: 0,
-      version: 1,
-      party: {
-        partners: this.collateralPlugin.groupInfo?.partners,
-        t: this.collateralPlugin.networkInfo?.tssThreshold,
-        max: this.collateralPlugin.networkInfo?.maxGroupSize,
-      }
-    }
   }
 
   get tssPlugin(): TssPlugin {
@@ -265,10 +253,6 @@ export default class AppManager extends CallablePlugin {
 
   getAppContext(appId: string) {
       return this.appContexts[appId];
-  }
-
-  getGlobalContext() {
-    return this.globalContext;
   }
 
   appHasTssKey(appId: string): boolean {

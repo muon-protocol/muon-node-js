@@ -21,7 +21,7 @@ const RemoteMethods = {
 class System extends CallablePlugin {
   APP_NAME = 'system'
 
-  get CollateralPlugin(): CollateralInfoPlugin {
+  get collateralPlugin(): CollateralInfoPlugin {
     return this.muon.getPlugin('collateral');
   }
 
@@ -35,11 +35,11 @@ class System extends CallablePlugin {
 
   getAvailableNodes(): MuonNodeInfo[] {
     const peerIds = Object.keys(this.tssPlugin.availablePeers)
-    const currentNodeInfo = this.CollateralPlugin.getNodeInfo(process.env.PEER_ID!)
+    const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.PEER_ID!)
     return [
       currentNodeInfo!,
       ...peerIds.map(peerId => {
-        return this.CollateralPlugin.getNodeInfo(peerId)!
+        return this.collateralPlugin.getNodeInfo(peerId)!
       })
     ]
   }
@@ -47,8 +47,8 @@ class System extends CallablePlugin {
   @appApiMethod()
   getNetworkInfo() {
     return {
-      tssThreshold: this.CollateralPlugin.networkInfo?.tssThreshold!,
-      maxGroupSize: this.CollateralPlugin.networkInfo?.maxGroupSize!,
+      tssThreshold: this.collateralPlugin.networkInfo?.tssThreshold!,
+      maxGroupSize: this.collateralPlugin.networkInfo?.maxGroupSize!,
     }
   }
 
@@ -98,7 +98,7 @@ class System extends CallablePlugin {
       return await this.__generateAppTss({appId}, null);
     }
     else {
-      const nodeInfo = this.CollateralPlugin.getNodeInfo(context.party.partners[0])!
+      const nodeInfo = this.collateralPlugin.getNodeInfo(context.party.partners[0])!
       // TODO: if nodeInfo not exist of partner is not online?
       return await this.remoteCall(
         nodeInfo.peerId,
@@ -175,7 +175,7 @@ class System extends CallablePlugin {
             });
         // else
         return this.remoteCall(
-          this.CollateralPlugin.getNodeInfo(wallet)!.peerId,
+          this.collateralPlugin.getNodeInfo(wallet)!.peerId,
           RemoteMethods.InformAppDeployed,
           request,
         )
@@ -271,10 +271,7 @@ class System extends CallablePlugin {
     await this.tssPlugin.createParty({
       id: partyId,
       t: this.tssPlugin.TSS_THRESHOLD,
-      partners: context.party.partners.map(wallet => ({
-        wallet,
-        peerId: this.CollateralPlugin.getNodeInfo(wallet)!.peerId
-      }))
+      partners: context.party.partners.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
     let party = this.tssPlugin.parties[partyId];
     if(!party)

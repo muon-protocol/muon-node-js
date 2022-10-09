@@ -188,7 +188,7 @@ class TssPlugin extends CallablePlugin {
       id: group,
       t: networkInfo.tssThreshold,
       max: networkInfo.maxGroupSize,
-      partners: partners.map(wallet => ({wallet, peerId: this.collateralPlugin.getNodeInfo(wallet)!.peerId}))
+      partners: partners.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
     this.parties[party.id] = party
     this.tssParty = party;
@@ -305,20 +305,7 @@ class TssPlugin extends CallablePlugin {
         id: partyId,
         t: _context.party.t,
         max: _context.party.max,
-        partners: _context.party.partners.map(wallet => {
-          const nodeInfo = this.collateralPlugin.getNodeInfo(wallet)!;
-          /**
-           * TODO: if nodeInfo not found
-           * this will happen when node remove from network and exist in context partners.
-            */
-          const peerId = nodeInfo.peerId
-          return {
-            wallet,
-            peerId,
-            /** peer property exist, if partner is online */
-            ... (this.availablePeers[peerId] ? {peer: peerId} : {})
-          }
-        })
+        partners: _context.party.partners.map(wallet => this.collateralPlugin.getNodeInfo(wallet)!)
       })
       this.parties[partyId] = party;
     }
@@ -385,6 +372,7 @@ class TssPlugin extends CallablePlugin {
       let p = Party.load(party)
       Object.keys(this.availablePeers).forEach(peerId => {
         const wallet = this.collateralPlugin.getNodeInfo(peerId)!.wallet;
+        // TODO: no need the line below bot check it more
         p.setWalletPeer(wallet, peerId)
       })
       this.parties[p.id] = p
@@ -512,7 +500,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   async createParty(options: PartyGenOptions) {
-    const {
+    let {
       id,
       t,
       partners=[]
@@ -527,7 +515,12 @@ class TssPlugin extends CallablePlugin {
       max: partners.length,
       partners
     }
-    CoreIpc.fireEvent({type: "party:generate", data: newParty});
+    if(!id || !this.parties[id])
+      CoreIpc.fireEvent({type: "party:generate", data: newParty});
+    /**
+     * filter partners and keep online ones.
+     */
+    partners = partners.filter(p => !!p.peer)
 
     let callResult = await Promise.all(
       partners
@@ -616,7 +609,7 @@ class TssPlugin extends CallablePlugin {
 
     keysCache.set(key.id, key);
 
-    let partners: OnlinePeerInfo[] = Object.values(party.onlinePartners)
+    let partners: MuonNodeInfo[] = Object.values(party.onlinePartners)
 
     if(maxPartners && maxPartners > 0) {
       /** exclude current node and add it later */
@@ -637,11 +630,11 @@ class TssPlugin extends CallablePlugin {
 
     let callResult = await Promise.all(
       partners
-        .map(({peer, wallet}) => {
+        .map(({peerId, wallet}) => {
           if(wallet === process.env.SIGN_WALLET_ADDRESS)
-            return true;
+            return "OK";
           return this.remoteCall(
-            peer,
+            peerId,
             RemoteMethods.createKey,
             {
               party: party.id,
@@ -649,11 +642,15 @@ class TssPlugin extends CallablePlugin {
               partners: partners.map(({wallet}) => wallet)
             },
             {taskId, timeout: 15000}
-          ).catch(e => 'error')
+          ).catch(e => {
+            if(process.env.VERBOSE)
+              console.log(e)
+            return e.message
+          })
         })
     )
     // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
-    key.partners = partners.filter((p, i) => callResult[i]!=='error').map(p => p.wallet)
+    key.partners = partners.filter((p, i) => callResult[i]==='OK').map(p => p.wallet)
     if(key.partners.length < party.t){
       console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
       throw {message: "Error in key creation"}
@@ -716,18 +713,16 @@ class TssPlugin extends CallablePlugin {
   }
 
   async handleBroadcastMessage(msg, callerInfo) {
-    // TODO: use {wallet, peer} from callerInfo instead of msg params.
     let {method, params} = msg;
     // console.log("TssPlugin.handleBroadcastMessage",msg, {callerInfo})
     switch (method) {
       case BroadcastMessage.WhoIsThere: {
-        let {peerId} = params;
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
         // TODO: is this message from 'wallet'
         if (!!this.tssParty) {
-          this.tssParty.setWalletPeer(callerInfo.wallet, peerId);
+          this.tssParty.setWalletPeer(callerInfo.wallet, callerInfo.peerId);
           this.remoteCall(
-            peerId,
+            callerInfo.peerId,
             RemoteMethods.iAmHere
           ).catch(e => {})
         }
@@ -798,12 +793,14 @@ class TssPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.createParty)
-  async __createParty(data, callerInfo) {
+  async __createParty(data: PartyGenOptions, callerInfo) {
     // console.log('TssPlugin.__createParty', data)
-    CoreIpc.fireEvent({
-      type: "party:generate",
-      data
-    });
+    if(!data.id || !this.parties[data.id]) {
+      CoreIpc.fireEvent({
+        type: "party:generate",
+        data
+      });
+    }
     return "OK"
   }
 
@@ -830,7 +827,7 @@ class TssPlugin extends CallablePlugin {
       throw {message: `key already exist [${keyId}]`}
     }
     keysCache.set(keyId, new DistributedKey(parties[party], keyId));
-    return true;
+    return "OK";
   }
 
   /**

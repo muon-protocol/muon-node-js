@@ -1,14 +1,14 @@
 import TimeoutPromise from '../../../common/timeout-promise'
-import { OnlinePeerInfo } from "../../../network/types";
 import {returnStatement} from "@babel/types";
 import {MuonNodeInfo} from "../../../common/types";
+const {stackTrace} = require('../../../utils/helpers')
 
 export default class TssParty {
   t: number = 0
   max: number = 0;
   id: string;
   /** map node wallet to OnlinePeerInfo */
-  partners: {[index: string]: OnlinePeerInfo} = {}
+  partners: {[index: string]: MuonNodeInfo} = {}
   timeoutPromise: TimeoutPromise;
 
   constructor(t, max, id=null, timeout=0){
@@ -17,10 +17,6 @@ export default class TssParty {
     this.t = t;
     this.max = max;
     this.id = id || TssParty.newId()
-    this.partners[process.env.SIGN_WALLET_ADDRESS] = {
-      peerId: process.env.PEER_ID,
-      wallet: process.env.SIGN_WALLET_ADDRESS,
-    }
     this.timeoutPromise = new TimeoutPromise(timeout, "Party join timeout", {resolveOnTimeout: true})
   }
 
@@ -40,7 +36,7 @@ export default class TssParty {
    * @param partner
    *
    */
-  addPartner(partner){
+  addPartner(partner: MuonNodeInfo){
     if(typeof partner === 'string')
       throw "partner most be object of type {wallet,peerId}"
     // if(this.partners[partner.wallet] === undefined)
@@ -55,28 +51,11 @@ export default class TssParty {
     }
   }
 
-  setPeers(peers){
-    try {
-      let id2wallet = {};
-      for (let wallet in this.partners) {
-        let {peerId} = this.partners[wallet]
-        id2wallet[peerId] = wallet
-      }
-      peers.filter(p => !!p).map(peer => {
-        if (peer.id === undefined)
-          console.log({peer})
-        let key = peer.id.toB58String()
-        let wallet = id2wallet[key]
-        this.partners[wallet].peer = peer
-      })
-    }
-    catch (e) {
-      console.error("Party.setPeers", e);
-      throw e;
-    }
-  }
-
   setWalletPeer(wallet, peer){
+    if(typeof peer !== 'string') {
+      console.log(`WARNING: peer should be string.`)
+      stackTrace()
+    }
     if(this.partners[wallet] !== undefined) {
       this.partners[wallet].peer = peer
     }
@@ -92,16 +71,8 @@ export default class TssParty {
     return Object.keys(partners).length >= max;
   }
 
-  getPeers(){
-    let peersWallet = Object.keys(this.partners).filter(wallet => wallet !== process.env.SIGN_WALLET_ADDRESS)
-    return peersWallet.map(w => this.partners[w].peer).filter(p => !!p)
-  }
-
   size(){
     return Object.keys(this.partners).length
-  }
-
-  makePoly(){
   }
 
   waitToFulfill(){
