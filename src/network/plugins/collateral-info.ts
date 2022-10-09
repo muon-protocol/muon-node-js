@@ -1,10 +1,10 @@
 import BaseNetworkPlugin from './base/base-network-plugin'
 import TimeoutPromise from '../../common/timeout-promise'
 const eth = require('../../utils/eth')
-const {stackTrace} = require('../../utils/helpers')
+const {stackTrace, timeout} = require('../../utils/helpers')
+const { multiCall } = require('../../utils/multicall')
 import NodeManagerAbi from '../../data/NodeManager-ABI.json'
 import {MuonNodeInfo} from "../../common/types";
-const _ = require('lodash')
 
 export type GroupInfo = {
   isValid: boolean,
@@ -21,11 +21,12 @@ export type NetworkInfo = {
 
 export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
-  groupInfo: GroupInfo | null = null;
+  groupInfo: GroupInfo;
   networkInfo: NetworkInfo | null = null;
   onlinePeers: {[index: string]: boolean} = {}
 
-  private _nodesList: MuonNodeInfo;
+  private lastNodesUpdateTime;
+  private _nodesList: MuonNodeInfo[];
   private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
   /**
    * @type {TimeoutPromise}
@@ -103,18 +104,12 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       maxGroupSize: parseInt(tss.max)
     }
 
-    let nodes = await this.loadNetworkNodes(nodeManager);
-    nodes = nodes
-      .filter(n => n.active)
-      .map(n => ({
-        id: n.id,
-        wallet: n.nodeAddress,
-        peerId: n.peerId
-      }))
-    console.log(nodes)
+    let {lastUpdateTime, allNodes} = await this.loadNetworkInfo(nodeManager);
+    this.lastNodesUpdateTime = lastUpdateTime;
+    this.watchNodesChange(nodeManager)
 
-    this._nodesList = nodes;
-    nodes.forEach(n => {
+    this._nodesList = allNodes;
+    allNodes.forEach(n => {
       this._nodesMap
         .set(n.id, n)
         .set(n.wallet, n)
@@ -125,7 +120,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       isValid: true,
       group: "1",
       sharedKey: null,
-      partners: nodes.map(n => n.wallet)
+      partners: allNodes.map(n => n.wallet)
     }
 
     if(process.env.VERBOSE) {
@@ -136,10 +131,128 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     this.loading.resolve(true);
   }
 
-  async loadNetworkNodes(nodeManagerInfo) {
+  async loadNetworkInfo(nodeManagerInfo){
     const {address, network} = nodeManagerInfo;
-    const result = await eth.call(address, 'getAllNodes', [], NodeManagerAbi, network)
-    return result;
+
+    const contractCallContext = {
+      reference: "get-muon-nodes-info",
+      contractAddress: address,
+      abi: NodeManagerAbi,
+      calls: [{
+        reference: "get-last-update-time",
+        methodName: 'lastUpdateTime()',
+        methodParameters: []
+      },{
+        reference: "get-nodes-list",
+        methodName: 'getAllNodes',
+        methodParameters: []
+      }]
+    }
+    let rawResult = await multiCall(network, [contractCallContext])
+    rawResult = rawResult[0].callsReturnContext;
+
+    return {
+      lastUpdateTime: parseInt(rawResult[0].returnValues[0]),
+      allNodes: rawResult[1].returnValues
+        .filter(item => item[4])
+        .map(item => ({
+          id: BigInt(item[0].hex).toString(),
+          wallet: item[1],
+          peerId: item[3],
+        }))
+    }
+  }
+
+  /**
+   * All events that changes the lastUpdateTime:
+   *
+   * 1) Add new node.
+   * 2) Remove node by Admin
+   * 3) Deactivate node by collateral address
+   * 4) Edit nodeAddress
+   * 5) Edit PeerId
+   */
+  async onNodesChange() {
+    let {nodeManager} = this.network.configs.net;
+
+    let {lastUpdateTime, allNodes} = await this.loadNetworkInfo(nodeManager);
+    this.lastNodesUpdateTime = lastUpdateTime;
+
+
+    /**
+     * 2) Remove node by Admin
+     * 3) Deactivate node by collateral address
+     */
+    const newIdList = allNodes.map(n => n.id);
+    const nodesToRemove = this._nodesList
+      .map(n => n.id)
+      .filter(id => !newIdList.includes(id))
+    nodesToRemove.forEach(id => {
+      let oldNode = this._nodesMap.get(id)!;
+      this._nodesMap.delete(oldNode.id)
+      this._nodesMap.delete(oldNode.wallet)
+      this._nodesMap.delete(oldNode.peerId)
+      if(process.env.VERBOSE) {
+        console.log(`Node info deleted from chain`, oldNode)
+      }
+      this.emit("node-delete", oldNode)
+    })
+
+    allNodes.forEach(n => {
+      let oldNode = this._nodesMap.get(n.id);
+      /** 1) Add new node. */
+      if(!oldNode){
+        this._nodesMap
+          .set(n.id, n)
+          .set(n.wallet, n)
+          .set(n.peerId, n)
+        if(process.env.VERBOSE) {
+          console.log(`New node info added to chain`, n)
+        }
+        this.emit("node-add", n)
+        return;
+      }
+      /**
+       * 4) Edit nodeAddress
+       * 5) Edit PeerId
+       */
+      if(oldNode.wallet !== n.wallet || oldNode.peerId !== n.peerId) {
+        this._nodesMap
+          .set(n.id, n)
+          .set(n.wallet, n)
+          .set(n.peerId, n)
+        if(process.env.VERBOSE) {
+          console.log(`Node info changed on chain`, {old: oldNode, new: n})
+        }
+        this.emit("node-edit", n)
+        return;
+      }
+    })
+
+    this._nodesList = allNodes;
+    this.groupInfo.partners = allNodes.map(n => n.wallet)
+  }
+
+  async watchNodesChange(nodeManagerInfo) {
+    const {address, network} = nodeManagerInfo;
+    while (true) {
+      /** every 10 seconds */
+      await timeout(20000);
+      try {
+        let lastUpdateTime = await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
+        lastUpdateTime = parseInt(lastUpdateTime);
+
+        if(lastUpdateTime !== this.lastNodesUpdateTime) {
+          if(process.env.VERBOSE) {
+            console.log("Muon nodes list changed on-chain.")
+          }
+          await this.onNodesChange();
+        }
+      }
+      catch (e) {
+        console.log(`Network.CollateralInfoPlugin.watchNodesChange`, e)
+      }
+    }
   }
 
   /**
@@ -165,7 +278,9 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     /**
      * onlinePartners not include current node
      */
-    return Object.keys(this.onlinePeers).length + 1 >= this.TssThreshold
+    return Object.keys(this.onlinePeers)
+      .map(peerId => this.getNodeInfo(peerId))
+      .filter(info => !!info).length + 1 >= this.TssThreshold
   }
 
   get MinGroupSize(){

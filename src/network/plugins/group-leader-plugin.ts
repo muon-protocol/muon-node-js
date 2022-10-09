@@ -244,9 +244,7 @@ class GroupLeaderPlugin extends CallablePlugin {
   get mainExecutor() {
     let walletList = [
       process.env.SIGN_WALLET_ADDRESS!,
-      ...Object.keys(this.collateralPlugin.onlinePeers)
-        .map(peerId => this.collateralPlugin.getNodeInfo(peerId)!)
-        .filter(n => !!n)
+      ...this.collateralPlugin.onlinePeersInfo
         .map(n => n.wallet)
         .filter(w => w !== process.env.SIGN_WALLET_ADDRESS)
     ]
