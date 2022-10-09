@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
-import {OnlinePeerInfo} from "../../network/types";
 import TssPlugin from "./tss-plugin";
+import {MuonNodeInfo} from "../../common/types";
 const {timeout} = require('../../utils/helpers')
 const OS = require('os')
 const util = require('util');
@@ -77,8 +77,8 @@ class HealthCheck extends CallablePlugin {
     if(!process.env.SIGN_WALLET_ADDRESS)
       throw `process.env.SIGN_WALLET_ADDRESS is not defined`
 
-    let partners: OnlinePeerInfo[] = Object.values(tssPlugin.tssParty.partners)
-      .filter((op: OnlinePeerInfo) => {
+    let partners: MuonNodeInfo[] = Object.values(tssPlugin.tssParty.partners)
+      .filter((op: MuonNodeInfo) => {
         return !!op.peer && op.wallet !== process.env.SIGN_WALLET_ADDRESS
       })
 

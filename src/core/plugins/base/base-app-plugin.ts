@@ -15,11 +15,11 @@ import { MemWrite } from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 const Web3 = require('web3')
 import DistributedKey from "../tss-plugin/distributed-key";
-import {OnlinePeerInfo} from "../../../network/types";
 import TssPlugin from "../tss-plugin";
 import AppManager from "../app-manager";
 import TssParty from "../tss-plugin/party";
 import CollateralInfoPlugin from "../collateral-info";
+import {MuonNodeInfo} from "../../../common/types";
 const chalk = require('chalk')
 const Ajv = require("ajv")
 const ajv = new Ajv()
@@ -733,8 +733,8 @@ class BaseAppPlugin extends CallablePlugin {
     let party = nonce.party;
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: nonce.party has not value.`}
-    let partners: OnlinePeerInfo[] = Object.values(party.partners)
-      .filter((op: OnlinePeerInfo) => {
+    let partners: MuonNodeInfo[] = Object.values(party.partners)
+      .filter((op: MuonNodeInfo) => {
         return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.wallet)
       })
 

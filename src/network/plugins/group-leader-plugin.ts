@@ -6,7 +6,6 @@ const {timeout} = require('../../utils/helpers');
 import TimeoutPromise from '../../common/timeout-promise'
 const {utils:{soliditySha3}} = require('web3')
 const CoreIpc = require('../../core/ipc')
-import { OnlinePeerInfo } from '../types'
 import { RemoteCallOptions } from './remote-call'
 import CollateralInfoPlugin from "./collateral-info";
 import {MuonNodeInfo} from "../../common/types";

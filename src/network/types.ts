@@ -54,9 +54,3 @@ export type NetworkConfig = {
         }
     }
 }
-
-export type OnlinePeerInfo = {
-    wallet: string,
-    peerId: string,
-    peer?: PeerInfo,
-}

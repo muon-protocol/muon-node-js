@@ -7,7 +7,7 @@ export default class TssParty {
   t: number = 0
   max: number = 0;
   id: string;
-  /** map node wallet to OnlinePeerInfo */
+  /** map node wallet to MuonNodeInfo */
   partners: {[index: string]: MuonNodeInfo} = {}
   timeoutPromise: TimeoutPromise;
 

@@ -7,7 +7,6 @@ const {utils:{toBN}} = require('web3')
 const {timeout} = require('../../../utils/helpers');
 import {remoteApp, remoteMethod, broadcastHandler} from '../base/app-decorators'
 import CollateralInfoPlugin from "../collateral-info";
-import {OnlinePeerInfo} from "../../../network/types";
 const NodeCache = require('node-cache');
 const NetworkIpc = require('../../../network/ipc')
 import * as CoreIpc from '../../ipc'
@@ -235,8 +234,8 @@ class TssPlugin extends CallablePlugin {
 
         while (!this.isReady) {
           await timeout(5000);
-          let onlinePartners: OnlinePeerInfo[] = Object.values(this.tssParty.onlinePartners)
-            .filter((op: OnlinePeerInfo) => {
+          let onlinePartners: MuonNodeInfo[] = Object.values(this.tssParty.onlinePartners)
+            .filter((op: MuonNodeInfo) => {
               return op.wallet !== process.env.SIGN_WALLET_ADDRESS
             });
 

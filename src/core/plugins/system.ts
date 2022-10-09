@@ -255,7 +255,7 @@ class System extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.GenerateAppTss)
   async __generateAppTss({appId}, callerInfo) {
-    console.log(`System.__generateAppTss`, {appId});
+    // console.log(`System.__generateAppTss`, {appId});
 
     const context = await AppContext.findOne({appId}).exec();
     if(!context)
