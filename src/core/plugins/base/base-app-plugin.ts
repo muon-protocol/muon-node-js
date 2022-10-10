@@ -369,19 +369,15 @@ class BaseAppPlugin extends CallablePlugin {
     let {timestamp, signature} = params
 
     const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
-      .filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
 
-    let callResult = [
-      /**
-       * current node call
-       * if current node return successfully, then other nodes will be called.
-       */
-      await this.__onAppDeploy({timestamp, signature}, null),
-      /**
-       * other nodes call
-       */
-      ... await Promise.all(
-        nodesToInform.map(n => {
+    console.log("nodes to inform deployment", nodesToInform);
+
+    let callResult = await Promise.all(
+      nodesToInform.map(n => {
+        if(n.wallet === process.env.SIGN_WALLET_ADDRESS) {
+          return this.__onAppDeploy({timestamp, signature}, null)
+        }
+        else {
           return this.remoteCall(
             n.peerId,
             RemoteMethods.AppDeploy,
@@ -390,9 +386,9 @@ class BaseAppPlugin extends CallablePlugin {
               signature,
             }
           )
-        })
-      )
-    ]
+        }
+      })
+    )
 
     if(callResult.filter(r => r === "OK").length < this.collateralPlugin.TssThreshold)
       throw {message: `Deploy failed`, nodesResponses: callResult}
@@ -502,27 +498,21 @@ class BaseAppPlugin extends CallablePlugin {
 
   async informRequestConfirmation(request) {
     // await this.onConfirm(request)
-    let collateralPlugin: CollateralInfoPlugin = this.muon.getPlugin('collateral');
     let nonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!;
-    const partnersWallet: string[] = [
+    const partners: MuonNodeInfo[] = [
       /** self */
-      process.env.SIGN_WALLET_ADDRESS!,
+      this.currentNodeInfo!,
       /** all other online partners */
-      ...Object.values(nonce?.party!.partners).filter(n => !!n.peer).map(n => n.wallet),
+      ...Object.values(nonce?.party!.onlinePartners),
     ]
 
-    const responses: string[] = await Promise.all(partnersWallet.map(async wallet => {
-      if(wallet === process.env.SIGN_WALLET_ADDRESS) {
-        const callerInfo = {
-          wallet: process.env.SIGN_WALLET_ADDRESS,
-          peerId: process.env.PEER_ID
-        }
-        return await this.__onRequestConfirmation(request, callerInfo)
+    const responses: string[] = await Promise.all(partners.map(async node => {
+      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
+        return await this.__onRequestConfirmation(request, node)
       }
       else {
-        const peerId = collateralPlugin.getNodeInfo(wallet)!.peerId;
         return this.remoteCall(
-          peerId,
+          node.peerId,
           RemoteMethods.InformRequestConfirmation,
           request,
           {taskId: `keygen-${nonce.id}`}
@@ -735,7 +725,7 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: `${this.ConstructorName}.broadcastNewRequest: nonce.party has not value.`}
     let partners: MuonNodeInfo[] = Object.values(party.partners)
       .filter((op: MuonNodeInfo) => {
-        return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.wallet)
+        return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.id)
       })
 
     this.requestManager.setPartnerCount(request.reqId, partners.length + 1);
@@ -833,6 +823,7 @@ class BaseAppPlugin extends CallablePlugin {
       if(request) {
         const ownerInfo = collateralPlugin.getNodeInfo(peerId);
         if(ownerInfo) {
+          // TODO: replace with ownerInfo.id
           this.requestManager.addError(reqId, ownerInfo.wallet, otherParts);
         }
       }

@@ -65,7 +65,7 @@ module.exports.deepFreeze = function deepFreeze (object) {
   return Object.freeze(object);
 }
 
-function stackTrace() {
-  var err = new Error();
+module.exports.stackTrace = function() {
+  let err = new Error();
   return err.stack;
 }

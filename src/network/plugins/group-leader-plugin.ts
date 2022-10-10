@@ -61,15 +61,15 @@ class GroupLeaderPlugin extends CallablePlugin {
   onPeerDisconnect(peerId) {
     let peerIdStr = peerId.toB58String()
     if(!!this.leader){
-      let nodeInfo = this.collateralPlugin.getNodeInfo(this.leader);
-      if(!nodeInfo)
+      let leaderInfo = this.collateralPlugin.getNodeInfo(this.leader);
+      if(!leaderInfo)
         return;
-      if(peerIdStr === nodeInfo.peerId){
+      if(peerIdStr === leaderInfo.peerId){
         console.log(`Leader disconnect and need to reselect another leader.`)
         this.reselectLeader();
       }
       else{
-        let onlineNodes = this.onlinePartners.map(p => p.wallet).filter(w => w!==peerIdStr);
+        let onlineNodes = this.onlinePartners.filter(p => p.peerId!==peerIdStr);
         if(onlineNodes.length+1 < this.collateralPlugin.TssThreshold){
           console.log(`No enough online nodes. The leader will be cleared to select it again.`)
           this.reselectLeader();
@@ -178,17 +178,13 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   async informElectionReady() {
-
-    // let partners = this.electionKey.partners
-    //   .map(w => this.TssPlugin.tssParty.onlinePartners[w])
-    //   .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
     if(this.electionKey === null)
       throw {message: "Election key is null."}
 
     let partners: MuonNodeInfo[] = this.electionKey.partners
-      .filter(w => w !== process.env.SIGN_WALLET_ADDRESS)
-      .map(w => this.collateralPlugin.getNodeInfo(w)!)
+      .map(id => this.collateralPlugin.getNodeInfo(id)!)
       .filter(n => !!n)
+      .filter(node => node.wallet !== process.env.SIGN_WALLET_ADDRESS)
 
     let responses = await this.callParty(
       RemoteMethods.ElectionResultReady,
@@ -200,20 +196,13 @@ class GroupLeaderPlugin extends CallablePlugin {
   }
 
   extractLeaderFromKey(key) {
-    let partners = key.partners;
+    let partners = key.partners.map(id => this.collateralPlugin.getNodeInfo(id));
     let sharedAddress = partners
-      .map(w => {
-        const index = this.collateralPlugin.getNodeInfo(w)!.id;
-        return key.getPubKey(index)
-      })
+      .map(node => key.getPubKey(node.id))
       .map(point => tssModule.pub2addr(point))
       .map(address => address.toLowerCase());
     let leaderIndex = sharedAddress.reduce((max, val, i, arr) => (val > arr[max] ? i : max), 0);
-    return partners[leaderIndex];
-  }
-
-  isLeader(wallet){
-    return this.leader === wallet;
+    return partners[leaderIndex].wallet;
   }
 
   isWalletPermittedToElect(wallet) {
@@ -238,7 +227,7 @@ class GroupLeaderPlugin extends CallablePlugin {
 
   private get onlinePartners(): MuonNodeInfo[] {
     return this.collateralPlugin.onlinePeersInfo
-      .filter(p => p.wallet !== process.env.SIGN_WALLET_ADDRESS)
+      .filter(p => (p.wallet !== process.env.SIGN_WALLET_ADDRESS))
   }
 
   get mainExecutor() {

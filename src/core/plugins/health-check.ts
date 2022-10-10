@@ -77,6 +77,7 @@ class HealthCheck extends CallablePlugin {
     if(!process.env.SIGN_WALLET_ADDRESS)
       throw `process.env.SIGN_WALLET_ADDRESS is not defined`
 
+    // TODO: replace with onlinePartners
     let partners: MuonNodeInfo[] = Object.values(tssPlugin.tssParty.partners)
       .filter((op: MuonNodeInfo) => {
         return !!op.peer && op.wallet !== process.env.SIGN_WALLET_ADDRESS

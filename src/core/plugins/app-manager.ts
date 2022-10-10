@@ -135,7 +135,7 @@ export default class AppManager extends CallablePlugin {
         return this.appQueryResult[appId].result;
     }
     /** refresh result */
-    const remoteNodes = Object.values(this.tssPlugin.tssParty!.onlinePartners);
+    const remoteNodes: MuonNodeInfo[] = Object.values(this.tssPlugin.tssParty!.onlinePartners);
     let callResult = await Promise.all(remoteNodes.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
         return this.getAppStatus(appId)

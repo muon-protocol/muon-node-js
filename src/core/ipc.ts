@@ -37,7 +37,7 @@ function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
   coreGlobalEvents.send(event, options)
 }
 
-async function generateTssKey(keyId: string) {
+async function generateTssKey(keyId?: string) {
   let key = await call('generate-tss-key', {keyId});
   // console.log("CoreIpc.generateTssKey", JSON.stringify(key,null, 2))
   // console.log("CoreIpc.generateTssKey", key.partners)

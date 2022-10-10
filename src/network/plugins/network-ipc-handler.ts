@@ -35,7 +35,8 @@ export const IpcMethods = {
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
   GetGroupExecutor: "get-group-executor",
-  ForwardGatewayRequest: "forward-gateway-request"
+  ForwardGatewayRequest: "forward-gateway-request",
+  GetCurrentNodeInfo: "get-current-node-info"
 } as const;
 
 export const RemoteMethods = {
@@ -208,20 +209,27 @@ class NetworkIpcHandler extends CallablePlugin {
     return providers.map(p => p.id._idB58String)
   }
 
+  // TODO: replace with idList
   @ipcMethod(IpcMethods.GetGroupExecutor)
   async __getGroupExecutor(data:{walletList: string[], task: string}, callerInfo) {
     return this.groupLeaderPlugin.getGroupExecutor(data.walletList, data.task);
   }
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
-  async __forwardGateWayRequest(data: {wallet: string, requestData: Object}) {
+  async __forwardGateWayRequest(data: {id: string, requestData: Object}) {
     console.log(`NetworkIpcHandler.__forwardGateWayRequest`, data);
-    const nodeInfo = this.collateralPlugin.getNodeInfo(data.wallet)
+    const nodeInfo = this.collateralPlugin.getNodeInfo(data.id)
     if(!nodeInfo) {
-      throw `Unknown wallet ${data.wallet}`
+      throw `Unknown id ${data.id}`
     }
     const peer = await this.findPeer(nodeInfo.peerId);
     return await this.remoteCall(peer, RemoteMethods.ExecGateWayRequest, data.requestData);
+  }
+
+  @ipcMethod(IpcMethods.GetCurrentNodeInfo)
+  async __onGetCurrentNodeInfo() {
+    await this.collateralPlugin.waitToLoad();
+    return this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
   }
 
   /** ==================== remote methods ===========================*/
@@ -254,6 +262,7 @@ class NetworkIpcHandler extends CallablePlugin {
         this.assignTaskToProcess(taskId, options.pid);
       }
     }
+    // TODO: add id to callerInfo
     return await coreIpc.call(
       "forward-remote-call",
       {

@@ -120,7 +120,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       isValid: true,
       group: "1",
       sharedKey: null,
-      partners: allNodes.map(n => n.wallet)
+      partners: allNodes.map(n => n.id)
     }
 
     if(process.env.VERBOSE) {
@@ -230,7 +230,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     })
 
     this._nodesList = allNodes;
-    this.groupInfo.partners = allNodes.map(n => n.wallet)
+    this.groupInfo.partners = allNodes.map(n => n.id)
   }
 
   async watchNodesChange(nodeManagerInfo) {

@@ -53,7 +53,8 @@ async function callProperNode(requestData) {
   if (!context)
     throw `App not deployed`;
   const {partners} = context.party
-  if (partners.includes(process.env.SIGN_WALLET_ADDRESS)) {
+  const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
+  if (partners.includes(currentNodeInfo.id)) {
     return await requestQueue.send(requestData)
   } else {
     const randomIndex = Math.floor(Math.random() * partners.length);

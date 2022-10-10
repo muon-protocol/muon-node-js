@@ -42,8 +42,8 @@ class RemoteCall extends BaseNetworkPlugin {
     this.network.libp2p.handle(PROTOCOL, this.handler.bind(this))
   }
 
-  handleCall(callId, method, params, callerWallet, responseStream, peerId){
-    return this.emit(`${method}`, params, {wallet: callerWallet, peerId})
+  handleCall(callId, method, params, callerInfo, responseStream, peerId){
+    return this.emit(`${method}`, params, {wallet: callerInfo.wallet, peerId})
       .then(result => {
         let response = {
           responseId: callId,
@@ -52,7 +52,7 @@ class RemoteCall extends BaseNetworkPlugin {
         return response
       })
       .catch(error => {
-        //console.error("network.RemoteCall.handleCall", error, {method, params, callerWallet})
+        //console.error("network.RemoteCall.handleCall", error, {method, params, callerInfo.wallet})
         if(typeof error === "string")
           error = {message: error};
         const {message: ___, ...otherErrorParts} = error;
@@ -80,7 +80,7 @@ class RemoteCall extends BaseNetworkPlugin {
 
       if('method' in data) {
         let {callId, method, params={}} = data;
-        return await this.handleCall(callId, method, params, nodeInfo.wallet, stream, peerId);
+        return await this.handleCall(callId, method, params, nodeInfo, stream, peerId);
       }
       else{
         // TODO: what to do?

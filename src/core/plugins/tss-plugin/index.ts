@@ -118,7 +118,7 @@ class TssPlugin extends CallablePlugin {
     console.log(`TssPlugin: remove online peer ${nodeInfo.wallet}@${disconnectedPeer}`)
     Object.keys(this.parties).forEach(partyId => {
       const party = this.parties[partyId]
-      party.setWalletPeer(nodeInfo.wallet, null);
+      party.setNodePeer(nodeInfo.id, null);
     })
   }
 
@@ -133,7 +133,7 @@ class TssPlugin extends CallablePlugin {
           if (nodeInfo.wallet) {
             // console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
             Object.keys(this.parties).forEach(partyId => {
-              this.parties[partyId].setWalletPeer(nodeInfo!.wallet, peerId);
+              this.parties[partyId].setNodePeer(nodeInfo!.id, peerId);
             })
           }
         } else {
@@ -187,7 +187,7 @@ class TssPlugin extends CallablePlugin {
       id: group,
       t: networkInfo.tssThreshold,
       max: networkInfo.maxGroupSize,
-      partners: partners.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
+      partners: partners.map(id => this.collateralPlugin.getNodeInfo(id))
     });
     this.parties[party.id] = party
     this.tssParty = party;
@@ -241,7 +241,7 @@ class TssPlugin extends CallablePlugin {
 
           let statuses = await Promise.all(onlinePartners.map(p => {
             return this.remoteCall(
-              p.peer,
+              p.peerId,
               RemoteMethods.checkTssStatus
             ).catch(e => 'error')
           }))
@@ -251,7 +251,7 @@ class TssPlugin extends CallablePlugin {
           statuses = statuses.filter((s, i) => filter[i]);
 
           if(statuses.length >= this.collateralPlugin.TssThreshold){
-            await this.tryToRecoverTssKey(onlinePartners.map(p => p.wallet));
+            await this.tryToRecoverTssKey(onlinePartners);
           }
         }
       }
@@ -370,9 +370,9 @@ class TssPlugin extends CallablePlugin {
     try {
       let p = Party.load(party)
       Object.keys(this.availablePeers).forEach(peerId => {
-        const wallet = this.collateralPlugin.getNodeInfo(peerId)!.wallet;
+        const id = this.collateralPlugin.getNodeInfo(peerId)!.id;
         // TODO: no need the line below bot check it more
-        p.setWalletPeer(wallet, peerId)
+        p.setNodePeer(id, peerId)
       })
       this.parties[p.id] = p
     }
@@ -399,9 +399,7 @@ class TssPlugin extends CallablePlugin {
     keysCache.set(key.id, key);
   }
 
-  async tryToRecoverTssKey(partners){
-    partners = partners.map(w => this.tssParty!.partners[w]);
-
+  async tryToRecoverTssKey(partners: MuonNodeInfo[]){
     if(partners.length < this.collateralPlugin.TssThreshold)
       throw {message: "No enough online partners to recover key."};
 
@@ -411,32 +409,36 @@ class TssPlugin extends CallablePlugin {
       partners.map(p => {
           return this.remoteCall(
             // online partners
-            p.peer,
+            p.peerId,
             RemoteMethods.recoverMyKey,
             {nonce: nonce.id},
             {taskId: `keygen-${nonce.id}`}
-          ).catch(e => null)
+          ).catch(e => {
+            console.log(`TssPlugin.tryToRecoverTssKey ERROR:`, e)
+            return null
+          })
         }
       )
     )
+
     let shares = partners
       .map((p, j) => {
           if (!keyResults[j])
             return null
-          const index = this.collateralPlugin.getNodeInfo(p.wallet)!.id;
           return {
-            i: index,
+            i: p.id,
             key: tssModule.keyFromPrivate(keyResults[j].recoveryShare)
           }
         }
       )
       .filter(s => !!s)
+
     if (shares.length < this.tssParty!.t) {
-      console.log(`Need's of ${this.tssParty!.t} result to recover the Key, but received ${shares.n} result.`)
+      console.log(`Need's of ${this.tssParty!.t} result to recover the Key, but received ${shares.length} result.`)
       return false;
     }
 
-    let myIndex = process.env.SIGN_WALLET_ADDRESS;
+    let myIndex = this.currentNodeInfo!.id;
     let reconstructed = tssModule.reconstructKey(shares, this.TSS_THRESHOLD, myIndex)
     // console.log({recon: reconstructed.toString(16)})
 
@@ -467,7 +469,7 @@ class TssPlugin extends CallablePlugin {
         key = await this.keyGen(this.tssParty)
       } while (tssModule.HALF_N.lt(key.getTotalPubKey().x));
 
-      let keyPartners = key.partners.map(wallet => this.tssParty!.partners[wallet])
+      let keyPartners = key.partners.map(id => this.tssParty!.partners[id])
       let callResult = await Promise.all(keyPartners.map(({wallet, peer}) => {
         if (wallet === process.env.SIGN_WALLET_ADDRESS)
           return Promise.resolve(true);
@@ -539,7 +541,7 @@ class TssPlugin extends CallablePlugin {
           })
         })
     )
-    const failed = partners.filter((p, i) => callResult[i]==='error').map(p => p.wallet)
+    const failed = partners.filter((p, i) => callResult[i]==='error')
     if(failed.length > 0)
       throw `Fail to create party.`
     return newParty.id;
@@ -557,9 +559,7 @@ class TssPlugin extends CallablePlugin {
   async keyGen(party?, options: KeyGenOptions={}): Promise<DistributedKey> {
     if(!party)
       party = this.tssParty;
-    if(!party.onlinePartners)
-      console.log(party)
-    if(party.onlinePartners.length < party.t){
+    if(Object.keys(party.onlinePartners).length < party.t){
       throw {message: "No enough online node."}
     }
     let t0 = Date.now()
@@ -615,7 +615,7 @@ class TssPlugin extends CallablePlugin {
       partners = partners.filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS))
       partners = [
         /** self */
-        party.partners[process.env.SIGN_WALLET_ADDRESS!],
+        this.currentNodeInfo,
         /** randomly select (maxPartners - 1) from others */
         ...shuffle(partners).slice(0, maxPartners - 1)
       ];
@@ -649,7 +649,7 @@ class TssPlugin extends CallablePlugin {
         })
     )
     // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
-    key.partners = partners.filter((p, i) => callResult[i]==='OK').map(p => p.wallet)
+    key.partners = partners.filter((p, i) => callResult[i]==='OK').map(p => p.id)
     if(key.partners.length < party.t){
       console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
       throw {message: "Error in key creation"}
@@ -668,7 +668,9 @@ class TssPlugin extends CallablePlugin {
     let A_ik = key.f_x.coefPubKeys()
     key.setSelfShare(selfWalletIndex, selfFH.f, selfFH.h, A_ik);
 
-    let keyPartners = key.partners.map(w => party.partners[w]);
+    // let keyPartners = key.partners.map(w => party.partners[w]);
+    const onlinePartners = party.onlinePartners;
+    let keyPartners = key.partners.map(id => onlinePartners[id]);
     let distKeyResult = await Promise.all(
       keyPartners
       .map(({wallet, peerId, peer}) => {
@@ -719,7 +721,8 @@ class TssPlugin extends CallablePlugin {
         // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
         // TODO: is this message from 'wallet'
         if (!!this.tssParty) {
-          this.tssParty.setWalletPeer(callerInfo.wallet, callerInfo.peerId);
+          const nodeInfo = this.collateralPlugin.getNodeInfo(callerInfo.wallet)!
+          this.tssParty.setNodePeer(nodeInfo.id, callerInfo.peerId);
           this.remoteCall(
             callerInfo.peerId,
             RemoteMethods.iAmHere
@@ -771,12 +774,13 @@ class TssPlugin extends CallablePlugin {
 
     let {tssParty, tssKey} = this
 
-    if (!Object.keys(tssParty.partners).includes(callerInfo.wallet))
-      return null;
+    const callerId = this.collateralPlugin.getNodeInfo(callerInfo.wallet)!.id;
+    if (!Object.keys(tssParty.partners).includes(callerId))
+      throw `Not included in the global party`;
 
     let {nonce: nonceId} = data
     if (!!tssKey && nonceId === tssKey.id)
-      return null;
+      throw `Cannot use tss key as nonce`;
 
     let nonce = keysCache.get(nonceId);
     await nonce.waitToFulfill()
@@ -921,7 +925,8 @@ class TssPlugin extends CallablePlugin {
   async __iAmHere(data={}, callerInfo) {
     // console.log('TssPlugin.__iAmHere', data)
     if (!!this.tssParty) {
-      this.tssParty.setWalletPeer(callerInfo.wallet, callerInfo.peerId)
+      const nodeInfo = this.collateralPlugin.getNodeInfo(callerInfo.wallet)!
+      this.tssParty.setNodePeer(nodeInfo.id, callerInfo.peerId)
     }
   }
 

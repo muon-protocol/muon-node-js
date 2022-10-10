@@ -6,8 +6,8 @@ import {MuonNodeInfo} from "../../common/types";
 
 export default class CollateralInfoPlugin extends BasePlugin{
 
-  groupInfo: GroupInfo | null = null;
-  networkInfo: NetworkInfo | null = null;
+  groupInfo: GroupInfo;
+  networkInfo: NetworkInfo;
   private allowedWallets: string[] = []
 
   private _nodesList: MuonNodeInfo;

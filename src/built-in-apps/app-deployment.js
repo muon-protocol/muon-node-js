@@ -90,7 +90,7 @@ module.exports = {
                     tssThreshold,
                     maxGroupSize,
                     selectedNodes: this.callPlugin("system", "selectRandomNodes", seed, tssThreshold, maxGroupSize)
-                        .map(node => node.wallet)
+                        .map(node => node.id)
                 };
             }
             case Methods.TssKeyGen: {
@@ -136,7 +136,7 @@ module.exports = {
                 return [
                     {t: 'uint64', v: result.timestamp},
                     {t: 'uint256', v: seed},
-                    ...result.selectedNodes.map(v => ({t: 'address', v}))
+                    ...result.selectedNodes.map(v => ({t: 'uint64', v}))
                 ]
             }
             case Methods.TssKeyGen: {

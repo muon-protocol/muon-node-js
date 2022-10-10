@@ -51,7 +51,7 @@ function hash(context) {
     {t: "uint32", v: context.version},
     {t: "uint256", v: context.appId},
     {t: "uint32", v: context.party.t},
-    ... context.party.partners.map(v => ({t: 'address', v}))
+    ... context.party.partners.map(v => ({t: 'uint64', v}))
   ])
 }
 

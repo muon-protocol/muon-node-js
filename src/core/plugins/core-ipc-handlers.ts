@@ -37,7 +37,7 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   @ipcMethod("generate-tss-key")
-  async __onGenerateTssKeyRequest(data: {keyId: string}, callerInfo) {
+  async __onGenerateTssKeyRequest(data: {keyId?: string}, callerInfo) {
     let key = await this.muon.getPlugin('tss-plugin').keyGen(null, {id:data.keyId});
     Object.keys(key.pubKeyParts).forEach(w => {
       key.pubKeyParts[w] = key.pubKeyParts[w].map(pubKey => pubKey.encode('hex'))

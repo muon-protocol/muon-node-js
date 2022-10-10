@@ -62,7 +62,7 @@ class System extends CallablePlugin {
         node,
         hash: soliditySha3([
           {t: 'uint256', v: seed},
-          {t: 'address', v: node.wallet},
+          {t: 'uint64', v: node.id},
         ])
       }
     });
@@ -157,17 +157,15 @@ class System extends CallablePlugin {
 
     let requestNonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!
 
-    // TODO: replace leader returned wallet with request owner. request owner most inform other parties.
-    let informer = await NetworkIpc.getGroupExecutor(requestNonce.partners, "inform-app-deployment")
-    if(informer === process.env.SIGN_WALLET_ADDRESS){
+    if(request.owner === process.env.SIGN_WALLET_ADDRESS){
       // let keyGenExecutor = await NetworkIpc.getGroupExecutor(partners, "app-tss-keygen")
       // console.log({keyGenExecutor})
 
       const noncePartners = requestNonce.partners
-      const noneInformedPartners = allOnlineNodes.map(n => n.wallet).filter(w => (noncePartners.indexOf(w) < 0))
+      const noneInformedPartners = allOnlineNodes.filter(node => (noncePartners.indexOf(node.id) < 0))
 
-      const informResponses = await Promise.all(noneInformedPartners.map(wallet => {
-        if(wallet === process.env.SIGN_WALLET_ADDRESS)
+      const informResponses = await Promise.all(noneInformedPartners.map(node => {
+        if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
           return this.__informAppDeployed(request, null)
             .catch(e => {
               console.log(`System.storeAppContext`, e)
@@ -175,7 +173,7 @@ class System extends CallablePlugin {
             });
         // else
         return this.remoteCall(
-          this.collateralPlugin.getNodeInfo(wallet)!.peerId,
+          node.peerId,
           RemoteMethods.InformAppDeployed,
           request,
         )

@@ -1,4 +1,6 @@
 import Muon from "../../muon";
+import {MuonNodeInfo} from "../../../common/types";
+import CollateralInfoPlugin from "../collateral-info";
 
 const Events = require('events-async')
 const PeerId = require('peer-id')
@@ -91,4 +93,8 @@ export default class BasePlugin extends Events{
     return await SharedMem.clear(this.sharedMemKey(key))
   }
 
+  get currentNodeInfo(): MuonNodeInfo | undefined {
+    const collateral: CollateralInfoPlugin = this.muon.getPlugin('collateral')
+    return collateral.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+  }
 }

@@ -7,7 +7,7 @@ export default class TssParty {
   t: number = 0
   max: number = 0;
   id: string;
-  /** map node wallet to MuonNodeInfo */
+  /** map nodeId to MuonNodeInfo */
   partners: {[index: string]: MuonNodeInfo} = {}
   timeoutPromise: TimeoutPromise;
 
@@ -41,7 +41,7 @@ export default class TssParty {
       throw "partner most be object of type {wallet,peerId}"
     // if(this.partners[partner.wallet] === undefined)
     {
-      this.partners[partner.wallet] = {
+      this.partners[partner.id] = {
         // if partner has "i" property, it replace default "i".
         ...partner
       }
@@ -51,13 +51,15 @@ export default class TssParty {
     }
   }
 
-  setWalletPeer(wallet, peer){
-    if(typeof peer !== 'string') {
+  setNodePeer(id, peer){
+    if(!!peer && typeof peer !== 'string') {
+      // TODO: uncomment this line. disconnect one node. fix the bug. the error should return to sender but not sending know.
+    // if(typeof peer !== 'string') {
       console.log(`WARNING: peer should be string.`)
       stackTrace()
     }
-    if(this.partners[wallet] !== undefined) {
-      this.partners[wallet].peer = peer
+    if(this.partners[id] !== undefined) {
+      this.partners[id].peer = peer
     }
   }
 
@@ -79,12 +81,16 @@ export default class TssParty {
     return this.timeoutPromise.promise;
   }
 
+  /**
+   * @return - current node included in result
+   */
+  // TODO: make this computed property instead of computing by every call.
   get onlinePartners(): {[index: string]: MuonNodeInfo}{
     let {partners} = this
     return Object.values(partners)
       .filter(p => (!!p.peer || p.wallet===process.env.SIGN_WALLET_ADDRESS))
       .reduce((obj, p) => {
-        obj[p.wallet] = p
+        obj[p.id] = p
         return obj;
       }, {})
   }
