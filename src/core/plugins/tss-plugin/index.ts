@@ -187,7 +187,7 @@ class TssPlugin extends CallablePlugin {
       id: group,
       t: networkInfo.tssThreshold,
       max: networkInfo.maxGroupSize,
-      partners: partners.map(id => this.collateralPlugin.getNodeInfo(id))
+      partners: partners.map(id => this.collateralPlugin.getNodeInfo(id)!)
     });
     this.parties[party.id] = party
     this.tssParty = party;
@@ -300,13 +300,12 @@ class TssPlugin extends CallablePlugin {
     const partyId = this.getAppPartyId(appId, _context.version);
 
     if(!this.parties[partyId]) {
-      let party = Party.load({
+      this.loadParty({
         id: partyId,
         t: _context.party.t,
         max: _context.party.max,
         partners: _context.party.partners.map(wallet => this.collateralPlugin.getNodeInfo(wallet)!)
       })
-      this.parties[partyId] = party;
     }
     return this.parties[partyId];
   }
@@ -365,7 +364,7 @@ class TssPlugin extends CallablePlugin {
     this.muon.saveConfig(tssConfig, 'tss.conf.json')
   }
 
-  async loadParty(party) {
+  loadParty(party) {
     // console.log(`TssPlugin.loadParty`, party)
     try {
       let p = Party.load(party)
@@ -684,7 +683,7 @@ class TssPlugin extends CallablePlugin {
         // }
         const destinationNodeInfo = this.collateralPlugin.getNodeInfo(wallet)!;
         return this.remoteCall(
-          peer,
+          peerId,
           RemoteMethods.distributeKey,
           {
             party: party.id,
@@ -697,7 +696,7 @@ class TssPlugin extends CallablePlugin {
           {taskId: `keygen-${key.id}`}
         )
           .catch(e => {
-            console.error(`TssPlugin.broadcast to ${peer} Error`, e)
+            console.error(`TssPlugin.broadcast to ${peerId} Error`, e)
             return 'error'
           });
       }))

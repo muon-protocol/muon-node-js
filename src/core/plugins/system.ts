@@ -94,14 +94,14 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId);
     if(!context)
       throw `App deployment info not found.`
-    if(context.party.partners[0] === process.env.SIGN_WALLET_ADDRESS){
+    const generatorInfo = this.collateralPlugin.getNodeInfo(context.party.partners[0])!
+    if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
       return await this.__generateAppTss({appId}, null);
     }
     else {
-      const nodeInfo = this.collateralPlugin.getNodeInfo(context.party.partners[0])!
       // TODO: if nodeInfo not exist of partner is not online?
       return await this.remoteCall(
-        nodeInfo.peerId,
+        generatorInfo.peerId,
         RemoteMethods.GenerateAppTss,
         {appId}
       )
@@ -259,8 +259,8 @@ class System extends CallablePlugin {
     if(!context)
       throw `App deployment info not found.`
     const oldTssKey = await AppTssConfig.findOne({
-      owner: process.env.SIGN_WALLET_ADDRESS,
-      context: context._id,
+      appId: context.appId,
+      version: context.version
     }).exec();
     if(oldTssKey)
       throw `App tss key already generated`

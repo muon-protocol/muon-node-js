@@ -370,8 +370,6 @@ class BaseAppPlugin extends CallablePlugin {
 
     const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
 
-    console.log("nodes to inform deployment", nodesToInform);
-
     let callResult = await Promise.all(
       nodesToInform.map(n => {
         if(n.wallet === process.env.SIGN_WALLET_ADDRESS) {

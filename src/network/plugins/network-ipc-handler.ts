@@ -6,6 +6,7 @@ import GroupLeaderPlugin from "./group-leader-plugin";
 import QueueProducer from "../../common/message-bus/queue-producer";
 let requestQueue = new QueueProducer(`gateway-requests`);
 const all = require('it-all')
+import _ from 'lodash';
 
 const {timeout} = require('../../utils/helpers')
 const {loadCID} = require('../../utils/cid')
@@ -91,7 +92,8 @@ class NetworkIpcHandler extends CallablePlugin {
     return {
       groupInfo,
       networkInfo,
-      nodesList: await collateralPlugin.getNodesList()
+      nodesList: await collateralPlugin.getNodesList(),
+      // nodesList: (await collateralPlugin.getNodesList()).map(item => _.omit(item, ['peer']))
     }
   }
 
@@ -262,17 +264,7 @@ class NetworkIpcHandler extends CallablePlugin {
         this.assignTaskToProcess(taskId, options.pid);
       }
     }
-    // TODO: add id to callerInfo
-    return await coreIpc.call(
-      "forward-remote-call",
-      {
-        data,
-        callerInfo: {
-          wallet: callerInfo.wallet,
-          peerId: callerInfo.peerId._idB58String
-        }
-      },
-      options);
+    return await coreIpc.forwardRemoteCall(data, _.omit(callerInfo, ['peer']), options);
   }
 
   @remoteMethod(RemoteMethods.ExecGateWayRequest)

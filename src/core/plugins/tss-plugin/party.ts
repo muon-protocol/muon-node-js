@@ -3,6 +3,13 @@ import {returnStatement} from "@babel/types";
 import {MuonNodeInfo} from "../../../common/types";
 const {stackTrace} = require('../../../utils/helpers')
 
+type PartyLoadParams = {
+  id?: string,
+  t: number,
+  max: number,
+  partners: MuonNodeInfo[]
+}
+
 export default class TssParty {
   t: number = 0
   max: number = 0;
@@ -11,7 +18,7 @@ export default class TssParty {
   partners: {[index: string]: MuonNodeInfo} = {}
   timeoutPromise: TimeoutPromise;
 
-  constructor(t, max, id=null, timeout=0){
+  constructor(t: number, max: number, id?:string, timeout?:number){
     if(!process.env.SIGN_WALLET_ADDRESS || !process.env.PEER_ID)
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
     this.t = t;
@@ -24,7 +31,7 @@ export default class TssParty {
     return `P${Date.now()}${Math.floor(Math.random()*9999999)}`
   }
 
-  static load(_party){
+  static load(_party: PartyLoadParams){
     let party = new TssParty(_party.t, _party.max, _party.id)
     party.partners = {};
     _party.partners.forEach(p => party.addPartner(p))

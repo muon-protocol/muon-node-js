@@ -26,7 +26,7 @@ class CoreIpcHandlers extends CallablePlugin {
     if(this.remoteCallPlugin.listenerCount(method) < 1){
       throw `Remote method [${method}] handler not defined`
     }
-    return await this.remoteCallPlugin.handleCall(undefined, method, params, callerInfo.wallet, null, callerInfo.peerId)
+    return await this.remoteCallPlugin.handleCall(undefined, method, params, callerInfo, null)
   }
 
   @ipcMethod("get-tss-key")

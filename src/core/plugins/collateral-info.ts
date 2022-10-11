@@ -8,6 +8,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
 
   groupInfo: GroupInfo;
   networkInfo: NetworkInfo;
+  private availablePeerIds: {[index: string]: boolean} = {}
   private allowedWallets: string[] = []
 
   private _nodesList: MuonNodeInfo;
@@ -19,6 +20,11 @@ export default class CollateralInfoPlugin extends BasePlugin{
 
   async onStart(){
     super.onStart();
+
+    this.muon.on('peer:discovery', this.onPeerDiscovery.bind(this));
+    this.muon.on('peer:connect', this.onPeerConnect.bind(this));
+    this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+
     this._loadCollateralInfo();
 
     // // TODO: check more this change
@@ -30,6 +36,44 @@ export default class CollateralInfoPlugin extends BasePlugin{
     //
     //   this._loadCollateralInfo();
     // })
+  }
+
+  async onPeerDiscovery(peerId: string) {
+    this.availablePeerIds[peerId] = true
+    this.updateNodeInfo(peerId, {isOnline: true});
+  }
+
+  async onPeerConnect(peerId: string) {
+    this.availablePeerIds[peerId] = true
+    this.updateNodeInfo(peerId, {isOnline: true});
+  }
+
+  onPeerDisconnect(peerId: string) {
+    delete this.availablePeerIds[peerId]
+    this.updateNodeInfo(peerId, {isOnline: false});
+  }
+
+  private updateNodeInfo(index: string, dataToMerge: object, keysToDelete?:string[]) {
+    let nodeInfo = this.getNodeInfo(index)!;
+    if (nodeInfo) {
+      /** update fields */
+      if (dataToMerge) {
+        Object.keys(dataToMerge).forEach(key => {
+          nodeInfo[key] = dataToMerge[key];
+        })
+      }
+      /** delete keys */
+      if (keysToDelete) {
+        keysToDelete.forEach(key => {
+          delete nodeInfo[key]
+        })
+      }
+      /**
+       * all three indexes id|wallet|peerId contains same object reference.
+       * by changing peerId index other two indexes, will change too.
+       */
+      this._nodesMap.set(index, nodeInfo);
+    }
   }
 
   async _loadCollateralInfo(){

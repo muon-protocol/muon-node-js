@@ -1,4 +1,4 @@
-import {IpcCallOptions} from "../common/types";
+import {IpcCallOptions, MuonNodeInfo} from "../common/types";
 const { QueueProducer, MessagePublisher } = require('../common/message-bus')
 const { BROADCAST_CHANNEL } = require('./plugins/broadcast')
 const { IPC_CHANNEL } = require('./plugins/core-ipc-plugin')
@@ -37,6 +37,10 @@ function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
   coreGlobalEvents.send(event, options)
 }
 
+async function forwardRemoteCall(data: any, callerInfo: MuonNodeInfo, options: IpcCallOptions) {
+  return await call('forward-remote-call', {data, callerInfo}, options);
+}
+
 async function generateTssKey(keyId?: string) {
   let key = await call('generate-tss-key', {keyId});
   // console.log("CoreIpc.generateTssKey", JSON.stringify(key,null, 2))
@@ -73,6 +77,7 @@ export {
   call,
   broadcast,
   fireEvent,
+  forwardRemoteCall,
   generateTssKey,
   getTssKey,
   getAppId,

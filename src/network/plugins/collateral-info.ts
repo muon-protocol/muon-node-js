@@ -61,37 +61,49 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     // console.log("peer available", peerId)
     await this.waitToLoad();
 
-    let nodeInfo = this.getNodeInfo(peerId._idB58String)
-    if(!nodeInfo) {
-      console.log(`network.CollateralInfo.onPeerDiscovery`, "Unknown peer connect", peerId);
-      return;
-    }
-    this.onlinePeers[peerId._idB58String] = true;
-    nodeInfo.peer = await this.findPeer(peerId)
+    this.onlinePeers[peerId._idB58String] = true
+    this.updateNodeInfo(peerId._idB58String, {
+      isOnline: true,
+      peer: await this.findPeer(peerId)
+    })
   }
 
   async onPeerConnect(peerId) {
     await this.waitToLoad();
 
-    // console.log("peer connected", peerId)
-    const nodeInfo = this.getNodeInfo(peerId._idB58String)
-    if(!nodeInfo) {
-      if(process.env.VERBOSE) {
-        console.log(`Unknown peer ${peerId} connected to network and ignored.`)
-      }
-      return;
-    }
-
     this.onlinePeers[peerId._idB58String] = true
-    nodeInfo.peer = await this.findPeer(peerId)
+    this.updateNodeInfo(peerId._idB58String, {
+      isOnline: true,
+      peer: await this.findPeer(peerId)
+    })
   }
 
-  onPeerDisconnect(disconnectedPeer) {
+  onPeerDisconnect(peerId) {
     // console.log("peer not available", peerId)
-    delete this.onlinePeers[disconnectedPeer._idB58String];
-    const nodeInfo = this.getNodeInfo(disconnectedPeer._idB58String)
+    delete this.onlinePeers[peerId._idB58String];
+    this.updateNodeInfo(peerId._idB58String, {isOnline: true}, ['peer'])
+  }
+
+  private updateNodeInfo(index: string, dataToMerge: object, keysToDelete?:string[]) {
+    let nodeInfo = this.getNodeInfo(index)!;
     if(nodeInfo) {
-      delete nodeInfo.peer
+      /** update fields */
+      if(dataToMerge) {
+        Object.keys(dataToMerge).forEach(key => {
+          nodeInfo[key] = dataToMerge[key];
+        })
+      }
+      /** delete keys */
+      if(keysToDelete) {
+        keysToDelete.forEach(key => {
+          delete nodeInfo[key]
+        })
+      }
+      /**
+       * all three indexes id|wallet|peerId contains same object reference.
+       * by changing peerId index other two indexes, will change too.
+       */
+      this._nodesMap.set(index, nodeInfo);
     }
   }
 

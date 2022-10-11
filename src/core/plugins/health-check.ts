@@ -78,10 +78,8 @@ class HealthCheck extends CallablePlugin {
       throw `process.env.SIGN_WALLET_ADDRESS is not defined`
 
     // TODO: replace with onlinePartners
-    let partners: MuonNodeInfo[] = Object.values(tssPlugin.tssParty.partners)
-      .filter((op: MuonNodeInfo) => {
-        return !!op.peer && op.wallet !== process.env.SIGN_WALLET_ADDRESS
-      })
+    let partners: MuonNodeInfo[] = Object.values(tssPlugin.tssParty.onlinePartners)
+      .filter((op: MuonNodeInfo) => op.wallet !== process.env.SIGN_WALLET_ADDRESS)
 
     let result = {
       [process.env.SIGN_WALLET_ADDRESS]: {
@@ -89,14 +87,13 @@ class HealthCheck extends CallablePlugin {
         ... await this.getNodeStatus()
       }
     }
-
-    const peerList = partners.map(({peer}) => peer)
-
-    let calls = peerList.map(peer => {
-      return this.remoteCall(peer, RemoteMethods.CheckHealth, {log: true})
-        .catch(e => null)
-    });
-    let responses = await Promise.all(calls)
+    let responses = await Promise.all(partners.map(node => {
+      return this.remoteCall(
+        node.peerId,
+        RemoteMethods.CheckHealth,
+        {log: true}
+      ).catch(e => null)
+    }))
 
     for(let i=0 ; i<responses.length ; i++){
       result[partners[i].wallet] = responses[i];
