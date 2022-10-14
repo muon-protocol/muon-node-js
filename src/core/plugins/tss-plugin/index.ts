@@ -73,7 +73,7 @@ const RemoteMethods = {
 @remoteApp
 class TssPlugin extends CallablePlugin {
   isReady = false
-  parties = {}
+  parties:{[index: string]: Party} = {}
   tssKey: DistributedKey | null = null;
   tssParty: Party | null = null;
   availablePeers = {}
@@ -86,6 +86,10 @@ class TssPlugin extends CallablePlugin {
     this.muon.on('peer:connect', this.onPeerConnect.bind(this));
     this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
 
+    this.muon.on("node:add", this.onNodeAdd.bind(this));
+    this.muon.on("node:edit", this.onNodeEdit.bind(this));
+    this.muon.on("node:delete", this.onNodeDelete.bind(this));
+
     this.muon.on('tss-key:generate', this.onTssKeyGenerate.bind(this));
     this.muon.on('key:generate', this.onDKeyGenerate.bind(this));
     this.muon.on('party:generate', this.loadParty.bind(this));
@@ -95,6 +99,28 @@ class TssPlugin extends CallablePlugin {
     await this.collateralPlugin.waitToLoad()
     this.loadTssInfo();
 
+  }
+
+  onNodeAdd(nodeInfo: MuonNodeInfo) {
+    console.log(`Core.TssPlugin.onNodeAdd`, nodeInfo)
+    if(this.tssParty) {
+    }
+  }
+
+  onNodeEdit(nodeInfo: MuonNodeInfo) {
+    console.log(`Core.TssPlugin.onNodeEdit`, nodeInfo)
+    Object.keys(this.parties).forEach(partyId => {
+        this.parties[partyId].addPartner(nodeInfo);
+      this.findPeerInfo(nodeInfo.peerId);
+    })
+  }
+
+  onNodeDelete(nodeInfo: MuonNodeInfo) {
+    console.log(`Core.TssPlugin.onNodeDelete`, nodeInfo)
+    Object.keys(this.parties).forEach(partyId => {
+      const party = this.parties[partyId]
+      party.deletePartner(nodeInfo.id);
+    })
   }
 
   async onPeerDiscovery(peerId: string) {

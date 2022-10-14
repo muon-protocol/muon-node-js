@@ -48,14 +48,15 @@ export default class TssParty {
       throw "partner most be object of type {wallet,peerId}"
     // if(this.partners[partner.wallet] === undefined)
     {
-      this.partners[partner.id] = {
-        // if partner has "i" property, it replace default "i".
-        ...partner
-      }
+      this.partners[partner.id] = partner
       if(this.isFulfilled()) {
         this.timeoutPromise.resolve(this)
       }
     }
+  }
+
+  deletePartner(id: string) {
+    delete this.partners[id]
   }
 
   setNodePeer(id, peer){

@@ -11,7 +11,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
   private availablePeerIds: {[index: string]: boolean} = {}
   private allowedWallets: string[] = []
 
-  private _nodesList: MuonNodeInfo;
+  private _nodesList: MuonNodeInfo[];
   private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
   /**
    * @type {TimeoutPromise}
@@ -24,6 +24,10 @@ export default class CollateralInfoPlugin extends BasePlugin{
     this.muon.on('peer:discovery', this.onPeerDiscovery.bind(this));
     this.muon.on('peer:connect', this.onPeerConnect.bind(this));
     this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+
+    this.muon.on("node:add", this.onNodeAdd.bind(this));
+    this.muon.on("node:edit", this.onNodeEdit.bind(this));
+    this.muon.on("node:delete", this.onNodeDelete.bind(this));
 
     this._loadCollateralInfo();
 
@@ -74,6 +78,44 @@ export default class CollateralInfoPlugin extends BasePlugin{
        */
       this._nodesMap.set(index, nodeInfo);
     }
+  }
+
+  onNodeAdd(nodeInfo: MuonNodeInfo) {
+    console.log(`Core.CollateralInfo.onNodeAdd`, nodeInfo)
+    this._nodesList.push(nodeInfo)
+
+    this._nodesMap
+      .set(nodeInfo.id, nodeInfo)
+      .set(nodeInfo.wallet, nodeInfo)
+      .set(nodeInfo.peerId, nodeInfo)
+
+    this.allowedWallets.push(nodeInfo.wallet);
+  }
+
+  onNodeEdit(nodeInfo: MuonNodeInfo) {
+    console.log(`Core.CollateralInfo.onNodeEdit`, nodeInfo)
+    const listIndex = this._nodesList.findIndex(item => item.id === nodeInfo.id)
+    this._nodesList.splice(listIndex, 1, nodeInfo);
+
+    this._nodesMap
+      .set(nodeInfo.id, nodeInfo)
+      .set(nodeInfo.wallet, nodeInfo)
+      .set(nodeInfo.peerId, nodeInfo)
+
+    this.allowedWallets.push(nodeInfo.wallet);
+  }
+
+  onNodeDelete(nodeInfo: MuonNodeInfo) {
+    console.log(`Core.CollateralInfo.onNodeDelete`, nodeInfo)
+    const idx1 = this._nodesList.findIndex(item => item.id === nodeInfo.id)
+    this._nodesList.splice(idx1, 1);
+
+    this._nodesMap.delete(nodeInfo.id)
+    this._nodesMap.delete(nodeInfo.wallet)
+    this._nodesMap.delete(nodeInfo.peerId)
+
+    const idx2 = this.allowedWallets.findIndex(w => w === nodeInfo.wallet)
+    this.allowedWallets.splice(idx2, 1);
   }
 
   async _loadCollateralInfo(){

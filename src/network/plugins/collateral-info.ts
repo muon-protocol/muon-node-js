@@ -5,6 +5,8 @@ const {stackTrace, timeout} = require('../../utils/helpers')
 const { multiCall } = require('../../utils/multicall')
 import NodeManagerAbi from '../../data/NodeManager-ABI.json'
 import {MuonNodeInfo} from "../../common/types";
+import * as CoreIpc from '../../core/ipc'
+import _ from 'lodash'
 
 export type GroupInfo = {
   isValid: boolean,
@@ -207,7 +209,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       if(process.env.VERBOSE) {
         console.log(`Node info deleted from chain`, oldNode)
       }
-      this.emit("node-delete", oldNode)
+      this.emit("node:delete", oldNode)
+      CoreIpc.fireEvent({type: "node:delete", data: _.omit(oldNode, ['peer'])})
     })
 
     allNodes.forEach(n => {
@@ -221,7 +224,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
         if(process.env.VERBOSE) {
           console.log(`New node info added to chain`, n)
         }
-        this.emit("node-add", n)
+        this.emit("node:add", n)
+        CoreIpc.fireEvent({type: "node:add", data: n})
         return;
       }
       /**
@@ -236,7 +240,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
         if(process.env.VERBOSE) {
           console.log(`Node info changed on chain`, {old: oldNode, new: n})
         }
-        this.emit("node-edit", n)
+        this.emit("node:edit", n)
+        CoreIpc.fireEvent({type: "node:edit", data: _.omit(n, ['peer'])})
         return;
       }
     })
@@ -248,7 +253,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   async watchNodesChange(nodeManagerInfo) {
     const {address, network} = nodeManagerInfo;
     while (true) {
-      /** every 10 seconds */
+      /** every 20 seconds */
       await timeout(20000);
       try {
         let lastUpdateTime = await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
