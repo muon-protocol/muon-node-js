@@ -166,11 +166,7 @@ class System extends CallablePlugin {
 
       const informResponses = await Promise.all(noneInformedPartners.map(node => {
         if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
-          return this.__informAppDeployed(request, null)
-            .catch(e => {
-              console.log(`System.storeAppContext`, e)
-              return 'error'
-            });
+          return "OK";
         // else
         return this.remoteCall(
           node.peerId,
