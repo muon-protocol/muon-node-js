@@ -333,7 +333,9 @@ class TssPlugin extends CallablePlugin {
         id: partyId,
         t: _context.party.t,
         max: _context.party.max,
-        partners: _context.party.partners.map(wallet => this.collateralPlugin.getNodeInfo(wallet)!)
+        partners: _context.party.partners
+          .map(wallet => this.collateralPlugin.getNodeInfo(wallet)!)
+          .filter(n => !!n)
       })
     }
     return this.parties[partyId];
