@@ -501,7 +501,7 @@ class BaseAppPlugin extends CallablePlugin {
       /** self */
       this.currentNodeInfo!,
       /** all other online partners */
-      ...Object.values(nonce?.party!.onlinePartners),
+      ...Object.values(nonce?.party!.onlinePartners).filter(n => n.id !== this.currentNodeInfo!.id),
     ]
 
     const responses: string[] = await Promise.all(partners.map(async node => {

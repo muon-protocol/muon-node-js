@@ -289,6 +289,9 @@ class TssPlugin extends CallablePlugin {
   }
 
   getAppTssKey(appId: string): DistributedKey | null {
+    if(appId == '1') {
+      return this.tssKey;
+    }
     if(!this.appTss[appId]) {
       const context = this.appManager.getAppContext(appId)
       if(!context)

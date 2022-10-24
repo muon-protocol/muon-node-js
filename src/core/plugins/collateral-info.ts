@@ -82,6 +82,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
 
   onNodeAdd(nodeInfo: MuonNodeInfo) {
     console.log(`Core.CollateralInfo.onNodeAdd`, nodeInfo)
+    this.groupInfo.partners.push(nodeInfo.id);
     this._nodesList.push(nodeInfo)
 
     this._nodesMap
@@ -107,13 +108,21 @@ export default class CollateralInfoPlugin extends BasePlugin{
 
   onNodeDelete(nodeInfo: MuonNodeInfo) {
     console.log(`Core.CollateralInfo.onNodeDelete`, nodeInfo)
+
+    /** remove from groupInfo*/
+    let pIndex = this.groupInfo.partners.indexOf(nodeInfo.id)
+    this.groupInfo.partners.splice(pIndex, 1);
+
+    /** remove from nodesList */
     const idx1 = this._nodesList.findIndex(item => item.id === nodeInfo.id)
     this._nodesList.splice(idx1, 1);
 
+    /** remove from nodesMap */
     this._nodesMap.delete(nodeInfo.id)
     this._nodesMap.delete(nodeInfo.wallet)
     this._nodesMap.delete(nodeInfo.peerId)
 
+    /** remove from allowedWallets */
     const idx2 = this.allowedWallets.findIndex(w => w === nodeInfo.wallet)
     this.allowedWallets.splice(idx2, 1);
   }

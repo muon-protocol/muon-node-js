@@ -27,12 +27,29 @@ export default class AppManager extends CallablePlugin {
   async onStart() {
     await super.onStart()
 
-    this.loadAppsInfo()
-
     appContextEventEmitter.on('change', this.onAppContextChange.bind(this))
     appTssConfigEventEmitter.on('change', this.onAppTssConfigChange.bind(this))
+    this.muon.on("node:add", this.onNodeAdd.bind(this));
+    this.muon.on("node:delete", this.onNodeDelete.bind(this));
 
-    await this.collateralPlugin.waitToLoad();
+    await this.loadAppsInfo()
+  }
+
+  onNodeAdd(nodeInfo: MuonNodeInfo) {
+    if(!this.isLoaded())
+      return;
+    let deploymentContext = this.appContexts['1'];
+    deploymentContext.party.partners = [
+      ...deploymentContext.party.partners,
+      nodeInfo.id
+    ]
+  }
+
+  onNodeDelete(nodeInfo: MuonNodeInfo) {
+    if(!this.isLoaded())
+      return;
+    let deploymentContext = this.appContexts['1'];
+    deploymentContext.party.partners = deploymentContext.party.partners.filter(id => id != nodeInfo.id)
   }
 
   get tssPlugin(): TssPlugin {
@@ -44,8 +61,21 @@ export default class AppManager extends CallablePlugin {
   }
 
   async loadAppsInfo() {
+    await this.collateralPlugin.waitToLoad();
     try {
       const allAppContexts = await AppContext.find({});
+      this.appContexts['1'] = {
+        appId: '1',
+        version: 0,
+        appName: "deployment",
+        isBuiltIn: true,
+        party: {
+          partners: this.collateralPlugin.groupInfo.partners,
+          t: this.collateralPlugin.TssThreshold,
+          max: this.collateralPlugin.MaxGroupSize
+        }
+      }
+
       allAppContexts.forEach(ac => {
         this.appContexts[ac.appId] = ac;
       })
@@ -243,7 +273,7 @@ export default class AppManager extends CallablePlugin {
   }
 
   appIsDeployed(appId: string): boolean {
-    return !!this.appContexts[appId]
+    return appId=='1' || !!this.appContexts[appId]
   }
 
   appIsBuiltIn(appId: string): boolean {
@@ -252,11 +282,14 @@ export default class AppManager extends CallablePlugin {
   }
 
   getAppContext(appId: string) {
-      return this.appContexts[appId];
+    if(appId == '1') {
+      return this._deploymentContext;
+    }
+    return this.appContexts[appId];
   }
 
   appHasTssKey(appId: string): boolean {
-    return !!this.appTssConfigs[appId];
+    return appId=='1' || !!this.appTssConfigs[appId];
   }
 
   getAppTssKey(appId: string) {
