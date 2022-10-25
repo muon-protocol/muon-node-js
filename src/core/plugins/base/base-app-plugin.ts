@@ -11,7 +11,7 @@ const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 import AppRequestManager from './app-request-manager'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
-import { MemWrite } from '../memory-plugin'
+import MemoryPlugin, { MemWrite } from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 const Web3 = require('web3')
 import DistributedKey from "../tss-plugin/distributed-key";
@@ -568,13 +568,14 @@ class BaseAppPlugin extends CallablePlugin {
       let appMem = this.onMemWrite(request, result)
       if (!appMem)
         return null;
-      let { ttl, data } = appMem
+      let { key, ttl, data } = appMem
 
       if(!this.APP_NAME)
         throw {message: `${this.ConstructorName}.getMemWrite: APP_NAME is not defined`}
 
       let memWrite: MemWrite = {
         type: 'app',
+        key,
         owner: this.APP_NAME,
         timestamp,
         ttl,
@@ -592,16 +593,24 @@ class BaseAppPlugin extends CallablePlugin {
       return null;
   }
 
-  async memRead(query, options) {
-    return this.muon.getPlugin('memory').readAppMem(this.APP_NAME, query, options)
+  async writeNodeMem(key, data, ttl=0) {
+    const memory: MemoryPlugin = this.muon.getPlugin('memory')
+    await memory.writeNodeMem(`app-${this.APP_ID}-${key}`, data, ttl)
   }
 
-  async writeNodeMem(data, ttl=0) {
-    await this.muon.getPlugin('memory').writeNodeMem({ttl, data})
+  async readNodeMem(key) {
+    const memory: MemoryPlugin = this.muon.getPlugin('memory')
+    return await memory.readLocalMem(`app-${this.APP_ID}-${key}`);
   }
 
-  async readNodeMem(query, options) {
-    return this.muon.getPlugin('memory').readNodeMem(query, options)
+  async writeLocalMem(key, data, ttl=0) {
+    const memory: MemoryPlugin = this.muon.getPlugin('memory')
+    await memory.writeLocalMem(`${this.APP_ID}-${key}`, data, ttl)
+  }
+
+  async readLocalMem(key) {
+    const memory: MemoryPlugin = this.muon.getPlugin('memory')
+    return await memory.readLocalMem(`${this.APP_ID}-${key}`);
   }
 
   async isOtherNodesConfirmed(newRequest) {

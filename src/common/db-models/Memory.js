@@ -4,6 +4,7 @@ const {MODEL_MEMORY} = require('./constants')
 const types = {
   App: 'app',
   Node: 'node',
+  Local: 'local'
 }
 
 var modelSchema = mongoose.Schema({
