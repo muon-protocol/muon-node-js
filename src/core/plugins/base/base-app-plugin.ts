@@ -11,7 +11,7 @@ const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 import AppRequestManager from './app-request-manager'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
-import MemoryPlugin, { MemWrite } from '../memory-plugin'
+import MemoryPlugin, {MemWrite, MemWriteOptions} from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 const Web3 = require('web3')
 import DistributedKey from "../tss-plugin/distributed-key";
@@ -603,9 +603,9 @@ class BaseAppPlugin extends CallablePlugin {
     return await memory.readLocalMem(`app-${this.APP_ID}-${key}`);
   }
 
-  async writeLocalMem(key, data, ttl=0) {
+  async writeLocalMem(key, data, ttl=0, options:MemWriteOptions) {
     const memory: MemoryPlugin = this.muon.getPlugin('memory')
-    await memory.writeLocalMem(`${this.APP_ID}-${key}`, data, ttl)
+    return await memory.writeLocalMem(`${this.APP_ID}-${key}`, data, ttl, options)
   }
 
   async readLocalMem(key) {

@@ -47,6 +47,10 @@ export type MemWrite = {
   signatures: string[]
 }
 
+export type MemWriteOptions = {
+  getset?:boolean,
+}
+
 export type MemReadOption = {
   distinct?: boolean,
   multi?: boolean
@@ -61,6 +65,7 @@ class MemoryPlugin extends CallablePlugin {
   private redisSet: (...args)=>Promise<any>;
   private redisGet: (key: string)=>Promise<any>;
   private redisGetset: (...args)=>Promise<any>;
+  private redisExpire: (...args)=>Promise<any>;
 
   constructor(muon, configs) {
     super(muon, configs);
@@ -74,6 +79,7 @@ class MemoryPlugin extends CallablePlugin {
     this.redisSet = promisify(redisClient.set).bind(redisClient)
     this.redisGet = promisify(redisClient.get).bind(redisClient)
     this.redisGetset = promisify(redisClient.getset).bind(redisClient)
+    this.redisExpire = promisify(redisClient.expire).bind(redisClient)
 
     this.redisClient = redisClient
   }
@@ -205,7 +211,7 @@ class MemoryPlugin extends CallablePlugin {
     this.broadcastWrite(memWrite);
   }
 
-  async writeLocalMem(key: string, data: any, ttl: number=0) {
+  async writeLocalMem(key: string, data: any, ttl: number=0, options:MemWriteOptions={}) {
     let memWrite: MemWrite = {
       type: Memory.types.Local,
       key,
@@ -217,10 +223,10 @@ class MemoryPlugin extends CallablePlugin {
       hash: '',
       signatures: []
     }
-    await this.storeMemWrite(memWrite);
+    return await this.storeMemWrite(memWrite, options);
   }
 
-  async storeMemWrite(memWrite: MemWrite, getOldData:boolean=false){
+  private async storeMemWrite(memWrite: MemWrite, options:MemWriteOptions={}){
     let {timestamp, key, ttl} = memWrite;
     if(!key)
       throw `MemoryPlugin.storeMemWrite ERROR: key not defined in MemWrite.`
@@ -228,10 +234,22 @@ class MemoryPlugin extends CallablePlugin {
       let expireAt = (timestamp + ttl) * 1000;
       ttl -= (getTimestamp() - timestamp)
       const dataToSave = {...memWrite, expireAt};
-      await this.redisSet(`${this.keyPrefix}-${key}`, JSON.stringify(dataToSave), 'EX', ttl)
+      if(options.getset){
+        const result = await this.redisGetset(`${this.keyPrefix}-${key}`, JSON.stringify(dataToSave))
+        await this.redisExpire(`${this.keyPrefix}-${key}`, ttl)
+        return result;
+      }
+      else {
+        await this.redisSet(`${this.keyPrefix}-${key}`, JSON.stringify(dataToSave), 'EX', ttl)
+      }
     }
     else {
-      await this.redisSet(`${this.keyPrefix}-${key}`, JSON.stringify(memWrite));
+      if(options.getset) {
+        return await this.redisGetset(`${this.keyPrefix}-${key}`, JSON.stringify(memWrite));
+      }
+      else {
+        await this.redisSet(`${this.keyPrefix}-${key}`, JSON.stringify(memWrite));
+      }
     }
   }
 
