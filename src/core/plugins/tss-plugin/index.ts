@@ -12,7 +12,8 @@ const NetworkIpc = require('../../../network/ipc')
 import * as CoreIpc from '../../ipc'
 import {MuonNodeInfo} from "../../../common/types";
 import AppManager from "../app-manager";
-import {returnStatement} from "@babel/types";
+
+const LEADER_ID = process.env.LEADER_ID || '1';
 
 const keysCache = new NodeCache({
   stdTTL: 6*60, // Keep distributed keys in memory for 6 minutes
@@ -247,7 +248,7 @@ class TssPlugin extends CallablePlugin {
         return;
 
       const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
-      if (currentNodeInfo && currentNodeInfo.id == '1' && await this.isNeedToCreateKey()) {
+      if (currentNodeInfo && currentNodeInfo.id == LEADER_ID && await this.isNeedToCreateKey()) {
         console.log(`[${process.pid}] got permission to create tss key`);
         let key = await this.tryToCreateTssKey();
         console.log(`TSS key generated with ${key.partners.length} partners`);
@@ -934,7 +935,7 @@ class TssPlugin extends CallablePlugin {
     if (!key)
       throw {message: 'TssPlugin.__storeTssKey: key not found.'};
     const nodeInfo = this.collateralPlugin.getNodeInfo(callerInfo.wallet)
-    if(nodeInfo && nodeInfo.id=='1' && await this.isNeedToCreateKey()) {
+    if(nodeInfo && nodeInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
       await key.waitToFulfill()
       this.saveTssConfig(party, key);
       this.tssKey = key
