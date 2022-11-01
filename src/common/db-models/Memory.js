@@ -4,10 +4,12 @@ const {MODEL_MEMORY} = require('./constants')
 const types = {
   App: 'app',
   Node: 'node',
+  Local: 'local'
 }
 
 var modelSchema = mongoose.Schema({
   type: {type: String, enum: Object.values(types)},
+  title: {type: String},
   owner: {type: String},
   timestamp: {type: Number},
   ttl: {type: Number, default: 0},

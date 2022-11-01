@@ -52,6 +52,33 @@ export function broadcastHandler (target, property, descriptor) {
   return descriptor
 }
 
+/**
+ * Exported methods can be call by apps.
+ *
+ * public: any app (built-in & client) can call this method
+ * built-in: only built-in app can call this method. Client apps are not permitted to call these methods.
+ *
+ * Example
+ * ======= app.js ========
+ * ...
+ * this.callPlugin(<plugin-name>, <method>, <arguments>)
+ * ...
+ */
+export type ApiExportType = "public" | "built-in"
+
+export type ApiExportOptions = {
+  type?: ApiExportType
+}
+
+export function appApiMethod (options: ApiExportOptions={}) {
+  return function (target, property, descriptor) {
+    if(!target.__appApiExports)
+      target.__appApiExports = {}
+    target.__appApiExports[property] = {property, options}
+    return descriptor
+  }
+}
+
 export function remoteApp (constructor): any {
   if(!classNames(constructor).includes('CallablePlugin')) {
     const error = {message: 'RemoteApp should be CallablePlugin.'}

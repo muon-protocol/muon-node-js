@@ -2,7 +2,10 @@ import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, ipcMethod, broadcastHandler} from './base/app-decorators'
 import {IpcCallOptions} from "../../common/types";
 import CollateralInfoPlugin from "./collateral-info";
+import QueueProducer from "../../common/message-bus/queue-producer";
+let requestQueue = new QueueProducer(`gateway-requests`);
 const all = require('it-all')
+import _ from 'lodash';
 
 const {timeout} = require('../../utils/helpers')
 const {loadCID} = require('../../utils/cid')
@@ -25,16 +28,18 @@ export const IpcMethods = {
   GetCollateralInfo: "get-collateral-info",
   BroadcastMessage: "broadcast-message",
   ReportClusterStatus: "report-cluster-status",
-  GetLeader: "get-leader",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
   RemoteCall: "remote-call",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
+  ForwardGatewayRequest: "forward-gateway-request",
+  GetCurrentNodeInfo: "get-current-node-info"
 } as const;
 
 export const RemoteMethods = {
-  ExexIpcRemoteCall: "exec-ipc-remote-call",
+  ExecIpcRemoteCall: "exec-ipc-remote-call",
+  ExecGateWayRequest: 'exec-gateway-request',
 }
 
 type IpcKeys = keyof typeof IpcMethods;
@@ -61,19 +66,28 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.network.getPlugin('remote-call');
   }
 
+  /**
+   * @private
+   * @ returns {Promise<string[]>} - list of online peers peerId
+   */
   @ipcMethod(IpcMethods.GetOnlinePeers)
-  async __onGetOnlinePeers() {
+  async __onGetOnlinePeers(): Promise<string[]> {
     return Object.keys(this.collateralPlugin.onlinePeers);
   }
 
   @ipcMethod(IpcMethods.GetCollateralInfo)
   async __onIpcGetCollateralInfo(data = {}, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
-    const collateralPlugin = this.network.getPlugin('collateral');
+    const collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
     await collateralPlugin.waitToLoad();
 
-    let {groupInfo, networkInfo, peersWallet, walletsPeer} = collateralPlugin;
-    return {groupInfo, networkInfo, peersWallet, walletsPeer}
+    let {groupInfo, networkInfo} = collateralPlugin;
+    return {
+      groupInfo,
+      networkInfo,
+      nodesList: await collateralPlugin.getNodesList(),
+      // nodesList: (await collateralPlugin.getNodesList()).map(item => _.omit(item, ['peer']))
+    }
   }
 
   @ipcMethod(IpcMethods.BroadcastMessage)
@@ -82,7 +96,6 @@ class NetworkIpcHandler extends CallablePlugin {
     this.broadcast(data);
     return "Ok"
   }
-
 
   @broadcastHandler
   async onBroadcastReceived(data={}, callerInfo) {
@@ -117,13 +130,6 @@ class NetworkIpcHandler extends CallablePlugin {
         break;
     }
     // console.log("NetworkIpcHandler.__reportClusterStatus", this.clustersPids);
-  }
-
-  @ipcMethod(IpcMethods.GetLeader)
-  async __getLeader(data: any, callerInfo) {
-    let leaderPlugin = this.network.getPlugin('group-leader')
-    await leaderPlugin.waitToLeaderSelect();
-    return leaderPlugin.leader;
   }
 
   clusterPermissions = {};
@@ -176,6 +182,41 @@ class NetworkIpcHandler extends CallablePlugin {
     return await this.remoteCall(peer, "exec-ipc-remote-call", data, data?.options);
   }
 
+  @ipcMethod(IpcMethods.ContentRoutingProvide)
+  async __onContentRoutingProvide(cids: string[], callerInfo) {
+    for (let cid of cids) {
+      console.log(`providing content ${cid}`)
+      await this.network.libp2p.contentRouting.provide(loadCID(cid));
+    }
+  }
+
+  @ipcMethod(IpcMethods.ContentRoutingFind)
+  async __onContentRoutingFind(cid: string, callerInfo) {
+    console.log(`NetworkIpcHandler.__onContentRoutingFind`, cid);
+    let providers = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
+    return providers.map(p => p.id._idB58String)
+  }
+
+  @ipcMethod(IpcMethods.ForwardGatewayRequest)
+  async __forwardGateWayRequest(data: {id: string, requestData: Object}) {
+    console.log(`NetworkIpcHandler.__forwardGateWayRequest`, data);
+    const nodeInfo = this.collateralPlugin.getNodeInfo(data.id)
+    if(!nodeInfo) {
+      throw `Unknown id ${data.id}`
+    }
+    const peer = await this.findPeer(nodeInfo.peerId);
+    return await this.remoteCall(peer, RemoteMethods.ExecGateWayRequest, data.requestData);
+  }
+
+  @ipcMethod(IpcMethods.GetCurrentNodeInfo)
+  async __onGetCurrentNodeInfo() {
+    await this.collateralPlugin.waitToLoad();
+    return this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
+  }
+
+  /** ==================== remote methods ===========================*/
+
+
   /**
    *
    * @param data {Object}
@@ -190,7 +231,7 @@ class NetworkIpcHandler extends CallablePlugin {
    * @returns {Promise<*>}
    * @private
    */
-  @remoteMethod(RemoteMethods.ExexIpcRemoteCall)
+  @remoteMethod(RemoteMethods.ExecIpcRemoteCall)
   async __onIpcRemoteCallExec(data, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcRemoteCallExec`, data);
     let taskId, options: IpcCallOptions = {};
@@ -203,31 +244,13 @@ class NetworkIpcHandler extends CallablePlugin {
         this.assignTaskToProcess(taskId, options.pid);
       }
     }
-    return await coreIpc.call(
-      "forward-remote-call",
-      {
-        data,
-        callerInfo: {
-          wallet: callerInfo.wallet,
-          peerId: callerInfo.peerId._idB58String
-        }
-      },
-      options);
+    return await coreIpc.forwardRemoteCall(data, _.omit(callerInfo, ['peer']), options);
   }
 
-  @ipcMethod(IpcMethods.ContentRoutingProvide)
-  async __onContentRoutingProvide(cids: string[], callerInfo) {
-    for (let cid of cids) {
-      console.log(`providing content ${cid}`)
-      await this.network.libp2p.contentRouting.provide(loadCID(cid));
-    }
-  }
-
-  @ipcMethod(IpcMethods.ContentRoutingFind)
-  async __onContentRoutingFind(cid: string, callerInfo) {
-    console.log(`NetworkIpcHandler.__onContentRoutingFind`, cid);
-    let providers = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
-    return providers.map(p => p.id._idB58String)
+  @remoteMethod(RemoteMethods.ExecGateWayRequest)
+  async __execGatewayRequest(data, callerInfo) {
+    // console.log(`NetworkIpcHandler.__execGatewayRequest`, data)
+    return await requestQueue.send(data)
   }
 }
 

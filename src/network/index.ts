@@ -9,7 +9,6 @@ const coreIpc = require('../core/ipc')
 const { MessagePublisher } = require('../common/message-bus')
 
 import CollateralPlugin from './plugins/collateral-info';
-import GroupLeaderPlugin from './plugins/group-leader-plugin'
 import IpcHandlerPlugin from './plugins/network-ipc-handler'
 import IpcPlugin from './plugins/network-ipc-plugin'
 import RemoteCallPlugin from './plugins/remote-call'
@@ -208,7 +207,6 @@ async function start() {
       'remote-call': [RemoteCallPlugin, {}],
       'ipc': [IpcPlugin, {}],
       'ipc-handler': [IpcHandlerPlugin, {}],
-      'group-leader': [GroupLeaderPlugin, {}],
     },
     net,
     // TODO: pass it into the tss-plugin
@@ -221,5 +219,6 @@ async function start() {
 }
 
 export {
+  Network,
   start
 }

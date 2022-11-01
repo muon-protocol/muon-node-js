@@ -10,9 +10,10 @@ export default class MessageSubscriber extends BaseMessageBus {
   }
 
   async onMessageReceived(channel: string, strMessage: string) {
-    let {pid, uid, data} = JSON.parse(strMessage)
+    let {pid, uid, data, options} = JSON.parse(strMessage)
     try {
-      await this.emit("message", data, {pid, uid})
+      if(options.selfEmit !== false || pid !== process.pid)
+        await this.emit("message", data, {pid, uid})
     } catch (e) {
       console.error("ERROR MessageSubscriber.onMessageReceived", e);
     }

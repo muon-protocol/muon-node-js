@@ -8,25 +8,47 @@ const emoji = require('node-emoji')
 const fs = require('fs')
 const { MessagePublisher, MessageSubscriber } = require('../common/message-bus')
 const { GLOBAL_EVENT_CHANNEL, fireEvent } = require('./ipc')
-import * as NetworkIpc from '../networking/ipc'
+import * as NetworkIpc from '../network/ipc'
 import MuonBasePlugin from './plugins/base/base-plugin';
-
-export interface MuonPlugin {
-  constructor(network: MuonBasePlugin, configs: MuonPluginConfigs);
-  onInit();
-  onStart();
-}
+import BaseAppPlugin from "./plugins/base/base-app-plugin";
+import BasePlugin from "./plugins/base/base-plugin";
+import {Constructor} from "../common/types";
 
 export type MuonPluginConfigs = any
 
 export type MuonConfigs = {
-  plugins: {[index: string]: [MuonPlugin, MuonPluginConfigs]}
+  plugins: {[index: string]: [Constructor<BasePlugin>, MuonPluginConfigs]},
+  tss: {
+    party: {
+      id: string,
+      t: number,
+      max: number
+    },
+    key: {
+      id: string,
+      share: string,
+      publicKey: string,
+      address: string
+    }
+  },
+  net: {
+    tss: {
+      threshold: number,
+      max: number
+    },
+    nodeManager: {
+      network: string,
+      address: string
+    }
+  },
 }
 
 export default class Muon extends Events {
   configs: MuonConfigs
   _plugins = {}
-  _apps = {}
+  private _apps = {}
+  private appIdToNameMap = {}
+  private appNameToIdMap = {}
   globalEventBus = new MessageSubscriber(GLOBAL_EVENT_CHANNEL)
 
   constructor(configs: MuonConfigs) {
@@ -41,25 +63,52 @@ export default class Muon extends Events {
   _initializePlugin(plugins) {
     for (let pluginName in plugins) {
       let [plugin, configs] = plugins[pluginName]
-      this._plugins[pluginName] = new plugin(this, configs)
-      this._plugins[pluginName].onInit();
+
+      const pluginInstance = new plugin(this, configs)
+      this._plugins[pluginName] = pluginInstance
+      pluginInstance.onInit();
+
+      if(pluginInstance instanceof BaseAppPlugin) {
+        if(pluginInstance.APP_NAME) {
+          this._apps[pluginInstance.APP_ID] = pluginInstance;
+          this.appIdToNameMap[pluginInstance.APP_ID] = pluginInstance.APP_NAME
+          this.appNameToIdMap[pluginInstance.APP_NAME] = pluginInstance.APP_ID
+        }
+      }
     }
     // console.log('plugins initialized.')
+  }
+
+  getAppNameById(appId): string {
+    return this.appIdToNameMap[appId]
+  }
+
+  getAppIdByName(appName): string {
+    return this.appNameToIdMap[appName] || "0";
+  }
+
+  getAppByName(appName) {
+    const appId = this.getAppIdByName(appName)
+    return this.getAppById(appId);
+  }
+
+  getAppById(appId) {
+    return this._apps[appId] || null;
   }
 
   getPlugin(pluginName) {
     return this._plugins[pluginName]
   }
 
-  getAppByName(appName) {
-    if (!appName) return null
-    let keys = Object.keys(this._plugins)
-    for (let i = 0; i < keys.length; i++) {
-      if (this._plugins[keys[i]].APP_NAME === appName)
-        return this._plugins[keys[i]]
-    }
-    return null
-  }
+  // getAppByName(appName) {
+  //   if (!appName) return null
+  //   let keys = Object.keys(this._plugins)
+  //   for (let i = 0; i < keys.length; i++) {
+  //     if (this._plugins[keys[i]].APP_NAME === appName)
+  //       return this._plugins[keys[i]]
+  //   }
+  //   return null
+  // }
 
   async start() {
     this.globalEventBus.on("message", this.onGlobalEventReceived.bind(this));
@@ -81,15 +130,9 @@ export default class Muon extends Events {
     }
   }
 
-  async onGlobalEventReceived(event: CoreGlobalEvent) {
+  async onGlobalEventReceived(event: CoreGlobalEvent, info) {
     // console.log(`[${process.pid}] core.Muon.onGlobalEventReceived`, event)
-    this.emit(event.type, event.data);
-  }
-
-  getSharedWalletPubKey() {
-    // return this.sharedWalletPubKey
-    let tssPlugin = this.getPlugin('tss-plugin')
-    return tssPlugin.tssKey.publicKey
+    this.emit(event.type, event.data, info);
   }
 
   get configDir(){

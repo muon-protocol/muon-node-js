@@ -27,13 +27,11 @@ const createEnv = async () => {
   let env1 = `
   REDIS_HOST = ${REDIS_HOST}\n
   REDIS_PORT = ${REDIS_PORT}\n
-  REDIS_QUEUE = muon_queue_1\n
-  REDIS_GATEWAY_CHANNEL = dev_node\n
   GATEWAY_HOST = 0.0.0.0\n
   GATEWAY_PORT = ${params['p'] ? params['p'] : 8000}\n
   CONFIG_BASE_PATH = dev-node-1\n
 
-  MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
+  MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}_1\n
   # ============ LibP2P Configs ==============
   SIGN_WALLET_ADDRESS = ${accountEnv1.address}\n
   SIGN_WALLET_PRIVATE_KEY = ${accountEnv1.privateKey.substr(2)}
@@ -67,7 +65,7 @@ const createEnv = async () => {
   WEB3_PROVIDER_FTM = "https://rpcapi.fantom.network/"\n
   WEB3_PROVIDER_FTMTEST = "https://rpc.testnet.fantom.network/"\n
   WEB3_PROVIDER_POLYGON="https://polygon-rpc.com"\n
-  WEB3_PROVIDER_MUMBAI="https://matic-mumbai.chainstacklabs.com"\n
+  WEB3_PROVIDER_MUMBAI="https://rpc.ankr.com/polygon_mumbai"\n
 
   watch_muon_on_bsctest="0xda2D1567Dfca43Dc2Bc9f8D072D746d0bfbF3E1a"\n
   watch_muon_on_rinkeby="0x8ed35887C77Ee1BB533f05f85661fcDeF1FEda1E"\n
@@ -105,13 +103,11 @@ const createEnv = async () => {
     let env2 = `
     REDIS_HOST = ${REDIS_HOST}\n
     REDIS_PORT = ${REDIS_PORT}\n
-    REDIS_QUEUE = muon_queue_${index + 1}\n
-    REDIS_GATEWAY_CHANNEL = dev_node\n
     GATEWAY_HOST = 0.0.0.0\n
     GATEWAY_PORT = ${params['p'] ? Number(params['p']) + index : 8000 + index}\n
     CONFIG_BASE_PATH = dev-node-${index + 1}\n
 
-    MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}\n
+    MONGODB_CS = mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}_${index+1}\n
     # ============ LibP2P Configs ==============
     SIGN_WALLET_ADDRESS = ${account.address}\n
     SIGN_WALLET_PRIVATE_KEY = ${account.privateKey.substr(2)}
@@ -145,7 +141,7 @@ const createEnv = async () => {
     WEB3_PROVIDER_FTM = "https://rpcapi.fantom.network/"\n
     WEB3_PROVIDER_FTMTEST = "https://rpc.testnet.fantom.network/"\n
     WEB3_PROVIDER_POLYGON="https://polygon-rpc.com"\n
-    WEB3_PROVIDER_MUMBAI="https://matic-mumbai.chainstacklabs.com"\n
+    WEB3_PROVIDER_MUMBAI="https://rpc.ankr.com/polygon_mumbai"\n
   
     watch_muon_on_bsctest="0xda2D1567Dfca43Dc2Bc9f8D072D746d0bfbF3E1a"\n
     watch_muon_on_rinkeby="0x8ed35887C77Ee1BB533f05f85661fcDeF1FEda1E"\n

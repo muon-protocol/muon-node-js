@@ -1,10 +1,10 @@
 import CallablePlugin from './base/callable-plugin'
-const Content = require('../../gateway/models/Content')
+const Content = require('../../common/db-models/Content')
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
 import {GatewayMethodData} from "../../gateway/types";
 const {loadCID} = require('../../utils/cid')
 const {timeout} = require('../../utils/helpers')
-import * as NetworkingIpc from '../../networking/ipc';
+import * as NetworkIpc from '../../network/ipc';
 import ContentVerifyPlugin from "./content-verify-plugin";
 
 @remoteApp
@@ -15,7 +15,7 @@ class ContentApp extends CallablePlugin {
     let content = await Content.create(response)
     await content.save();
     response['cid'] = content.cid;
-    await NetworkingIpc.provideContent([content.cid])
+    await NetworkIpc.provideContent([content.cid])
   }
 
   async onStart() {
@@ -23,7 +23,7 @@ class ContentApp extends CallablePlugin {
 
     this.muon.getPlugin('gateway-interface').on('confirmed', this.onGatewayConfirmed.bind(this))
 
-    let onlinePeers = await NetworkingIpc.getOnlinePeers()
+    let onlinePeers = await NetworkIpc.getOnlinePeers()
     if(onlinePeers.length > 0){
       this.provideContents()
     }
@@ -34,7 +34,7 @@ class ContentApp extends CallablePlugin {
     }
   }
 
-  // TODO: move to networking
+  // TODO: move to network
   async provideContents() {
     /** wait to DHT load peer info */
     await timeout(50000);
@@ -42,7 +42,7 @@ class ContentApp extends CallablePlugin {
     try {
       let contents = await Content.find({});
       let cidList = contents.map(c => c.cid)
-      await NetworkingIpc.provideContent(cidList);
+      await NetworkIpc.provideContent(cidList);
     }catch (e) {
       console.error("ERROR: ContentApp.provideContents", e)
     }
@@ -54,7 +54,7 @@ class ContentApp extends CallablePlugin {
       // console.log(`content found locally`, content.content)
       return content.content;
     }else{
-      let providers = await NetworkingIpc.findContent(cid);
+      let providers = await NetworkIpc.findContent(cid);
       for(let provider of providers){
         if(provider !== process.env.PEER_ID){
           let request = await this.remoteCall(provider, 'get_content', {cid})

@@ -5,6 +5,7 @@
   },
   "ignore": [
     "*.test.js",
+    "src/cmd/**/*.*",
     "__test__/*",
     "config/",
     "fixtures/*"

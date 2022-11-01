@@ -1,6 +1,6 @@
 import BasePlugin from './base/base-plugin'
 const {createCIDFromString, cid2str} = require('../../utils/cid')
-const Violation = require('../../gateway/models/Violation')
+const Violation = require('../../common/db-models/Violation')
 const { subscribeLogEvent } = require('../../utils/eth')
 const muonAbi = require('../../utils/muon-abi')
 
