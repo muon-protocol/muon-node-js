@@ -158,8 +158,6 @@ class System extends CallablePlugin {
     let requestNonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!
 
     if(request.owner === process.env.SIGN_WALLET_ADDRESS){
-      // let keyGenExecutor = await NetworkIpc.getGroupExecutor(partners, "app-tss-keygen")
-      // console.log({keyGenExecutor})
 
       const noncePartners = requestNonce.partners
       const noneInformedPartners = allOnlineNodes.filter(node => (noncePartners.indexOf(node.id) < 0))

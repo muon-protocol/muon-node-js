@@ -41,10 +41,6 @@ function assignTask(taskId) {
   return call(IpcMethods.AssignTask, {taskId})
 }
 
-function getLeader(): Promise<String | null> {
-  return call(IpcMethods.GetLeader)
-}
-
 function askClusterPermission(key, expireTime) {
   return call(IpcMethods.AskClusterPermission, {key, expireTime})
 }
@@ -55,10 +51,6 @@ function provideContent(cids: string[]): Promise<any> {
 
 function findContent(cid: string): Promise<any> {
   return call(IpcMethods.ContentRoutingFind, cid)
-}
-
-function getGroupExecutor(walletList: string[], task: string): Promise<string> {
-  return call(IpcMethods.GetGroupExecutor, {walletList, task})
 }
 
 function forwardRequest(id, requestData) {
@@ -77,11 +69,9 @@ export {
   forwardRemoteCall,
   reportClusterStatus,
   assignTask,
-  getLeader,
   askClusterPermission,
   provideContent,
   findContent,
-  getGroupExecutor,
   forwardRequest,
   getCurrentNodeInfo,
 }

@@ -2,7 +2,6 @@ import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, ipcMethod, broadcastHandler} from './base/app-decorators'
 import {IpcCallOptions} from "../../common/types";
 import CollateralInfoPlugin from "./collateral-info";
-import GroupLeaderPlugin from "./group-leader-plugin";
 import QueueProducer from "../../common/message-bus/queue-producer";
 let requestQueue = new QueueProducer(`gateway-requests`);
 const all = require('it-all')
@@ -29,13 +28,11 @@ export const IpcMethods = {
   GetCollateralInfo: "get-collateral-info",
   BroadcastMessage: "broadcast-message",
   ReportClusterStatus: "report-cluster-status",
-  GetLeader: "get-leader",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
   RemoteCall: "remote-call",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
-  GetGroupExecutor: "get-group-executor",
   ForwardGatewayRequest: "forward-gateway-request",
   GetCurrentNodeInfo: "get-current-node-info"
 } as const;
@@ -63,10 +60,6 @@ class NetworkIpcHandler extends CallablePlugin {
 
   get collateralPlugin(): CollateralInfoPlugin {
     return this.network.getPlugin('collateral');
-  }
-
-  get groupLeaderPlugin(): GroupLeaderPlugin {
-    return this.network.getPlugin('group-leader');
   }
 
   get remoteCallPlugin() {
@@ -139,13 +132,6 @@ class NetworkIpcHandler extends CallablePlugin {
     // console.log("NetworkIpcHandler.__reportClusterStatus", this.clustersPids);
   }
 
-  @ipcMethod(IpcMethods.GetLeader)
-  async __getLeader(data: any, callerInfo) {
-    let leaderPlugin = this.network.getPlugin('group-leader')
-    await leaderPlugin.waitToLeaderSelect();
-    return leaderPlugin.leader;
-  }
-
   clusterPermissions = {};
 
   @ipcMethod(IpcMethods.AskClusterPermission)
@@ -209,12 +195,6 @@ class NetworkIpcHandler extends CallablePlugin {
     console.log(`NetworkIpcHandler.__onContentRoutingFind`, cid);
     let providers = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
     return providers.map(p => p.id._idB58String)
-  }
-
-  // TODO: replace with idList
-  @ipcMethod(IpcMethods.GetGroupExecutor)
-  async __getGroupExecutor(data:{walletList: string[], task: string}, callerInfo) {
-    return this.groupLeaderPlugin.getGroupExecutor(data.walletList, data.task);
   }
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)

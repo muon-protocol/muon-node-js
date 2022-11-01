@@ -242,13 +242,12 @@ class TssPlugin extends CallablePlugin {
       console.log('tss ready');
     }
     else{
-      console.log('waiting to leader be selected ...');
-      let leader = await NetworkIpc.getLeader();
       let permitted = await NetworkIpc.askClusterPermission('tss-key-creation', 20000)
       if(!permitted)
         return;
 
-      if (leader === process.env.SIGN_WALLET_ADDRESS && await this.isNeedToCreateKey()) {
+      const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+      if (currentNodeInfo && currentNodeInfo.id == '1' && await this.isNeedToCreateKey()) {
         console.log(`[${process.pid}] got permission to create tss key`);
         let key = await this.tryToCreateTssKey();
         console.log(`TSS key generated with ${key.partners.length} partners`);
@@ -492,7 +491,6 @@ class TssPlugin extends CallablePlugin {
   }
 
   async tryToCreateTssKey() {
-    // TODO: need to redesign. Now, the executor can loop over the key generation, until it becomes the leader.
     try {
       let key;
       do {
@@ -915,7 +913,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   /**
-   * Leader inform other nodes that tss creation completed.
+   * Node with ID:[1] inform other nodes that tss creation completed.
    *
    * @param data
    * @param callerInfo: caller node information
@@ -935,8 +933,8 @@ class TssPlugin extends CallablePlugin {
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
       throw {message: 'TssPlugin.__storeTssKey: key not found.'};
-    let leader = await NetworkIpc.getLeader();
-    if(await this.isNeedToCreateKey() && leader === callerInfo.wallet) {
+    const nodeInfo = this.collateralPlugin.getNodeInfo(callerInfo.wallet)
+    if(nodeInfo && nodeInfo.id=='1' && await this.isNeedToCreateKey()) {
       await key.waitToFulfill()
       this.saveTssConfig(party, key);
       this.tssKey = key
