@@ -277,7 +277,12 @@ class TssPlugin extends CallablePlugin {
           statuses = statuses.filter((s, i) => filter[i]);
 
           if(statuses.length >= this.collateralPlugin.TssThreshold){
-            await this.tryToRecoverTssKey(onlinePartners);
+            try {
+              await this.tryToRecoverTssKey(onlinePartners);
+            }
+            catch (e) {
+              console.log(`Error when trying to recover tss key`);
+            }
           }
         }
       }
@@ -622,9 +627,9 @@ class TssPlugin extends CallablePlugin {
    * @returns {Promise<DistributedKey>}
    */
   async createKey(party, options: KeyGenOptions={}) {
-    let {id, maxPartners, timeout=15} = options;
+    let {id, maxPartners, timeout=1500} = options;
     // 1- create new key
-    let key = new DistributedKey(party, id, 15000)
+    let key = new DistributedKey(party, id, timeout)
     let taskId = `keygen-${key.id}`;
     let assignResponse = await NetworkIpc.assignTask(taskId);
     if(assignResponse !== 'Ok')
