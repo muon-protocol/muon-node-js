@@ -627,7 +627,7 @@ class TssPlugin extends CallablePlugin {
    * @returns {Promise<DistributedKey>}
    */
   async createKey(party, options: KeyGenOptions={}) {
-    let {id, maxPartners, timeout=1500} = options;
+    let {id, maxPartners, timeout=30000} = options;
     // 1- create new key
     let key = new DistributedKey(party, id, timeout)
     let taskId = `keygen-${key.id}`;
