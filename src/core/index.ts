@@ -40,21 +40,25 @@ function prepareApp(app, fileName, isBuiltInApp=false) {
   return [dynamicExtend(BaseApp, app), {}]
 }
 
+function loadApp(path) {
+  try {
+    require.resolve(path)
+    return require(path)
+  }
+  catch (e) {
+    console.error(chalk.red(`Error when loading app from path [${path}]`))
+    console.error(e);
+    return undefined
+  }
+}
+
 function getCustomApps() {
   let pluginsStr = process.env['MUON_CUSTOM_APPS']
   if (!pluginsStr)
     return {}
   return pluginsStr.split('|').reduce((res, key) => {
-    // check if app exist.
-    try {
-      require.resolve(`../../apps/custom/${key}`);
-    } catch (e) {
-      console.error(e);
-      return res;
-    }
-    // load app
-    let app = require(`../../apps/custom/${key}`)
-    if (!!app.APP_NAME) {
+    let app = loadApp(`../../apps/custom/${key}`)
+    if (app && !!app.APP_NAME) {
       return {
         ...res,
         [key]: prepareApp(app, `${key}.js`)
@@ -72,8 +76,8 @@ function getBuiltInApps() {
   files.forEach((file) => {
     let ext = file.split('.').pop();
     if (ext.toLowerCase() === 'js') {
-      let app = require(`../built-in-apps/${file}`)
-      if (!!app.APP_NAME) {
+      let app = loadApp(`../built-in-apps/${file}`)
+      if (app && !!app.APP_NAME) {
         result[app.APP_NAME] = prepareApp(app, file, true)
       }
     }
@@ -88,8 +92,8 @@ function getGeneralApps() {
   files.forEach((file) => {
     let ext = file.split('.').pop();
     if (ext.toLowerCase() === 'js') {
-      let app = require(`../../apps/general/${file}`)
-      if (!!app.APP_NAME) {
+      let app = loadApp(`../../apps/general/${file}`)
+      if (app && !!app.APP_NAME) {
         result[app.APP_NAME] = prepareApp(app, file)
       }
     }
