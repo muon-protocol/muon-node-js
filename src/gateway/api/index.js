@@ -34,6 +34,10 @@ function extraLogs(req, result) {
 }
 
 async function callProperNode(requestData) {
+  if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
+    return await requestQueue.send(requestData)
+  }
+
   let context = await CoreIpc.getAppContext(requestData.app);
   if (!context) {
     console.log("context not found. query the network for context.")

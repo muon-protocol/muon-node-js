@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin'
 const Content = require('../../common/db-models/Content')
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
-import {GatewayMethodData} from "../../gateway/types";
+import {GatewayCallData} from "../../gateway/types";
 const {loadCID} = require('../../utils/cid')
 const {timeout} = require('../../utils/helpers')
 import * as NetworkIpc from '../../network/ipc';
@@ -98,7 +98,7 @@ class ContentApp extends CallablePlugin {
   }
 
   @gatewayMethod('get_content')
-  async responseToGatewayRequestData(data: GatewayMethodData){
+  async responseToGatewayRequestData(data: GatewayCallData){
     let {cid, format='string'} = data.params;
     let content = await this.getContent(cid)
     if(content){

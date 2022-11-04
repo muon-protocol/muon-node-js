@@ -49,6 +49,19 @@ export default class GatewayInterface extends BasePlugin{
     }
   }
 
+  getActualHandlerMethod(app, method) {
+    if(app){
+      if(this.listenerCount(`call/${app}/${method}`) > 0){
+        return method
+      }
+      else if(this.listenerCount(`call/${app}/request`) > 0){
+        return 'request'
+      }
+      /** return undefined */
+    }
+    /** return undefined */
+  }
+
   async __onGatewayCall(message, {pid, uid: callId}){
     // console.log("GatewayInterface.__onGatewayCall", message)
     try {
