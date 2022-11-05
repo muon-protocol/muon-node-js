@@ -18,6 +18,10 @@ type GetAppData = Override<GatewayCallData, {params: { appName?: string, appId?:
 class Explorer extends CallablePlugin {
   APP_NAME="explorer"
 
+  get tssPlugin(): TssPlugin {
+    return this.muon.getPlugin('tss-plugin');
+  }
+
   get healthPlugin(): HealthCheck {
     return this.muon.getPlugin('health-check')
   }
@@ -87,16 +91,28 @@ class Explorer extends CallablePlugin {
       throw `App Name/ID required`
 
     const context = this.appManager.getAppContext(appId!)
+    const tss = this.tssPlugin.getAppTssKey(appId!)
 
     return {
       appId,
       appName: context.appName,
-      context: {
+      context: !context ? null : {
         isBuiltIn: context.isBuiltIn,
         version: context.version,
         deployedTime: context.deployedTime,
         deploySeed: context.seed,
-        party: context.party,
+      },
+      tss: !context ? null : {
+        threshold: {
+          t: context.party.t,
+          max: context.party.max
+        },
+        publicKey: !tss ? null : {
+          address: tss.address,
+          encoded: tss.publicKey?.encodeCompressed("hex"),
+          x: tss.publicKey?.getX().toBuffer('be', 32).toString('hex'),
+          yParity: tss.publicKey?.getY().isEven() ? 0 : 1
+        },
       }
     }
   }
