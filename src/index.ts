@@ -7,6 +7,11 @@ const NetworkIpc = require('./network/ipc');
 const SharedMemory = require('./common/shared-memory')
 const { parseBool, timeout } = require('./utils/helpers')
 
+process.on('unhandledRejection', function(reason, _promise) {
+  console.log("Unhandled promise rejection", reason, _promise);
+  throw `Unhandled promise rejection reason: ${reason}`
+});
+
 
 let clusterCount = 1;
 if(parseBool(process.env.CLUSTER_MODE)) {

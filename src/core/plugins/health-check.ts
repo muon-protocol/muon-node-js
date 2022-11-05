@@ -55,7 +55,7 @@ class HealthCheck extends CallablePlugin {
     await this.muon.onPeerDisconnect({remotePeer: peerId})
   }
 
-  async getNodeStatus(){
+  private async collectNodeStatus(){
     const {stdout: uptimeStdOut, stderr: uptimeStdErr} = await shellExec('uptime');
     const {stdout: freeStdOut, stderr: freeStdErr} = await shellExec('free');
 
@@ -67,39 +67,15 @@ class HealthCheck extends CallablePlugin {
     }
   }
 
-  @gatewayMethod("list-nodes")
-  async _onListNodes(data){
-    let tssPlugin: TssPlugin = this.muon.getPlugin('tss-plugin')
+  async getNodeStatus(node?: MuonNodeInfo) {
+    if(!node)
+      return await this.collectNodeStatus()
 
-    if(tssPlugin.tssParty === null)
-      throw `TSS module not loaded yet`
-
-    if(!process.env.SIGN_WALLET_ADDRESS)
-      throw `process.env.SIGN_WALLET_ADDRESS is not defined`
-
-    // TODO: replace with onlinePartners
-    let partners: MuonNodeInfo[] = Object.values(tssPlugin.tssParty.onlinePartners)
-      .filter((op: MuonNodeInfo) => op.wallet !== process.env.SIGN_WALLET_ADDRESS)
-
-    let result = {
-      [process.env.SIGN_WALLET_ADDRESS]: {
-        status: "CURRENT",
-        ... await this.getNodeStatus()
-      }
-    }
-    let responses = await Promise.all(partners.map(node => {
-      return this.remoteCall(
-        node.peerId,
-        RemoteMethods.CheckHealth,
-        {log: true}
-      ).catch(e => null)
-    }))
-
-    for(let i=0 ; i<responses.length ; i++){
-      result[partners[i].wallet] = responses[i];
-    }
-
-    return result;
+    return await this.remoteCall(
+      node.peerId,
+      RemoteMethods.CheckHealth,
+      {log: true}
+    )
   }
 
   @remoteMethod(RemoteMethods.CheckHealth)
@@ -108,7 +84,7 @@ class HealthCheck extends CallablePlugin {
       console.log(`===== HealthCheck._onHealthCheck =====`, new Date());
     return {
       status: "OK",
-      ... await this.getNodeStatus()
+      ... await this.collectNodeStatus()
     }
   }
 }

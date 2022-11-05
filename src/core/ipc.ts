@@ -4,6 +4,7 @@ const { BROADCAST_CHANNEL } = require('./plugins/broadcast')
 const { IPC_CHANNEL } = require('./plugins/core-ipc-plugin')
 import DistributedKey from './plugins/tss-plugin/distributed-key'
 import {MessageOptions} from "../common/message-bus/msg-publisher";
+import {IpcMethods, CoreIpcMethod} from "./plugins/core-ipc-handlers";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 const broadcastQueue = new QueueProducer(BROADCAST_CHANNEL)
@@ -25,7 +26,7 @@ export type CoreGlobalEvent = {
  * @param options.pid - define cluster PID to running ipc method
  * @returns {Promise<Object>}
  */
-function call(method: string, params: any, options: IpcCallOptions={}) {
+function call(method: CoreIpcMethod, params: any, options: IpcCallOptions={}) {
   return callQueue.send({method, params}, options);
 }
 
@@ -38,23 +39,23 @@ function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
 }
 
 async function forwardRemoteCall(data: any, callerInfo: MuonNodeInfo, options: IpcCallOptions) {
-  return await call('forward-remote-call', {data, callerInfo}, options);
+  return await call(IpcMethods.ForwardRemoteCall, {data, callerInfo}, options);
 }
 
 async function generateTssKey(keyId?: string) {
-  let key = await call('generate-tss-key', {keyId});
+  let key = await call(IpcMethods.GenerateTssKey, {keyId});
   // console.log("CoreIpc.generateTssKey", JSON.stringify(key,null, 2))
   // console.log("CoreIpc.generateTssKey", key.partners)
   return DistributedKey.load(null, key)
 }
 
 async function getTssKey(keyId: string, options: IpcCallOptions) {
-  const key = await call('get-tss-key', {keyId}, options);
+  const key = await call(IpcMethods.GetTssKey, {keyId}, options);
   return DistributedKey.load(null, key)
 }
 
 async function getAppId(appName: string): Promise<string> {
-  return await call('get-app-id', {appName})
+  return await call(IpcMethods.GetAppId, {appName})
 }
 
 /**
@@ -62,7 +63,7 @@ async function getAppId(appName: string): Promise<string> {
  * @param appName
  */
 async function getAppContext(appName) {
-  return await call('get-app-context', appName)
+  return await call(IpcMethods.GetAppContext, appName)
 }
 
 /**
@@ -70,7 +71,11 @@ async function getAppContext(appName) {
  * @param appName
  */
 async function queryAppContext(appName) {
-  return await call('query-app-context', appName)
+  return await call(IpcMethods.QueryAppContext, appName)
+}
+
+async function isDeploymentExcerpt(appName, method) {
+  return await call(IpcMethods.IsDeploymentExcerpt, {appName, method})
 }
 
 export {
@@ -83,5 +88,6 @@ export {
   getAppId,
   getAppContext,
   queryAppContext,
+  isDeploymentExcerpt,
   GLOBAL_EVENT_CHANNEL,
 }

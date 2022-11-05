@@ -34,24 +34,19 @@ function extraLogs(req, result) {
 }
 
 async function callProperNode(requestData) {
-  /**
-   * the `request` method type, needs the app tss key to exist.
-   * without the app tss key request cannot proceed.
-   * any method except request can proceed.
-   */
-  if(requestData.method !== 'request')
+  if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
     return await requestQueue.send(requestData)
+  }
 
-  /**
-   * if the calling method is `request`, it needs the app context to exist.
-   */
   let context = await CoreIpc.getAppContext(requestData.app);
   if (!context) {
     console.log("context not found. query the network for context.")
     context = await CoreIpc.queryAppContext(requestData.app)
   }
-  if (!context)
+  if (!context) {
+    console.log('app context not found', requestData)
     throw `App not deployed`;
+  }
   const {partners} = context.party
   const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
   if (partners.includes(currentNodeInfo.id)) {

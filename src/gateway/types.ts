@@ -1,6 +1,6 @@
 export type GatewayCallMode = 'sign' | 'view'
 
-export type GatewayMethodData = {
+export type GatewayCallData = {
     app: string,
     method: string,
     params: any,
