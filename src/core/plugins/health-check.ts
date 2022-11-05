@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
-import {OnlinePeerInfo} from "../../networking/types";
 import TssPlugin from "./tss-plugin";
+import {MuonNodeInfo} from "../../common/types";
 const {timeout} = require('../../utils/helpers')
 const OS = require('os')
 const util = require('util');
@@ -77,10 +77,9 @@ class HealthCheck extends CallablePlugin {
     if(!process.env.SIGN_WALLET_ADDRESS)
       throw `process.env.SIGN_WALLET_ADDRESS is not defined`
 
-    let partners: OnlinePeerInfo[] = Object.values(tssPlugin.tssParty.partners)
-      .filter((op: OnlinePeerInfo) => {
-        return !!op.peer && op.wallet !== process.env.SIGN_WALLET_ADDRESS
-      })
+    // TODO: replace with onlinePartners
+    let partners: MuonNodeInfo[] = Object.values(tssPlugin.tssParty.onlinePartners)
+      .filter((op: MuonNodeInfo) => op.wallet !== process.env.SIGN_WALLET_ADDRESS)
 
     let result = {
       [process.env.SIGN_WALLET_ADDRESS]: {
@@ -88,14 +87,13 @@ class HealthCheck extends CallablePlugin {
         ... await this.getNodeStatus()
       }
     }
-
-    const peerList = partners.map(({peer}) => peer)
-
-    let calls = peerList.map(peer => {
-      return this.remoteCall(peer, RemoteMethods.CheckHealth, {log: true})
-        .catch(e => null)
-    });
-    let responses = await Promise.all(calls)
+    let responses = await Promise.all(partners.map(node => {
+      return this.remoteCall(
+        node.peerId,
+        RemoteMethods.CheckHealth,
+        {log: true}
+      ).catch(e => null)
+    }))
 
     for(let i=0 ; i<responses.length ; i++){
       result[partners[i].wallet] = responses[i];

@@ -1,5 +1,5 @@
 import BasePlugin from './base/base-plugin'
-import * as NetworkingIpc from '../../networking/ipc'
+import * as NetworkIpc from '../../network/ipc'
 import QueueConsumer from '../../common/message-bus/queue-consumer'
 
 export const BROADCAST_CHANNEL = 'core-broadcast';
@@ -37,14 +37,14 @@ export default class BroadcastPlugin extends BasePlugin {
       return await this.emit(channel, message, callerInfo);
     }
     else {
-      throw {message: `broadcast channel "${channel}" is not handled`}
+      console.error({message: `core.Broadcast.onBroadcastReceived: broadcast channel "${channel}" is not handled`})
     }
   }
 
   async broadcastToChannel(channel, message) {
     if(channel===undefined || message===undefined)
       throw {message: "Broadcast channel/message must be defined"}
-    let response = await NetworkingIpc.broadcastToChannel(channel, message);
+    let response = await NetworkIpc.broadcastToChannel(channel, message);
     // TODO: is need to check response is 'Ok' or not?
   }
 }

@@ -1,3 +1,7 @@
+import Muon from "../../muon";
+import {MuonNodeInfo} from "../../../common/types";
+import CollateralInfoPlugin from "../collateral-info";
+
 const Events = require('events-async')
 const PeerId = require('peer-id')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
@@ -5,12 +9,12 @@ const uint8ArrayToString = require('uint8arrays/to-string').toString;
 const SharedMem = require('../../../common/shared-memory')
 
 export default class BasePlugin extends Events{
-  muon;
+  private readonly _muon;
   configs = {}
 
   constructor(muon, configs){
     super()
-    this.muon = muon
+    this._muon = muon
     this.configs = {...configs}
   }
 
@@ -29,8 +33,12 @@ export default class BasePlugin extends Events{
     this.registerBroadcastHandler()
   }
 
+  get muon(): Muon {
+    return this._muon;
+  }
+
   get peerId(){
-    throw "peerId moved to networking module"
+    throw "peerId moved to network module"
     // return this.muon.peerId;
   }
 
@@ -85,4 +93,8 @@ export default class BasePlugin extends Events{
     return await SharedMem.clear(this.sharedMemKey(key))
   }
 
+  get currentNodeInfo(): MuonNodeInfo | undefined {
+    const collateral: CollateralInfoPlugin = this.muon.getPlugin('collateral')
+    return collateral.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+  }
 }

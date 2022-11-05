@@ -1,5 +1,7 @@
 import CallablePlugin from './callable-plugin'
-const Request = require('../../../gateway/models/Request')
+const Request = require('../../../common/db-models/Request')
+const AppContext = require("../../../common/db-models/AppContext")
+const AppTssConfig = require("../../../common/db-models/AppTssConfig")
 const {makeAppDependency} = require('./app-dependencies')
 const { getTimestamp, timeout } = require('../../../utils/helpers')
 const crypto = require('../../../utils/crypto')
@@ -9,14 +11,19 @@ const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 import AppRequestManager from './app-request-manager'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
-import { MemWrite } from '../memory-plugin'
+import MemoryPlugin, {MemWrite, MemWriteOptions} from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
+const Web3 = require('web3')
 import DistributedKey from "../tss-plugin/distributed-key";
-import {OnlinePeerInfo} from "../../../networking/types";
+import TssPlugin from "../tss-plugin";
+import AppManager from "../app-manager";
+import TssParty from "../tss-plugin/party";
+import CollateralInfoPlugin from "../collateral-info";
+import {MuonNodeInfo} from "../../../common/types";
 const chalk = require('chalk')
 const Ajv = require("ajv")
 const ajv = new Ajv()
-
+const web3 = new Web3();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 
 export type AppRequestSignature = {
@@ -50,12 +57,22 @@ export type AppRequestSignature = {
   memWriteSignature?: string
 }
 
+const RemoteMethods = {
+  WantSign: 'wantSign',
+  InformRequestConfirmation: 'InformReqConfirmation',
+  AppDeploy: "appDeploy",
+  AppTssKeyGenStep1: "AppTssKeyGenStep1",
+  AppTssKeyGenStep2: "AppTssKeyGenStep2",
+}
+
 @remoteApp
 class BaseAppPlugin extends CallablePlugin {
-  APP_NAME = null
+  APP_NAME: string | null = null
   REMOTE_CALL_TIMEOUT = 15000
   requestManager = new AppRequestManager();
   readOnlyMethods = []
+  /** initialize when loading */
+  isBuiltInApp: boolean
 
   constructor(muon, configs) {
     super(muon, configs);
@@ -81,10 +98,6 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
-    if(this.APP_NAME) {
-      this.muon._apps[this.APP_NAME] = this;
-    }
-
     this.warnArrowFunctions([
       "onArrive",
       "onAppInit",
@@ -122,12 +135,21 @@ class BaseAppPlugin extends CallablePlugin {
         gateway.registerAppCall(this.APP_NAME, method, this[method].bind(this))
       })
     }
+
+    /** load app party on start */
+    await this.appManager.waitToLoad();
+    await this.collateralPlugin.waitToLoad();
+
+    const appParty = this.tssPlugin.getAppParty(this.APP_ID);
+    if(process.env.VERBOSE && appParty) {
+      console.log(`App party loaded`, appParty.id)
+    }
   }
 
   getNSign () {
     if(!this.tssPlugin.isReady)
       throw {message: 'Tss not initialized'};
-    return this.tssPlugin.tssKey.party.t;
+    return this.tssPlugin.tssKey!.party!.t;
   }
 
   get tssWalletAddress(){
@@ -135,12 +157,21 @@ class BaseAppPlugin extends CallablePlugin {
     return tss.pub2addr(tssPlugin.tssKey.publicKey)
   }
 
-  get tssPlugin(){
+  get tssPlugin(): TssPlugin{
     return this.muon.getPlugin('tss-plugin');
   }
 
+  get collateralPlugin(): CollateralInfoPlugin{
+    return this.muon.getPlugin('collateral');
+  }
+
+  get appManager(): AppManager {
+    return this.muon.getPlugin('app-manager');
+  }
+
   async invoke(appName, method, params) {
-    let result = await this.muon._apps[appName][method](params);
+    const app = this.muon.getAppByName(appName)
+    let result = await app[method](params);
     return result;
   }
 
@@ -150,6 +181,14 @@ class BaseAppPlugin extends CallablePlugin {
   protected get BROADCAST_CHANNEL() {
     // return this.APP_NAME ? `muon/${this.APP_NAME}/request/broadcast` : null
     return this.APP_NAME ? super.BROADCAST_CHANNEL : null
+  }
+
+  private get appParty(): TssParty | null | undefined {
+    return this.appTss?.party;
+  }
+
+  private get appTss(): DistributedKey | null {
+    return this.tssPlugin.getAppTssKey(this.APP_ID)
   }
 
   @gatewayMethod("request")
@@ -166,8 +205,16 @@ class BaseAppPlugin extends CallablePlugin {
     if(this.getNSign)
       nSign = this.getNSign()
 
-    if(!this.tssPlugin.isReady)
-      throw {message: "Tss not initialized"}
+    if(this.isBuiltInApp) {
+      if (!this.tssPlugin.isReady)
+        throw {message: "Tss not initialized"}
+    }
+    else{
+      if(!this.appManager.appIsDeployed(this.APP_ID))
+        throw `App not deployed`;
+      if(!this.appManager.appHasTssKey(this.APP_ID))
+        throw `App tss not initialized`
+    }
 
     if(this.METHOD_PARAMS_SCHEMA){
       if(this.METHOD_PARAMS_SCHEMA[method]){
@@ -296,12 +343,187 @@ class BaseAppPlugin extends CallablePlugin {
       }
 
       if (confirmed && !isDuplicateRequest) {
+        if(!!this.onConfirm) {
+          await this.informRequestConfirmation(requestData);
+        }
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
       }
 
       return requestData
     }
+  }
+
+  @gatewayMethod("__info")
+  async __getAppInfo({method, params}) {
+    return {
+      name: this.APP_NAME,
+      id: this.APP_ID,
+      deployed: this.isBuiltInApp ? true : this.appManager.appIsDeployed(this.APP_ID),
+      hasTss: this.appManager.appHasTssKey(this.APP_ID)
+    }
+  }
+
+  @gatewayMethod("__deploy")
+  async qwOnAppDeploy({method, params}) {
+    let {timestamp, signature} = params
+
+    const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
+
+    let callResult = await Promise.all(
+      nodesToInform.map(n => {
+        if(n.wallet === process.env.SIGN_WALLET_ADDRESS) {
+          return this.__onAppDeploy({timestamp, signature}, null)
+        }
+        else {
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.AppDeploy,
+            {
+              timestamp,
+              signature,
+            }
+          )
+        }
+      })
+    )
+
+    if(callResult.filter(r => r === "OK").length < this.collateralPlugin.TssThreshold)
+      throw {message: `Deploy failed`, nodesResponses: callResult}
+
+    return {
+      done: true,
+      partners: this.collateralPlugin.groupInfo?.partners,
+    }
+  }
+
+  @gatewayMethod("__keygen")
+  async gwOnTssKeygen({method, params}) {
+    let {timestamp, signature} = params
+
+    const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
+        .filter(n => n.wallet!==process.env.SIGN_WALLET_ADDRESS)
+    /**
+     * KeyGen Step 1
+     * check that key gen is ok or not
+     */
+    const callResult = [
+      /**
+       * current node call
+       * if current node return successfully, then other nodes will be called.
+       */
+      await this.__onAppKeyGenStep1({timestamp, signature}, null),
+      /**
+       * other nodes call
+       */
+      ... await Promise.all(
+        nodesToInform.map(n => {
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.AppTssKeyGenStep1,
+            {
+              timestamp,
+              signature,
+            }
+          )
+        })
+      )
+    ]
+    if(callResult.filter(r => r === "OK").length < this.collateralPlugin.TssThreshold)
+      throw {message: `KeyGen creation failed`, nodesCheckResult: callResult}
+
+    /**
+     * Creating APP party
+     */
+    const context = this.appManager.getAppContext(this.APP_ID)
+    const partyId = this.tssPlugin.getAppPartyId(context.appId, context.version)
+    await this.tssPlugin.createParty({
+      id: partyId,
+      t: this.tssPlugin.TSS_THRESHOLD,
+      partners: context.party.partners
+        .map(wallet => this.collateralPlugin.getNodeInfo(wallet))
+    });
+
+    /**
+     * Generate a Distributed Key
+     */
+    const contextHash = AppContext.hash(context);
+    const keyId = `app-tss-key-${contextHash}-${signature}`
+
+    const party = this.tssPlugin.getAppParty(this.APP_ID);
+    const key = await this.tssPlugin.keyGen(party, {id: keyId})
+
+    /**
+     * KeyGen Step 2
+     * save tss key data
+     */
+    const callResult2 = [
+      /**
+       * current node call
+       * if current node return successfully, then other nodes will be called.
+       */
+      await this.__onAppKeyGenStep2({timestamp, signature}, null),
+      /**
+       * other nodes call
+       */
+      ... await Promise.all(
+        nodesToInform.map(n => {
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.AppTssKeyGenStep2,
+            {
+              timestamp,
+              signature,
+            }
+          )
+        })
+      )
+    ]
+
+    if(callResult2.filter(r => r==="OK").length < this.collateralPlugin.TssThreshold)
+      throw `KeyGen failed on step 2`;
+
+    return {
+      done: true,
+      publicKey: {
+        address: key.address,
+        encoded: key.publicKey?.encodeCompressed("hex"),
+        x: key.publicKey?.getX().toBuffer('be', 32).toString('hex'),
+        yParity: key.publicKey?.getY().isEven() ? 0 : 1
+      },
+    }
+  }
+
+  async informRequestConfirmation(request) {
+    // await this.onConfirm(request)
+    let nonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!;
+    const partners: MuonNodeInfo[] = [
+      /** self */
+      this.currentNodeInfo!,
+      /** all other online partners */
+      ...Object.values(nonce?.party!.onlinePartners).filter(n => n.id !== this.currentNodeInfo!.id),
+    ]
+
+    const responses: string[] = await Promise.all(partners.map(async node => {
+      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
+        return await this.__onRequestConfirmation(request, node)
+      }
+      else {
+        return this.remoteCall(
+          node.peerId,
+          RemoteMethods.InformRequestConfirmation,
+          request,
+          {taskId: `keygen-${nonce.id}`}
+        )
+          .catch(e => {
+            console.log(`BaseAppPlugin.informRequestConfirmation`, e)
+            return 'error'
+          })
+      }
+    }))
+    const successResponses = responses.filter(r => (r === 'OK'))
+    if(successResponses.length < this.tssPlugin.TSS_THRESHOLD)
+      throw `Error when informing request confirmation.`
   }
 
   calculateRequestId(request, resultHash) {
@@ -320,10 +542,10 @@ class BaseAppPlugin extends CallablePlugin {
     if(!tssPlugin.isReady){
       throw {message: 'Tss not initialized'};
     }
-    let party = tssPlugin.tssKey.party;
-    // console.log('party generation done.')
+
+    let party = this.appParty;
     if(!party)
-      throw {message: 'party not generated'}
+      throw {message: 'App party not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     let nonce = await tssPlugin.keyGen(party, {
@@ -346,13 +568,14 @@ class BaseAppPlugin extends CallablePlugin {
       let appMem = this.onMemWrite(request, result)
       if (!appMem)
         return null;
-      let { ttl, data } = appMem
+      let { key, ttl, data } = appMem
 
       if(!this.APP_NAME)
         throw {message: `${this.ConstructorName}.getMemWrite: APP_NAME is not defined`}
 
       let memWrite: MemWrite = {
         type: 'app',
+        key,
         owner: this.APP_NAME,
         timestamp,
         ttl,
@@ -370,24 +593,32 @@ class BaseAppPlugin extends CallablePlugin {
       return null;
   }
 
-  async memRead(query, options) {
-    return this.muon.getPlugin('memory').readAppMem(this.APP_NAME, query, options)
+  async writeNodeMem(key, data, ttl=0) {
+    const memory: MemoryPlugin = this.muon.getPlugin('memory')
+    await memory.writeNodeMem(`app-${this.APP_ID}-${key}`, data, ttl)
   }
 
-  async writeNodeMem(data, ttl=0) {
-    await this.muon.getPlugin('memory').writeNodeMem({ttl, data})
+  async readNodeMem(key) {
+    const memory: MemoryPlugin = this.muon.getPlugin('memory')
+    return await memory.readLocalMem(`app-${this.APP_ID}-${key}`);
   }
 
-  async readNodeMem(query, options) {
-    return this.muon.getPlugin('memory').readNodeMem(query, options)
+  async writeLocalMem(key, data, ttl=0, options:MemWriteOptions) {
+    const memory: MemoryPlugin = this.muon.getPlugin('memory')
+    return await memory.writeLocalMem(`${this.APP_ID}-${key}`, data, ttl, options)
+  }
+
+  async readLocalMem(key) {
+    const memory: MemoryPlugin = this.muon.getPlugin('memory')
+    return await memory.readLocalMem(`${this.APP_ID}-${key}`);
   }
 
   async isOtherNodesConfirmed(newRequest) {
     let signers = {}
 
-    let party = this.tssPlugin.getSharedKey(newRequest.reqId).party
-    let masterWalletPubKey = this.muon.getSharedWalletPubKey()
-    let signersIndices;
+    // let party = this.tssPlugin.getSharedKey(newRequest.reqId)!.party
+    let party = this.appParty
+    let verifyingPubKey = this.appTss?.publicKey!
 
     signers = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
 
@@ -398,7 +629,9 @@ class BaseAppPlugin extends CallablePlugin {
       let [s, e] = signature.split(',').map(toBN)
       return {s, e};
     })
-    let aggregatedSign = tss.schnorrAggregateSigs(party.t, schnorrSigns, owners)
+
+    const ownersIndex = owners.map(wallet => this.collateralPlugin.getNodeInfo(wallet)!.id);
+    let aggregatedSign = tss.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
     let resultHash;
     if(this.isV3()) {
       // security params already appended to newRequest.data.signParams
@@ -409,16 +642,16 @@ class BaseAppPlugin extends CallablePlugin {
     }
 
     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
-    let confirmed = tss.schnorrVerify(masterWalletPubKey, resultHash, aggregatedSign)
+    let confirmed = tss.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
     // TODO: check and detect nodes misbehavior if request not confirmed
 
     return [
       confirmed,
       confirmed ? [{
-        owner: tss.pub2addr(masterWalletPubKey),
+        owner: tss.pub2addr(verifyingPubKey),
         ownerPubKey: {
-          x: '0x' + masterWalletPubKey.x.toBuffer('be', 32).toString('hex'),
-          yParity: masterWalletPubKey.y.mod(toBN(2)).toString(),
+          x: '0x' + verifyingPubKey.getX().toBuffer('be', 32).toString('hex'),
+          yParity: verifyingPubKey.getY().mod(toBN(2)).toString(),
         },
         // signers: signersIndices,
         timestamp: getTimestamp(),
@@ -476,7 +709,7 @@ class BaseAppPlugin extends CallablePlugin {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let nonce = tssPlugin.getSharedKey(request.reqId)
 
-    let idx = owner;
+    let idx = this.collateralPlugin.getNodeInfo(owner)!.id;
     let Z_i = pubKey;
     let K_i = nonce.getPubKey(idx);
 
@@ -485,15 +718,21 @@ class BaseAppPlugin extends CallablePlugin {
     return p1 === p2 ? owner : null;
   }
 
+  verify(hash: string, signature: string, nonceAddress: string): boolean {
+    let tssKey = this.appTss;
+    const signingPubKey = tssKey!.publicKey;
+    return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey);
+  }
+
   broadcastNewRequest(request) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let nonce: DistributedKey = tssPlugin.getSharedKey(request.reqId)
     let party = nonce.party;
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: nonce.party has not value.`}
-    let partners: OnlinePeerInfo[] = Object.values(party.partners)
-      .filter((op: OnlinePeerInfo) => {
-        return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.wallet)
+    let partners: MuonNodeInfo[] = Object.values(party.partners)
+      .filter((op: MuonNodeInfo) => {
+        return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.id)
       })
 
     this.requestManager.setPartnerCount(request.reqId, partners.length + 1);
@@ -536,7 +775,17 @@ class BaseAppPlugin extends CallablePlugin {
     if(withSecurityParams) {
       signParams = this.appendSecurityParams(request, signParams);
     }
-    return soliditySha3(signParams)
+    try {
+      return soliditySha3(signParams)
+    }
+    catch (e) {
+      const {message, ...otherProps} = e;
+      throw {
+        message: `Failed to hash signParams: ${e.message}`,
+        ...otherProps,
+        signParams
+      }
+    }
   }
 
   makeSignature(request, result, resultHash): AppRequestSignature {
@@ -547,7 +796,10 @@ class BaseAppPlugin extends CallablePlugin {
     let {reqId} = request;
     let nonce = tssPlugin.getSharedKey(reqId)
 
-    let tssKey = tssPlugin.tssKey;
+    // let tssKey = this.isBuiltInApp ? tssPlugin.tssKey : tssPlugin.getAppTssKey(this.APP_ID);
+    let tssKey = this.appTss!;
+    if(!tssKey)
+      throw `App TSS key not found`;
     let k_i = nonce.share
     let K = nonce.publicKey;
     // TODO: remove nonce after sign
@@ -562,7 +814,7 @@ class BaseAppPlugin extends CallablePlugin {
       // node stake wallet address
       owner: process.env.SIGN_WALLET_ADDRESS,
       // tss shared public key
-      pubKey: tssKey.sharePubKey,
+      pubKey: tssKey.sharePubKey!,
       timestamp: signTimestamp,
       result,
       signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`
@@ -572,13 +824,14 @@ class BaseAppPlugin extends CallablePlugin {
   async __onRemoteSignTheRequest(data: {sign: AppRequestSignature} | null, error) {
     // console.log('BaseAppPlugin.__onRemoteSignTheRequest', data)
     if(error){
-      let collateralPlugin = this.muon.getPlugin('collateral');
+      let collateralPlugin:CollateralInfoPlugin = this.muon.getPlugin('collateral');
       let {peerId, request: reqId, ...otherParts} = error;
       let request = this.requestManager.getRequest(reqId);
       if(request) {
-        const owner = collateralPlugin.getPeerWallet(peerId);
-        if(owner) {
-          this.requestManager.addError(reqId, owner, otherParts);
+        const ownerInfo = collateralPlugin.getNodeInfo(peerId);
+        if(ownerInfo) {
+          // TODO: replace with ownerInfo.id
+          this.requestManager.addError(reqId, ownerInfo.wallet, otherParts);
         }
       }
       return;
@@ -611,15 +864,16 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  @remoteMethod('wantSign')
-  async __onRemoteWantSign(request, callerInfo) {
-    deepFreeze(request);
-    /**
-     * Check request owner
-     */
-    if((this.isV3() ? request.gwAddress : request.owner) !== callerInfo.wallet){
-      throw "Only request owner can want signature."
-    }
+  callPlugin(pluginName, method, ...otherArgs) {
+    if(!this.isBuiltInApp)
+      throw `Only built-in apps can call plugins.`
+    let plugin = this.muon.getPlugin(pluginName);
+    if(!plugin.__appApiExports[method])
+      throw `Method ${pluginName}.${method} not exported as API method.`
+    return plugin[method](...otherArgs)
+  }
+
+  async preProcessRemoteRequest(request) {
     /**
      * Check request timestamp
      */
@@ -662,17 +916,203 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: `Request ID mismatch.`, result}
     }
 
+    return [result, hash1]
+  }
+
+  async verifyRequestSignature(_request) {
+    const request = clone(_request)
+    deepFreeze(request);
+
+    const [result, hash] = await this.preProcessRemoteRequest(request);
+
+    request.signatures.forEach(sign => {
+      if(!this.verify(hash, sign.signature, request.data.init.nonceAddress)) {
+        throw `TSS signature not verified`
+      }
+    })
+  }
+
+  @remoteMethod(RemoteMethods.WantSign)
+  async __onRemoteWantSign(request, callerInfo) {
+    deepFreeze(request);
+    /**
+     * Check request owner
+     */
+    if((this.isV3() ? request.gwAddress : request.owner) !== callerInfo.wallet){
+      throw "Only request owner can want signature."
+    }
+
+    const [result, hash] = await this.preProcessRemoteRequest(request);
+
     let nonce = this.tssPlugin.getSharedKey(request.reqId);
     // wait for nonce broadcast complete
-    await nonce.waitToFulfill()
+    await nonce!.waitToFulfill()
 
-    let sign = this.makeSignature(request, result, hash2)
+    let sign = this.makeSignature(request, result, hash)
     let memWrite = this.getMemWrite(request, result)
     if(memWrite){
       sign.memWriteSignature = memWrite.signatures[0]
     }
 
     return { sign }
+  }
+
+  @remoteMethod(RemoteMethods.InformRequestConfirmation)
+  async __onRequestConfirmation(request, callerInfo) {
+    if(!this.onConfirm)
+      return `onConfirm not defined for this app`;
+
+    deepFreeze(request);
+    /**
+     * Check request owner
+     */
+    if((this.isV3() ? request.gwAddress : request.owner) !== callerInfo.wallet){
+      throw "Only request owner can inform confirmation."
+    }
+
+    const [result, hash] = await this.preProcessRemoteRequest(request);
+
+    request.signatures.forEach(sign => {
+      if(!this.verify(hash, sign.signature, request.data.init.nonceAddress)) {
+        throw `TSS signature not verified`
+      }
+    })
+
+    await this.onConfirm(request, result, request.signatures);
+
+    return `OK`;
+  }
+
+  @remoteMethod(RemoteMethods.AppDeploy)
+  async __onAppDeploy(data:{timestamp: number, signature: string}, callerInfo) {
+    // console.log(`BaseAppPlugin.__onAppDeploy`, data)
+    const {timestamp, signature} = data
+    if(!timestamp)
+      throw `timestamp missing`
+    if(!signature)
+      throw `signature missing`
+    if(this.appManager.appIsDeployed(this.APP_ID))
+      throw `App already deployed`
+    /**
+     * Only built-in apps can be deployed using this method.
+     * Client's Apps needs random seed to be deployed
+     */
+    if(!this.appManager.appIsBuiltIn(this.APP_ID))
+      throw `Only builtin apps can deploy with this method. use deployment app to deploy your app.`
+
+    const owners = this.owners || []
+    let signatureHash = soliditySha3([
+      {t: 'uint256', v: this.APP_ID},
+      {t: 'string', v: '__deploy'},
+      {t: 'uint64', v: timestamp},
+    ])
+    const signer = web3.eth.accounts.recover(signatureHash, signature)
+    let signatureVerified = owners.includes(signer)
+    if(!signatureVerified) {
+      throw `Signature not verified. only owners can call this method.`
+    }
+
+    const partners = this.collateralPlugin.groupInfo?.partners
+    const version = 0;
+    const deployTime = timestamp * 1000
+
+    await AppContext.findOneAndUpdate({
+      version,
+      appId: this.APP_ID,
+    },{
+      version, // TODO: version definition
+      appId: this.APP_ID,
+      appName: this.APP_NAME,
+      isBuiltIn: true,
+      party: {
+        t: this.collateralPlugin.networkInfo?.tssThreshold!,
+        max: this.collateralPlugin.networkInfo?.maxGroupSize!,
+        partners,
+      },
+      deploymentRequest: {
+        signer,
+        timestamp,
+        signature,
+      },
+      deployTime
+    },{
+      upsert: true,
+      useFindAndModify: false,
+    })
+
+    return "OK"
+  }
+
+  private _validateRemoteKeygenRequest(timestamp, signature) {
+    if(!timestamp)
+      throw `timestamp missing`
+    if(!signature)
+      throw `signature missing`
+    if(!this.appManager.appIsDeployed(this.APP_ID))
+      throw `App is not deployed`
+    /**
+     * Only built-in apps can be deployed using this method.
+     * Client's Apps needs random seed to be deployed
+     */
+    if(!this.appManager.appIsBuiltIn(this.APP_ID))
+      throw `Only builtin apps can deploy with this method. use deployment app to deploy your app.`
+
+    if(this.appManager.appHasTssKey(this.APP_ID))
+      throw `App already has tss key`;
+
+    let signatureHash = soliditySha3([
+      {t: 'uint256', v: this.APP_ID},
+      {t: 'string', v: "__keygen"},
+      {t: 'uint64', v: timestamp},
+    ])
+
+    const signer = web3.eth.accounts.recover(signatureHash, signature);
+    const owners = this.owners || [];
+    let signatureVerified = owners.includes(signer)
+    if(!signatureVerified) {
+      throw `Signature not verified. only owners can call this method.`
+    }
+  }
+
+  @remoteMethod(RemoteMethods.AppTssKeyGenStep1)
+  async __onAppKeyGenStep1(data: {timestamp: number, signature: string}, callerInfo) {
+    // console.log(`BaseAppPlugin.__onAppKeyGenStep1`, data);
+    let {timestamp, signature} = data
+    this._validateRemoteKeygenRequest(timestamp, signature);
+
+    return "OK";
+  }
+
+  @remoteMethod(RemoteMethods.AppTssKeyGenStep2)
+  async __onAppKeyGenStep2(data: {timestamp: number, signature: string}, callerInfo) {
+    // console.log(`BaseAppPlugin.__onAppKeyGenStep2`, data);
+    let {timestamp, signature} = data
+    this._validateRemoteKeygenRequest(timestamp, signature);
+
+    let context = this.appManager.getAppContext(this.APP_ID)
+    const contextHash = AppContext.hash(context);
+    const keyId = `app-tss-key-${contextHash}-${signature}`
+
+    const key = this.tssPlugin.getSharedKey(keyId);
+    if(!key)
+      throw `DistributedKey not generated.`
+    await key.waitToFulfill();
+
+    const tssConfig = new AppTssConfig({
+      version: context.version,
+      appId: this.APP_ID,
+      publicKey: {
+        address: key.address,
+        encoded: '0x' + key.publicKey?.encodeCompressed('hex'),
+        x: '0x' + key.publicKey?.getX().toBuffer('be',32).toString('hex'),
+        yParity: key.publicKey?.getY().isEven() ? 0 : 1,
+      },
+      keyShare: key.share?.toBuffer('be', 32).toString('hex'),
+    })
+
+    await tssConfig.save();
+
+    return "OK"
   }
 }
 

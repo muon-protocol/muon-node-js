@@ -1,0 +1,34 @@
+const dotenv = require("dotenv");
+dotenv.config();
+const PeerId = require("peer-id");
+const emoji = require("node-emoji");
+const fs = require("fs");
+const Web3 = require("web3");
+const parseArgv = require("./src/utils/parseArgv");
+const web3 = new Web3();
+
+const createEnv = async () => {
+  let params = parseArgv();
+
+  if(fs.existsSync('./.env')) {
+    console.log('.env file already exists.');
+    process.exit(1);
+  }
+
+  let wallet = web3.eth.accounts.create();
+  let libP2PConfig = await PeerId.create({ bits: 1024, keyType: "RSA" });
+  libP2PConfig = libP2PConfig.toJSON();
+  let env = fs.readFileSync(".env.example", "utf8");
+
+  env = env.replace("__SIGN_WALLET_ADDRESS__", wallet.address);
+  env = env.replace("__SIGN_WALLET_PRIVATE_KEY__", wallet.privateKey.substr(2));
+
+  env = env.replace("__PEER_ID__", libP2PConfig.id);
+  env = env.replace("__PEER_PUBLIC_KEY__", libP2PConfig.pubKey);
+  env = env.replace("__PEER_PRIVATE_KEY__", libP2PConfig.privKey);
+
+  fs.writeFileSync(".env", env);
+  console.log('.env created successfully.');  
+};
+
+createEnv();

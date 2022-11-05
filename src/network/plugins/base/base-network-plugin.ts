@@ -1,13 +1,16 @@
+import CollateralInfoPlugin from "../collateral-info";
+import {Network} from "../../index";
+
 const Events = require('events-async')
 const PeerId = require('peer-id')
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 
-export default class BaseNetworkingPlugin extends Events {
-  network;
+export default class BaseNetworkPlugin extends Events {
+  network: Network;
   configs = {}
 
-  constructor(network, configs){
+  constructor(network: Network, configs){
     super()
     this.network = network
     this.configs = {...configs}
@@ -21,7 +24,7 @@ export default class BaseNetworkingPlugin extends Events {
   }
 
   /**
-   * This method will call immediately after Networking start.
+   * This method will call immediately after Network start.
    * @returns {Promise<void>}
    */
   async onStart(){
@@ -82,21 +85,22 @@ export default class BaseNetworkingPlugin extends Events {
   }
 
   async __onPluginBroadcastReceived({data: rawData, from, ...otherItems}){
+    // console.log("BaseNetworkPlugin.__onPluginBroadcastReceived", from, rawData)
     try{
       let strData = uint8ArrayToString(rawData)
       let data = JSON.parse(strData);
-      let collateralPlugin = this.network.getPlugin('collateral');
+      let collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
 
-      let senderWallet = collateralPlugin.getPeerWallet(from);
-      if(!senderWallet){
-        throw {message: `Unrecognized broadcast owner ${senderWallet}`, data: strData}
+      let sender = collateralPlugin.getNodeInfo(from);
+      if(!sender){
+        throw {message: `Unrecognized broadcast owner ${from}`, data: strData}
       }
 
       /*eslint no-undef: "error"*/
       let broadcastHandler = this[this.__broadcastHandlerMethod].bind(this);
       if(typeof from != "string")
         from = from.peerId._idB58String
-      await broadcastHandler(data, {wallet: senderWallet, peerId: from});
+      await broadcastHandler(data, {wallet: sender.wallet, peerId: from});
     }
     catch (e) {
       console.log('BasePlugin.__onPluginBroadcastReceived', e)

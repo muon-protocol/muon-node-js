@@ -10,13 +10,14 @@ function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions) {
   return callQueue.send({method, params}, options);
 }
 
-function getCollateralInfo() {
+function getCollateralInfo(options?: IpcCallOptions) {
   return call(
     IpcMethods.GetCollateralInfo,
     {},
     {
       timeout: 5000,
-      timeoutMessage: "Getting collateral info timed out"
+      timeoutMessage: "Getting collateral info timed out",
+      ...options
     })
 }
 
@@ -40,10 +41,6 @@ function assignTask(taskId) {
   return call(IpcMethods.AssignTask, {taskId})
 }
 
-function getLeader() {
-  return call(IpcMethods.GetLeader)
-}
-
 function askClusterPermission(key, expireTime) {
   return call(IpcMethods.AskClusterPermission, {key, expireTime})
 }
@@ -56,6 +53,14 @@ function findContent(cid: string): Promise<any> {
   return call(IpcMethods.ContentRoutingFind, cid)
 }
 
+function forwardRequest(id, requestData) {
+  return call(IpcMethods.ForwardGatewayRequest, {id, requestData});
+}
+
+function getCurrentNodeInfo() {
+  return call(IpcMethods.GetCurrentNodeInfo);
+}
+
 export {
   call,
   getCollateralInfo,
@@ -64,8 +69,9 @@ export {
   forwardRemoteCall,
   reportClusterStatus,
   assignTask,
-  getLeader,
   askClusterPermission,
   provideContent,
   findContent,
+  forwardRequest,
+  getCurrentNodeInfo,
 }

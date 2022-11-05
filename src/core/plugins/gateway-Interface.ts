@@ -29,6 +29,15 @@ let gatewayRequests;
 
 export default class GatewayInterface extends BasePlugin{
 
+  async onStart(){
+    if(!!process.env.GATEWAY_PORT) {
+      gatewayRequests = new QueueConsumer(`gateway-requests`);
+      gatewayRequests.on("message", this.__onGatewayCall.bind(this));
+      // callRedis.subscribe(GATEWAY_CALL_REQUEST)
+      // callRedis.on('message', this.__onGatewayCall.bind(this))
+    }
+  }
+
   async __handleCallResponse(callingArgs, response){
     if(callingArgs.app === 'content')
       return ;
@@ -73,10 +82,11 @@ export default class GatewayInterface extends BasePlugin{
         console.error('gateway-interface error')
         console.dir(e, {depth: null})
       }
-      let {message, data: errorData} = e;
-      return {
-        error: message || "GatewayInterface: Unknown error occurred",
+      let {message, data: errorData, ...otherProps} = e;
+      throw {
+        message: message || "GatewayInterface: Unknown error occurred",
         data: errorData,
+        ...otherProps
       }
     }
   }
@@ -87,14 +97,5 @@ export default class GatewayInterface extends BasePlugin{
 
   registerMuonCall(method, callback){
     this.on(`call/muon/${method}`, callback)
-  }
-
-  async onStart(){
-    if(!!process.env.GATEWAY_PORT) {
-      gatewayRequests = new QueueConsumer(`gateway-requests`);
-      gatewayRequests.on("message", this.__onGatewayCall.bind(this));
-      // callRedis.subscribe(GATEWAY_CALL_REQUEST)
-      // callRedis.on('message', this.__onGatewayCall.bind(this))
-    }
   }
 }

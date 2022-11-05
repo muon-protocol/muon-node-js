@@ -5,7 +5,7 @@ const fs = require('fs');
 const {dynamicExtend} = require('./utils')
 import BaseApp from './plugins/base/base-app-plugin'
 require('./global')
-const loadConfigs = require('../networking/configurations')
+const loadConfigs = require('../network/configurations')
 const {utils: {sha3}} = require('web3')
 const chalk = require('chalk')
 
@@ -24,7 +24,7 @@ function isV3(app) {
   return !!app.signParams;
 }
 
-function prepareApp(app, fileName) {
+function prepareApp(app, fileName, isBuiltInApp=false) {
   if(!app.APP_ID) {
     if(isV3(app)) {
       app.APP_ID = sha3(fileName);
@@ -34,6 +34,9 @@ function prepareApp(app, fileName) {
       app.APP_ID = '0x' + sha3(fileName).slice(-8);
     }
   }
+
+  app.APP_ID = BigInt(app.APP_ID).toString(10);
+  app.isBuiltInApp = isBuiltInApp;
   return [dynamicExtend(BaseApp, app), {}]
 }
 
@@ -60,6 +63,22 @@ function getCustomApps() {
       return res;
     }
   }, {})
+}
+
+function getBuiltInApps() {
+  const appDir = path.join(__dirname, '../built-in-apps');
+  let result = {};
+  let files = fs.readdirSync(appDir);
+  files.forEach((file) => {
+    let ext = file.split('.').pop();
+    if (ext.toLowerCase() === 'js') {
+      let app = require(`../built-in-apps/${file}`)
+      if (!!app.APP_NAME) {
+        result[app.APP_NAME] = prepareApp(app, file, true)
+      }
+    }
+  });
+  return result
 }
 
 function getGeneralApps() {
@@ -89,10 +108,7 @@ async function start() {
   let config = await loadConfigs();
   let {
     net,
-    peerId,
-    account,
     tss,
-    ... otherConfigs
   } = config
   try {
     // const nodeVersion = process.versions.node.split('.');
@@ -101,6 +117,7 @@ async function start() {
     muon = new Muon({
       plugins: {
         'collateral': [(await import('./plugins/collateral-info')).default, {}],
+        'app-manager': [(await import('./plugins/app-manager')).default, {}],
         'remote-call': [(await import('./plugins/remote-call')).default, {}],
         'gateway-interface': [(await import('./plugins/gateway-Interface')).default, {}],
         'ipc': [(await import('./plugins/core-ipc-plugin')).default, {}],
@@ -111,15 +128,15 @@ async function start() {
         'memory': [(await import('./plugins/memory-plugin')).default, {}],
         'tss-plugin': [(await import('./plugins/tss-plugin')).default, {}],
         'health-check': [(await import('./plugins/health-check')).default, {}],
+        'system': [(await import('./plugins/system')).default, {}],
         ...await getEnvPlugins(),
         ...getCustomApps(),
         ...getGeneralApps(),
+        ...getBuiltInApps(),
       },
       net,
-      account,
       // TODO: pass it into the tss-plugin
       tss,
-      ...otherConfigs,
     })
 
     await muon.initialize();

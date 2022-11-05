@@ -81,7 +81,7 @@ class DistributedKey {
 
   static loadPubKey(publicKey) {
     if(typeof publicKey === "string")
-      return tss.keyFromPublic(publicKey)
+      return tss.keyFromPublic(publicKey.replace("0x", ""), "hex")
     else if(Array.isArray(publicKey))
       return tss.keyFromPublic({x: publicKey[0], y: publicKey[1]})
     else
@@ -100,8 +100,8 @@ class DistributedKey {
     if(_key.partners)
       key.partners = _key.partners;
     if(_key.pubKeyParts && Object.keys(_key.pubKeyParts).length > 0){
-      Object.keys(_key.pubKeyParts).forEach(w => {
-        key.pubKeyParts[w] = _key.pubKeyParts[w].map(w => tss.keyFromPublic(w))
+      Object.keys(_key.pubKeyParts).forEach(index => {
+        key.pubKeyParts[index] = _key.pubKeyParts[index].map(w => tss.keyFromPublic(w))
       })
     }
     key.timeoutPromise.resolve(key);
@@ -111,6 +111,7 @@ class DistributedKey {
   toSerializable() {
     return {
       id: this.id,
+      party: this.party?.id,
       share: !this.share ? null : this.share.toBuffer('be', 32).toString('hex'),
       publicKey: !this.publicKey ? null : this.publicKey.encode('hex', true),
       partners: [...this.partners],
@@ -132,30 +133,27 @@ class DistributedKey {
     }
   }
 
-  setPartnerShare(from, keyPartners, f, h, publicKeys, commitment) {
+  setPartnerShare(currentNodeIndex, fromIndex, keyPartners, f, h, publicKeys, commitment) {
     /**
      * Check pedersen commitment
      */
-    let p1 = tss.calcPolyPoint(process.env.SIGN_WALLET_ADDRESS, commitment)
+    let p1 = tss.calcPolyPoint(currentNodeIndex, commitment)
     let p2 = tss.pointAdd(tss.curve.g.mul(f), tss.H.mul(h));
     if(!p1.eq(p2)) {
-      throw `DistributedKey partial data verification failed from partner ${from}.`
+      throw `DistributedKey partial data verification failed from partner ${fromIndex}.`
     }
-    this.commitmentParts[from] = commitment;
+    this.commitmentParts[fromIndex] = commitment;
 
     this.partners = keyPartners;
-    this.keyParts[from] = {f:toBN(f), h: toBN(h)}
-    this.pubKeyParts[from] = publicKeys
+    this.keyParts[fromIndex] = {f:toBN(f), h: toBN(h)}
+    this.pubKeyParts[fromIndex] = publicKeys
 
     this.checkKeyFinalization()
   }
 
-  setSelfShare(f, h, publicKeys) {
-    if(!process.env.SIGN_WALLET_ADDRESS)
-      throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
-    const from = process.env.SIGN_WALLET_ADDRESS;
-    this.keyParts[from] = {f:toBN(f), h: toBN(h)}
-    this.pubKeyParts[from] = publicKeys
+  setSelfShare(selfIndex, f, h, publicKeys) {
+    this.keyParts[selfIndex] = {f:toBN(f), h: toBN(h)}
+    this.pubKeyParts[selfIndex] = publicKeys
 
     this.checkKeyFinalization()
   }
