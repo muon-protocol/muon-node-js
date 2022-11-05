@@ -704,7 +704,9 @@ class TssPlugin extends CallablePlugin {
 
     // let keyPartners = key.partners.map(w => party.partners[w]);
     const onlinePartners = party.onlinePartners;
-    let keyPartners = key.partners.map(id => onlinePartners[id]);
+    let keyPartners = key.partners.map(id => onlinePartners[id]).filter(
+      x => x && x.wallet // filter partners who are not online
+    );
     let distKeyResult = await Promise.all(
       keyPartners
       .map(({wallet, peerId, peer}) => {
