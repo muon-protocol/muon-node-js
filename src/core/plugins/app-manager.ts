@@ -282,9 +282,9 @@ export default class AppManager extends CallablePlugin {
   }
 
   getAppContext(appId: string) {
-    if(appId == '1') {
-      return this._deploymentContext;
-    }
+    // if(appId == '1') {
+    //   return this._deploymentContext;
+    // }
     return this.appContexts[appId];
   }
 
@@ -310,7 +310,7 @@ export default class AppManager extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.AppStatus)
   async __returnAppStatus(appId): Promise<AppDeploymentStatus> {
-    return this.getAppStatus(appId);
+    return await this.getAppStatus(appId);
   }
 
   @remoteMethod(RemoteMethods.AppDeploymentInquiry)

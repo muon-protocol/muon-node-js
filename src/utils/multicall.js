@@ -1,10 +1,14 @@
 const { Multicall } = require('ethereum-multicall')
 const { getWeb3 } = require('./eth')
 
-async function multiCall(chainId, contractCallContext, tryAggregate = false) {
+async function multiCall(chainId, contractCallContext, tryAggregate = false, multicallCustomContractAddress) {
   try {
     const web3 = await getWeb3(chainId)
-    const multicall = new Multicall({ web3Instance: web3, tryAggregate })
+    const multicall = new Multicall({
+      ...(!!multicallCustomContractAddress ? {multicallCustomContractAddress} : {}),
+      web3Instance: web3,
+      tryAggregate
+    })
     let { results } = await multicall.call(contractCallContext)
     results = contractCallContext.map((item) => ({
       reference: item.reference,

@@ -104,15 +104,19 @@ class TssPlugin extends CallablePlugin {
 
   onNodeAdd(nodeInfo: MuonNodeInfo) {
     console.log(`Core.TssPlugin.onNodeAdd`, nodeInfo)
-    if(this.tssParty) {
-    }
+    Object.keys(this.parties).forEach(partyId => {
+      this.parties[partyId].addPartner(nodeInfo);
+      if(nodeInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
+        this.findPeerInfo(nodeInfo.peerId);
+    })
   }
 
   onNodeEdit(nodeInfo: MuonNodeInfo) {
     console.log(`Core.TssPlugin.onNodeEdit`, nodeInfo)
     Object.keys(this.parties).forEach(partyId => {
-        this.parties[partyId].addPartner(nodeInfo);
-      this.findPeerInfo(nodeInfo.peerId);
+      this.parties[partyId].addPartner(nodeInfo);
+      if(nodeInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
+        this.findPeerInfo(nodeInfo.peerId);
     })
   }
 
@@ -675,8 +679,7 @@ class TssPlugin extends CallablePlugin {
             RemoteMethods.createKey,
             {
               party: party.id,
-              key: key.id,
-              partners: partners.map(({wallet}) => wallet)
+              key: key.id
             },
             {taskId, timeout: 15000}
           ).catch(e => {
