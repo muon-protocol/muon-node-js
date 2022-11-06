@@ -497,40 +497,44 @@ class TssPlugin extends CallablePlugin {
   }
 
   async tryToCreateTssKey() {
-    try {
-      let key;
-      do {
-        key = await this.keyGen(this.tssParty)
-      } while (tssModule.HALF_N.lt(key.getTotalPubKey().x));
+    while (!this.isReady) {
+      try {
+        let key;
+        do {
+          key = await this.keyGen(this.tssParty)
+        } while (tssModule.HALF_N.lt(key.getTotalPubKey().x));
 
-      let keyPartners = key.partners.map(id => this.tssParty!.partners[id])
-      let callResult = await Promise.all(keyPartners.map(({wallet, peer}) => {
-        if (wallet === process.env.SIGN_WALLET_ADDRESS)
-          return Promise.resolve(true);
-        ;
+        let keyPartners = key.partners.map(id => this.tssParty!.partners[id])
+        let callResult = await Promise.all(keyPartners.map(({wallet, peer}) => {
+          if (wallet === process.env.SIGN_WALLET_ADDRESS)
+            return Promise.resolve(true);
+          ;
 
-        return this.remoteCall(
-          peer,
-          RemoteMethods.storeTssKey,
-          {
-            party: this.tssParty!.id,
-            key: key.id,
-          },
-          {taskId: `keygen-${key.id}`}
-        ).catch(() => false);
-      }))
-      // console.log(`key save broadcast count: ${key.partners.length}`, callResult);
-      this.saveTssConfig(this.tssParty, key)
+          return this.remoteCall(
+            peer,
+            RemoteMethods.storeTssKey,
+            {
+              party: this.tssParty!.id,
+              key: key.id,
+            },
+            {taskId: `keygen-${key.id}`}
+          ).catch(()=>false);
+        }))
+        // console.log(`key save broadcast count: ${key.partners.length}`, callResult);
+        if (callResult.filter(r => r === true).length < this.TSS_THRESHOLD)
+          throw `Tss creation failed.`
+        this.saveTssConfig(this.tssParty, key)
 
-      keysCache.set(key.id, key, 0);
-      this.tssKey = key;
-      this.isReady = true;
-      CoreIpc.fireEvent({type: "tss-key:generate", data: key.toSerializable()});
-      console.log('tss ready.')
+        keysCache.set(key.id, key, 0);
+        this.tssKey = key;
+        this.isReady = true;
+        CoreIpc.fireEvent({type: "tss-key:generate", data: key.toSerializable()});
+        console.log('tss ready.')
 
-      return key;
-    } catch (e) {
-      console.error('TssPlugin.tryToCreateTssKey', e, e.stack);
+        return key;
+      } catch (e) {
+        console.error('TssPlugin.tryToCreateTssKey', e, e.stack);
+      }
     }
   }
 
@@ -704,9 +708,7 @@ class TssPlugin extends CallablePlugin {
 
     // let keyPartners = key.partners.map(w => party.partners[w]);
     const onlinePartners = party.onlinePartners;
-    let keyPartners = key.partners.map(id => onlinePartners[id]).filter(
-      x => x && x.wallet // filter partners who are not online
-    );
+    let keyPartners = key.partners.map(id => onlinePartners[id]);
     let distKeyResult = await Promise.all(
       keyPartners
       .map(({wallet, peerId, peer}) => {
