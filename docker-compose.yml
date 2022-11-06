@@ -19,6 +19,7 @@ services:
   muon_mongo:
     container_name: mongo
     image: mongo
+    command: --replSet rs01 && sleep 10 && mongosh --eval "rs.initiate()"
 #    ports:
 #      - '27017:27017'
   muon_redis:
