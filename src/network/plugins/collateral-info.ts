@@ -173,7 +173,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           id: BigInt(item[0].hex).toString(),
           wallet: item[1],
           peerId: item[3],
-        })).slice(0, 4)
+        }))
     }
   }
 
