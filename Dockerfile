@@ -15,13 +15,9 @@ RUN npm install
 COPY . .
 #
 ## generate nodes env variables
-ARG INFURA_PROJECT_ID
-ENV INFURA_PROJECT_ID=${INFURA_PROJECT_ID}
-ENV MONGO_HOST="muon_mongo"
-ENV REDIS_HOST="muon_redis"
 ENV DOCKER_MODE=1
-RUN node devnet-generate-envs.js -n=4 -p=8080
+RUN node testnet-generate-env.js
 
 EXPOSE 8080
 
-CMD [ "node", "devnet-run.js", "-n=4" ]
+CMD [ "npm", "start" ]

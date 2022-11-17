@@ -1,4 +1,5 @@
 import CallablePlugin from './callable-plugin'
+import { createClient, RedisClient } from 'redis'
 const Request = require('../../../common/db-models/Request')
 const AppContext = require("../../../common/db-models/AppContext")
 const AppTssConfig = require("../../../common/db-models/AppTssConfig")
@@ -10,7 +11,7 @@ const tss = require('../../../utils/tss');
 const {utils: {toBN}} = require('web3')
 const { omit } = require('lodash')
 import AppRequestManager from './app-request-manager'
-import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators'
+import {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} from './app-decorators'
 import MemoryPlugin, {MemWrite, MemWriteOptions} from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 const Web3 = require('web3')
@@ -74,15 +75,38 @@ class BaseAppPlugin extends CallablePlugin {
   /** initialize when loading */
   isBuiltInApp: boolean
 
+  private broadcastPubSubRedis: RedisClient
+
   constructor(muon, configs) {
     super(muon, configs);
 
+    if(!!process.env.BROADCAST_PUB_SUB_REDIS){
+      this.broadcastPubSubRedis = createClient({
+        url: process.env.BROADCAST_PUB_SUB_REDIS
+      });
+    }
     /**
      * This is abstract class, so "new BaseAppPlugin()" is not allowed
      */
     // if (new.target === BaseAppPlugin) {
     //   throw new TypeError("Cannot construct abstract BaseAppPlugin instances directly");
     // }
+  }
+
+  @broadcastHandler
+  async onBroadcastReceived(data) {
+    try {
+      if (data && data.type === 'request_signed' && 
+        !!process.env.BROADCAST_PUB_SUB_REDIS) {
+        // console.log("Publishing request_signed");
+        this.broadcastPubSubRedis.publish(
+          process.env.BROADCAST_PUB_SUB_CHANNEL,
+          JSON.stringify(data)
+        );
+      }
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   isV3(){
@@ -348,6 +372,13 @@ class BaseAppPlugin extends CallablePlugin {
         }
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
+
+        // console.log('broadcast signed request');
+        this.broadcast({
+          type: 'request_signed',
+          peerId: process.env.PEER_ID,
+          requestData
+        })
       }
 
       return requestData
