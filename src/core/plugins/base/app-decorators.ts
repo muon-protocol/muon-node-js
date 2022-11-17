@@ -1,3 +1,5 @@
+import {RemoteMethodOptions} from '../../../common/types'
+
 function classNames(target): string[] {
   let names: string[] = []
   let tmp = target
@@ -8,7 +10,7 @@ function classNames(target): string[] {
   return names;
 }
 
-export function remoteMethod (title, options={}) {
+export function remoteMethod (title, options: RemoteMethodOptions={}) {
   return function (target, property, descriptor) {
     if(!target.__remoteMethods)
       target.__remoteMethods = []
@@ -93,7 +95,16 @@ export function remoteApp (constructor): any {
         for (let i = 0; i < constructor.prototype.__remoteMethods.length; i++) {
           let item = constructor.prototype.__remoteMethods[i];
           // console.log('########## registering remote method', item, this.remoteMethodEndpoint(item.title))
-          this.registerRemoteMethod(item.title, this[item.property].bind(this))
+          this.registerRemoteMethod(item.title, this[item.property].bind(this), {
+            /** default options */
+            allowShieldNode: false,
+            /** override options */
+            ...item.options,
+            /** other props */
+            method: item.title,
+            appName: this.APP_NAME,
+            appId: this.APP_ID,
+          })
         }
       }
 

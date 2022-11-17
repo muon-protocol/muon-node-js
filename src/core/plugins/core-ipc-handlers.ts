@@ -3,6 +3,7 @@ import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
 import System from "./system";
 import AppManager from "./app-manager";
 import GatewayInterface from "./gateway-Interface";
+import BaseAppPlugin from "./base/base-app-plugin";
 const {timeout} = require('../../utils/helpers')
 
 export const IpcMethods = {
@@ -13,6 +14,8 @@ export const IpcMethods = {
   GetAppContext: 'get-app-context',
   QueryAppContext: 'query-app-context',
   IsDeploymentExcerpt: 'is-deployment-excerpt',
+  ShieldConfirmedRequest: 'shield-confirmed-request',
+  EnsureAppTssKeyExist: 'ensure-app-tss-key-exist',
 } as const;
 type IpcKeys = keyof typeof IpcMethods;
 export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
@@ -92,6 +95,23 @@ class CoreIpcHandlers extends CallablePlugin {
   async __isDeploymentExcerpt(data: {appName: string, method: string}) {
     const gp: GatewayInterface = this.muon.getPlugin('gateway-interface')
     return gp.getActualHandlerMethod(data.appName, data.method) !== 'request'
+  }
+
+  @ipcMethod(IpcMethods.ShieldConfirmedRequest)
+  async __shieldConfirmedRequest(request) {
+    const app: BaseAppPlugin = this.muon.getAppById(request.appId)
+    if(!app)
+      throw `CoreIpcHandler.__shieldConfirmedRequest Error: app not found ${request.appId}`
+    return await app.shieldConfirmedRequest(request)
+  }
+
+  @ipcMethod(IpcMethods.EnsureAppTssKeyExist)
+  async __ensureAppTssKeyExist(appId: string) {
+    console.log(`CoreIpcHandler.__ensureAppTssKeyExist`, {appId})
+    if(this.appManager.appHasTssKey(appId))
+      return true;
+    const tssKey = this.appManager.queryAndLoadAppTssKey(appId);
+    return !!tssKey;
   }
 }
 

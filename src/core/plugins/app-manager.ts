@@ -5,6 +5,7 @@ import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
 import TssPlugin from "./tss-plugin";
 import BaseAppPlugin from "./base/base-app-plugin";
 import CollateralInfoPlugin from "./collateral-info";
+const TssModule = require('../../utils/tss');
 const AppContext = require("../../common/db-models/AppContext")
 const AppTssConfig = require("../../common/db-models/AppTssConfig")
 
@@ -15,6 +16,7 @@ const RemoteMethods = {
   AppStatus: "app-status",
   AppDeploymentInquiry: "app-deployment-inquiry",
   AppDeploymentInfo: "app-deployment-info",
+  GetAppTss: "get-app-tss",
 }
 
 @remoteApp
@@ -161,7 +163,7 @@ export default class AppManager extends CallablePlugin {
   async queryAndLoadAppContext(appId) {
     /** cache for 5 minutes */
     if(this.appQueryResult[appId]){
-      if(Date.now() - this.appQueryResult[appId].time < 5*60*60*1000)
+      if(Date.now() - this.appQueryResult[appId].time < 5*60*1000)
         return this.appQueryResult[appId].result;
     }
     /** refresh result */
@@ -227,6 +229,90 @@ export default class AppManager extends CallablePlugin {
       result: context || null
     }
     return context
+  }
+
+  tssKeyQueryResult = {}
+  async queryAndLoadAppTssKey(appId) {
+    if(!this.appIsDeployed(appId))
+      return null;
+    /** cache for 5 minutes */
+    if(this.tssKeyQueryResult[appId]){
+      if(Date.now() - this.tssKeyQueryResult[appId].time < 5*60*1000)
+        return this.tssKeyQueryResult[appId].result;
+    }
+    let appContext = this.appContexts[appId];
+    let partnersId = appContext.party.partners;
+
+    /** refresh result */
+    const remoteNodes: MuonNodeInfo[] = partnersId
+        .map(id => this.collateralPlugin.getNodeInfo(id))
+        .filter(n => (n.isOnline && n.wallet !== process.env.SIGN_WALLET_ADDRESS))
+
+    let callResult = await Promise.all(remoteNodes.map(node => {
+      return this.remoteCall(
+        node.peerId,
+        RemoteMethods.GetAppTss,
+        appId,
+        {timeout: 15000}
+      )
+        .catch(e => {
+          if(process.env.VERBOSE)
+            console.error(`core.AppManager.queryAndLoadAppTssKey [GetAppTss] Error`, e);
+          return "error"
+        })
+    }));
+    const threshold = this.tssPlugin.TSS_THRESHOLD;
+    const trueCallResult = callResult.filter(r => !!r)
+    if(trueCallResult.length < threshold) {
+      this.tssKeyQueryResult[appId] = {
+        time: Date.now(),
+        result: null
+      }
+      return null;
+    }
+
+    const hashCounts = {}
+    trueCallResult.forEach(r => {
+      let hash = `${r.version}.${r.publicKey}`
+      if(hashCounts[hash] === undefined)
+        hashCounts[hash] = 1
+      else
+        hashCounts[hash] ++;
+    })
+    let maxHash = ''
+    Object.keys(hashCounts).forEach(hash => {
+      if(!maxHash)
+        maxHash = hash
+      else if(hashCounts[hash] > hashCounts[maxHash])
+        maxHash = hash
+    })
+    if(hashCounts[maxHash] < threshold){
+      this.tssKeyQueryResult[appId] = {
+        time: Date.now(),
+        result: null
+      }
+      return null;
+    }
+
+    let [version, publicKeyEncoded] = maxHash.split('.');
+
+    const publicKey = TssModule.keyFromPublic(publicKeyEncoded.replace("0x", ""), "hex")
+    const result = {
+      appId,
+      version: parseInt(version),
+      publicKey: {
+        address: TssModule.pub2addr(publicKey),
+        encoded: publicKeyEncoded,
+        x: '0x' + publicKey.getX().toBuffer('be', 32).toString('hex'),
+        yParity: publicKey.getY().isEven() ? 0 : 1
+      }
+    }
+    this.tssKeyQueryResult[appId] = {
+      time: Date.now(),
+      result: result
+    }
+
+    return result;
   }
 
   async onAppTssConfigChange(change) {
@@ -321,5 +407,16 @@ export default class AppManager extends CallablePlugin {
   @remoteMethod(RemoteMethods.AppDeploymentInfo)
   async __appDeploymentData(appId, callerInfo) {
     return this.getAppContext(appId)
+  }
+
+  @remoteMethod(RemoteMethods.GetAppTss)
+  async __getAppTss(appId, callerInfo) {
+    const tssKey = this.getAppTssKey(appId)
+    if(!tssKey)
+      return null;
+    return {
+      version: tssKey.version,
+      publicKey: tssKey.publicKey.encoded,
+    }
   }
 }

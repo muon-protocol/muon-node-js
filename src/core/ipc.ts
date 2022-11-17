@@ -78,6 +78,14 @@ async function isDeploymentExcerpt(appName, method) {
   return await call(IpcMethods.IsDeploymentExcerpt, {appName, method})
 }
 
+async function shieldConfirmedRequest(request) {
+  return await call(IpcMethods.ShieldConfirmedRequest, request);
+}
+
+async function ensureAppTssKeyExist(appId) {
+  return await call(IpcMethods.EnsureAppTssKeyExist, appId);
+}
+
 export {
   call,
   broadcast,
@@ -89,5 +97,7 @@ export {
   getAppContext,
   queryAppContext,
   isDeploymentExcerpt,
+  shieldConfirmedRequest,
+  ensureAppTssKeyExist,
   GLOBAL_EVENT_CHANNEL,
 }

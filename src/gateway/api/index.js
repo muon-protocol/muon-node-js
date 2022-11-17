@@ -3,6 +3,7 @@ const RequestLog = require('../../common/db-models/RequestLog')
 const {QueueProducer} = require('../../common/message-bus')
 let requestQueue = new QueueProducer(`gateway-requests`);
 let {parseBool} = require('../../utils/helpers')
+let soliditySha3 = require('../../utils/soliditySha3')
 const CoreIpc = require('../../core/ipc')
 const NetworkIpc = require('../../network/ipc')
 
@@ -53,7 +54,16 @@ async function callProperNode(requestData) {
     return await requestQueue.send(requestData)
   } else {
     const randomIndex = Math.floor(Math.random() * partners.length);
-    return await NetworkIpc.forwardRequest(partners[randomIndex], requestData)
+    let request = await NetworkIpc.forwardRequest(partners[randomIndex], requestData)
+    if(requestData.gwSign){
+      const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
+      const requestHash = soliditySha3(request.data.signParams)
+      if(shieldHash !== requestHash)
+        throw `Shield result mismatch.`
+      request.gwAddress = process.env.SIGN_WALLET_ADDRESS;
+      request.gwSignature = "";
+    }
+    return request
   }
 }
 

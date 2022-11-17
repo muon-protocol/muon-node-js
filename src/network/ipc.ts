@@ -61,6 +61,10 @@ function getCurrentNodeInfo() {
   return call(IpcMethods.GetCurrentNodeInfo);
 }
 
+function allowRemoteCallByShieldNode(method, options) {
+  return call(IpcMethods.AllowRemoteCallByShieldNode, {method, options})
+}
+
 export {
   call,
   getCollateralInfo,
@@ -74,4 +78,5 @@ export {
   findContent,
   forwardRequest,
   getCurrentNodeInfo,
+  allowRemoteCallByShieldNode,
 }

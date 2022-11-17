@@ -20,4 +20,14 @@ export default class RemoteCall extends BasePlugin {
   call(peer, method, params, options={}){
     return NetworkIpc.forwardRemoteCall(peer, method, params, options)
   }
+
+  on(method, handler, options) {
+    // console.log(`core.RemoteCall registering call handler`, {method, options})
+    if(options.allowShieldNode) {
+      NetworkIpc.allowRemoteCallByShieldNode(method, options).catch(e => {
+        console.log(`network.RemoteCall.on: IPC call failed`, e)
+      })
+    }
+    super.on(method, handler)
+  }
 }

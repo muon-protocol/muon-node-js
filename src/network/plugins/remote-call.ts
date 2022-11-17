@@ -3,6 +3,7 @@ const pipe = require('it-pipe')
 const {newCallId} = require('../../utils/helpers')
 import TimeoutPromise from '../../common/timeout-promise'
 import CollateralInfoPlugin from "./collateral-info";
+import {RemoteMethodOptions} from "../../common/types"
 const NodeCache = require('node-cache');
 
 const callCache = new NodeCache({
@@ -37,6 +38,8 @@ export type RemoteCallOptions = {
 }
 
 class RemoteCall extends BaseNetworkPlugin {
+
+  private shieldNodeAllowedMethods = {}
 
   async onStart() {
     this.network.libp2p.handle(PROTOCOL, this.handler.bind(this))
@@ -73,6 +76,7 @@ class RemoteCall extends BaseNetworkPlugin {
       let message = signAndMessage.toString()
       let nodeInfo = collateralPlugin.getNodeInfo(peerId._idB58String)
       if(!nodeInfo){
+        /** TODO: check shield node allowed methods */
         throw {message: `Unrecognized request owner`}
       }
 
@@ -231,6 +235,18 @@ class RemoteCall extends BaseNetworkPlugin {
       resultPromise
     });
     return resultPromise.promise;
+  }
+
+  on(method, handler, options: RemoteMethodOptions) {
+    // console.log(`network.RemoteCall.on registering call handler`, {method, options})
+    if(options.allowShieldNode)
+      this.shieldNodeAllowedMethods[method] = options;
+    super.on(method, handler)
+  }
+
+  allowCallByShieldNode(method, options) {
+    // console.log(`network.RemoteCall.allowCallByShieldNode registering call handler`, {method, options})
+    this.shieldNodeAllowedMethods[method] = options;
   }
 }
 

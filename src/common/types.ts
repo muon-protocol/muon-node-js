@@ -1,6 +1,10 @@
 export type RemoteCallOptions = {
 }
 
+export type RemoteMethodOptions = {
+    allowShieldNode?: boolean,
+}
+
 export type Constructor<T> = new (...args: any[]) => T;
 
 export type IpcCallOptions = {

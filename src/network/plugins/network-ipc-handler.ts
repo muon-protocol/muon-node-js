@@ -6,6 +6,7 @@ import QueueProducer from "../../common/message-bus/queue-producer";
 let requestQueue = new QueueProducer(`gateway-requests`);
 const all = require('it-all')
 import _ from 'lodash';
+import RemoteCall from "./remote-call";
 
 const {timeout} = require('../../utils/helpers')
 const {loadCID} = require('../../utils/cid')
@@ -34,7 +35,8 @@ export const IpcMethods = {
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
   ForwardGatewayRequest: "forward-gateway-request",
-  GetCurrentNodeInfo: "get-current-node-info"
+  GetCurrentNodeInfo: "get-current-node-info",
+  AllowRemoteCallByShieldNode: "allow-remote-call-by-shield-node",
 } as const;
 
 export const RemoteMethods = {
@@ -62,7 +64,7 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.network.getPlugin('collateral');
   }
 
-  get remoteCallPlugin() {
+  get remoteCallPlugin(): RemoteCall {
     return this.network.getPlugin('remote-call');
   }
 
@@ -212,6 +214,12 @@ class NetworkIpcHandler extends CallablePlugin {
   async __onGetCurrentNodeInfo() {
     await this.collateralPlugin.waitToLoad();
     return this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
+  }
+
+  @ipcMethod(IpcMethods.AllowRemoteCallByShieldNode)
+  async __allowRemoteCallByShieldNode(data: {method: string, options: any}) {
+    this.remoteCallPlugin.allowCallByShieldNode(data.method, data.options)
+    return true
   }
 
   /** ==================== remote methods ===========================*/
