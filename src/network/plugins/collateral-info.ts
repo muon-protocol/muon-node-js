@@ -2,7 +2,6 @@ import BaseNetworkPlugin from './base/base-network-plugin'
 import TimeoutPromise from '../../common/timeout-promise'
 const eth = require('../../utils/eth')
 const {stackTrace, timeout} = require('../../utils/helpers')
-const { multiCall } = require('../../utils/multicall')
 import NodeManagerAbi from '../../data/NodeManager-ABI.json'
 import {MuonNodeInfo} from "../../common/types";
 import * as CoreIpc from '../../core/ipc'
@@ -148,29 +147,17 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   async loadNetworkInfo(nodeManagerInfo){
     const {address, network} = nodeManagerInfo;
 
-    const contractCallContext = {
-      reference: "get-muon-nodes-info",
-      contractAddress: address,
-      abi: NodeManagerAbi,
-      calls: [{
-        reference: "get-last-update-time",
-        methodName: 'lastUpdateTime()',
-        methodParameters: []
-      },{
-        reference: "get-nodes-list",
-        methodName: 'getAllNodes',
-        methodParameters: []
-      }]
-    }
-    let rawResult = await multiCall(network, [contractCallContext])
-    rawResult = rawResult[0].callsReturnContext;
+    let rawResult = await Promise.all([
+      eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network),
+      eth.call(address, 'getAllNodes', [], NodeManagerAbi, network),
+    ])
 
     return {
-      lastUpdateTime: parseInt(rawResult[0].returnValues[0]),
-      allNodes: rawResult[1].returnValues
+      lastUpdateTime: parseInt(rawResult[0]),
+      allNodes: rawResult[1]
         .filter(item => item[4])
         .map(item => ({
-          id: BigInt(item[0].hex).toString(),
+          id: BigInt(item[0]).toString(),
           wallet: item[1],
           peerId: item[3],
         }))
