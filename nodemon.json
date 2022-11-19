@@ -3,6 +3,7 @@
   "env": {
     "BABEL_DISABLE_CACHE": 1
   },
+  "ext": "js,ts,json",
   "ignore": [
     "*.test.js",
     "src/cmd/**/*.*",

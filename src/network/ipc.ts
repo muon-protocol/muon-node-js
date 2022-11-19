@@ -65,6 +65,10 @@ function allowRemoteCallByShieldNode(method, options) {
   return call(IpcMethods.AllowRemoteCallByShieldNode, {method, options})
 }
 
+function isCurrentNodeInNetwork() {
+  return call(IpcMethods.IsCurrentNodeInNetwork)
+}
+
 export {
   call,
   getCollateralInfo,
@@ -79,4 +83,5 @@ export {
   forwardRequest,
   getCurrentNodeInfo,
   allowRemoteCallByShieldNode,
+  isCurrentNodeInNetwork,
 }

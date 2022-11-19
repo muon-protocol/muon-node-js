@@ -96,7 +96,7 @@ class BaseAppPlugin extends CallablePlugin {
   @broadcastHandler
   async onBroadcastReceived(data) {
     try {
-      if (data && data.type === 'request_signed' && 
+      if (data && data.type === 'request_signed' &&
         !!process.env.BROADCAST_PUB_SUB_REDIS) {
         // console.log("Publishing request_signed");
         this.broadcastPubSubRedis.publish(
@@ -913,12 +913,25 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async preProcessRemoteRequest(request) {
+    const {method, data: {params={}}} = request
     /**
      * Check request timestamp
      */
     if(getTimestamp() - request.data.timestamp > 40) {
       throw "Request timestamp expired to sign."
     }
+
+    /**
+     * validate params schema
+     */
+    if(this.METHOD_PARAMS_SCHEMA){
+      if(this.METHOD_PARAMS_SCHEMA[method]){
+        if(!ajv.validate(this.APP_METHOD_PARAMS_SCHEMA[method], params)){
+          throw ajv.errors.map(e => e.message).join("\n");
+        }
+      }
+    }
+
     /**
      * validate request
      */

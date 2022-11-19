@@ -37,6 +37,7 @@ export const IpcMethods = {
   ForwardGatewayRequest: "forward-gateway-request",
   GetCurrentNodeInfo: "get-current-node-info",
   AllowRemoteCallByShieldNode: "allow-remote-call-by-shield-node",
+  IsCurrentNodeInNetwork: "is-current-node-in-network",
 } as const;
 
 export const RemoteMethods = {
@@ -220,6 +221,13 @@ class NetworkIpcHandler extends CallablePlugin {
   async __allowRemoteCallByShieldNode(data: {method: string, options: any}) {
     this.remoteCallPlugin.allowCallByShieldNode(data.method, data.options)
     return true
+  }
+
+  @ipcMethod(IpcMethods.IsCurrentNodeInNetwork)
+  async __isCurrentNodeInNetwork() {
+    await this.collateralPlugin.waitToLoad();
+    const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+    return !!currentNodeInfo;
   }
 
   /** ==================== remote methods ===========================*/

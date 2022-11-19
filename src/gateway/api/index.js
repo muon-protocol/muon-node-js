@@ -6,6 +6,16 @@ let {parseBool} = require('../../utils/helpers')
 let soliditySha3 = require('../../utils/soliditySha3')
 const CoreIpc = require('../../core/ipc')
 const NetworkIpc = require('../../network/ipc')
+const axios = require('axios').default
+const crypto = require('../../utils/crypto')
+
+const SHIELD_FORWARD_URL = process.env.SHIELD_FORWARD_URL
+const appIsShielded = (process.env.SHIELDED_APPS || "")
+  .split('|')
+  .reduce((acc, curr) => {
+    acc[curr] = true
+    return acc
+  }, {});
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)
@@ -34,6 +44,20 @@ function extraLogs(req, result) {
   return logs;
 }
 
+let cachedNetworkCheck = {
+  time: 0,
+  result: undefined
+};
+async function isCurrentNodeInNetwork() {
+  /** check every 5 minute */
+  if(Date.now() - cachedNetworkCheck.time > 5*60*1000) {
+    cachedNetworkCheck.time = Date.now()
+    cachedNetworkCheck.result = await NetworkIpc.isCurrentNodeInNetwork()
+  }
+
+  return cachedNetworkCheck.result;
+}
+
 async function callProperNode(requestData) {
   if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
     return await requestQueue.send(requestData)
@@ -55,16 +79,25 @@ async function callProperNode(requestData) {
   } else {
     const randomIndex = Math.floor(Math.random() * partners.length);
     let request = await NetworkIpc.forwardRequest(partners[randomIndex], requestData)
-    if(requestData.gwSign){
-      const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
-      const requestHash = soliditySha3(request.data.signParams)
-      if(shieldHash !== requestHash)
-        throw `Shield result mismatch.`
-      request.gwAddress = process.env.SIGN_WALLET_ADDRESS;
-      request.gwSignature = "";
-    }
+    // if(requestData.gwSign){
+    //   const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
+    //   const requestHash = soliditySha3(request.data.signParams)
+    //   if(shieldHash !== requestHash)
+    //     throw `Shield result mismatch.`
+    //   request.gwAddress = process.env.SIGN_WALLET_ADDRESS;
+    //   request.gwSignature = "";
+    // }
     return request
   }
+}
+
+async function shieldConfirmedResult(requestData, request) {
+  const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
+  const requestHash = soliditySha3(request.data.signParams)
+  if(shieldHash !== requestHash)
+    throw `Shield result mismatch.`
+  // request.gwAddress = process.env.SIGN_WALLET_ADDRESS;
+  request.shieldSignature = crypto.sign(shieldHash);
 }
 
 router.use('/', async (req, res, next) => {
@@ -80,51 +113,79 @@ router.use('/', async (req, res, next) => {
 
   gwSign = parseBool(gwSign);
   const requestData = {app, method, params, nSign, mode, gwSign}
-  callProperNode(requestData)
-    .then(result => {
-      storeRequestLog({
-        app,
-        method,
-        params,
-        mode,
-        gwSign,
-        success: true,
-        confirmed: result?.confirmed,
-        errorMessage: result?.confirmed ? "" : "",
-        ...extraLogs(req, result),
-      });
-      res.json({success: true, result})
-    })
-    .catch(async error => {
-      if(typeof error === "string")
-        error = {message: error}
-      let appId
-      try {
-        appId = await CoreIpc.getAppId(app);
-      } catch (e) {
-        console.log("gateway.api", e)
-      }
-      storeRequestLog({
-        app,
-        method,
-        params,
-        mode,
-        gwSign,
-        success: false,
-        confirmed: false,
-        errorMessage: error.message || error.error,
-        ...extraLogs(req),
-      });
-      const {message, ...otherProps} = error;
-      res.json({
+
+  if(!await isCurrentNodeInNetwork()){
+    if(!SHIELD_FORWARD_URL) {
+      const appId = await CoreIpc.getAppId(app);
+      return res.json({
         success: false,
         appId,
         error: {
-          message: message || `Unknown error occurred`,
-          ...otherProps
+          message: `Shield forward url (SHIELD_FORWARD_URL) not configured.`
         }
       })
-    })
+    }
+    const result = await axios.post(SHIELD_FORWARD_URL, requestData)
+      .then(({data}) => data)
+    if(result.success && appIsShielded[app]) {
+      await shieldConfirmedResult(requestData, result.result)
+    }
+    return res.json(result);
+  }
+  else {
+    callProperNode(requestData)
+      .then(async result => {
+        /** if request forwarded to other node */
+        if(result.gwAddress !== process.env.SIGN_WALLET_ADDRESS) {
+          if(appIsShielded[app]) {
+            await shieldConfirmedResult(requestData, result)
+          }
+        }
+
+        storeRequestLog({
+          app,
+          method,
+          params,
+          mode,
+          gwSign,
+          success: true,
+          confirmed: result?.confirmed,
+          errorMessage: result?.confirmed ? "" : "",
+          ...extraLogs(req, result),
+        });
+        res.json({success: true, result})
+      })
+      .catch(async error => {
+        if (typeof error === "string")
+          error = {message: error}
+        let appId
+        try {
+          appId = await CoreIpc.getAppId(app);
+        } catch (e) {
+          console.log("gateway.api", e)
+        }
+        storeRequestLog({
+          app,
+          method,
+          params,
+          mode,
+          gwSign,
+          success: false,
+          confirmed: false,
+          errorMessage: error.message || error.error,
+          ...extraLogs(req),
+        });
+        const {message, ...otherProps} = error;
+        res.json({
+          success: false,
+          appId,
+          error: {
+            message: message || `Unknown error occurred`,
+            ...otherProps
+          }
+        })
+      })
+  }
 })
 
 module.exports = router

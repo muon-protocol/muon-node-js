@@ -212,6 +212,13 @@ class TssPlugin extends CallablePlugin {
     }
     let {groupInfo: {isValid, group, sharedKey, partners}, networkInfo} = this.collateralPlugin;
 
+    const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+
+    /** current node not in the network */
+    if(!currentNodeInfo) {
+      return;
+    }
+
     //TODO: handle {isValid: false};
 
     let party = Party.load({

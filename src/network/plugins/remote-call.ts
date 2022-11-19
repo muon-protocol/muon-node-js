@@ -70,10 +70,10 @@ class RemoteCall extends BaseNetworkPlugin {
       })
   }
 
-  async handleIncomingMessage(signAndMessage, stream, peerId){
+  async handleIncomingMessage(message, stream, peerId){
     let collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
     try {
-      let message = signAndMessage.toString()
+      message = message.toString()
       let nodeInfo = collateralPlugin.getNodeInfo(peerId._idB58String)
       if(!nodeInfo){
         /** TODO: check shield node allowed methods */
@@ -90,7 +90,7 @@ class RemoteCall extends BaseNetworkPlugin {
         // TODO: what to do?
       }
     }catch (e) {
-      console.error("network.RemoteCall.handleIncomingMessage", e, peerId._idB58String, signAndMessage);
+      console.error("network.RemoteCall.handleIncomingMessage", e, peerId._idB58String, message);
     }
   }
 
