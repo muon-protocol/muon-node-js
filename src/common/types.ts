@@ -1,3 +1,5 @@
+import {GlobalBroadcastChannels} from "./contantes";
+
 export type RemoteCallOptions = {
 }
 
@@ -42,5 +44,8 @@ export type AppDeploymentStatus = {
     /** hash of context */
     contextHash?: string,
 };
+
+type GlobalBroadcastChannelsKeys = keyof typeof GlobalBroadcastChannels;
+export type GlobalBroadcastChannel = typeof GlobalBroadcastChannels[GlobalBroadcastChannelsKeys];
 
 export type Override<T1, T2> = Omit<T1, keyof T2> & T2;

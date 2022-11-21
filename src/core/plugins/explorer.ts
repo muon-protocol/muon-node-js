@@ -1,11 +1,13 @@
 import CallablePlugin from './base/callable-plugin'
 const Content = require('../../common/db-models/Content')
-import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
+import {remoteApp, remoteMethod, gatewayMethod, globalBroadcastHandler, broadcastHandler} from './base/app-decorators'
 import TssPlugin from "./tss-plugin";
 import {MuonNodeInfo, Override} from "../../common/types";
 import HealthCheck from "./health-check";
 import {GatewayCallData} from "../../gateway/types";
 import AppManager from "./app-manager";
+import * as NetworkIpc from '../../network/ipc'
+import {GlobalBroadcastChannels} from "../../common/contantes";
 const {timeout} = require('../../utils/helpers')
 
 type GetTransactionData = Override<GatewayCallData, {params: { reqId: string }}>

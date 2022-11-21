@@ -30,7 +30,7 @@ function call(method: CoreIpcMethod, params: any, options: IpcCallOptions={}) {
   return callQueue.send({method, params}, options);
 }
 
-function broadcast(data: any, options: IpcCallOptions) {
+function broadcast(data: any, options: IpcCallOptions={}) {
   return broadcastQueue.send(data, options)
 }
 

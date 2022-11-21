@@ -1,4 +1,5 @@
-import {RemoteMethodOptions} from '../../../common/types'
+import {GlobalBroadcastChannel, RemoteMethodOptions} from '../../../common/types'
+import CoreBroadcastPlugin from "../../../core/plugins/broadcast";
 
 function classNames(target): string[] {
   let names: string[] = []
@@ -54,6 +55,15 @@ export function broadcastHandler (target, property, descriptor) {
   return descriptor
 }
 
+export function globalBroadcastHandler (title: GlobalBroadcastChannel, options={}) {
+  return function (target, property, descriptor) {
+    if(!target.__globalBroadcastHandlers)
+      target.__globalBroadcastHandlers = []
+    target.__globalBroadcastHandlers.push({title, property, options})
+    return descriptor
+  }
+}
+
 /**
  * Exported methods can be call by apps.
  *
@@ -105,6 +115,15 @@ export function remoteApp (constructor): any {
             appName: this.APP_NAME,
             appId: this.APP_ID,
           })
+        }
+      }
+
+      if(constructor.prototype.__globalBroadcastHandlers) {
+        const broadcastPlugin: CoreBroadcastPlugin = this.muon.getPlugin('broadcast')
+        for (let i = 0; i < constructor.prototype.__globalBroadcastHandlers.length; i++) {
+          let item = constructor.prototype.__globalBroadcastHandlers[i];
+          await broadcastPlugin.subscribe(item.title)
+          broadcastPlugin.on(item.title, this[item.property].bind(this))
         }
       }
 

@@ -50,7 +50,7 @@ export default class BasePlugin extends Events{
   protected get BROADCAST_CHANNEL(){
     if(this.__broadcastHandlerMethod === undefined)
       return null;
-    return `${this.ConstructorName}.${this.__broadcastHandlerMethod}`
+    return `muon.core.${this.ConstructorName}.${this.__broadcastHandlerMethod}`
   }
 
   async registerBroadcastHandler(){
@@ -60,20 +60,27 @@ export default class BasePlugin extends Events{
       if(process.env.VERBOSE) {
         console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
       }
+      this.muon.getPlugin('broadcast').subscribe(this.BROADCAST_CHANNEL);
       this.muon.getPlugin('broadcast').on(broadcastChannel, this[this.__broadcastHandlerMethod].bind(this))
     }
   }
 
   broadcast(data){
     if(this.__broadcastHandlerMethod === undefined) {
-      console.log(this);
-      let superClass = Object.getPrototypeOf(this);
-      throw `${superClass.constructor.name} is not declared broadcast handler`;
+      throw `core.${this.ConstructorName} plugin is not declared broadcast handler`;
     }
     this.muon.getPlugin('broadcast')
         .broadcastToChannel(this.BROADCAST_CHANNEL, data)
         .catch(e => {
           console.log(`${this.ConstructorName}.broadcast`, e)
+        })
+  }
+
+  broadcastToChannel(channel, data){
+    this.muon.getPlugin('broadcast')
+        .broadcastToChannel(channel, data)
+        .catch(e => {
+          console.log(`${this.ConstructorName}.broadcastToChannel`, e)
         })
   }
 

@@ -12,6 +12,7 @@ import CollateralPlugin from './plugins/collateral-info';
 import IpcHandlerPlugin from './plugins/network-ipc-handler'
 import IpcPlugin from './plugins/network-ipc-plugin'
 import RemoteCallPlugin from './plugins/remote-call'
+import NetworkBroadcastPlugin from './plugins/network-broadcast'
 
 class Network extends Events {
   configs
@@ -204,6 +205,7 @@ async function start() {
     },
     plugins: {
       'collateral': [CollateralPlugin, {}],
+      'broadcast': [NetworkBroadcastPlugin, {}],
       'remote-call': [RemoteCallPlugin, {}],
       'ipc': [IpcPlugin, {}],
       'ipc-handler': [IpcHandlerPlugin, {}],

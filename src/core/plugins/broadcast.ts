@@ -15,7 +15,7 @@ export type CoreBroadcastMessage = {
   }
 }
 
-export default class BroadcastPlugin extends BasePlugin {
+export default class CoreBroadcastPlugin extends BasePlugin {
   /**
    * @type {QueueConsumer}
    */
@@ -33,12 +33,16 @@ export default class BroadcastPlugin extends BasePlugin {
     if(!channel)
       throw "broadcast channel not defined";
 
-    if(this.listenerCount(`${channel}`) > 0){
+    // if(this.listenerCount(`${channel}`) > 0){
       return await this.emit(channel, message, callerInfo);
-    }
-    else {
-      console.error({message: `core.Broadcast.onBroadcastReceived: broadcast channel "${channel}" is not handled`})
-    }
+    // }
+    // else {
+    //   console.error({message: `core.Broadcast.onBroadcastReceived: broadcast channel "${channel}" is not handled`})
+    // }
+  }
+
+  async subscribe(channel) {
+    await NetworkIpc.subscribeToBroadcastChannel(channel);
   }
 
   async broadcastToChannel(channel, message) {

@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin'
-import {remoteApp, remoteMethod, ipcMethod, broadcastHandler} from './base/app-decorators'
+import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
 import {IpcCallOptions} from "../../common/types";
 import CollateralInfoPlugin from "./collateral-info";
 import QueueProducer from "../../common/message-bus/queue-producer";
@@ -7,6 +7,7 @@ let requestQueue = new QueueProducer(`gateway-requests`);
 const all = require('it-all')
 import _ from 'lodash';
 import RemoteCall from "./remote-call";
+import NetworkBroadcastPlugin from "./network-broadcast";
 
 const {timeout} = require('../../utils/helpers')
 const {loadCID} = require('../../utils/cid')
@@ -27,7 +28,8 @@ const tasksCache = new NodeCache({
 export const IpcMethods = {
   GetOnlinePeers: "get-online-peers",
   GetCollateralInfo: "get-collateral-info",
-  BroadcastMessage: "broadcast-message",
+  SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
+  BroadcastToChannel: "broadcast-to-channel",
   ReportClusterStatus: "report-cluster-status",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
@@ -59,6 +61,10 @@ class NetworkIpcHandler extends CallablePlugin {
     this.network.once('peer:connect', async (peerId) => {
       await timeout(5000);
     })
+  }
+
+  get broadcastPlugin(): NetworkBroadcastPlugin {
+    return this.network.getPlugin('broadcast')
   }
 
   get collateralPlugin(): CollateralInfoPlugin {
@@ -93,17 +99,16 @@ class NetworkIpcHandler extends CallablePlugin {
     }
   }
 
-  @ipcMethod(IpcMethods.BroadcastMessage)
-  async __onBroadcastMessage(data) {
-    // console.log("NetworkIpcHandler.__onBroadcastMessage", data);
-    this.broadcast(data);
-    return "Ok"
+  @ipcMethod(IpcMethods.SubscribeToBroadcastChannel)
+  async __subscribeToBroadcastChannel(channel: string) {
+    await this.broadcastPlugin.subscribe(channel);
   }
 
-  @broadcastHandler
-  async onBroadcastReceived(data={}, callerInfo) {
-    // console.log('NetworkIpcHandler.onBroadcastReceived', data, callerInfo);
-    return await coreIpc.broadcast({data, callerInfo})
+  @ipcMethod(IpcMethods.BroadcastToChannel)
+  async __broadcastToChannel(data: {channel: string, message: any}) {
+    // console.log("NetworkIpcHandler.__broadcastToChannel", data);
+    this.broadcastToChannel(data.channel, data.message);
+    return "Ok"
   }
 
   assignTaskToProcess(taskId: string, pid: number) {

@@ -26,7 +26,7 @@ function getOnlinePeers(): Promise<string[]> {
 }
 
 function broadcastToChannel(channel, message) {
-  return call(IpcMethods.BroadcastMessage, {channel, message})
+  return call(IpcMethods.BroadcastToChannel, {channel, message})
 }
 
 function forwardRemoteCall(peer, method, params, options) {
@@ -69,6 +69,10 @@ function isCurrentNodeInNetwork() {
   return call(IpcMethods.IsCurrentNodeInNetwork)
 }
 
+function subscribeToBroadcastChannel(channel: string) {
+  return call(IpcMethods.SubscribeToBroadcastChannel, channel)
+}
+
 export {
   call,
   getCollateralInfo,
@@ -84,4 +88,5 @@ export {
   getCurrentNodeInfo,
   allowRemoteCallByShieldNode,
   isCurrentNodeInNetwork,
+  subscribeToBroadcastChannel,
 }

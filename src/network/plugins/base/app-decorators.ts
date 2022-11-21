@@ -1,4 +1,5 @@
-import {RemoteMethodOptions} from "../../../common/types";
+import {GlobalBroadcastChannel, RemoteMethodOptions} from "../../../common/types";
+import NetworkBroadcastPlugin from "../network-broadcast";
 
 function classNames(target): string[]{
   let names: string[] = []
@@ -45,6 +46,15 @@ export function broadcastHandler (target, property, descriptor) {
   return descriptor
 }
 
+export function globalBroadcastHandler (title: GlobalBroadcastChannel, options={}) {
+  return function (target, property, descriptor) {
+    if(!target.__globalBroadcastHandlers)
+      target.__globalBroadcastHandlers = []
+    target.__globalBroadcastHandlers.push({title, property, options})
+    return descriptor
+  }
+}
+
 export function remoteApp (constructor): any {
   if(!classNames(constructor).includes('CallablePlugin'))
     throw {message: 'RemoteApp should be CallablePlugin.'}
@@ -66,6 +76,15 @@ export function remoteApp (constructor): any {
             appName: this.APP_NAME,
             appId: this.APP_ID,
           })
+        }
+      }
+
+      if(constructor.prototype.__globalBroadcastHandlers) {
+        const broadcastPlugin: NetworkBroadcastPlugin = this.network.getPlugin('broadcast')
+        for (let i = 0; i < constructor.prototype.__globalBroadcastHandlers.length; i++) {
+          let item = constructor.prototype.__globalBroadcastHandlers[i];
+          await broadcastPlugin.subscribe(item.title)
+          broadcastPlugin.on(item.title, this[item.property].bind(this))
         }
       }
 

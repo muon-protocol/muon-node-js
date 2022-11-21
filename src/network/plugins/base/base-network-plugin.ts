@@ -1,5 +1,6 @@
 import CollateralInfoPlugin from "../collateral-info";
 import {Network} from "../../index";
+import NetworkBroadcastPlugin from "../network-broadcast";
 
 const Events = require('events-async')
 const PeerId = require('peer-id')
@@ -55,23 +56,19 @@ export default class BaseNetworkPlugin extends Events {
     return superClass.constructor.name
   }
 
+  private get __broadcastPlugin(): NetworkBroadcastPlugin {
+    return this.network.getPlugin('broadcast')
+  }
+
   get BROADCAST_CHANNEL(){
     if(this.__broadcastHandlerMethod === undefined)
       return null;
-    return `muon/network/plugin/${this.ConstructorName}/broadcast`
+    return `muon.network.${this.ConstructorName}.${this.__broadcastHandlerMethod}`
   }
 
   async registerBroadcastHandler(){
-    let broadcastChannel = this.BROADCAST_CHANNEL
-    /*eslint no-undef: "error"*/
-    if (broadcastChannel) {
-
-      if(process.env.VERBOSE) {
-        console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
-      }
-      await this.network.libp2p.pubsub.subscribe(broadcastChannel)
-      this.network.libp2p.pubsub.on(broadcastChannel, this.__onPluginBroadcastReceived.bind(this))
-    }
+    await this.__broadcastPlugin.subscribe(this.BROADCAST_CHANNEL)
+    this.__broadcastPlugin.on(this.BROADCAST_CHANNEL, this.__onPluginBroadcastReceived.bind(this))
   }
 
   broadcast(data){
@@ -80,30 +77,22 @@ export default class BaseNetworkPlugin extends Events {
       console.log(`Broadcast not available for plugin ${this.ConstructorName}`)
       return;
     }
-    let dataStr = JSON.stringify(data)
-    this.network.libp2p.pubsub.publish(broadcastChannel, uint8ArrayFromString(dataStr))
+    this.__broadcastPlugin.rawBroadcast(this.BROADCAST_CHANNEL, data)
   }
 
-  async __onPluginBroadcastReceived({data: rawData, from, ...otherItems}){
-    // console.log("BaseNetworkPlugin.__onPluginBroadcastReceived", from, rawData)
+  broadcastToChannel(channel, data) {
+    this.__broadcastPlugin.rawBroadcast(channel, data)
+  }
+
+  async __onPluginBroadcastReceived(data, callerInfo){
+    // console.log("BaseNetworkPlugin.__onPluginBroadcastReceived", {data, callerInfo})
     try{
-      let strData = uint8ArrayToString(rawData)
-      let data = JSON.parse(strData);
-      let collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
 
-      let sender = collateralPlugin.getNodeInfo(from);
-      if(!sender){
-        throw {message: `Unrecognized broadcast owner ${from}`, data: strData}
-      }
-
-      /*eslint no-undef: "error"*/
       let broadcastHandler = this[this.__broadcastHandlerMethod].bind(this);
-      if(typeof from != "string")
-        from = from.peerId._idB58String
-      await broadcastHandler(data, {wallet: sender.wallet, peerId: from});
+      await broadcastHandler(data, callerInfo);
     }
     catch (e) {
-      console.log('BasePlugin.__onPluginBroadcastReceived', e)
+      console.log(`${this.ConstructorName}.__onPluginBroadcastReceived`, e)
       throw e;
     }
   }
