@@ -125,9 +125,12 @@ router.use('/', async (req, res, next) => {
         }
       })
     }
+    if(!appIsShielded[app]) {
+      return res.json({success: false, error: {message: `The '${app}' app is neither shielded nor included in the network.`}});
+    }
     const result = await axios.post(SHIELD_FORWARD_URL, requestData)
       .then(({data}) => data)
-    if(result.success && appIsShielded[app]) {
+    if(result.success) {
       await shieldConfirmedResult(requestData, result.result)
     }
     return res.json(result);
