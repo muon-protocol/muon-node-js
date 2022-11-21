@@ -40,7 +40,7 @@ class System extends CallablePlugin {
       currentNodeInfo!,
       ...peerIds.map(peerId => {
         return this.collateralPlugin.getNodeInfo(peerId)!
-      })
+      }).filter(n => !!n)
     ]
   }
 
