@@ -92,12 +92,22 @@ class Explorer extends CallablePlugin {
     else if(!appId)
       throw `App Name/ID required`
 
+    if(appId === '0')
+      throw `App not found`;
+
     const context = this.appManager.getAppContext(appId!)
-    const tss = this.tssPlugin.getAppTssKey(appId!)
+    const tss = !context ? null : this.tssPlugin.getAppTssKey(appId!)
+
+    let statusCode = 0
+    if(!!context)
+      statusCode ++;
+    if(!!tss)
+      statusCode ++;
 
     return {
       appId,
-      appName: context.appName,
+      appName,
+      status: ["NEW","TSS_GROUP_SELECTED", "DEPLOYED"][statusCode],
       context: !context ? null : {
         isBuiltIn: context.isBuiltIn,
         version: context.version,
