@@ -106,8 +106,12 @@ class TssPlugin extends CallablePlugin {
     console.log(`Core.TssPlugin.onNodeAdd`, nodeInfo)
     Object.keys(this.parties).forEach(partyId => {
       this.parties[partyId].addPartner(nodeInfo);
-      if(nodeInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
+      if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS) {
+        this.loadTssInfo()
+      }
+      else {
         this.findPeerInfo(nodeInfo.peerId);
+      }
     })
   }
 
