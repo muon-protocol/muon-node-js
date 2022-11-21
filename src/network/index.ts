@@ -59,12 +59,12 @@ class Network extends Events {
     this.libp2p = libp2p
   }
 
-  _initializePlugin() {
+  async _initializePlugin() {
     const { plugins } = this.configs
     for (let pluginName in plugins) {
       const [plugin, configs] = plugins[pluginName]
       this._plugins[pluginName] = new plugin(this, configs);
-      this._plugins[pluginName].onInit();
+      await this._plugins[pluginName].onInit();
     }
     // console.log('plugins initialized.')
   }

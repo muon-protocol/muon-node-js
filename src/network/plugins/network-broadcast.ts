@@ -53,11 +53,12 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
       Promise.all(topicIDs.map(topicID => {
         return CoreIpc.broadcast({data: {channel: topicID, message: data}, callerInfo: senderInfo})
       }))
-        .then(()=>{});
+        .catch(e => {
+          console.log('NetworkBroadcastPlugin.__onBroadcastReceived #1', e)
+        })
     }
     catch (e) {
-      console.log('NetworkBroadcastPlugin.__onBroadcastReceived', e)
-      throw e;
+      console.log('NetworkBroadcastPlugin.__onBroadcastReceived #2', e)
     }
   }
 }

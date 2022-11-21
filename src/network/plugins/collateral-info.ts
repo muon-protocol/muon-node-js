@@ -34,9 +34,15 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
    */
   loading = new TimeoutPromise(0, "collateral loading timed out")
 
+  async onInit() {
+    let {nodeManager} = this.network.configs.net;
+    console.log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
+    await this._loadCollateralInfo();
+    console.log("Network info loaded.")
+  }
+
   async onStart(){
     super.onStart();
-    this._loadCollateralInfo();
 
     this.network.on('peer:discovery', this.onPeerDiscovery.bind(this));
     this.network.on('peer:connect', this.onPeerConnect.bind(this));
