@@ -12,6 +12,7 @@ const NetworkIpc = require('../../../network/ipc')
 import * as CoreIpc from '../../ipc'
 import {MuonNodeInfo} from "../../../common/types";
 import AppManager from "../app-manager";
+const log = require('debug')('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
 
@@ -103,7 +104,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   onNodeAdd(nodeInfo: MuonNodeInfo) {
-    console.log(`Core.TssPlugin.onNodeAdd`, nodeInfo)
+    log(`Node add %o`, nodeInfo)
     Object.keys(this.parties).forEach(partyId => {
       this.parties[partyId].addPartner(nodeInfo);
       if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS) {
@@ -116,7 +117,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   onNodeEdit(nodeInfo: MuonNodeInfo) {
-    console.log(`Core.TssPlugin.onNodeEdit`, nodeInfo)
+    console.log(`Node edit %o`, nodeInfo)
     Object.keys(this.parties).forEach(partyId => {
       this.parties[partyId].addPartner(nodeInfo);
       if(nodeInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
@@ -125,7 +126,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   onNodeDelete(nodeInfo: MuonNodeInfo) {
-    console.log(`Core.TssPlugin.onNodeDelete`, nodeInfo)
+    log(`Node delete %o`, nodeInfo)
     Object.keys(this.parties).forEach(partyId => {
       const party = this.parties[partyId]
       party.deletePartner(nodeInfo.id);
@@ -133,24 +134,24 @@ class TssPlugin extends CallablePlugin {
   }
 
   async onPeerDiscovery(peerId: string) {
-    // console.log(`[${process.pid}] peer available`, peerId);
+    log(`Peer discovered %s`, peerId);
     this.availablePeers[peerId] = true
     this.findPeerInfo(peerId);
   }
 
   async onPeerConnect(peerId: string) {
-    // console.log(`[${process.pid}] peer connected`, peerId)
+    log(`Peer connected %s`, peerId)
     this.availablePeers[peerId] = true
     this.findPeerInfo(peerId)
   }
 
   onPeerDisconnect(disconnectedPeer: string) {
-    // console.log(`[${process.pid}] peer disconnect`, peerId)
+    log(`Peer disconnect %s`, disconnectedPeer)
     delete this.availablePeers[disconnectedPeer];
     const nodeInfo = this.collateralPlugin.getNodeInfo(disconnectedPeer)
     if(!nodeInfo)
       return;
-    console.log(`TssPlugin: remove online peer ${nodeInfo.wallet}@${disconnectedPeer}`)
+    log(`remove online peer ${nodeInfo.wallet}@${disconnectedPeer}`)
     Object.keys(this.parties).forEach(partyId => {
       const party = this.parties[partyId]
       party.setNodePeer(nodeInfo.id, null);
@@ -172,7 +173,7 @@ class TssPlugin extends CallablePlugin {
             })
           }
         } else {
-          console.log(`[${process.pid}] There is no tss party`);
+          console.log(`There is no tss party`);
         }
       }else {
         console.log("Peer connected with unknown peerId", peerId);
@@ -255,7 +256,7 @@ class TssPlugin extends CallablePlugin {
       keysCache.set(key.id, key, 0);
       this.tssKey = key;
       this.isReady = true
-      console.log('tss ready');
+      log('tss ready');
     }
     else{
       let permitted = await NetworkIpc.askClusterPermission('tss-key-creation', 20000)
@@ -264,9 +265,9 @@ class TssPlugin extends CallablePlugin {
 
       const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
       if (currentNodeInfo && currentNodeInfo.id == LEADER_ID && await this.isNeedToCreateKey()) {
-        console.log(`[${process.pid}] got permission to create tss key`);
+        log(`Got permission to create tss key`);
         let key = await this.tryToCreateTssKey();
-        console.log(`TSS key generated with ${key.partners.length} partners`);
+        log(`TSS key generated with ${key.partners.length} partners`);
       }
       else{
         await timeout(6000);
@@ -296,7 +297,7 @@ class TssPlugin extends CallablePlugin {
               await this.tryToRecoverTssKey(onlinePartners);
             }
             catch (e) {
-              console.log(`Error when trying to recover tss key`);
+              log(`Error when trying to recover tss key`);
             }
           }
         }
@@ -332,7 +333,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   async onAppTssDelete(appId, appTssConfig) {
-    // console.log(`AppTss delete from db`, appId, appTssConfig)
+    log(`AppTss delete from db %s %o`, appId, appTssConfig)
     delete this.appTss[appId]
   }
 
@@ -409,7 +410,6 @@ class TssPlugin extends CallablePlugin {
       }
     }
 
-    // TODO: backup old key >> tss.conf.json.[date:time].bak
     this.muon.backupConfigFile('tss.conf.json');
     // console.log('save config temporarily disabled for test.');
     this.muon.saveConfig(tssConfig, 'tss.conf.json')
@@ -484,7 +484,7 @@ class TssPlugin extends CallablePlugin {
       .filter(s => !!s)
 
     if (shares.length < this.tssParty!.t) {
-      console.log(`Need's of ${this.tssParty!.t} result to recover the Key, but received ${shares.length} result.`)
+      log(`Need's of ${this.tssParty!.t} result to recover the Key, but received ${shares.length} result.`)
       return false;
     }
 
@@ -507,7 +507,7 @@ class TssPlugin extends CallablePlugin {
     this.isReady = true;
     this.saveTssConfig(this.tssParty, tssKey)
     CoreIpc.fireEvent({type: "tss-key:generate", data: tssKey.toSerializable()});
-    console.log(`${process.pid} tss key recovered`);
+    log(`${process.pid} tss key recovered`);
     return true;
   }
 
@@ -544,11 +544,11 @@ class TssPlugin extends CallablePlugin {
         this.tssKey = key;
         this.isReady = true;
         CoreIpc.fireEvent({type: "tss-key:generate", data: key.toSerializable()});
-        console.log('tss ready.')
+        log('tss ready.')
 
         return key;
       } catch (e) {
-        console.error('TssPlugin.tryToCreateTssKey', e, e.stack);
+        log('error when trying to create tss key %o %o', e, e.stack);
       }
     }
   }
@@ -703,7 +703,7 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
     key.partners = partners.filter((p, i) => callResult[i]==='OK').map(p => p.id)
     if(key.partners.length < party.t){
-      console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
+      log('TssPlugin.createKey %o'+ key.id, {remoteCallResult: callResult});
       throw {message: "Error in key creation"}
     }
     return key;
@@ -749,7 +749,7 @@ class TssPlugin extends CallablePlugin {
           {taskId: `keygen-${key.id}`}
         )
           .catch(e => {
-            console.error(`TssPlugin.broadcast to ${peerId} Error`, e)
+            log(`TssPlugin.broadcast to ${peerId} Error %o`, e)
             return 'error'
           });
       }))
@@ -783,7 +783,7 @@ class TssPlugin extends CallablePlugin {
         break;
       }
       default:
-        console.log(`unknown message`, msg);
+        log(`unknown message %o`, msg);
     }
   }
 
@@ -874,11 +874,11 @@ class TssPlugin extends CallablePlugin {
     let {parties} = this
     let {party, key: keyId} = data
     if (!parties[party]) {
-      console.log('TssPlugin.__createKey>> party not fount on this node id: ' + party);
+      log('TssPlugin.__createKey>> party not fount on this node id: ' + party);
       throw {message: 'party not found'}
     }
     if (keysCache.has(keyId)) {
-      console.log(`TssPlugin.__createKey>> key already exist [${keyId}]`);
+      log(`TssPlugin.__createKey>> key already exist [${keyId}]`);
       throw {message: `key already exist [${keyId}]`}
     }
     keysCache.set(keyId, new DistributedKey(parties[party], keyId));
@@ -909,11 +909,11 @@ class TssPlugin extends CallablePlugin {
     // @ts-ignore
     let {commitment, party, key: keyId, partners, pubKeys, f, h} = data
     if (!parties[party]) {
-      console.log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party)
+      log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party)
       throw {message: 'party not found'}
     }
     if (!keysCache.has(keyId)) {
-      console.log('TssPlugin.__distributeKey>> key not fount on this node id: ' + keyId);
+      log('TssPlugin.__distributeKey>> key not fount on this node id: ' + keyId);
       throw {message: 'key not found'}
     }
 
@@ -964,7 +964,7 @@ class TssPlugin extends CallablePlugin {
       this.tssKey = key
       this.isReady = true;
       CoreIpc.fireEvent({type: "tss-key:generate", data: key.toSerializable()});
-      console.log('save done')
+      log('save done')
       // CoreIpc.fireEvent({type: "tss:generate", })
       return true;
     }

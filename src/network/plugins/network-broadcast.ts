@@ -3,6 +3,7 @@ import CollateralInfoPlugin from "./collateral-info";
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 import * as CoreIpc from '../../core/ipc'
+const log = require('debug')('muon:network:plugins:broadcast')
 
 export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 
@@ -10,9 +11,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 
   async subscribe(channel){
     if (channel) {
-      if(process.env.VERBOSE) {
-        console.log('Subscribing to broadcast channel', channel)
-      }
+      log('Subscribing to broadcast channel %s', channel)
 
       if(!this.handlerRegistered[channel]) {
         this.handlerRegistered[channel] = true;
@@ -24,7 +23,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 
   rawBroadcast(channel, data){
     if (!channel) {
-      console.log(`NetworkBroadcastPlugin.rawBroadcast: Channel not defined for broadcast`);
+      log(`NetworkBroadcastPlugin.rawBroadcast: Channel not defined for broadcast`);
       return;
     }
     let dataStr = JSON.stringify(data)
@@ -32,7 +31,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
   }
 
   async __onBroadcastReceived({data: rawData, from, topicIDs, ...otherItems}){
-    // console.log("NetworkBroadcastPlugin.__onBroadcastReceived", from, topicIDs)
+    // log("NetworkBroadcastPlugin.__onBroadcastReceived %s %o", from, topicIDs)
     try{
       let strData = uint8ArrayToString(rawData)
       let data = JSON.parse(strData);
@@ -45,7 +44,9 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 
       /** call network process listeners */
       Promise.all(topicIDs.map(topicID => {
-        return this.emit(topicID, data, senderInfo).catch(console.error)
+        return this.emit(topicID, data, senderInfo).catch(e => {
+          log('Error when calling listener on topic %s %o', topicID, e)
+        })
       }))
         .then(()=>{});
 
@@ -54,11 +55,11 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
         return CoreIpc.broadcast({data: {channel: topicID, message: data}, callerInfo: senderInfo})
       }))
         .catch(e => {
-          console.log('NetworkBroadcastPlugin.__onBroadcastReceived #1', e)
+          log('NetworkBroadcastPlugin.__onBroadcastReceived #1 %O', e)
         })
     }
     catch (e) {
-      console.log('NetworkBroadcastPlugin.__onBroadcastReceived #2', e)
+      log('NetworkBroadcastPlugin.__onBroadcastReceived #2 %O', e)
     }
   }
 }

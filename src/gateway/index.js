@@ -3,10 +3,12 @@ var cors = require('cors')
 let bodyParser = require('body-parser')
 let mongoose = require('mongoose')
 let api = require('./api')
+const log = require('debug')('muon:gateway')
 
 let app = express()
 
 function start(options) {
+  log(`gateway starting ...`)
   var port = options.port || 8080
   var host = options.host || '127.0.0.1'
 
@@ -25,9 +27,10 @@ function start(options) {
   })
   var db = mongoose.connection
 
-  if (!db) console.log('Error connecting db')
-  // console.log("Db connected successfully")
+  if (!db)
+    log('Error connecting db')
   else {
+    log("Db connected successfully")
     app.use('/v1/', api)
     app.use('/status', (req, res, next) => {
       res.json({
@@ -37,7 +40,7 @@ function start(options) {
   }
 
   app.listen(port, host, function () {
-    console.log(`Running gateway on port ${port} at ${host}`)
+    log(`Running gateway on port ${port} at ${host}`)
   })
 }
 

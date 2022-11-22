@@ -1,6 +1,7 @@
 import Muon from "../../muon";
 import {MuonNodeInfo} from "../../../common/types";
 import CollateralInfoPlugin from "../collateral-info";
+const log = require('debug')('muon:core:plugins:base')
 
 const Events = require('events-async')
 const PeerId = require('peer-id')
@@ -58,7 +59,7 @@ export default class BasePlugin extends Events{
     /*eslint no-undef: "error"*/
     if (broadcastChannel) {
       if(process.env.VERBOSE) {
-        console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
+        log('Subscribing to broadcast channel %s', this.BROADCAST_CHANNEL)
       }
       this.muon.getPlugin('broadcast').subscribe(this.BROADCAST_CHANNEL);
       this.muon.getPlugin('broadcast').on(broadcastChannel, this[this.__broadcastHandlerMethod].bind(this))
@@ -72,7 +73,7 @@ export default class BasePlugin extends Events{
     this.muon.getPlugin('broadcast')
         .broadcastToChannel(this.BROADCAST_CHANNEL, data)
         .catch(e => {
-          console.log(`${this.ConstructorName}.broadcast`, e)
+          log(`${this.ConstructorName}.broadcast %O`, e)
         })
   }
 
@@ -80,7 +81,7 @@ export default class BasePlugin extends Events{
     this.muon.getPlugin('broadcast')
         .broadcastToChannel(channel, data)
         .catch(e => {
-          console.log(`${this.ConstructorName}.broadcastToChannel`, e)
+          log(`${this.ConstructorName}.broadcastToChannel %O`, e)
         })
   }
 

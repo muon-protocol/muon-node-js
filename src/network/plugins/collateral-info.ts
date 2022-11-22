@@ -6,6 +6,7 @@ import NodeManagerAbi from '../../data/NodeManager-ABI.json'
 import {MuonNodeInfo} from "../../common/types";
 import * as CoreIpc from '../../core/ipc'
 import _ from 'lodash'
+const log = require('debug')('muon:network:plugins:collateral')
 
 export type GroupInfo = {
   isValid: boolean,
@@ -36,9 +37,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   async onInit() {
     let {nodeManager} = this.network.configs.net;
-    console.log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
+    log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
     await this._loadCollateralInfo();
-    console.log("Network info loaded.")
   }
 
   async onStart(){
@@ -142,9 +142,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       partners: allNodes.map(n => n.id)
     }
 
-    if(process.env.VERBOSE) {
-      console.log('CollateralInfo._loadCollateralInfo: Info loaded.');
-    }
+    log('Collateral nfo loaded.');
 
     this.emit('loaded');
     this.loading.resolve(true);
@@ -199,9 +197,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       this._nodesMap.delete(oldNode.id)
       this._nodesMap.delete(oldNode.wallet)
       this._nodesMap.delete(oldNode.peerId)
-      if(process.env.VERBOSE) {
-        console.log(`Node info deleted from chain`, oldNode)
-      }
+      log(`Node info deleted from chain %o`, oldNode)
       this.emit("node:delete", oldNode)
       CoreIpc.fireEvent({type: "node:delete", data: _.omit(oldNode, ['peer'])})
     })
@@ -214,9 +210,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           .set(n.id, n)
           .set(n.wallet, n)
           .set(n.peerId, n)
-        if(process.env.VERBOSE) {
-          console.log(`New node info added to chain`, n)
-        }
+        log(`New node info added to chain %o`, n)
         this.emit("node:add", n)
         CoreIpc.fireEvent({type: "node:add", data: n})
         return;
@@ -230,9 +224,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           .set(n.id, n)
           .set(n.wallet, n)
           .set(n.peerId, n)
-        if(process.env.VERBOSE) {
-          console.log(`Node info changed on chain`, {old: oldNode, new: n})
-        }
+        log(`Node info changed on chain %o`, {old: oldNode, new: n})
         this.emit("node:edit", n)
         CoreIpc.fireEvent({type: "node:edit", data: _.omit(n, ['peer'])})
         return;
@@ -253,9 +245,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
         lastUpdateTime = parseInt(lastUpdateTime);
 
         if(lastUpdateTime !== this.lastNodesUpdateTime) {
-          if(process.env.VERBOSE) {
-            console.log("Muon nodes list changed on-chain.")
-          }
+          log("Muon nodes list changed on-chain.")
           await this.onNodesChange();
         }
       }

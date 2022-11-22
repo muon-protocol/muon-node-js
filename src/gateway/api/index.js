@@ -8,6 +8,7 @@ const CoreIpc = require('../../core/ipc')
 const NetworkIpc = require('../../network/ipc')
 const axios = require('axios').default
 const crypto = require('../../utils/crypto')
+const log = require('debug')('muon:gateway:api')
 
 const SHIELD_FORWARD_URL = process.env.SHIELD_FORWARD_URL
 const appIsShielded = (process.env.SHIELDED_APPS || "")
@@ -60,16 +61,17 @@ async function isCurrentNodeInNetwork() {
 
 async function callProperNode(requestData) {
   if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
+    log("Deployment excerpt method call %o", requestData)
     return await requestQueue.send(requestData)
   }
 
   let context = await CoreIpc.getAppContext(requestData.app);
   if (!context) {
-    console.log("context not found. query the network for context.")
+    log("context not found. query the network for context.")
     context = await CoreIpc.queryAppContext(requestData.app)
   }
   if (!context) {
-    console.log('app context not found', requestData)
+    log('app context not found and it throwing error %o', requestData)
     throw `App not deployed`;
   }
   const {partners} = context.party
@@ -78,6 +80,7 @@ async function callProperNode(requestData) {
     return await requestQueue.send(requestData)
   } else {
     const randomIndex = Math.floor(Math.random() * partners.length);
+    log(`forwarding request to id:%s`, partners[randomIndex])
     let request = await NetworkIpc.forwardRequest(partners[randomIndex], requestData)
     // if(requestData.gwSign){
     //   const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
@@ -92,6 +95,7 @@ async function callProperNode(requestData) {
 }
 
 async function shieldConfirmedResult(requestData, request) {
+  log(`Shield applying %o`, requestData)
   const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
   const requestHash = soliditySha3(request.data.signParams)
   if(shieldHash !== requestHash)
@@ -113,9 +117,12 @@ router.use('/', async (req, res, next) => {
 
   gwSign = parseBool(gwSign);
   const requestData = {app, method, params, nSign, mode, gwSign}
+  log("request arrived %o", requestData);
 
   if(!await isCurrentNodeInNetwork()){
+    log("This node in not in the network.")
     if(!SHIELD_FORWARD_URL) {
+      log("Env variable 'SHIELD_FORWARD_URL' not specified.")
       const appId = await CoreIpc.getAppId(app);
       return res.json({
         success: false,
@@ -126,8 +133,10 @@ router.use('/', async (req, res, next) => {
       })
     }
     if(!appIsShielded[app]) {
+      log("This app is not shielded.")
       return res.json({success: false, error: {message: `The '${app}' app is neither shielded nor included in the network.`}});
     }
+    log(`forwarding request to ${SHIELD_FORWARD_URL}`, requestData);
     const result = await axios.post(SHIELD_FORWARD_URL, requestData)
       .then(({data}) => data)
     if(result.success) {
@@ -165,7 +174,7 @@ router.use('/', async (req, res, next) => {
         try {
           appId = await CoreIpc.getAppId(app);
         } catch (e) {
-          console.log("gateway.api", e)
+          log("gateway.api error %o", e)
         }
         storeRequestLog({
           app,

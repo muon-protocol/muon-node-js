@@ -4,13 +4,12 @@ import {IpcCallOptions} from "../../common/types";
 import CollateralInfoPlugin from "./collateral-info";
 import QueueProducer from "../../common/message-bus/queue-producer";
 let requestQueue = new QueueProducer(`gateway-requests`);
-const all = require('it-all')
 import _ from 'lodash';
 import RemoteCall from "./remote-call";
 import NetworkBroadcastPlugin from "./network-broadcast";
+import NetworkContentPlugin from "./content-plugin";
 
 const {timeout} = require('../../utils/helpers')
-const {loadCID} = require('../../utils/cid')
 const NodeCache = require('node-cache');
 const coreIpc = require('../../core/ipc')
 
@@ -73,6 +72,10 @@ class NetworkIpcHandler extends CallablePlugin {
 
   get remoteCallPlugin(): RemoteCall {
     return this.network.getPlugin('remote-call');
+  }
+
+  get contentPlugin(): NetworkContentPlugin {
+    return this.network.getPlugin('content');
   }
 
   /**
@@ -191,18 +194,13 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.ContentRoutingProvide)
-  async __onContentRoutingProvide(cids: string[], callerInfo) {
-    for (let cid of cids) {
-      console.log(`providing content ${cid}`)
-      await this.network.libp2p.contentRouting.provide(loadCID(cid));
-    }
+  async __contentRoutingProvide(cids: string | string[], callerInfo) {
+    await this.contentPlugin.provide(cids);
   }
 
   @ipcMethod(IpcMethods.ContentRoutingFind)
   async __onContentRoutingFind(cid: string, callerInfo) {
-    console.log(`NetworkIpcHandler.__onContentRoutingFind`, cid);
-    let providers = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
-    return providers.map(p => p.id._idB58String)
+    return this.contentPlugin.find(cid);
   }
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)

@@ -1,3 +1,5 @@
+import NetworkContentPlugin from "./plugins/content-plugin";
+
 const Events = require('events-async');
 const Libp2pBundle = require('./libp2p_bundle')
 const loadConfigs = require('./configurations')
@@ -7,6 +9,7 @@ const emoji = require('node-emoji')
 const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
 const coreIpc = require('../core/ipc')
 const { MessagePublisher } = require('../common/message-bus')
+const log = require('debug')('muon:network')
 
 import CollateralPlugin from './plugins/collateral-info';
 import IpcHandlerPlugin from './plugins/network-ipc-handler'
@@ -66,7 +69,7 @@ class Network extends Events {
       this._plugins[pluginName] = new plugin(this, configs);
       await this._plugins[pluginName].onInit();
     }
-    // console.log('plugins initialized.')
+    log('plugins initialized.')
   }
 
   getPlugin(pluginName) {
@@ -74,10 +77,7 @@ class Network extends Events {
   }
 
   async start() {
-    console.log(
-      emoji.get('moon'),
-      chalk.green(` peer [${this.peerId.toB58String()}] starting ...`)
-    )
+    log(emoji.get('moon') + " " +chalk.green(` peer [${this.peerId.toB58String()}] starting ...`))
     await this.libp2p.start()
 
     if (this.configs.libp2p.natIp) {
@@ -85,20 +85,20 @@ class Network extends Events {
       this.libp2p.addressManager.addObservedAddr(`/ip4/${natIp}/tcp/${port}/p2p/${this.peerId.toB58String()}`);
     }
 
-    console.log(
-      emoji.get('moon'),
-      chalk.blue(' Node ready '),
-      emoji.get('headphones'),
+    log(
+      emoji.get('moon') + " " +
+      chalk.blue(' Node ready ') + " " +
+      emoji.get('headphones') + " " +
       chalk.blue(` Listening on: ${this.configs.libp2p.port}`)
     )
 
     // if(process.env.VERBOSE) {
-    console.log("====================== Bindings ====================")
+    log("====================== Bindings ====================")
     this.libp2p.multiaddrs.forEach((ma) => {
-      console.log(ma.toString())
+      log(ma.toString())
       // console.log(`${ma.toString()}/p2p/${this.libp2p.peerId.toB58String()}`)
     })
-    console.log("====================================================")
+    log("====================================================")
     // }
 
     // if (this.libp2p.isStarted()) {
@@ -110,17 +110,17 @@ class Network extends Events {
   }
 
   async _onceStarted() {
-    console.log(`muon started at ${new Date()} (node-js version ${process.versions.node}).`)
+    log(`muon started at ${new Date()} (node-js version ${process.versions.node}).`)
     for (let pluginName in this._plugins) {
       this._plugins[pluginName].onStart()
     }
   }
 
   onPeerConnect(connection) {
-    console.log(
-      emoji.get('moon'),
-      chalk.blue(' Node connected to '),
-      emoji.get('large_blue_circle'),
+    log(
+      emoji.get('moon') + " " +
+      chalk.blue(' Node connected to ') + " " +
+      emoji.get('large_blue_circle') + " " +
       chalk.blue(` ${connection.remotePeer.toB58String()}`)
     )
     this.emit('peer:connect', connection.remotePeer)
@@ -128,10 +128,10 @@ class Network extends Events {
   }
 
   onPeerDisconnect(connection) {
-    console.log(
-      emoji.get('moon'),
-      chalk.red(' Node disconnected'),
-      emoji.get('large_blue_circle'),
+    log(
+      emoji.get('moon') + " " +
+      chalk.red(' Node disconnected') + " " +
+      emoji.get('large_blue_circle') + " " +
       chalk.red(` ${connection.remotePeer.toB58String()}`)
     );
     this.emit('peer:disconnect', connection.remotePeer)
@@ -141,7 +141,7 @@ class Network extends Events {
   async onPeerDiscovery(peerId) {
     this.emit('peer:discovery', peerId)
     coreIpc.fireEvent({type: "peer:discovery", data: peerId.toB58String()})
-    console.log('found peer');
+    log('found peer');
     try {
       const peerInfo = await this.libp2p.peerRouting.findPeer(peerId)
       console.log({
@@ -178,6 +178,7 @@ function clearMessageBus(){
 }
 
 async function start() {
+  log("starting ...")
   await clearMessageBus();
 
   let {
@@ -206,6 +207,7 @@ async function start() {
     plugins: {
       'collateral': [CollateralPlugin, {}],
       'broadcast': [NetworkBroadcastPlugin, {}],
+      'content': [NetworkContentPlugin, {}],
       'remote-call': [RemoteCallPlugin, {}],
       'ipc': [IpcPlugin, {}],
       'ipc-handler': [IpcHandlerPlugin, {}],

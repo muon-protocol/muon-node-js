@@ -45,7 +45,7 @@ function askClusterPermission(key, expireTime) {
   return call(IpcMethods.AskClusterPermission, {key, expireTime})
 }
 
-function provideContent(cids: string[]): Promise<any> {
+function provideContent(cids: string | string[]): Promise<any> {
   return call(IpcMethods.ContentRoutingProvide, cids)
 }
 

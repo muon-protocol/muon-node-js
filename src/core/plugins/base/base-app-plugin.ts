@@ -26,6 +26,7 @@ const Ajv = require("ajv")
 const ajv = new Ajv()
 const web3 = new Web3();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
+const Log = require('debug')
 
 export type AppRequestSignature = {
   /**
@@ -74,6 +75,7 @@ class BaseAppPlugin extends CallablePlugin {
   readOnlyMethods = []
   /** initialize when loading */
   isBuiltInApp: boolean
+  private log;
 
   private broadcastPubSubRedis: RedisClient
 
@@ -85,6 +87,10 @@ class BaseAppPlugin extends CallablePlugin {
         url: process.env.BROADCAST_PUB_SUB_REDIS
       });
     }
+
+    this.log = Log("muon:apps:base")
+
+    // console.log(this.APP_NAME);
     /**
      * This is abstract class, so "new BaseAppPlugin()" is not allowed
      */
@@ -122,6 +128,8 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
+    this.log = Log(`muon:apps:${this.APP_NAME}`);
+
     this.warnArrowFunctions([
       "onArrive",
       "onAppInit",
@@ -165,8 +173,8 @@ class BaseAppPlugin extends CallablePlugin {
     await this.collateralPlugin.waitToLoad();
 
     const appParty = this.tssPlugin.getAppParty(this.APP_ID);
-    if(process.env.VERBOSE && appParty) {
-      console.log(`App party loaded`, appParty.id)
+    if(appParty) {
+      this.log(`App party loaded %s`, appParty.id)
     }
   }
 
@@ -194,6 +202,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async invoke(appName, method, params) {
+    this.log(`invoking app ${appName}.${method} params: %o`, params)
     const app = this.muon.getAppByName(appName)
     let result = await app[method](params);
     return result;
@@ -547,7 +556,7 @@ class BaseAppPlugin extends CallablePlugin {
           {taskId: `keygen-${nonce.id}`}
         )
           .catch(e => {
-            console.log(`BaseAppPlugin.informRequestConfirmation`, e)
+            this.log(`informRequestConfirmation error %o`, e)
             return 'error'
           })
       }

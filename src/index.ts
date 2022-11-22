@@ -1,5 +1,6 @@
 import cluster, {Worker} from 'cluster'
 import * as os from 'os'
+const log = require('debug')('muon:boot')
 
 const Gateway = require('./gateway')
 const Network = require('./network');
@@ -30,7 +31,7 @@ const applicationWorkers:ApplicationDictionary = {};
 function runNewApplicationCluster(): Worker | null {
   const child:Worker = cluster.fork();//{MASTER_PROCESS_ID: process.pid}
   if(!child?.process?.pid){
-    console.log(`application cluster does not start correctly.`)
+    log(`application cluster does not start correctly.`)
     return null;
   }
   applicationWorkers[child.process.pid] = child
@@ -43,7 +44,7 @@ async function refreshWorkersList() {
 
 async function boot() {
   if (cluster.isMaster) {
-    console.log(`Master cluster start at [${process.pid}]`)
+    log(`Master cluster start at [${process.pid}]`)
     SharedMemory.startServer();
 
     /** Start gateway */
@@ -55,9 +56,9 @@ async function boot() {
     await Network.start()
     //
     cluster.on("exit", async function (worker, code, signal) {
-      console.log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
+      log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
       if(!worker.process.pid) {
-        console.log(`a worker with an unknown pid stopped working.`)
+        log(`a worker with an unknown pid stopped working.`)
         await refreshWorkersList();
       }
       else {
@@ -66,7 +67,7 @@ async function boot() {
       }
 
       await timeout(5000);
-      console.log("Starting a new worker");
+      log("Starting a new worker");
       let child = runNewApplicationCluster();
       if(!child){
         return ;
@@ -79,12 +80,12 @@ async function boot() {
       const child:Worker|null = runNewApplicationCluster();
       if(child === null){
         i--;
-        console.log(`child process fork failed. trying one more time`);
+        log(`child process fork failed. trying one more time`);
       }else
         await NetworkIpc.reportClusterStatus(child.process.pid, 'start')
     }
   } else {
-    console.log(`application cluster start pid:${process.pid}`)
+    log(`application cluster start pid:${process.pid}`)
     require('./core').start();
   }
 

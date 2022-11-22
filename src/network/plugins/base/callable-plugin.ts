@@ -1,4 +1,5 @@
 import BaseNetworkPlugin from './base-network-plugin';
+const log = require('debug')('muon:network:plugins:callable')
 
 export default class CallablePlugin extends BaseNetworkPlugin {
 
@@ -15,17 +16,13 @@ export default class CallablePlugin extends BaseNetworkPlugin {
 
   registerRemoteMethod(title, method, options){
     let remoteCall = this.network.getPlugin('remote-call')
-    if(process.env.VERBOSE){
-      console.log(`Registering remote method: ${this.remoteMethodEndpoint(title)}`)
-    }
+    log(`Registering remote method: ${this.remoteMethodEndpoint(title)}`)
     remoteCall.on(`${this.remoteMethodEndpoint(title)}`, method, options)
   }
 
   registerIpcMethod(title, method){
     let ipc = this.network.getPlugin('ipc')
-    if(process.env.VERBOSE){
-      console.log(`Registering ipc method: ${this.remoteMethodEndpoint(title)}`)
-    }
+    log(`Registering ipc method: ${this.remoteMethodEndpoint(title)}`)
     ipc.on(`call/${title}`, method)
   }
 

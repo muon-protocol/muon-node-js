@@ -1,4 +1,5 @@
 import BasePlugin from './base-plugin'
+const log = require('debug')('muon:core:plugins:callable')
 
 export default class CallablePlugin extends BasePlugin {
 
@@ -15,17 +16,13 @@ export default class CallablePlugin extends BasePlugin {
 
   registerRemoteMethod(title, method, options){
     let remoteCall = this.muon.getPlugin('remote-call')
-    if(process.env.VERBOSE){
-      console.log(`Registering remote method: ${this.remoteMethodEndpoint(title)}`)
-    }
+    log(`Registering remote method: ${this.remoteMethodEndpoint(title)}`)
     remoteCall.on(`${this.remoteMethodEndpoint(title)}`, method, options);
   }
 
   registerIpcMethod(title, method){
     let ipc = this.muon.getPlugin('ipc')
-    if(process.env.VERBOSE){
-      console.log(`Registering ipc method: ${this.remoteMethodEndpoint(title)}`)
-    }
+    log(`Registering ipc method: ${this.remoteMethodEndpoint(title)}`)
     ipc.on(`call/${title}`, method)
   }
 
