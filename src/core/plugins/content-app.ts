@@ -2,8 +2,6 @@ import CallablePlugin from './base/callable-plugin'
 const Content = require('../../common/db-models/Content')
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
 import {GatewayCallData} from "../../gateway/types";
-const {loadCID} = require('../../utils/cid')
-const {timeout} = require('../../utils/helpers')
 import * as NetworkIpc from '../../network/ipc';
 import ContentVerifyPlugin from "./content-verify-plugin";
 
@@ -22,30 +20,6 @@ class ContentApp extends CallablePlugin {
     super.onStart()
 
     this.muon.getPlugin('gateway-interface').on('confirmed', this.onGatewayConfirmed.bind(this))
-
-    let onlinePeers = await NetworkIpc.getOnlinePeers()
-    if(onlinePeers.length > 0){
-      this.provideContents()
-    }
-    else{
-      this.muon.once('peer:connect', () => {
-        this.provideContents();
-      })
-    }
-  }
-
-  // TODO: move to network
-  async provideContents() {
-    /** wait to DHT load peer info */
-    await timeout(50000);
-
-    try {
-      let contents = await Content.find({});
-      let cidList = contents.map(c => c.cid)
-      await NetworkIpc.provideContent(cidList);
-    }catch (e) {
-      console.error("ERROR: ContentApp.provideContents", e)
-    }
   }
 
   async getContent(cid: string): Promise<string | null>{
