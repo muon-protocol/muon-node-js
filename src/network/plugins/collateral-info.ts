@@ -151,14 +151,11 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   async loadNetworkInfo(nodeManagerInfo){
     const {address, network} = nodeManagerInfo;
 
-    let rawResult = await Promise.all([
-      eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network),
-      eth.call(address, 'getAllNodes', [], NodeManagerAbi, network),
-    ])
+    let allInfo = await eth.call(address, "info", [], NodeManagerAbi, network);
 
     return {
-      lastUpdateTime: parseInt(rawResult[0]),
-      allNodes: rawResult[1]
+      lastUpdateTime: parseInt(allInfo._lastUpdateTime),
+      allNodes: allInfo._nodes
         .filter(item => item[4])
         .map(item => ({
           id: BigInt(item[0]).toString(),

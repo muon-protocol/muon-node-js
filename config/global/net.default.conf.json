@@ -1,10 +1,10 @@
 {
   "tss": {
-    "threshold": "7",
-    "max": 20
+    "threshold": "2",
+    "max": 3
   },
   "nodeManager": {
     "network": "mumbai",
-    "address": "0x327ae52e08929909326aec25a72508fd9cbe0bed"
+    "address": "0xd9732018ca7c8aaef24aa96205d01e94349d4142"
   }
 }
