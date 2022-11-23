@@ -150,7 +150,7 @@ class Network extends Events {
         // peerInfo,
       })
     } catch (e) {
-      console.log('Error Muon.onPeerDiscovery', e)
+      console.log('Error Muon.onPeerDiscovery', e);
     }
   }
 }
