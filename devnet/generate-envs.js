@@ -153,6 +153,9 @@ const createEnv = async () => {
     2
   )
 
+  //TODO: When net.default.conf is updating, net.conf should
+  // reload. For example, when address of NodeManager is updating
+  // net.conf still refers to the old address
   fs.writeFileSync(`${BASE_PATH}/config/global/net.conf.json`, netConf)
   console.log(emoji.get('o'), `net.conf.json is created`)
   // console.log('Environment is created successfully for run nodes')
