@@ -1,10 +1,10 @@
-import Polynomial from '../../../utils/tss/polynomial'
+import Polynomial from './polynomial'
 import Party from './party'
 import BN from 'bn.js';
-import { PublicKey } from '../../../utils/tss/types'
-const tss = require('../../../utils/tss/index')
+import { PublicKey } from './types'
+const tss = require('./index')
 const {utils:{toBN}} = require('web3')
-import TimeoutPromise from '../../../common/timeout-promise'
+import TimeoutPromise from '../../common/timeout-promise'
 const assert = require('assert')
 
 const random = () => Math.floor(Math.random()*9999999)
@@ -62,12 +62,12 @@ class DistributedKey {
   partnersPubKey = {}
   address = null
 
-  constructor(party, id, timeout?: number){
+  constructor(party, id, timeout?: number, value?: BN){
     this.id = id || `K${Date.now()}${random()}`
     if(!!party) {
       this.party = party;
 
-      let fx = new Polynomial(party.t, tss.curve);
+      let fx = new Polynomial(party.t, tss.curve, value);
       let hx = new Polynomial(party.t, tss.curve);
       this.f_x = fx
       this.h_x = hx

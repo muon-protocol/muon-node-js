@@ -2,7 +2,7 @@ import {IpcCallOptions, MuonNodeInfo} from "../common/types";
 const { QueueProducer, MessagePublisher } = require('../common/message-bus')
 const { BROADCAST_CHANNEL } = require('./plugins/broadcast')
 const { IPC_CHANNEL } = require('./plugins/core-ipc-plugin')
-import DistributedKey from './plugins/tss-plugin/distributed-key'
+import DistributedKey from '../utils/tss/distributed-key'
 import {MessageOptions} from "../common/message-bus/msg-publisher";
 import {IpcMethods, CoreIpcMethod} from "./plugins/core-ipc-handlers";
 

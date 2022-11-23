@@ -15,12 +15,13 @@ import {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} from './app-de
 import MemoryPlugin, {MemWrite, MemWriteOptions} from '../memory-plugin'
 const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
 const Web3 = require('web3')
-import DistributedKey from "../tss-plugin/distributed-key";
+import DistributedKey from "../../../utils/tss/distributed-key";
 import TssPlugin from "../tss-plugin";
 import AppManager from "../app-manager";
-import TssParty from "../tss-plugin/party";
+import TssParty from "../../../utils/tss/party";
 import CollateralInfoPlugin from "../collateral-info";
 import {MuonNodeInfo} from "../../../common/types";
+import useDistributedKey from "../../../utils/tss/use-distributed-key";
 const chalk = require('chalk')
 const Ajv = require("ajv")
 const ajv = new Ajv()
@@ -337,7 +338,7 @@ class BaseAppPlugin extends CallablePlugin {
 
         // await newRequest.save()
 
-        let sign = this.makeSignature(newRequest, result, resultHash)
+        let sign = await this.makeSignature(newRequest, result, resultHash)
         if (!!memWrite) {
           sign.memWriteSignature = memWrite.signatures[0]
         }
@@ -828,7 +829,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  makeSignature(request, result, resultHash): AppRequestSignature {
+  async makeSignature(request, result, resultHash): Promise<AppRequestSignature> {
     let signTimestamp = getTimestamp()
     // let signature = crypto.sign(resultHash)
 
@@ -842,6 +843,8 @@ class BaseAppPlugin extends CallablePlugin {
       throw `App TSS key not found`;
     let k_i = nonce.share
     let K = nonce.publicKey;
+
+    await useDistributedKey(K.encodeCompressed('hex'), resultHash)
     // TODO: remove nonce after sign
     let signature = tss.schnorrSign(tssKey.share, k_i, K, resultHash)
 
@@ -1009,7 +1012,7 @@ class BaseAppPlugin extends CallablePlugin {
     // wait for nonce broadcast complete
     await nonce!.waitToFulfill()
 
-    let sign = this.makeSignature(request, result, hash)
+    let sign = await this.makeSignature(request, result, hash)
     let memWrite = this.getMemWrite(request, result)
     if(memWrite){
       sign.memWriteSignature = memWrite.signatures[0]

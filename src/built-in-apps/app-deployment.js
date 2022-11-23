@@ -45,6 +45,16 @@ module.exports = {
                     throw `seed not verified`
                 break;
             }
+            case Methods.TssReshare: {
+                const {appId} = params
+              const context = await this.callPlugin('system', "getAppContext", appId)
+              if(!context) {
+                throw `App not deployed`;
+              }
+
+              if(context.appName !== 'tss')
+                throw `Not allowed for this app`
+            }
         }
     },
 
@@ -57,9 +67,13 @@ module.exports = {
             case Methods.TssKeyGen: {
                 const { appId } = params
                 // await this.callPlugin('system', "newAppTss", appId)
-                return {
-                    publicKey: await this.callPlugin('system', "genAppTss", appId)
-                }
+                const {id, publicKey} = await this.callPlugin('system', "genAppTss", appId)
+                return {id, publicKey}
+            }
+            case Methods.TssReshare: {
+                const {appId} = params
+                const reshareNonce = await this.callPlugin('system', "generateReshareNonce", appId, request.data.uid)
+                // return {reshareNonce}
             }
         }
     },
@@ -67,7 +81,7 @@ module.exports = {
     onRequest: async function(request) {
         let {
             method,
-            data: { params }
+            data: { params, init }
         } = request
         switch (method) {
             case Methods.Check: {
@@ -94,8 +108,7 @@ module.exports = {
                 };
             }
             case Methods.TssKeyGen: {
-                const {appId} = params
-                let key = await this.callPlugin('system', "getAppTss", appId)
+                let key = await this.callPlugin('system', "getDistributedKey", init.id)
                 if(!key)
                     throw `App new tss key not found`;
                 return {
@@ -104,6 +117,10 @@ module.exports = {
                     x: "0x" + key.publicKey.x.toString('hex'),
                     yParity: key.publicKey.y.isEven() ? 0 : 1,
                 }
+            }
+
+            case Methods.TssReshare: {
+                return 'done'
             }
             default:
                 throw "Unknown method"
@@ -145,6 +162,9 @@ module.exports = {
                     {t: 'address', v:request.data.result.address}
                 ]
             }
+            case Methods.TssReshare: {
+                return [{t: 'string', v: 'done'}]
+            }
             default:
                 throw "Unknown method"
         }
@@ -153,7 +173,7 @@ module.exports = {
     onConfirm: async function(request, result, signatures) {
         let {
             method,
-            data: { params }
+            data: { params, init }
         } = request
         switch (method) {
             case Methods.Deploy: {
@@ -168,7 +188,8 @@ module.exports = {
             }
             case Methods.TssKeyGen: {
                 const {appId} = params
-                await this.callPlugin('system', "storeAppTss", appId)
+                // await this.callPlugin('system', "storeAppTss", appId)
+                await this.callPlugin('system', "storeAppTss", appId, init.id)
             }
         }
     }

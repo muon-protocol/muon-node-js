@@ -1,7 +1,7 @@
-import TimeoutPromise from '../../../common/timeout-promise'
+import TimeoutPromise from '../../common/timeout-promise'
 import {returnStatement} from "@babel/types";
-import {MuonNodeInfo} from "../../../common/types";
-const {stackTrace} = require('../../../utils/helpers')
+import {MuonNodeInfo} from "../../common/types";
+const {stackTrace} = require('../helpers')
 
 type PartyLoadParams = {
   id?: string,

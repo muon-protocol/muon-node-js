@@ -4,11 +4,14 @@ import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
 const soliditySha3 = require('../../utils/soliditySha3');
+const {toBN} = require('../../utils/tss/utils');
+const tssModule = require('../../utils/tss');
 const AppContext = require("../../common/db-models/AppContext")
 const AppTssConfig = require("../../common/db-models/AppTssConfig")
 import * as NetworkIpc from '../../network/ipc'
-import DistributedKey from "./tss-plugin/distributed-key";
+import DistributedKey from "../../utils/tss/distributed-key";
 import AppManager from "./app-manager";
+import useDistributedKey from "../../utils/tss/use-distributed-key";
 const { timeout } = require('../../utils/helpers')
 const { promisify } = require("util");
 
@@ -99,7 +102,7 @@ class System extends CallablePlugin {
       return await this.__generateAppTss({appId}, null);
     }
     else {
-      // TODO: if nodeInfo not exist of partner is not online?
+      // TODO: if partner is not online
       return await this.remoteCall(
         generatorInfo.peerId,
         RemoteMethods.GenerateAppTss,
@@ -115,6 +118,12 @@ class System extends CallablePlugin {
       throw `App deployment info not found.`
     const id = this.getAppTssKeyId(appId, context.seed)
     let key = this.tssPlugin.getSharedKey(id)
+    return key
+  }
+
+  @appApiMethod({})
+  async getDistributedKey(keyId) {
+    let key = this.tssPlugin.getSharedKey(keyId)
     return key
   }
 
@@ -183,7 +192,7 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async storeAppTss(appId) {
+  async storeAppTss(appId, keyId) {
     // console.log(`System.storeAppTss`, {appId})
 
     /** check context exist */
@@ -200,8 +209,8 @@ class System extends CallablePlugin {
       throw `App tss key already generated`
 
     /** store tss key */
-    const id = this.getAppTssKeyId(appId, context.seed);
-    let key: DistributedKey = this.tssPlugin.getSharedKey(id)!
+    let key: DistributedKey = this.tssPlugin.getSharedKey(keyId)!
+    await useDistributedKey(key.publicKey!.encodeCompressed('hex'), `app-${appId}-tss`)
     const tssConfig = new AppTssConfig({
       version: context.version,
       appId: appId,
@@ -223,6 +232,22 @@ class System extends CallablePlugin {
       appId
     });
     return contexts[0]
+  }
+
+  @appApiMethod({})
+  async generateReshareNonce(appId, reqId) {
+    let key = await this.tssPlugin.keyGen(undefined, {id: `reshare-${appId}-${reqId}`, value: toBN('2')})
+    /**
+     * Ethereum addresses
+     * [0]: 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf
+     * [1]: 0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF
+     * [2]: 0x6813Eb9362372EEF6200f3b1dbC3f819671cBA69
+     */
+    console.log({
+      expected: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+      calculated: tssModule.pub2addr(key.publicKey)
+    })
+    return key.publicKey
   }
 
   /**
@@ -269,13 +294,16 @@ class System extends CallablePlugin {
     if(!party)
       throw `Party not created`
 
-    let key = await this.tssPlugin.keyGen(party, {id: this.getAppTssKeyId(appId, context.seed)})
+    let key = await this.tssPlugin.keyGen(party)
 
     return {
-      address: key.address,
-      encoded: key.publicKey?.encodeCompressed("hex"),
-      x: key.publicKey?.getX().toBuffer('be', 32).toString('hex'),
-      yParity: key.publicKey?.getY().isEven() ? 0 : 1
+      id: key.id,
+      publicKey: {
+        address: key.address,
+        encoded: key.publicKey?.encodeCompressed("hex"),
+        x: key.publicKey?.getX().toBuffer('be', 32).toString('hex'),
+        yParity: key.publicKey?.getY().isEven() ? 0 : 1
+      }
     }
   }
 }

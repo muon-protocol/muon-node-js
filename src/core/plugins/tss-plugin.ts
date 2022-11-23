@@ -1,17 +1,18 @@
-import CallablePlugin from '../base/callable-plugin'
-import Party from './party'
-import DistributedKey from "./distributed-key";
+import CallablePlugin from './base/callable-plugin'
+import Party from '../../utils/tss/party'
+import DistributedKey from "../../utils/tss/distributed-key";
 const {shuffle} = require('lodash')
-const tssModule = require('../../../utils/tss')
+const tssModule = require('../../utils/tss/index')
 const {utils:{toBN}} = require('web3')
-const {timeout} = require('../../../utils/helpers');
-import {remoteApp, remoteMethod, broadcastHandler} from '../base/app-decorators'
-import CollateralInfoPlugin from "../collateral-info";
+const {timeout} = require('../../utils/helpers');
+import {remoteApp, remoteMethod, broadcastHandler} from './base/app-decorators'
+import CollateralInfoPlugin from "./collateral-info";
 const NodeCache = require('node-cache');
-const NetworkIpc = require('../../../network/ipc')
-import * as CoreIpc from '../../ipc'
-import {MuonNodeInfo} from "../../../common/types";
-import AppManager from "../app-manager";
+const NetworkIpc = require('../../network/ipc')
+import * as CoreIpc from '../ipc'
+import {MuonNodeInfo} from "../../common/types";
+import AppManager from "./app-manager";
+import BN from 'bn.js';
 const log = require('debug')('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
@@ -55,7 +56,11 @@ export type KeyGenOptions = {
   /**
    Timeout for key generation process
    */
-  timeout?: number
+  timeout?: number,
+  /**
+   * If you set this value, the value will be shared between partners.
+   */
+  value?: BN
 }
 
 const BroadcastMessage = {
@@ -646,9 +651,9 @@ class TssPlugin extends CallablePlugin {
    * @returns {Promise<DistributedKey>}
    */
   async createKey(party, options: KeyGenOptions={}) {
-    let {id, maxPartners, timeout=30000} = options;
+    let {id, maxPartners, timeout=30000, value} = options;
     // 1- create new key
-    let key = new DistributedKey(party, id, timeout)
+    let key = new DistributedKey(party, id, timeout, value)
     let taskId = `keygen-${key.id}`;
     let assignResponse = await NetworkIpc.assignTask(taskId);
     if(assignResponse !== 'Ok')
@@ -690,7 +695,8 @@ class TssPlugin extends CallablePlugin {
             RemoteMethods.createKey,
             {
               party: party.id,
-              key: key.id
+              key: key.id,
+              value: !!value ? value.toString('hex') : undefined
             },
             {taskId, timeout: 15000}
           ).catch(e => {
@@ -869,7 +875,7 @@ class TssPlugin extends CallablePlugin {
    * @private
    */
   @remoteMethod(RemoteMethods.createKey)
-  async __createKey(data: {party: string, key: string}) {
+  async __createKey(data: {party: string, key: string, value?: string}) {
     // console.log('TssPlugin.__createKey', data)
     let {parties} = this
     let {party, key: keyId} = data
@@ -881,7 +887,7 @@ class TssPlugin extends CallablePlugin {
       log(`TssPlugin.__createKey>> key already exist [${keyId}]`);
       throw {message: `key already exist [${keyId}]`}
     }
-    keysCache.set(keyId, new DistributedKey(parties[party], keyId));
+    keysCache.set(keyId, new DistributedKey(parties[party], keyId, undefined, !!data.value ? toBN(data.value) : undefined));
     return "OK";
   }
 
