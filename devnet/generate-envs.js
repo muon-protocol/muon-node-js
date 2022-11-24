@@ -146,7 +146,7 @@ const createEnv = async () => {
       },
       "nodeManager": {
         "network": "mumbai",
-        "address": "0xd9732018Ca7C8aAEf24aa96205D01e94349d4142"
+        "address": "0x8Abd99F5f74777bd275Ed506D909fd2E9D099Ee6"
       }
     },
     null,
