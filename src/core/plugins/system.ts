@@ -124,6 +124,9 @@ class System extends CallablePlugin {
   @appApiMethod({})
   async getDistributedKey(keyId) {
     let key = this.tssPlugin.getSharedKey(keyId)
+    if(!key)
+      throw `Distributed key not found.`
+    await key.waitToFulfill();
     return key
   }
 
@@ -295,7 +298,6 @@ class System extends CallablePlugin {
       throw `Party not created`
 
     let key = await this.tssPlugin.keyGen(party)
-    await key.waitToFulfill();
 
     return {
       id: key.id,
