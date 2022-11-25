@@ -435,6 +435,7 @@ class TssPlugin extends CallablePlugin {
       this.parties[p.id] = p
     }
     catch (e) {
+      console.log('loading party: ', party);
       console.log(`TssPlugin.loadParty ERROR:`, e)
     }
   }
