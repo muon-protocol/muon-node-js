@@ -16,8 +16,14 @@ import {Constructor} from "../common/types";
 
 export type MuonPluginConfigs = any
 
+export type MuonPlugin = {
+  name: string ,
+  module: Constructor<BasePlugin>,
+  config: MuonPluginConfigs
+}
+
 export type MuonConfigs = {
-  plugins: {[index: string]: [Constructor<BasePlugin>, MuonPluginConfigs]},
+  plugins: MuonPlugin[],
   tss: {
     party: {
       id: string,
@@ -60,16 +66,17 @@ export default class Muon extends Events {
     await this._initializePlugin(this.configs.plugins)
   }
 
-  _initializePlugin(plugins) {
-    for (let pluginName in plugins) {
-      let [plugin, configs] = plugins[pluginName]
+  _initializePlugin(plugins: MuonPlugin[]) {
+    for (let plugin of plugins) {
 
-      const pluginInstance = new plugin(this, configs)
-      this._plugins[pluginName] = pluginInstance
+      const pluginInstance = new plugin.module(this, plugin.config)
+      this._plugins[plugin.name] = pluginInstance
       pluginInstance.onInit();
 
       if(pluginInstance instanceof BaseAppPlugin) {
         if(pluginInstance.APP_NAME) {
+          if(this.appNameToIdMap[pluginInstance.APP_NAME])
+            throw `There is two app with same APP_NAME: ${pluginInstance.APP_NAME}`
           this._apps[pluginInstance.APP_ID] = pluginInstance;
           this.appIdToNameMap[pluginInstance.APP_ID] = pluginInstance.APP_NAME
           this.appNameToIdMap[pluginInstance.APP_NAME] = pluginInstance.APP_ID

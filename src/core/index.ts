@@ -1,4 +1,4 @@
-import Muon from './muon'
+import Muon, {MuonPlugin, MuonPluginConfigs} from './muon'
 let mongoose = require('mongoose')
 const path = require('path');
 const fs = require('fs');
@@ -8,14 +8,16 @@ require('./global')
 const loadConfigs = require('../network/configurations')
 const {utils: {sha3}} = require('web3')
 const chalk = require('chalk')
+import {Constructor} from "../common/types";
+import BasePlugin from "./plugins/base/base-plugin";
 
-async function getEnvPlugins() {
+async function getEnvPlugins(): Promise<MuonPlugin[]> {
   let pluginsStr = process.env['MUON_PLUGINS']
   if (!pluginsStr)
-    return {}
-  let result: {[index: string]: any} = {};
+    return []
+  let result: MuonPlugin[] = [];
   for (let key of pluginsStr.split('|')) {
-    result[`__${key}__`] = [(await import(`./plugins/${key}`)).default, {}]
+    result.push({name: `__${key}__`, module: (await import(`./plugins/${key}`)).default, config: {}})
   }
   return result
 }
@@ -24,7 +26,7 @@ function isV3(app) {
   return !!app.signParams;
 }
 
-function prepareApp(app, fileName, isBuiltInApp=false) {
+function prepareApp(app, fileName, isBuiltInApp=false): [Constructor<BasePlugin>, MuonPluginConfigs] {
   if(!app.APP_ID) {
     if(isV3(app)) {
       app.APP_ID = sha3(fileName);
@@ -52,49 +54,49 @@ function loadApp(path) {
   }
 }
 
-function getCustomApps() {
+function getCustomApps(): MuonPlugin[] {
   let pluginsStr = process.env['MUON_CUSTOM_APPS']
   if (!pluginsStr)
-    return {}
-  return pluginsStr.split('|').reduce((res, key) => {
-    let app = loadApp(`../../apps/custom/${key}`)
+    return []
+  let result: MuonPlugin[] = []
+  pluginsStr.split('|').forEach((name) => {
+    let app = loadApp(`../../apps/custom/${name}`)
     if (app && !!app.APP_NAME) {
-      return {
-        ...res,
-        [key]: prepareApp(app, `${key}.js`)
-      }
-    } else {
-      return res;
+      const [module, config] = prepareApp(app, `${name}.js`);
+      result.push({name, module, config})
     }
-  }, {})
+  })
+  return result;
 }
 
-function getBuiltInApps() {
+function getBuiltInApps(): MuonPlugin[] {
   const appDir = path.join(__dirname, '../built-in-apps');
-  let result = {};
+  let result: MuonPlugin[] = [];
   let files = fs.readdirSync(appDir);
   files.forEach((file) => {
     let ext = file.split('.').pop();
     if (ext.toLowerCase() === 'js') {
       let app = loadApp(`../built-in-apps/${file}`)
       if (app && !!app.APP_NAME) {
-        result[app.APP_NAME] = prepareApp(app, file, true)
+        const [module, config] = prepareApp(app, file, true)
+        result.push({name: app.APP_NAME, module, config})
       }
     }
   });
   return result
 }
 
-function getGeneralApps() {
+function getGeneralApps(): MuonPlugin[] {
   const appDir = path.join(__dirname, '../../apps/general');
-  let result = {};
+  let result: MuonPlugin[] = [];
   let files = fs.readdirSync(appDir);
   files.forEach((file) => {
     let ext = file.split('.').pop();
     if (ext.toLowerCase() === 'js') {
       let app = loadApp(`../../apps/general/${file}`)
       if (app && !!app.APP_NAME) {
-        result[app.APP_NAME] = prepareApp(app, file)
+        const [module, config] = prepareApp(app, file)
+        result.push({name: app.APP_NAME, module, config})
       }
     }
   });
@@ -119,26 +121,26 @@ async function start() {
     // if(nodeVersion[0] < '16')
     //   throw {message: `Node version most be >="16.0.0". current version is "${process.versions.node}"`}
     muon = new Muon({
-      plugins: {
-        'collateral': [(await import('./plugins/collateral-info')).default, {}],
-        'app-manager': [(await import('./plugins/app-manager')).default, {}],
-        'remote-call': [(await import('./plugins/remote-call')).default, {}],
-        'gateway-interface': [(await import('./plugins/gateway-Interface')).default, {}],
-        'ipc': [(await import('./plugins/core-ipc-plugin')).default, {}],
-        'ipc-handlers': [(await import('./plugins/core-ipc-handlers')).default, {}],
-        'broadcast': [(await import('./plugins/broadcast')).default, {}],
-        'content-verify': [(await import('./plugins/content-verify-plugin')).default, {}],
-        'content': [(await import('./plugins/content-app')).default, {}],
-        'memory': [(await import('./plugins/memory-plugin')).default, {}],
-        'tss-plugin': [(await import('./plugins/tss-plugin')).default, {}],
-        'health-check': [(await import('./plugins/health-check')).default, {}],
-        'explorer': [(await import('./plugins/explorer')).default, {}],
-        'system': [(await import('./plugins/system')).default, {}],
+      plugins: [
+        {name: 'collateral', module: (await import('./plugins/collateral-info')).default, config: {}},
+        {name: 'app-manager', module: (await import('./plugins/app-manager')).default, config: {}},
+        {name: 'remote-call', module: (await import('./plugins/remote-call')).default, config: {}},
+        {name: 'gateway-interface', module: (await import('./plugins/gateway-Interface')).default, config: {}},
+        {name: 'ipc', module: (await import('./plugins/core-ipc-plugin')).default, config: {}},
+        {name: 'ipc-handlers', module: (await import('./plugins/core-ipc-handlers')).default, config: {}},
+        {name: 'broadcast', module: (await import('./plugins/broadcast')).default, config: {}},
+        {name: 'content-verify', module: (await import('./plugins/content-verify-plugin')).default, config: {}},
+        {name: 'content', module: (await import('./plugins/content-app')).default, config: {}},
+        {name: 'memory', module: (await import('./plugins/memory-plugin')).default, config: {}},
+        {name: 'tss-plugin', module: (await import('./plugins/tss-plugin')).default, config: {}},
+        {name: 'health-check', module: (await import('./plugins/health-check')).default, config: {}},
+        {name: 'explorer', module: (await import('./plugins/explorer')).default, config: {}},
+        {name: 'system', module: (await import('./plugins/system')).default, config: {}},
         ...await getEnvPlugins(),
         ...getCustomApps(),
         ...getGeneralApps(),
         ...getBuiltInApps(),
-      },
+      ],
       net,
       // TODO: pass it into the tss-plugin
       tss,
