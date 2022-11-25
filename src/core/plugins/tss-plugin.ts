@@ -430,14 +430,17 @@ class TssPlugin extends CallablePlugin {
         partners: party.partners.map(id => this.collateralPlugin.getNodeInfo(id))
       })
       Object.keys(this.availablePeers).forEach(peerId => {
-        const id = this.collateralPlugin.getNodeInfo(peerId)!.id;
-        // TODO: no need the line below bot check it more
-        p.setNodePeer(id, peerId)
+        const nodeInfo = this.collateralPlugin.getNodeInfo(peerId)
+        if(!nodeInfo)
+          return;
+        // TODO: no need the line below but check it more
+        p.setNodePeer(nodeInfo.id, peerId)
       })
       this.parties[p.id] = p
     }
     catch (e) {
       console.log('loading party: ', party);
+      console.log('partners info: ', party);
       console.log(`TssPlugin.loadParty ERROR:`, e)
     }
   }
