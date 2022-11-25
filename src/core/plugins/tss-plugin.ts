@@ -4,7 +4,7 @@ import DistributedKey from "../../utils/tss/distributed-key";
 const {shuffle} = require('lodash')
 const tssModule = require('../../utils/tss/index')
 const {utils:{toBN}} = require('web3')
-const {timeout} = require('../../utils/helpers');
+const {timeout, stackTrace} = require('../../utils/helpers');
 import {remoteApp, remoteMethod, broadcastHandler} from './base/app-decorators'
 import CollateralInfoPlugin from "./collateral-info";
 const NodeCache = require('node-cache');
@@ -360,8 +360,6 @@ class TssPlugin extends CallablePlugin {
         t: _context.party.t,
         max: _context.party.max,
         partners: _context.party.partners
-          .map(wallet => this.collateralPlugin.getNodeInfo(wallet)!)
-          .filter(n => !!n)
       })
     }
     return this.parties[partyId];
@@ -422,6 +420,10 @@ class TssPlugin extends CallablePlugin {
 
   loadParty(party) {
     // console.log(`TssPlugin.loadParty`, party)
+    if(party.partners.lengh > 0 && typeof party.partners[0] !== "string") {
+      console.log("TssPlugin.loadParty.partners most be string array", party.partners)
+      stackTrace()
+    }
     try {
       let p = Party.load({
         ...party,

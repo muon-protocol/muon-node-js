@@ -482,7 +482,6 @@ class BaseAppPlugin extends CallablePlugin {
       id: partyId,
       t: this.tssPlugin.TSS_THRESHOLD,
       partners: context.party.partners
-        .map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
 
     /**
