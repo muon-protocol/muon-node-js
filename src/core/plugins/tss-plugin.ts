@@ -40,7 +40,7 @@ export type PartyGenOptions = {
   /**
    * Exact partners of party
    */
-  partners?: MuonNodeInfo[]
+  partners?: string[]
 }
 
 export type KeyGenOptions = {
@@ -423,7 +423,10 @@ class TssPlugin extends CallablePlugin {
   loadParty(party) {
     // console.log(`TssPlugin.loadParty`, party)
     try {
-      let p = Party.load(party)
+      let p = Party.load({
+        ...party,
+        partners: party.partners.map(id => this.collateralPlugin.getNodeInfo(id))
+      })
       Object.keys(this.availablePeers).forEach(peerId => {
         const id = this.collateralPlugin.getNodeInfo(peerId)!.id;
         // TODO: no need the line below bot check it more
@@ -579,10 +582,13 @@ class TssPlugin extends CallablePlugin {
     /**
      * filter partners and keep online ones.
      */
-    partners = partners.filter(p => !!p.peer)
+    // @ts-ignore
+    const partnersToCall: MuonNodeInfo[] = partners
+      .map(id => this.collateralPlugin.getNodeInfo(id))
+      .filter(p => p && !!p.peer)
 
     let callResult = await Promise.all(
-      partners
+      partnersToCall
         .map(({peerId, wallet}) => {
           if(wallet === process.env.SIGN_WALLET_ADDRESS)
             return true;
@@ -592,16 +598,14 @@ class TssPlugin extends CallablePlugin {
             newParty, // TODO: send less data. just send id and partners wallet
             {timeout: 15000}
           ).catch(e => {
-            if(process.env.VERBOSE){
-              console.log("TssPlugin.createParty", e)
-            }
+            console.log("TssPlugin.createParty", e)
             return 'error'
           })
         })
     )
     const failed = partners.filter((p, i) => callResult[i]==='error')
     if(failed.length > 0)
-      throw `Fail to create party.`
+      throw `${failed.length} partner failed when creating party.`
     return newParty.id;
   }
 

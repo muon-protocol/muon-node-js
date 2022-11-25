@@ -288,7 +288,7 @@ class System extends CallablePlugin {
     await this.tssPlugin.createParty({
       id: partyId,
       t: this.tssPlugin.TSS_THRESHOLD,
-      partners: context.party.partners.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
+      partners: context.party.partners,//.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
     let party = this.tssPlugin.parties[partyId];
     if(!party)
