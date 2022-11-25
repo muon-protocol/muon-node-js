@@ -295,6 +295,7 @@ class System extends CallablePlugin {
       throw `Party not created`
 
     let key = await this.tssPlugin.keyGen(party)
+    await key.waitToFulfill();
 
     return {
       id: key.id,
