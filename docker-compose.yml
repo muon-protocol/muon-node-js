@@ -6,7 +6,8 @@ services:
     build:
       context: .
     ports:
-      - '8080:8080'
+      - '8000:8000'
+      - '4000:4000'
     external_links:
       - muon_mongo
       - muon_redis

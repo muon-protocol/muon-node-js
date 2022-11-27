@@ -26,10 +26,11 @@ EXPOSE 4000
 
 # Add cronjobs
 RUN mkdir /root/.ssh/
-ADD .ssh/id_rsa /root/.ssh/
-ADD .ssh/id_rsa.pub /root/.ssh/
-RUN chmod 700 /root/.ssh/id_rsa
-RUN chown -R root:root /root/.ssh
+
+#ADD .ssh/id_rsa /root/.ssh/
+#ADD .ssh/id_rsa.pub /root/.ssh/
+#RUN chmod 700 /root/.ssh/id_rsa
+#RUN chown -R root:root /root/.ssh
 
 RUN touch /root/.ssh/known_hosts
 RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
