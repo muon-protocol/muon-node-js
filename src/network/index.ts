@@ -184,6 +184,11 @@ async function start() {
     useUnifiedTopology: true
   })
 
+  if (!mongoose.connection)
+    throw 'Error connecting to MongoDB'
+
+  log(`MongoDB successfully connected.`)
+
   log("starting ...")
   await clearMessageBus();
 

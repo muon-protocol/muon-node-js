@@ -52,8 +52,17 @@ async function boot() {
       host: process.env.GATEWAY_HOST,
       port: process.env.GATEWAY_PORT,
     })
+      .catch(e => {
+        console.log(`Gateway failed to start.`, e)
+      })
 
-    await Network.start()
+    try {
+      await Network.start()
+    }
+    catch (e) {
+      console.log(`Network failed to start.`, e)
+      throw e
+    }
     //
     cluster.on("exit", async function (worker, code, signal) {
       log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
