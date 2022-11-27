@@ -13,7 +13,7 @@ git clone git@github.com:muon-protocol/muon-node-js.git --recurse-submodules --b
 
 ```
 docker-compose build
-docker-compose up
+docker-compose up -d
 ```
 
 ### Get PeerId and SignWallet address
