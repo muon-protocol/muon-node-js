@@ -21,7 +21,7 @@ function runNodes(node_n) {
         console.log(data.toString())
       })
       result.stderr.on('data', (data) => {
-        console.error(`stderr: ${data}`)
+        console.error(data.toString())
       })
     }
   } catch (error) {

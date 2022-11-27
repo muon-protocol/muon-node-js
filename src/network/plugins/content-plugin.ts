@@ -4,7 +4,7 @@ import CollateralInfoPlugin from "./collateral-info";
 const {loadCID} = require('../../utils/cid')
 const {timeout} = require('../../utils/helpers')
 const all = require('it-all')
-const log = require('debug')('muon:network:plugins:content')
+const log = require('../../common/muon-log')('muon:network:plugins:content')
 
 export default class NetworkContentPlugin extends BaseNetworkPlugin {
 

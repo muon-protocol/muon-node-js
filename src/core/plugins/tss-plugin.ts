@@ -13,7 +13,7 @@ import * as CoreIpc from '../ipc'
 import {MuonNodeInfo} from "../../common/types";
 import AppManager from "./app-manager";
 import BN from 'bn.js';
-const log = require('debug')('muon:core:plugins:tss')
+const log = require('../../common/muon-log')('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
 

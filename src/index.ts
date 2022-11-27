@@ -1,6 +1,6 @@
 import cluster, {Worker} from 'cluster'
 import * as os from 'os'
-const log = require('debug')('muon:boot')
+const log = require('./common/muon-log')('muon:boot')
 
 const Gateway = require('./gateway')
 const Network = require('./network');

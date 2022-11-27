@@ -3,7 +3,7 @@ var cors = require('cors')
 let bodyParser = require('body-parser')
 let mongoose = require('mongoose')
 let api = require('./api')
-const log = require('debug')('muon:gateway')
+const log = require('../common/muon-log')('muon:gateway')
 
 let app = express()
 

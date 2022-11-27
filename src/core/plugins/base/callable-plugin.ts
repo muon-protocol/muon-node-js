@@ -1,5 +1,5 @@
 import BasePlugin from './base-plugin'
-const log = require('debug')('muon:core:plugins:callable')
+const log = require('../../../common/muon-log')('muon:core:plugins:callable')
 
 export default class CallablePlugin extends BasePlugin {
 

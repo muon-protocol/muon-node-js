@@ -27,7 +27,7 @@ const Ajv = require("ajv")
 const ajv = new Ajv()
 const web3 = new Web3();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
-const Log = require('debug')
+const Log = require('../../../common/muon-log')
 
 export type AppRequestSignature = {
   /**

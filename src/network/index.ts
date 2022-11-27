@@ -9,7 +9,7 @@ const emoji = require('node-emoji')
 const isPrivate = require('libp2p-utils/src/multiaddr/is-private')
 const coreIpc = require('../core/ipc')
 const { MessagePublisher } = require('../common/message-bus')
-const log = require('debug')('muon:network')
+const log = require('../common/muon-log')('muon:network')
 
 import CollateralPlugin from './plugins/collateral-info';
 import IpcHandlerPlugin from './plugins/network-ipc-handler'

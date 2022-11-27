@@ -1,7 +1,7 @@
 import Muon from "../../muon";
 import {MuonNodeInfo} from "../../../common/types";
 import CollateralInfoPlugin from "../collateral-info";
-const log = require('debug')('muon:core:plugins:base')
+const log = require('../../../common/muon-log')('muon:core:plugins:base')
 
 const Events = require('events-async')
 const PeerId = require('peer-id')

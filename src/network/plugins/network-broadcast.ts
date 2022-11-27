@@ -3,7 +3,7 @@ import CollateralInfoPlugin from "./collateral-info";
 const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
 const uint8ArrayToString = require('uint8arrays/to-string').toString;
 import * as CoreIpc from '../../core/ipc'
-const log = require('debug')('muon:network:plugins:broadcast')
+const log = require('../../common/muon-log')('muon:network:plugins:broadcast')
 
 export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 

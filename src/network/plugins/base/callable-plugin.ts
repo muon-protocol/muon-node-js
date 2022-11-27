@@ -1,5 +1,5 @@
 import BaseNetworkPlugin from './base-network-plugin';
-const log = require('debug')('muon:network:plugins:callable')
+const log = require('../../../common/muon-log')('muon:network:plugins:callable')
 
 export default class CallablePlugin extends BaseNetworkPlugin {
 

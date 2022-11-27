@@ -8,7 +8,7 @@ const CoreIpc = require('../../core/ipc')
 const NetworkIpc = require('../../network/ipc')
 const axios = require('axios').default
 const crypto = require('../../utils/crypto')
-const log = require('debug')('muon:gateway:api')
+const log = require('../../common/muon-log')('muon:gateway:api')
 
 const SHIELD_FORWARD_URL = process.env.SHIELD_FORWARD_URL
 const appIsShielded = (process.env.SHIELDED_APPS || "")

@@ -10,7 +10,7 @@ const {utils: {sha3}} = require('web3')
 const chalk = require('chalk')
 import {Constructor} from "../common/types";
 import BasePlugin from "./plugins/base/base-plugin";
-const log = require('debug')('muon:core')
+const log = require('../common/muon-log')('muon:core')
 
 async function getEnvPlugins(): Promise<MuonPlugin[]> {
   let pluginsStr = process.env['MUON_PLUGINS']
