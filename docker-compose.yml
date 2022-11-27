@@ -1,12 +1,13 @@
 version: '3'
 services:
   muon_api:
-    container_name: docker-node-mongo-redis
+    container_name: muon-node
     restart: always
     build:
       context: .
     ports:
-      - '8080:8080'
+      - '8000:8000'
+      - '4000:4000'
     external_links:
       - muon_mongo
       - muon_redis
