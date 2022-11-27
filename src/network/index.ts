@@ -1,5 +1,5 @@
 import NetworkContentPlugin from "./plugins/content-plugin";
-
+let mongoose = require('mongoose')
 const Events = require('events-async');
 const Libp2pBundle = require('./libp2p_bundle')
 const loadConfigs = require('./configurations')
@@ -178,6 +178,12 @@ function clearMessageBus(){
 }
 
 async function start() {
+  log("connecting to mongodb ...")
+  await mongoose.connect(process.env.MONGODB_CS, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+
   log("starting ...")
   await clearMessageBus();
 
