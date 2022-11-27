@@ -18,6 +18,27 @@ COPY . .
 ENV DOCKER_MODE=1
 RUN node testnet-generate-env.js
 
+# gateway
 EXPOSE 8080
 
-CMD [ "npm", "start" ]
+# P2P
+EXPOSE 4000
+
+# Add cronjobs
+RUN mkdir /root/.ssh/
+ADD .ssh/id_rsa /root/.ssh/
+ADD .ssh/id_rsa.pub /root/.ssh/
+RUN chmod 700 /root/.ssh/id_rsa
+RUN chown -R root:root /root/.ssh
+
+RUN touch /root/.ssh/known_hosts
+RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
+
+### Install app dependencies
+RUN npm i -g pm2
+
+RUN apt-get update && apt-get -y install cron
+RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-testnet'
+
+CMD [ "pm2-runtime", "start", "ecosystem.config.js" ]
+#

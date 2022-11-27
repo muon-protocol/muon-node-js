@@ -1,7 +1,7 @@
 version: '3'
 services:
   muon_api:
-    container_name: docker-node-mongo-redis
+    container_name: muon-node
     restart: always
     build:
       context: .
