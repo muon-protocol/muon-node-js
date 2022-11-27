@@ -10,6 +10,7 @@ const {utils: {sha3}} = require('web3')
 const chalk = require('chalk')
 import {Constructor} from "../common/types";
 import BasePlugin from "./plugins/base/base-plugin";
+const log = require('debug')('muon:core')
 
 async function getEnvPlugins(): Promise<MuonPlugin[]> {
   let pluginsStr = process.env['MUON_PLUGINS']
@@ -106,10 +107,16 @@ function getGeneralApps(): MuonPlugin[] {
 var muon;
 
 async function start() {
+  log('starting ...')
   await mongoose.connect(process.env.MONGODB_CS, {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })
+
+  if (!mongoose.connection)
+    throw 'Error connecting to MongoDB'
+
+  log(`MongoDB successfully connected.`)
 
   let config = await loadConfigs();
   let {

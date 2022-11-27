@@ -7,7 +7,7 @@ const log = require('debug')('muon:gateway')
 
 let app = express()
 
-function start(options) {
+async function start(options) {
   log(`gateway starting ...`)
   var port = options.port || 8080
   var host = options.host || '127.0.0.1'
@@ -21,23 +21,22 @@ function start(options) {
   )
   app.use(bodyParser.json())
 
-  mongoose.connect(process.env.MONGODB_CS, {
+  await mongoose.connect(process.env.MONGODB_CS, {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })
-  var db = mongoose.connection
 
-  if (!db)
-    log('Error connecting db')
-  else {
-    log("Db connected successfully")
-    app.use('/v1/', api)
-    app.use('/status', (req, res, next) => {
-      res.json({
-        running: true
-      })
+  if (!mongoose.connection)
+    throw 'Error connecting to MongoDB'
+
+  log(`MongoDB successfully connected.`)
+
+  app.use('/v1/', api)
+  app.use('/status', (req, res, next) => {
+    res.json({
+      running: true
     })
-  }
+  })
 
   app.listen(port, host, function () {
     log(`Running gateway on port ${port} at ${host}`)

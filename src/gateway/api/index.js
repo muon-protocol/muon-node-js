@@ -39,7 +39,7 @@ function extraLogs(req, result) {
     logs.extra = {
       ...logs.extra,
       nonce: result.data?.init?.nonceAddress,
-      reqHash: result.reqId
+      reqId: result.reqId
     }
   }
   return logs;

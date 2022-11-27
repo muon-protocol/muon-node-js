@@ -35,7 +35,7 @@ export default class NetworkContentPlugin extends BaseNetworkPlugin {
       let cidList = contents.map(c => c.cid)
       await this.provide(cidList);
     }catch (e) {
-      console.error("ERROR: ContentApp.provideContents", e)
+      console.error("ERROR: network.ContentPlugin.provideContents", e)
     }
   }
 
