@@ -12,6 +12,7 @@ git clone git@github.com:muon-protocol/muon-node-js.git --recurse-submodules --b
 ### Build and run docker
 
 ```
+cd muon-node-js
 docker-compose build
 docker-compose up -d
 ```
