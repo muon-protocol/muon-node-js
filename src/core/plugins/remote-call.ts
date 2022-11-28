@@ -7,7 +7,7 @@ export default class RemoteCall extends BasePlugin {
     try {
       return await this.emit(`${method}`, params, callerInfo)
     }catch (e) {
-      errorLog("error happened %o", e)
+      errorLog("error happened %o %o", {method, params, callerInfo}, e)
       throw e
     }
   }

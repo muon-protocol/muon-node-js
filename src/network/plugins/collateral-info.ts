@@ -6,7 +6,7 @@ import NodeManagerAbi from '../../data/NodeManager-ABI.json'
 import {MuonNodeInfo} from "../../common/types";
 import * as CoreIpc from '../../core/ipc'
 import _ from 'lodash'
-const log = require('debug')('muon:network:plugins:collateral')
+const log = require('../../common/muon-log')('muon:network:plugins:collateral')
 
 export type GroupInfo = {
   isValid: boolean,
@@ -27,7 +27,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   networkInfo: NetworkInfo | null = null;
   onlinePeers: {[index: string]: boolean} = {}
 
-  private lastNodesUpdateTime;
+  private lastNodesUpdateTime: number;
   private _nodesList: MuonNodeInfo[];
   private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
   /**
@@ -110,6 +110,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
        * all three indexes id|wallet|peerId contains same object reference.
        * by changing peerId index other two indexes, will change too.
        */
+      // TODO: is this needed?
       this._nodesMap.set(index, nodeInfo);
     }
   }
@@ -148,7 +149,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     this.loading.resolve(true);
   }
 
-  async loadNetworkInfo(nodeManagerInfo){
+  async loadNetworkInfo(nodeManagerInfo): Promise<{lastUpdateTime: number, allNodes: MuonNodeInfo[]}>{
     const {address, network} = nodeManagerInfo;
 
     let rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
@@ -272,7 +273,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       return Infinity;
   }
 
-  hasEnoughPartners() {
+  hasEnoughPartners(): boolean {
     /**
      * onlinePartners not include current node
      */

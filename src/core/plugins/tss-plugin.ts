@@ -170,16 +170,10 @@ class TssPlugin extends CallablePlugin {
     try {
       let nodeInfo = this.collateralPlugin.getNodeInfo(peerId);
       if(nodeInfo) {
-        if (!!this.tssParty) {
-          if (nodeInfo.wallet) {
-            // console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
-            Object.keys(this.parties).forEach(partyId => {
-              this.parties[partyId].setNodePeer(nodeInfo!.id, peerId);
-            })
-          }
-        } else {
-          console.log(`There is no tss party`);
-        }
+        // console.log(`[${process.pid}] TssPlugin: adding online peer`, {peerId, peerWallet})
+        Object.keys(this.parties).forEach(partyId => {
+          this.parties[partyId].setNodePeer(nodeInfo!.id, peerId);
+        })
       }else {
         console.log("Peer connected with unknown peerId", peerId);
       }
@@ -225,17 +219,19 @@ class TssPlugin extends CallablePlugin {
     const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
 
     /** current node not in the network */
-    if(!currentNodeInfo) {
+    if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
       return;
     }
 
     //TODO: handle {isValid: false};
 
     let party = Party.load({
-      id: group,
+      id: 'deployers-party',
       t: networkInfo.tssThreshold,
       max: networkInfo.maxGroupSize,
-      partners: partners.map(id => this.collateralPlugin.getNodeInfo(id)!)
+      partners: partners
+        .map(id => this.collateralPlugin.getNodeInfo(id)!)
+        .filter(n => n.isDeployer)
     });
     this.parties[party.id] = party
     this.tssParty = party;
@@ -836,6 +832,9 @@ class TssPlugin extends CallablePlugin {
   async __recoverMyKey(data: {nonce: string}, callerInfo) {
     // TODO: can malicious user use a nonce twice?
     // console.log('TssPlugin.__recoverMyKey', data, callerInfo.wallet)
+    if(!callerInfo.isDeployer)
+      throw `Only deployer nodes can have global tss`
+
     if(!this.tssKey || !this.tssParty){
         throw "Tss not initialized"
     }
@@ -843,23 +842,23 @@ class TssPlugin extends CallablePlugin {
     let {tssParty, tssKey} = this
 
     const callerId = this.collateralPlugin.getNodeInfo(callerInfo.wallet)!.id;
-    if (!Object.keys(tssParty.partners).includes(callerId))
+    if (!Object.keys(tssParty!.partners).includes(callerId))
       throw `Not included in the global party`;
 
     let {nonce: nonceId} = data
-    if (!!tssKey && nonceId === tssKey.id)
+    if (!!tssKey && nonceId === tssKey!.id)
       throw `Cannot use tss key as nonce`;
 
     let nonce = keysCache.get(nonceId);
     await nonce.waitToFulfill()
-    let keyPart = tssModule.addKeys(nonce.share, tssKey.share);
+    let keyPart = tssModule.addKeys(nonce.share, tssKey!.share);
     return {
-      id: tssKey.id,
+      id: tssKey!.id,
       recoveryShare: `0x${keyPart.toString(16)}`,
       // distributedKey public
-      publicKey: `${tssKey.publicKey!.encode('hex', true)}`,
+      publicKey: `${tssKey!.publicKey!.encode('hex', true)}`,
       // distributed key address
-      address: tssModule.pub2addr(tssKey.publicKey)
+      address: tssModule.pub2addr(tssKey!.publicKey)
     }
   }
 

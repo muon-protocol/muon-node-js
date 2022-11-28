@@ -29,6 +29,7 @@ export type MuonNodeInfo = {
     id: string,
     wallet: string,
     peerId: string,
+    isDeployer: boolean,
     isOnline?: boolean,
     peer?: any
 }
