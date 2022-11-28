@@ -3,6 +3,7 @@ import TimeoutPromise from '../../common/timeout-promise'
 import * as NetworkIpc from '../../network/ipc'
 import { GroupInfo, NetworkInfo } from '../../network/plugins/collateral-info'
 import {MuonNodeInfo} from "../../common/types";
+const log = require('../../common/muon-log')('muon:core:plugins:collateral')
 
 export default class CollateralInfoPlugin extends BasePlugin{
 
@@ -81,7 +82,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
   }
 
   onNodeAdd(nodeInfo: MuonNodeInfo) {
-    console.log(`Core.CollateralInfo.onNodeAdd`, nodeInfo)
+    log(`Core.CollateralInfo.onNodeAdd %o`, nodeInfo)
     this.groupInfo.partners.push(nodeInfo.id);
     this._nodesList.push(nodeInfo)
 
@@ -93,8 +94,9 @@ export default class CollateralInfoPlugin extends BasePlugin{
     this.allowedWallets.push(nodeInfo.wallet);
   }
 
-  onNodeEdit(nodeInfo: MuonNodeInfo) {
-    console.log(`Core.CollateralInfo.onNodeEdit`, nodeInfo)
+  onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
+    const {nodeInfo, oldNodeInfo} = data
+    log(`Core.CollateralInfo.onNodeEdit %o`, {nodeInfo, oldNodeInfo})
     const listIndex = this._nodesList.findIndex(item => item.id === nodeInfo.id)
     this._nodesList.splice(listIndex, 1, nodeInfo);
 
@@ -103,11 +105,15 @@ export default class CollateralInfoPlugin extends BasePlugin{
       .set(nodeInfo.wallet, nodeInfo)
       .set(nodeInfo.peerId, nodeInfo)
 
+
+    /** update allowedWallets */
+    const idx2 = this.allowedWallets.findIndex(w => w === oldNodeInfo.wallet)
+    this.allowedWallets.splice(idx2, 1);
     this.allowedWallets.push(nodeInfo.wallet);
   }
 
   onNodeDelete(nodeInfo: MuonNodeInfo) {
-    console.log(`Core.CollateralInfo.onNodeDelete`, nodeInfo)
+    log(`Core.CollateralInfo.onNodeDelete %o`, nodeInfo)
 
     /** remove from groupInfo*/
     let pIndex = this.groupInfo.partners.indexOf(nodeInfo.id)
@@ -131,9 +137,9 @@ export default class CollateralInfoPlugin extends BasePlugin{
     let info;
     while(!info) {
       try {
-        info = await NetworkIpc.getCollateralInfo({timeout: 0});
+        info = await NetworkIpc.getCollateralInfo({timeout: 5000});
       }catch (e) {
-        console.log(`[${process.pid}] CoreCollateralInfo._loadCollateralInfo`, e);
+        log(`[${process.pid}] CoreCollateralInfo._loadCollateralInfo %o`, e);
       }
     }
     const { groupInfo, networkInfo, nodesList } = info

@@ -175,6 +175,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
    * 3) Deactivate node by collateral address
    * 4) Edit nodeAddress
    * 5) Edit PeerId
+   * 6) Edit isDeployer
    */
   async onNodesChange() {
     let {nodeManager} = this.network.configs.net;
@@ -217,15 +218,22 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       /**
        * 4) Edit nodeAddress
        * 5) Edit PeerId
+       * 6) Edit isDeployer
        */
-      if(oldNode.wallet !== n.wallet || oldNode.peerId !== n.peerId) {
+      if(oldNode.wallet !== n.wallet || oldNode.peerId !== n.peerId || oldNode.isDeployer !== n.isDeployer) {
         this._nodesMap
           .set(n.id, n)
           .set(n.wallet, n)
           .set(n.peerId, n)
         log(`Node info changed on chain %o`, {old: oldNode, new: n})
-        this.emit("node:edit", n)
-        CoreIpc.fireEvent({type: "node:edit", data: _.omit(n, ['peer'])})
+        this.emit("node:edit", n, oldNode)
+        CoreIpc.fireEvent({
+          type: "node:edit",
+          data: {
+            nodeInfo: _.omit(n, ['peer']),
+            oldNodeInfo: _.omit(oldNode, ['peer']),
+          }
+        })
         return;
       }
     })

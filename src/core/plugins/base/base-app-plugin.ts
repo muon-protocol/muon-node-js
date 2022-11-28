@@ -779,7 +779,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     // TODO: remove async
     partners.map(async ({peerId, wallet}) => {
-      return this.remoteCall(peerId, 'wantSign', request, {timeout: this.REMOTE_CALL_TIMEOUT, taskId: `keygen-${nonce.id}`})
+      return this.remoteCall(peerId, RemoteMethods.WantSign, request, {timeout: this.REMOTE_CALL_TIMEOUT, taskId: `keygen-${nonce.id}`})
         .then(this.__onRemoteSignTheRequest.bind(this))
         .catch(e => {
           // console.log('base-tss-app-plugin: on broadcast request error', e)

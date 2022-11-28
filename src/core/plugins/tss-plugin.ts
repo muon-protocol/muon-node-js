@@ -121,8 +121,9 @@ class TssPlugin extends CallablePlugin {
     })
   }
 
-  onNodeEdit(nodeInfo: MuonNodeInfo) {
-    console.log(`Node edit %o`, nodeInfo)
+  onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
+    const {nodeInfo, oldNodeInfo} = data
+    log(`core.tssPlugin.onNodeEdit %o`, {nodeInfo, oldNodeInfo})
     Object.keys(this.parties).forEach(partyId => {
       this.parties[partyId].addPartner(nodeInfo);
       if(nodeInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
