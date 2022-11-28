@@ -40,6 +40,8 @@ The test token is on Ploygon test network
 
 https://mumbai.polygonscan.com/address/0xb6ba20951acd0b5bd092e61052c54d3f783d1008#code
 
+```mint``` function.
+
 ### Stake minimum 1000 tokens on MuonNodesStaking contract
 
 https://mumbai.polygonscan.com/address/0x44325D08C455adf634866f8c4cE5035352a745e1#code
