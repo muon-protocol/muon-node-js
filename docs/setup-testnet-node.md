@@ -44,9 +44,9 @@ The [test token](https://mumbai.polygonscan.com/address/0xb6ba20951acd0b5bd092e6
 
 Use the `approve` function of the [token contract](https://mumbai.polygonscan.com/address/0xb6ba20951acd0b5bd092e61052c54d3f783d1008#code) to approve staking contract at `0x44325D08C455adf634866f8c4cE5035352a745e1` to stake your test tokens.
 
-### Stake minimum 1000 tokens on MuonNodesStaking contract
+### Stake tokens on MuonNodesStaking contract
 
-Use the`stake` function of the [staking contract](https://mumbai.polygonscan.com/address/0x44325D08C455adf634866f8c4cE5035352a745e1#code) to stake your test tokens.
+Use the`stake` function of the [staking contract](https://mumbai.polygonscan.com/address/0x44325D08C455adf634866f8c4cE5035352a745e1#code) to stake at least 1000 test tokens for your node.
 
 ### Add the node on MuonNodesStaking contract
 
