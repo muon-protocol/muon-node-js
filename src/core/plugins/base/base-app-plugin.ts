@@ -1005,6 +1005,18 @@ class BaseAppPlugin extends CallablePlugin {
       throw "Only request owner can want signature."
     }
 
+    /**
+     * Check to ensure the current node exists in the app party.
+     */
+    const context = this.appManager.getAppContext(this.APP_ID)
+    if(!context)
+      throw `Missing app context`
+    const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!
+    if(!context.party.partners.includes(currentNodeInfo.id))
+      throw `Current node does not exist in the app party`
+    if(!this.appTss)
+      throw `Missing app tss key`
+
     const [result, hash] = await this.preProcessRemoteRequest(request);
 
     let nonce = this.tssPlugin.getSharedKey(request.reqId);
