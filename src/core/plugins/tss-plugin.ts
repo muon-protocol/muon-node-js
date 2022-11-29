@@ -112,23 +112,47 @@ class TssPlugin extends CallablePlugin {
     log(`Node add %o`, nodeInfo)
     Object.keys(this.parties).forEach(partyId => {
       this.parties[partyId].addPartner(nodeInfo);
-      if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        this.loadTssInfo()
-      }
-      else {
-        this.findPeerInfo(nodeInfo.peerId);
-      }
     })
+    if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS) {
+      this.loadTssInfo()
+    }
+    else {
+      this.findPeerInfo(nodeInfo.peerId);
+    }
   }
 
-  onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
+  async onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
     const {nodeInfo, oldNodeInfo} = data
+    if(this.availablePeers[nodeInfo.peerId])
+      nodeInfo.peer = nodeInfo.peerId
     log(`core.tssPlugin.onNodeEdit %o`, {nodeInfo, oldNodeInfo})
-    Object.keys(this.parties).forEach(partyId => {
-      this.parties[partyId].addPartner(nodeInfo);
-      if(nodeInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
-        this.findPeerInfo(nodeInfo.peerId);
-    })
+    // Object.keys(this.parties).forEach(partyId => {
+    //   this.parties[partyId].addPartner(nodeInfo);
+    // })
+    if(nodeInfo.isDeployer !== oldNodeInfo.isDeployer) {
+      if(nodeInfo.isDeployer) {
+        if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
+          await this.loadTssInfo()
+        }
+        else {
+          this.tssParty!.addPartner(nodeInfo)
+        }
+      }
+      else {
+        if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
+          this.isReady = false
+          this.tssKey = null
+          if(this.tssParty) {
+            const p = this.tssParty
+            delete this.parties[p.id];
+          }
+        }
+        else {
+          if(this.tssParty)
+            this.tssParty.deletePartner(nodeInfo.id);
+        }
+      }
+    }
   }
 
   onNodeDelete(nodeInfo: MuonNodeInfo) {
@@ -223,6 +247,7 @@ class TssPlugin extends CallablePlugin {
     if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
       return;
     }
+    log(`loading global tss info ...`)
 
     //TODO: handle {isValid: false};
 
@@ -236,6 +261,7 @@ class TssPlugin extends CallablePlugin {
     });
     this.parties[party.id] = party
     this.tssParty = party;
+    log(`tss party loaded.`)
 
     Object.keys(this.availablePeers).forEach(peerId => {
       this.findPeerInfo(peerId);
@@ -272,6 +298,7 @@ class TssPlugin extends CallablePlugin {
         log(`TSS key generated with ${key.partners.length} partners`);
       }
       else{
+        log(`trying to recover global tss key...`)
         await timeout(6000);
 
         // this.tryToFindOthers();
@@ -722,7 +749,7 @@ class TssPlugin extends CallablePlugin {
     return key;
   }
 
-  async broadcastKey(key) {
+  async broadcastKey(key: DistributedKey) {
     // console.log(`broadcasting key shares ...`, key.id)
     key.keyDistributed = true;
     let {party} = key;
@@ -730,11 +757,11 @@ class TssPlugin extends CallablePlugin {
     // set key self FH
     let selfWalletIndex = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!.id;
     let selfFH = key.getFH(selfWalletIndex)
-    let A_ik = key.f_x.coefPubKeys()
+    let A_ik = key.f_x!.coefPubKeys()
     key.setSelfShare(selfWalletIndex, selfFH.f, selfFH.h, A_ik);
 
     // let keyPartners = key.partners.map(w => party.partners[w]);
-    const onlinePartners = party.onlinePartners;
+    const onlinePartners = party!.onlinePartners;
     let keyPartners = key.partners.map(id => onlinePartners[id]);
     let distKeyResult = await Promise.all(
       keyPartners
@@ -752,11 +779,11 @@ class TssPlugin extends CallablePlugin {
           peerId,
           RemoteMethods.distributeKey,
           {
-            party: party.id,
+            party: party!.id,
             key: key.id,
             partners: key.partners,
-            commitment: key.commitment.map(c => c.encode('hex')),
-            pubKeys: A_ik.map(pubKey => pubKey.encode('hex')),
+            commitment: key.commitment.map(c => c.encode('hex', false)),
+            pubKeys: A_ik.map(pubKey => pubKey.encode('hex', false)),
             ...key.getFH(destinationNodeInfo.id),
           },
           {taskId: `keygen-${key.id}`}

@@ -139,7 +139,9 @@ export default class Muon extends Events {
 
   async onGlobalEventReceived(event: CoreGlobalEvent, info) {
     // console.log(`[${process.pid}] core.Muon.onGlobalEventReceived`, event)
-    this.emit(event.type, event.data, info);
+    try {
+      await this.emit(event.type, event.data, info);
+    }catch (e) {}
   }
 
   get configDir(){

@@ -143,7 +143,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       partners: allNodes.map(n => n.id)
     }
 
-    log('Collateral nfo loaded.');
+    log('Collateral info loaded.');
 
     this.emit('loaded');
     this.loading.resolve(true);
@@ -230,8 +230,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
         CoreIpc.fireEvent({
           type: "node:edit",
           data: {
-            nodeInfo: _.omit(n, ['peer']),
-            oldNodeInfo: _.omit(oldNode, ['peer']),
+            nodeInfo: {...n, peer: !!n.peer ? n.peerId : undefined},
+            oldNodeInfo: {...oldNode, peer: !!oldNode.peer ? oldNode.peerId : undefined},
           }
         })
         return;
