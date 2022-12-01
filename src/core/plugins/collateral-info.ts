@@ -165,6 +165,10 @@ export default class CollateralInfoPlugin extends BasePlugin{
     return this.allowedWallets;
   }
 
+  getDeployerNodes(): MuonNodeInfo[] {
+    return this._nodesList.filter(n => n.isDeployer)
+  }
+
   /**
    * @param index {string} - id/wallet/peerId of node
    */

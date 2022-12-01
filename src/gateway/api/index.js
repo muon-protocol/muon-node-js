@@ -68,7 +68,12 @@ async function callProperNode(requestData) {
   let context = await CoreIpc.getAppContext(requestData.app);
   if (!context) {
     log("context not found. query the network for context.")
-    context = await CoreIpc.queryAppContext(requestData.app)
+    try {
+      context = await CoreIpc.queryAppContext(requestData.app)
+    }catch (e) {
+      log('query app context failed %o', e)
+      throw e;
+    }
   }
   if (!context) {
     log('app context not found and it throwing error %o', requestData)

@@ -8,6 +8,7 @@ import CollateralInfoPlugin from "./collateral-info";
 const TssModule = require('../../utils/tss');
 const AppContext = require("../../common/db-models/AppContext")
 const AppTssConfig = require("../../common/db-models/AppTssConfig")
+const log = require('../../common/muon-log')('muon:core:plugins:app-manager')
 
 const appContextEventEmitter = AppContext.watch()
 const appTssConfigEventEmitter = AppTssConfig.watch()
@@ -167,7 +168,7 @@ export default class AppManager extends CallablePlugin {
         return this.appQueryResult[appId].result;
     }
     /** refresh result */
-    const remoteNodes: MuonNodeInfo[] = Object.values(this.tssPlugin.tssParty!.onlinePartners);
+    const remoteNodes: MuonNodeInfo[] = this.collateralPlugin.getDeployerNodes()
     let callResult = await Promise.all(remoteNodes.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
         return this.getAppStatus(appId)
@@ -177,7 +178,10 @@ export default class AppManager extends CallablePlugin {
         appId,
         {timeout: 15000}
       )
-        .catch(e => "error")
+        .catch(e => {
+          log('error when calling remote method AppState %o',e);
+          return "error"
+        })
     }));
     const threshold = this.tssPlugin.TSS_THRESHOLD;
     const trueCallResult = callResult.filter(r => r?.deployed)
