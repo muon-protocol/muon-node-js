@@ -168,7 +168,7 @@ export default class AppManager extends CallablePlugin {
         return this.appQueryResult[appId].result;
     }
     /** refresh result */
-    const remoteNodes: MuonNodeInfo[] = this.collateralPlugin.getDeployerNodes()
+    const remoteNodes: MuonNodeInfo[] = this.collateralPlugin.filterNodes({isDeployer: true, isOnline: true})
     let callResult = await Promise.all(remoteNodes.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
         return this.getAppStatus(appId)

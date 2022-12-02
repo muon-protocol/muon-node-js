@@ -409,7 +409,10 @@ class BaseAppPlugin extends CallablePlugin {
   async qwOnAppDeploy({method, params}) {
     let {timestamp, signature} = params
 
-    const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
+    const nodesToInform = this.collateralPlugin.filterNodes({
+      list: this.tssPlugin.tssParty?.partners,
+      isOnline: true
+    })
 
     let callResult = await Promise.all(
       nodesToInform.map(n => {
@@ -442,7 +445,10 @@ class BaseAppPlugin extends CallablePlugin {
   async gwOnTssKeygen({method, params}) {
     let {timestamp, signature} = params
 
-    const nodesToInform = Object.values(this.tssPlugin.tssParty?.onlinePartners!)
+    const nodesToInform = this.collateralPlugin.filterNodes({
+      list: this.tssPlugin.tssParty?.partners,
+      isOnline: true
+    })
         .filter(n => n.wallet!==process.env.SIGN_WALLET_ADDRESS)
     /**
      * KeyGen Step 1
@@ -541,7 +547,12 @@ class BaseAppPlugin extends CallablePlugin {
       /** self */
       this.currentNodeInfo!,
       /** all other online partners */
-      ...Object.values(nonce?.party!.onlinePartners).filter(n => n.id !== this.currentNodeInfo!.id),
+      ...this.collateralPlugin
+        .filterNodes({
+          list: nonce?.party!.partners,
+          isOnline: true
+        })
+        .filter(n => n.id !== this.currentNodeInfo!.id),
     ]
 
     const responses: string[] = await Promise.all(partners.map(async node => {
@@ -770,7 +781,7 @@ class BaseAppPlugin extends CallablePlugin {
     let party = nonce.party;
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: nonce.party has not value.`}
-    let partners: MuonNodeInfo[] = Object.values(party.partners)
+    let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: party.partners})
       .filter((op: MuonNodeInfo) => {
         return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.id)
       })

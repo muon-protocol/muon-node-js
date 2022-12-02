@@ -1,12 +1,10 @@
 import TimeoutPromise from '../../common/timeout-promise'
-import {MuonNodeInfo} from "../../common/types";
-const {stackTrace} = require('../helpers')
 
 type PartyLoadParams = {
   id?: string,
   t: number,
   max: number,
-  partners: MuonNodeInfo[]
+  partners: string[]
 }
 
 export default class TssParty {
@@ -14,7 +12,7 @@ export default class TssParty {
   max: number = 0;
   id: string;
   /** map nodeId to MuonNodeInfo */
-  partners: {[index: string]: MuonNodeInfo} = {}
+  partners: string[]
   timeoutPromise: TimeoutPromise;
 
   constructor(t: number, max: number, id?:string, timeout?:number){
@@ -32,7 +30,7 @@ export default class TssParty {
 
   static load(_party: PartyLoadParams){
     let party = new TssParty(_party.t, _party.max, _party.id)
-    party.partners = {};
+    party.partners = _party.partners;
     _party.partners.forEach(p => party.addPartner(p))
     party.timeoutPromise.resolve(party);
     return party;
@@ -42,12 +40,12 @@ export default class TssParty {
    * @param partner
    *
    */
-  addPartner(partner: MuonNodeInfo){
-    if(typeof partner === 'string')
-      throw "partner most be object of type {wallet,peerId}"
-    // if(this.partners[partner.wallet] === undefined)
+  addPartner(partner: string){
+    if(typeof partner !== 'string')
+      throw "partner most be string"
+    if(!this.partners.includes(partner))
     {
-      this.partners[partner.id] = partner
+      this.partners.push(partner)
       if(this.isFulfilled()) {
         this.timeoutPromise.resolve(this)
       }
@@ -58,18 +56,6 @@ export default class TssParty {
     delete this.partners[id]
   }
 
-  setNodePeer(id, peer){
-    if(!!peer && typeof peer !== 'string') {
-      // TODO: uncomment this line. disconnect one node. fix the bug. the error should return to sender but not sending know.
-    // if(typeof peer !== 'string') {
-      console.log(`WARNING: peer should be string.`)
-      stackTrace()
-    }
-    if(this.partners[id] !== undefined) {
-      this.partners[id].peer = peer
-    }
-  }
-
   hasEnoughPartners(){
     let {partners, t} = this;
     return Object.keys(partners).length >= t;
@@ -77,7 +63,7 @@ export default class TssParty {
 
   isFulfilled(){
     let {partners, t, max} = this;
-    return Object.keys(partners).length >= max;
+    return partners.length >= max;
   }
 
   size(){
@@ -86,19 +72,5 @@ export default class TssParty {
 
   waitToFulfill(){
     return this.timeoutPromise.promise;
-  }
-
-  /**
-   * @return - current node included in result
-   */
-  // TODO: make this computed property instead of computing by every call.
-  get onlinePartners(): {[index: string]: MuonNodeInfo}{
-    let {partners} = this
-    return Object.values(partners)
-      .filter(p => (!!p.peer || p.wallet===process.env.SIGN_WALLET_ADDRESS))
-      .reduce((obj, p) => {
-        obj[p.id] = p
-        return obj;
-      }, {})
   }
 }

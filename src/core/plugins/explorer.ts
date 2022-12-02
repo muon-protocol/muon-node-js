@@ -8,6 +8,7 @@ import {GatewayCallData} from "../../gateway/types";
 import AppManager from "./app-manager";
 import * as NetworkIpc from '../../network/ipc'
 import {GlobalBroadcastChannels} from "../../common/contantes";
+import CollateralInfoPlugin from "./collateral-info";
 const {timeout} = require('../../utils/helpers')
 
 type GetTransactionData = Override<GatewayCallData, {params: { reqId: string }}>
@@ -22,6 +23,10 @@ class Explorer extends CallablePlugin {
 
   get tssPlugin(): TssPlugin {
     return this.muon.getPlugin('tss-plugin');
+  }
+
+  get collateralPlugin(): CollateralInfoPlugin {
+    return this.muon.getPlugin('collateral');
   }
 
   get healthPlugin(): HealthCheck {
@@ -43,8 +48,11 @@ class Explorer extends CallablePlugin {
       throw `process.env.SIGN_WALLET_ADDRESS is not defined`
 
     // TODO: replace with onlinePartners
-    let partners: MuonNodeInfo[] = Object.values(tssPlugin.tssParty.onlinePartners)
-      .filter((op: MuonNodeInfo) => op.wallet !== process.env.SIGN_WALLET_ADDRESS)
+    // TODO: this returns only deployer nodes
+    let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+      isOnline: true,
+      excludeSelf: true
+    })
 
     let result = {
       [process.env.SIGN_WALLET_ADDRESS]: {

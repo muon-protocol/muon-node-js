@@ -165,7 +165,10 @@ class System extends CallablePlugin {
     let {appId, seed} = request.data.params
     const partners = result.selectedNodes
     const context = await this.writeAppContextIntoDb(request, result);
-    const allOnlineNodes = Object.values(this.tssPlugin.tssParty?.onlinePartners!);
+    const allOnlineNodes = this.collateralPlugin.filterNodes({
+      list: this.tssPlugin.tssParty?.partners,
+      isOnline: true
+    });
 
     let requestNonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!
 

@@ -11,7 +11,7 @@ export default class NetworkContentPlugin extends BaseNetworkPlugin {
   async onStart(){
     await super.onStart()
 
-    let onlinePeers = Object.keys(this.collateralPlugin.onlinePeers)
+    let onlinePeers = this.collateralPlugin.onlinePeers
     if(onlinePeers.length > 0){
       this.provideContents()
     }

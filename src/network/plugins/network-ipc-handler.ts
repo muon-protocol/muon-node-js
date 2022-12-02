@@ -84,14 +84,14 @@ class NetworkIpcHandler extends CallablePlugin {
    */
   @ipcMethod(IpcMethods.GetOnlinePeers)
   async __onGetOnlinePeers(): Promise<string[]> {
-    return Object.keys(this.collateralPlugin.onlinePeers);
+    return this.collateralPlugin.onlinePeers;
   }
 
   @ipcMethod(IpcMethods.GetCollateralInfo)
   async __onIpcGetCollateralInfo(data = {}, callerInfo) {
     // console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
     const collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
-    await collateralPlugin.waitToLoad();
+    // await collateralPlugin.waitToLoad();
 
     let {groupInfo, networkInfo} = collateralPlugin;
     return {
@@ -205,7 +205,7 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
   async __forwardGateWayRequest(data: {id: string, requestData: Object}) {
-    console.log(`NetworkIpcHandler.__forwardGateWayRequest`, data);
+    // console.log(`NetworkIpcHandler.__forwardGateWayRequest`, data);
     const nodeInfo = this.collateralPlugin.getNodeInfo(data.id)
     if(!nodeInfo) {
       throw `Unknown id ${data.id}`

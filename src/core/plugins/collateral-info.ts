@@ -1,7 +1,7 @@
 import BasePlugin from './base/base-plugin'
 import TimeoutPromise from '../../common/timeout-promise'
 import * as NetworkIpc from '../../network/ipc'
-import { GroupInfo, NetworkInfo } from '../../network/plugins/collateral-info'
+import {GroupInfo, NetworkInfo, NodeFilterOptions} from '../../network/plugins/collateral-info'
 import {MuonNodeInfo} from "../../common/types";
 const log = require('../../common/muon-log')('muon:core:plugins:collateral')
 
@@ -44,16 +44,19 @@ export default class CollateralInfoPlugin extends BasePlugin{
   }
 
   async onPeerDiscovery(peerId: string) {
+    log(`peer discovered %s`, peerId)
     this.availablePeerIds[peerId] = true
     this.updateNodeInfo(peerId, {isOnline: true});
   }
 
   async onPeerConnect(peerId: string) {
+    log(`peer connected %s`, peerId)
     this.availablePeerIds[peerId] = true
     this.updateNodeInfo(peerId, {isOnline: true});
   }
 
   onPeerDisconnect(peerId: string) {
+    log(`peer disconnected %s`, peerId)
     delete this.availablePeerIds[peerId]
     this.updateNodeInfo(peerId, {isOnline: false});
   }
@@ -137,9 +140,9 @@ export default class CollateralInfoPlugin extends BasePlugin{
     let info;
     while(!info) {
       try {
-        info = await NetworkIpc.getCollateralInfo({timeout: 5000});
+        info = await NetworkIpc.getCollateralInfo({timeout: 1000});
       }catch (e) {
-        log(`[${process.pid}] CoreCollateralInfo._loadCollateralInfo %o`, e);
+        log(`process[${process.pid}] collateral info loading failed %o`, e);
       }
     }
     const { groupInfo, networkInfo, nodesList } = info
@@ -156,6 +159,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
       this.allowedWallets.push(n.wallet);
     })
 
+    log('Collateral info loaded.');
     this.emit('loaded');
     this.loading.resolve(true);
   }
@@ -197,5 +201,25 @@ export default class CollateralInfoPlugin extends BasePlugin{
 
   isLoaded(): boolean{
     return this.loading.isFulfilled;
+  }
+
+  filterNodes(options: NodeFilterOptions): MuonNodeInfo[] {
+    let result: MuonNodeInfo[]
+    if(options.list) {
+      result = options.list.map(n => this._nodesMap.get(n)!)
+        .filter(n => !!n)
+    }
+    else {
+      result = this._nodesList
+    }
+    if(options.isDeployer)
+      result = result.filter(n => n.isDeployer)
+    if(options.isOnline)
+      result = result.filter(n => {
+        return n.isOnline
+      })
+    if(options.excludeSelf)
+      result = result.filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
+    return result
   }
 }

@@ -15,6 +15,13 @@ export type GroupInfo = {
   partners: string[]
 }
 
+export type NodeFilterOptions = {
+  list?: string[],
+  isOnline?: boolean,
+  isDeployer?: boolean,
+  excludeSelf?: boolean
+}
+
 export type NetworkInfo = {
   tssThreshold: number,
   minGroupSize: number,
@@ -25,7 +32,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   groupInfo: GroupInfo;
   networkInfo: NetworkInfo | null = null;
-  onlinePeers: {[index: string]: boolean} = {}
+  private _onlinePeers: {[index: string]: object} = {}
 
   private lastNodesUpdateTime: number;
   private _nodesList: MuonNodeInfo[];
@@ -58,8 +65,12 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     // })
   }
 
+  get onlinePeers(): string[] {
+    return Object.keys(this._onlinePeers)
+  }
+
   get onlinePeersInfo(): MuonNodeInfo[] {
-    return Object.keys(this.onlinePeers)
+    return Object.keys(this._onlinePeers)
       .map(peerId => this.getNodeInfo(peerId)!)
       .filter(info => !!info)
   }
@@ -68,42 +79,34 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     // console.log("peer available", peerId)
     await this.waitToLoad();
 
-    this.onlinePeers[peerId._idB58String] = true
-    this.updateNodeInfo(peerId._idB58String, {
-      isOnline: true,
-      peer: await this.findPeer(peerId)
-    })
+    await timeout(5000);
+
+    this._onlinePeers[peerId._idB58String] = await this.findPeer(peerId)
+    this.updateNodeInfo(peerId._idB58String, {isOnline: true})
   }
 
   async onPeerConnect(peerId) {
     await this.waitToLoad();
 
-    this.onlinePeers[peerId._idB58String] = true
-    this.updateNodeInfo(peerId._idB58String, {
-      isOnline: true,
-      peer: await this.findPeer(peerId)
-    })
+    await timeout(5000);
+
+    this._onlinePeers[peerId._idB58String] = await this.findPeer(peerId);
+    this.updateNodeInfo(peerId._idB58String, {isOnline: true})
   }
 
   onPeerDisconnect(peerId) {
     // console.log("peer not available", peerId)
-    delete this.onlinePeers[peerId._idB58String];
-    this.updateNodeInfo(peerId._idB58String, {isOnline: true}, ['peer'])
+    delete this._onlinePeers[peerId._idB58String];
+    this.updateNodeInfo(peerId._idB58String, {isOnline: false})
   }
 
-  private updateNodeInfo(index: string, dataToMerge: object, keysToDelete?:string[]) {
+  private updateNodeInfo(index: string, dataToMerge: object) {
     let nodeInfo = this.getNodeInfo(index)!;
     if(nodeInfo) {
       /** update fields */
       if(dataToMerge) {
         Object.keys(dataToMerge).forEach(key => {
           nodeInfo[key] = dataToMerge[key];
-        })
-      }
-      /** delete keys */
-      if(keysToDelete) {
-        keysToDelete.forEach(key => {
-          delete nodeInfo[key]
         })
       }
       /**
@@ -162,7 +165,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           id: BigInt(item.id).toString(),
           wallet: item.nodeAddress,
           peerId: item.peerId,
-          isDeployer: item.isDeployer
+          isDeployer: item.isDeployer,
+          isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS
         }))
     }
   }
@@ -230,8 +234,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
         CoreIpc.fireEvent({
           type: "node:edit",
           data: {
-            nodeInfo: {...n, peer: !!n.peer ? n.peerId : undefined},
-            oldNodeInfo: {...oldNode, peer: !!oldNode.peer ? oldNode.peerId : undefined},
+            nodeInfo: {...n, isOnline: !!this._onlinePeers[n.peerId]},
+            oldNodeInfo: {...oldNode, isOnline: !!this._onlinePeers[oldNode.peerId]},
           }
         })
         return;
@@ -285,7 +289,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     /**
      * onlinePartners not include current node
      */
-    return Object.keys(this.onlinePeers)
+    return Object.keys(this._onlinePeers)
       .map(peerId => this.getNodeInfo(peerId))
       .filter(info => !!info).length + 1 >= this.TssThreshold
   }
@@ -309,5 +313,23 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   isLoaded(): boolean{
     return this.loading.isFulfilled;
+  }
+
+  filterNodes(options: NodeFilterOptions): MuonNodeInfo[] {
+    let result: MuonNodeInfo[]
+    if(options.list) {
+      result = options.list.map(n => this._nodesMap.get(n)!)
+        .filter(n => !!n)
+    }
+    else {
+      result = this._nodesList
+    }
+    if(options.isDeployer)
+      result = result.filter(n => n.isDeployer)
+    if(options.isOnline)
+      result = result.filter(n => n.isOnline)
+    if(options.excludeSelf)
+      result = result.filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
+    return result
   }
 }

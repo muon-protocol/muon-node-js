@@ -30,8 +30,7 @@ export type MuonNodeInfo = {
     wallet: string,
     peerId: string,
     isDeployer: boolean,
-    isOnline?: boolean,
-    peer?: any
+    isOnline?: boolean
 }
 
 export type AppDeploymentStatus = {
