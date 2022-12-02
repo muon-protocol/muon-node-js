@@ -26,7 +26,7 @@ docker exec -it muon-node cat .env| egrep "SIGN_WALLET_ADDRESS|PEER_ID"
 Output is something like this:
 
 ```
-PEER_ID=QmeS4VP6o4HvkDGAA5Mzwxidas1Pq6cTZvtDpg88qsEumw
+PEER_ID = QmeS4VP6o4HvkDGAA5Mzwxidas1Pq6cTZvtDpg88qsEumw
 SIGN_WALLET_ADDRESS = 0x587000cB548f1e88b8977b417F3DF562A76F8cC9
 ```
 

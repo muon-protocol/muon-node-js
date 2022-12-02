@@ -3,6 +3,9 @@ services:
   muon_api:
     container_name: muon-node
     restart: always
+    volumes:
+      - ~/.ssh/id_rsa:/root/.ssh/id_rsa:ro
+      - ~/.ssh/id_rsa.pub:/root/.ssh/id_rsa.pub:ro
     build:
       context: .
     ports:
@@ -15,8 +18,8 @@ services:
       - muon_mongo
       - muon_redis
     environment:
-        - MONGO_HOST=muon_mongo
-        - REDIS_HOST=muon_redis
+      - MONGO_HOST=muon_mongo
+      - REDIS_HOST=muon_redis
   muon_mongo:
     container_name: mongo
     image: mongo
@@ -28,5 +31,5 @@ services:
   muon_redis:
     container_name: redis
     image: redis:6
-#    ports:
-#      - '6379:6379'
+#   ports:
+#     - '6379:6379'
