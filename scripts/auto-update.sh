@@ -36,7 +36,7 @@ check_for_update (){
         ``;
     else
         # restart services
-        export _NODE=`which node`;
+        _NODE=`which node`;
         log "========== updating detected ===========";
         log "Installing dependencies ...";
         log `$_NPM install`
