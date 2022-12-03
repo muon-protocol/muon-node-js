@@ -36,11 +36,12 @@ check_for_update (){
         ``;
     else
         # restart services
+        export _NODE=`which node`;
         log "========== updating detected ===========";
-         log "Installing dependencies ...";
-         log `$_NPM install`
-        log "Restarting PM2 ...";
-        log `$_PM2 restart "$_PM2_APP"`
+        log "Installing dependencies ...";
+        log `$_NPM install`
+        log "Restarting PM2: $_NODE $_PM2 restart $_PM2_APP";
+        log `$_NODE $_PM2 restart "$_PM2_APP"`
         log "============ updating done =============";
     fi
 }
@@ -61,5 +62,5 @@ elif [[ "$action" == "update" ]]
 then
     check_for_update;
 else
-    log "no action defined.";
+    log "No action defined.";
 fi
