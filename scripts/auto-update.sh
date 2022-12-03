@@ -37,6 +37,11 @@ check_for_update (){
     else
         # restart services
         _NODE=`which node`;
+        if [[ -z $_NODE ]]
+        then
+            _NODE=/usr/local/bin/node # node Docker
+        fi
+
         log "========== updating detected ===========";
         log "Installing dependencies ...";
         log `$_NPM install`
