@@ -26,9 +26,9 @@ export default class CollateralInfoPlugin extends BasePlugin{
     this.muon.on('peer:connect', this.onPeerConnect.bind(this));
     this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
 
-    this.muon.on("node:add", this.onNodeAdd.bind(this));
-    this.muon.on("node:edit", this.onNodeEdit.bind(this));
-    this.muon.on("node:delete", this.onNodeDelete.bind(this));
+    this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
+    this.muon.on("collateral:node:edit", this.onNodeEdit.bind(this));
+    this.muon.on("collateral:node:delete", this.onNodeDelete.bind(this));
 
     this._loadCollateralInfo();
 

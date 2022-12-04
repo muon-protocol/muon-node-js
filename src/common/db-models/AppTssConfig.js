@@ -18,4 +18,11 @@ var modelSchema = mongoose.Schema({
     keyShare: {type: String, required: true},
 }, {timestamps: true});
 
+modelSchema.pre('save', function (next) {
+    if(!this.dangerousAllowToSave)
+        throw `AppTssConfig save only allowed from NetworkAppManager`
+
+    next();
+})
+
 module.exports = mongoose.model(MODEL_APP_TSS_CONFIG, modelSchema);

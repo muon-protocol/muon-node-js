@@ -32,6 +32,8 @@ var modelSchema = mongoose.Schema({
 modelSchema.pre('save', function (next) {
   /** force appId to be hex string */
   this.appId = BigInt(this.appId).toString(10);
+  if(!this.dangerousAllowToSave)
+    throw `AppContext save only allowed from NetworkAppManager`
 
   next();
 })
