@@ -227,6 +227,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   @gatewayMethod("request")
   async __onRequestArrived({method, params, nSign, mode, callId: gatewayCallId, gwSign}) {
+    this.log(`request arrived %O`, {method, params})
     let t0 = Date.now()
     let startedAt = getTimestamp()
     if(!nSign && !process.env.NUM_SIGN_TO_CONFIRM) {
@@ -1008,6 +1009,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.WantSign)
   async __onRemoteWantSign(request, callerInfo) {
+    this.log(`remote node [id:${callerInfo.id}] wants signature %o`, request)
     deepFreeze(request);
     /**
      * Check request owner

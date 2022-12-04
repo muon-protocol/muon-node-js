@@ -108,32 +108,47 @@ class TssPlugin extends CallablePlugin {
 
   }
 
-  onNodeAdd(nodeInfo: MuonNodeInfo) {
-    log(`Node add %o`, nodeInfo)
-    Object.keys(this.parties).forEach(partyId => {
-      this.parties[partyId].addPartner(nodeInfo.id);
-    })
-    if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS) {
+  async onNodeAdd(nodeInfo: MuonNodeInfo) {
+    log(`node add %o`, nodeInfo)
+
+    await timeout(5000);
+
+    const selfInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
+    if(!selfInfo)
+      return ;
+
+    if(selfInfo.id === nodeInfo.id){
       this.loadTssInfo()
     }
     else {
+      if(selfInfo.isDeployer)
+        this.tssParty!.addPartner(nodeInfo.id)
+
       this.findPeerInfo(nodeInfo.peerId);
     }
   }
 
   async onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
     const {nodeInfo, oldNodeInfo} = data
-    log(`core.tssPlugin.onNodeEdit %o`, {nodeInfo, oldNodeInfo})
-    // Object.keys(this.parties).forEach(partyId => {
-    //   this.parties[partyId].addPartner(nodeInfo);
-    // })
+    log(`node edit %o`, {nodeInfo, oldNodeInfo})
+
+    /**
+     * if the current node is edited, its needs some time to tssParty be updated
+     */
+    await timeout(5000);
+
     if(nodeInfo.isDeployer !== oldNodeInfo.isDeployer) {
+      const selfInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+      if(!selfInfo)
+        return ;
+
       if(nodeInfo.isDeployer) {
         if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
           await this.loadTssInfo()
         }
         else {
-          this.tssParty!.addPartner(nodeInfo.id)
+          if(selfInfo.isDeployer)
+            this.tssParty!.addPartner(nodeInfo.id)
         }
       }
       else {
