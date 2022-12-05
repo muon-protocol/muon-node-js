@@ -1,4 +1,3 @@
-
 import assert from 'node:assert/strict';
 import { muonCall } from '../utils'
 import {getConfigs} from "./cmd-conf-mod";
@@ -18,7 +17,7 @@ module.exports = {
       type: 'string',
     },
     app: {
-      describe: "App id to do action on it.",
+      describe: "App name to do action on it.",
       type: "string"
     }
   },
@@ -32,12 +31,18 @@ module.exports = {
 
     switch (action) {
       case 'deploy': {
+        console.log('retrieving app ID ...')
+        const idResponse = await muonCall(configs.url, {app, method: `dummy-method`})
+        assert('appId' in idResponse, "appId not exist in ID response")
+        const { appId } = idResponse
+        console.log('App Id is ', appId);
+
         console.log(`random seed generating ...`)
         const randomSeedResponse = await muonCall(configs.url, {
           app: 'deployment',
           method: `random-seed`,
           params: {
-            appId: app
+            appId
           }
         })
         expectConfirmed(randomSeedResponse)
@@ -48,7 +53,7 @@ module.exports = {
           app: 'deployment',
           method: `deploy`,
           params: {
-            appId: app,
+            appId,
             reqId: randomSeedResponse.result.reqId,
             nonce: randomSeedResponse.result.data.init.nonceAddress,
             seed: randomSeedResponse.result.signatures[0].signature
@@ -62,7 +67,7 @@ module.exports = {
           app: `deployment`,
           method: "tss-key-gen",
           params: {
-            appId: app,
+            appId,
           }
         })
         expectConfirmed(tssResponse)
