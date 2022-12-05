@@ -1,29 +1,26 @@
-import { QueueProducer } from '../../common/message-bus'
-let requestQueue = new QueueProducer(`gateway-requests`);
+
+import assert from 'node:assert/strict';
 import { muonCall } from '../utils'
-const soliditySha3 = require('../../utils/soliditySha3')
-import Web3 from 'web3'
 import {getConfigs} from "./cmd-conf-mod";
-const web3 = new Web3();
+
+function expectConfirmed(response) {
+  assert.equal(response?.success, true)
+  assert.equal(response?.result?.confirmed, true)
+}
 
 module.exports = {
-  command: 'app <app> <action> <wallet>',
-  describe: 'Deploy/generate/re-share app tss',
+  command: 'app <action> <app>',
+  describe: 'Deploy/re-share app tss',
   builder: {
     action: {
       describe: "action",
-      choices: ['deploy', 'keygen', 'reshare'],
+      choices: ['deploy', 'reshare'],
       type: 'string',
     },
     app: {
-      describe: "App name to do action on it.",
+      describe: "App id to do action on it.",
       type: "string"
-    },
-    wallet: {
-      describe: 'App owner wallet private key',
-      demandOption: true,
-      type: 'string',
-    },
+    }
   },
 
   // Function for your command
@@ -31,30 +28,46 @@ module.exports = {
     const configs = getConfigs();
     if(!configs.url)
       throw `Please set muon api url config`;
-    const {action, app, wallet} = argv;
-    const appInfo = await muonCall(configs.url, {app, method: `__info`,})
-    if(!appInfo.success) {
-      console.log(appInfo);
-      throw appInfo?.error?.message || `Unknown error happened when getting app info.`
-    }
+    const {action, app} = argv;
 
-    const timestamp = Math.floor(Date.now() / 1000);
-    const method = `__${action}`;
+    switch (action) {
+      case 'deploy': {
+        console.log(`random seed generating ...`)
+        const randomSeedResponse = await muonCall(configs.url, {
+          app: 'deployment',
+          method: `random-seed`,
+          params: {
+            appId: app
+          }
+        })
+        expectConfirmed(randomSeedResponse)
+        console.log(`random seed generated`, {randomSeed: randomSeedResponse.result.signatures[0].signature})
 
-    const requestHash = soliditySha3([
-      {t: 'uint256', v: appInfo.result.id},
-      {t: 'string', v: method},
-      {t: 'uint64', v: timestamp},
-    ])
+        console.log('deploying ...')
+        const deployResponse = await muonCall(configs.url, {
+          app: 'deployment',
+          method: `deploy`,
+          params: {
+            appId: app,
+            reqId: randomSeedResponse.result.reqId,
+            nonce: randomSeedResponse.result.data.init.nonceAddress,
+            seed: randomSeedResponse.result.signatures[0].signature
+          }
+        })
+        expectConfirmed(deployResponse)
+        console.log(`deployment done.`)
 
-    let result = await muonCall(configs.url, {
-      app,
-      method,
-      params: {
-        timestamp,
-        signature: web3.eth.accounts.sign(requestHash, wallet).signature,
+        console.log('generating app tss key ...')
+        const tssResponse = await muonCall(configs.url, {
+          app: `deployment`,
+          method: "tss-key-gen",
+          params: {
+            appId: app,
+          }
+        })
+        expectConfirmed(tssResponse)
+        console.log(`tss key generating done.`, tssResponse.result.data.result)
       }
-    })
-    console.log(JSON.stringify(result, null, 2));
+    }
   }
 }
