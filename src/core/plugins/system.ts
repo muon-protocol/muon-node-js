@@ -136,10 +136,7 @@ class System extends CallablePlugin {
     const version = 0;
     const deployTime = request.confirmedAt * 1000
 
-    await AppContext.findOneAndUpdate({
-      version,
-      appId,
-    },{
+    await this.appManager.saveAppContext({
       version, // TODO: version definition
       appId,
       appName: this.muon.getAppNameById(appId),
@@ -152,9 +149,6 @@ class System extends CallablePlugin {
       },
       deploymentRequest: request,
       deployTime
-    },{
-      upsert: true,
-      useFindAndModify: false,
     })
 
     return true
@@ -217,7 +211,7 @@ class System extends CallablePlugin {
     /** store tss key */
     let key: DistributedKey = this.tssPlugin.getSharedKey(keyId)!
     await useDistributedKey(key.publicKey!.encodeCompressed('hex'), `app-${appId}-tss`)
-    const tssConfig = new AppTssConfig({
+    await this.appManager.saveAppTssConfig({
       version: context.version,
       appId: appId,
       publicKey: {
@@ -228,8 +222,6 @@ class System extends CallablePlugin {
       },
       keyShare: key.share?.toBuffer('be', 32).toString('hex'),
     })
-    await tssConfig.save();
-    // console.log(key)
   }
 
   @appApiMethod({})

@@ -5,13 +5,12 @@ import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
 import TssPlugin from "./tss-plugin";
 import BaseAppPlugin from "./base/base-app-plugin";
 import CollateralInfoPlugin from "./collateral-info";
+import * as CoreIpc from "../ipc";
 const TssModule = require('../../utils/tss');
 const AppContext = require("../../common/db-models/AppContext")
 const AppTssConfig = require("../../common/db-models/AppTssConfig")
+const _ = require('lodash');
 const log = require('../../common/muon-log')('muon:core:plugins:app-manager')
-
-const appContextEventEmitter = AppContext.watch()
-const appTssConfigEventEmitter = AppTssConfig.watch()
 
 const RemoteMethods = {
   AppStatus: "app-status",
@@ -30,10 +29,11 @@ export default class AppManager extends CallablePlugin {
   async onStart() {
     await super.onStart()
 
-    appContextEventEmitter.on('change', this.onAppContextChange.bind(this))
-    appTssConfigEventEmitter.on('change', this.onAppTssConfigChange.bind(this))
-    this.muon.on("node:add", this.onNodeAdd.bind(this));
-    this.muon.on("node:delete", this.onNodeDelete.bind(this));
+    this.muon.on('app-context:add', this.onAppContextAdd.bind(this))
+    this.muon.on('app-tss-key:add', this.onAppTssConfigAdd.bind(this))
+
+    this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
+    this.muon.on("collateral:node:delete", this.onNodeDelete.bind(this));
 
     await this.loadAppsInfo()
   }
@@ -64,67 +64,154 @@ export default class AppManager extends CallablePlugin {
   }
 
   async loadAppsInfo() {
+    log('loading apps info ...')
     await this.collateralPlugin.waitToLoad();
     try {
-      const allAppContexts = await AppContext.find({});
-      this.appContexts['1'] = {
-        appId: '1',
-        version: 0,
-        appName: "deployment",
-        isBuiltIn: true,
-        party: {
-          partners: this.collateralPlugin.groupInfo.partners,
-          t: this.collateralPlugin.TssThreshold,
-          max: this.collateralPlugin.MaxGroupSize
-        }
-      }
+      const allAppContexts = [
+        /** deployment app context */
+        {
+          appId: '1',
+          version: 0,
+          appName: "deployment",
+          isBuiltIn: true,
+          party: {
+            partners: this.collateralPlugin.groupInfo.partners,
+            t: this.collateralPlugin.TssThreshold,
+            max: this.collateralPlugin.MaxGroupSize
+          }
+        },
+        /** other apps contexts */
+        ...await AppContext.find({})
+      ]
 
       allAppContexts.forEach(ac => {
         this.appContexts[ac.appId] = ac;
       })
+      log('apps contexts loaded.')
 
       const allTssKeys = await AppTssConfig.find({});
       allTssKeys.forEach(key => {
         this.appTssConfigs[key.appId] = key;
       })
+      log('apps tss keys loaded.')
 
       this.loading.resolve(true);
     }catch (e) {
-      console.log(`AppManager.loadAppsInfo`, e);
+      console.error(`core.AppManager.loadAppsInfo`, e);
     }
   }
 
-  async onAppContextChange(change) {
+  async saveAppContext(context: object) {
+    // @ts-ignore
+    const oldDoc = await AppContext.findOne({version: context.version, appId: context.appId})
+    if(oldDoc) {
+      _.assign(oldDoc, context)
+      oldDoc.dangerousAllowToSave = true
+      await oldDoc.save()
+      CoreIpc.fireEvent({
+        type: "app-context:add",
+        data: context
+      })
+      return oldDoc
+    }
+    else {
+      let newContext = new AppContext(context)
+      /**
+       * Do not use this code in any other place
+       * Call this method as the base method for saving AppContext.
+       */
+      newContext.dangerousAllowToSave = true
+      await newContext.save()
+      CoreIpc.fireEvent({
+        type: "app-context:add",
+        data: context
+      })
+
+      return newContext;
+    }
+  }
+
+  async deleteAppContext(_id: string) {
+  }
+
+  async saveAppTssConfig(appTssConfig: object) {
+    let newConfig = new AppTssConfig(appTssConfig)
+    /**
+     * Do not use this code in any other place
+     * Call this method as the base method for saving AppTssConfig.
+     */
+    newConfig.dangerousAllowToSave = true
+    await newConfig.save()
+    CoreIpc.fireEvent({
+      type: "app-tss-key:add",
+      data: newConfig
+    })
+  }
+
+  async deleteAppTssKey() {
+  }
+
+  private async onAppContextAdd(doc) {
+    log(`app context add %o`, doc)
+    this.appContexts[doc.appId] = doc;
+    this.contextIdToAppIdMap[doc._id] = doc.appId
+  }
+
+  private async onAppContextDelete(_id: string) {
     // console.log("====== AppContext:change ======", JSON.stringify(change))
+    try {
+      const contextId = Object.keys(this.appContexts).find(contextId => (this.appContexts[contextId]._id.toString() === _id))
+      if(!contextId) {
+        console.error(`AppContext deleted but contextId not found`, {_id})
+        return
+      }
+      delete this.appContexts[contextId]
+    }
+    catch (e) {
+      console.log(`AppManager.onAppContextChange`, e);
+    }
+  }
+
+  private async onAppTssConfigAdd(doc) {
+    log(`app tss config add %o`, doc)
+    this.appTssConfigs[doc.appId] = doc;
+  }
+
+  private async onAppTssConfigChange(change) {
+    // console.log("====== AppTssConfig:change ======", JSON.stringify(change))
     switch (change.operationType) {
-      case "insert": {
+      case "replace": {
         const doc = change.fullDocument;
-        this.appContexts[doc.appId] = doc;
-        this.contextIdToAppIdMap[doc._id] = doc.appId
+        this.appTssConfigs[doc.appId] = doc;
+
+        try {
+          /** TssPlugin needs to refresh tss key info */
+          await this.emit("app-tss:delete", doc.appId, doc)
+        }
+        catch (e) {
+          console.log(`AppManager.onAppTssConfigChange`, e);
+        }
         break
       }
-      // case "replace": {
-      //   break
-      // }
       case "delete": {
         let documentId = change.documentKey._id.toString();
         try {
-          const contextId = Object.keys(this.appContexts).find(contextId => (this.appContexts[contextId]._id.toString() === documentId))
-          if(!contextId) {
-            console.error(`AppContext deleted but contextId not found`, change)
+          const appId = Object.keys(this.appTssConfigs).find(appId => (this.appTssConfigs[appId]._id.toString() === documentId))
+          if(!appId) {
+            console.error(`AppTssConfig deleted but appId not found`, change)
             return
           }
-          const appContext = this.appContexts[contextId]
-          delete this.appContexts[contextId]
-          await this.emit("app-context:delete", contextId, appContext)
+          const appTssConfig = this.appTssConfigs[appId]
+          delete this.appTssConfigs[appId]
+          await this.emit("app-tss:delete", appId, appTssConfig)
         }
         catch (e) {
-          console.log(`AppManager.onAppContextChange`, e);
+          console.log(`AppManager.onAppTssConfigChange`, e);
         }
         break
       }
       default:
-        console.log(`AppManager.onAppContextChange`, change)
+        console.log(`AppManager.onAppContextChange`, JSON.stringify(change))
     }
   }
 
@@ -137,8 +224,7 @@ export default class AppManager extends CallablePlugin {
       )
       if(data) {
         try {
-          const context = new AppContext(data);
-          await context.save();
+          const context = await this.saveAppContext(data);
           return context;
         }catch (e) {}
       }
@@ -317,49 +403,6 @@ export default class AppManager extends CallablePlugin {
     }
 
     return result;
-  }
-
-  async onAppTssConfigChange(change) {
-    // console.log("====== AppTssConfig:change ======", JSON.stringify(change))
-    switch (change.operationType) {
-      case "insert": {
-        const doc = change.fullDocument;
-        this.appTssConfigs[doc.appId] = doc;
-        break
-      }
-      case "replace": {
-        const doc = change.fullDocument;
-        this.appTssConfigs[doc.appId] = doc;
-
-        try {
-          /** TssPlugin needs to refresh tss key info */
-          await this.emit("app-tss:delete", doc.appId, doc)
-        }
-        catch (e) {
-          console.log(`AppManager.onAppTssConfigChange`, e);
-        }
-        break
-      }
-      case "delete": {
-        let documentId = change.documentKey._id.toString();
-        try {
-          const appId = Object.keys(this.appTssConfigs).find(appId => (this.appTssConfigs[appId]._id.toString() === documentId))
-          if(!appId) {
-            console.error(`AppTssConfig deleted but appId not found`, change)
-            return
-          }
-          const appTssConfig = this.appTssConfigs[appId]
-          delete this.appTssConfigs[appId]
-          await this.emit("app-tss:delete", appId, appTssConfig)
-        }
-        catch (e) {
-          console.log(`AppManager.onAppTssConfigChange`, e);
-        }
-        break
-      }
-      default:
-        console.log(`AppManager.onAppContextChange`, JSON.stringify(change))
-    }
   }
 
   appIsDeployed(appId: string): boolean {

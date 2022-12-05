@@ -1104,10 +1104,7 @@ class BaseAppPlugin extends CallablePlugin {
     const version = 0;
     const deployTime = timestamp * 1000
 
-    await AppContext.findOneAndUpdate({
-      version,
-      appId: this.APP_ID,
-    },{
+    await this.appManager.saveAppContext({
       version, // TODO: version definition
       appId: this.APP_ID,
       appName: this.APP_NAME,
@@ -1123,9 +1120,6 @@ class BaseAppPlugin extends CallablePlugin {
         signature,
       },
       deployTime
-    },{
-      upsert: true,
-      useFindAndModify: false,
     })
 
     return "OK"
@@ -1186,7 +1180,7 @@ class BaseAppPlugin extends CallablePlugin {
       throw `DistributedKey not generated.`
     await key.waitToFulfill();
 
-    const tssConfig = new AppTssConfig({
+    await this.appManager.saveAppTssConfig({
       version: context.version,
       appId: this.APP_ID,
       publicKey: {
@@ -1197,8 +1191,6 @@ class BaseAppPlugin extends CallablePlugin {
       },
       keyShare: key.share?.toBuffer('be', 32).toString('hex'),
     })
-
-    await tssConfig.save();
 
     return "OK"
   }

@@ -202,8 +202,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       this._nodesMap.delete(oldNode.wallet)
       this._nodesMap.delete(oldNode.peerId)
       log(`Node info deleted from chain %o`, oldNode)
-      this.emit("node:delete", oldNode)
-      CoreIpc.fireEvent({type: "node:delete", data: _.omit(oldNode, ['peer'])})
+      this.emit("collateral:node:delete", oldNode)
+      CoreIpc.fireEvent({type: "collateral:node:delete", data: _.omit(oldNode, ['peer'])})
     })
 
     allNodes.forEach(n => {
@@ -215,8 +215,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           .set(n.wallet, n)
           .set(n.peerId, n)
         log(`New node info added to chain %o`, n)
-        this.emit("node:add", n)
-        CoreIpc.fireEvent({type: "node:add", data: n})
+        this.emit("collateral:node:add", n)
+        CoreIpc.fireEvent({type: "collateral:node:add", data: n})
         return;
       }
       /**
@@ -230,9 +230,9 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           .set(n.wallet, n)
           .set(n.peerId, n)
         log(`Node info changed on chain %o`, {old: oldNode, new: n})
-        this.emit("node:edit", n, oldNode)
+        this.emit("collateral:node:edit", n, oldNode)
         CoreIpc.fireEvent({
-          type: "node:edit",
+          type: "collateral:node:edit",
           data: {
             nodeInfo: {...n, isOnline: !!this._onlinePeers[n.peerId]},
             oldNodeInfo: {...oldNode, isOnline: !!this._onlinePeers[oldNode.peerId]},

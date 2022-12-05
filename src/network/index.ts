@@ -113,6 +113,9 @@ class Network extends Events {
     log(`muon started at ${new Date()} (node-js version ${process.versions.node}).`)
     for (let pluginName in this._plugins) {
       this._plugins[pluginName].onStart()
+        .catch(e => {
+          console.error(`network: plugins start error`, e)
+        })
     }
   }
 
