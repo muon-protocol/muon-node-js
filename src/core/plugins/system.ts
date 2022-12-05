@@ -37,7 +37,7 @@ class System extends CallablePlugin {
   }
 
   getAvailableNodes(): MuonNodeInfo[] {
-    const peerIds = Object.keys(this.tssPlugin.availablePeers)
+    const peerIds = Object.keys(this.collateralPlugin.availablePeerIds)
     const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.PEER_ID!)
     return [
       currentNodeInfo!,

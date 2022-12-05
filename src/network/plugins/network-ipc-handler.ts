@@ -12,6 +12,7 @@ import NetworkContentPlugin from "./content-plugin";
 const {timeout} = require('../../utils/helpers')
 const NodeCache = require('node-cache');
 const coreIpc = require('../../core/ipc')
+const log = require('../../common/muon-log')('muon:network:plugins:ipc-handler')
 
 const tasksCache = new NodeCache({
   stdTTL: 6 * 60, // Keep distributed keys in memory for 6 minutes
@@ -190,6 +191,8 @@ class NetworkIpcHandler extends CallablePlugin {
   async __onRemoteCallRequest(data) {
     // console.log(`NetworkIpcHandler.__onRemoteCallRequest`, data);
     const peer = await this.findPeer(data?.peer);
+    if(!peer)
+      log(`trying to call offline node %o`, data)
     return await this.remoteCall(peer, "exec-ipc-remote-call", data, data?.options);
   }
 

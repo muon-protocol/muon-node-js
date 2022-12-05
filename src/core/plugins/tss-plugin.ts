@@ -83,15 +83,10 @@ class TssPlugin extends CallablePlugin {
   parties:{[index: string]: TssParty} = {}
   tssKey: DistributedKey | null = null;
   tssParty: TssParty | null = null;
-  availablePeers = {}
   appTss:{[index: string]: DistributedKey} = {}
 
   async onStart() {
     super.onStart();
-
-    this.muon.on('peer:discovery', this.onPeerDiscovery.bind(this));
-    this.muon.on('peer:connect', this.onPeerConnect.bind(this));
-    this.muon.on('peer:disconnect', this.onPeerDisconnect.bind(this));
 
     this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
     this.muon.on("collateral:node:edit", this.onNodeEdit.bind(this));
@@ -123,8 +118,6 @@ class TssPlugin extends CallablePlugin {
     else {
       if(selfInfo.isDeployer)
         this.tssParty!.addPartner(nodeInfo.id)
-
-      this.findPeerInfo(nodeInfo.peerId);
     }
   }
 
@@ -174,26 +167,6 @@ class TssPlugin extends CallablePlugin {
       const party = this.parties[partyId]
       party.deletePartner(nodeInfo.id);
     })
-  }
-
-  async onPeerDiscovery(peerId: string) {
-    log(`Peer discovered %s`, peerId);
-    this.availablePeers[peerId] = true
-    this.findPeerInfo(peerId);
-  }
-
-  async onPeerConnect(peerId: string) {
-    log(`Peer connected %s`, peerId)
-    this.availablePeers[peerId] = true
-    this.findPeerInfo(peerId)
-  }
-
-  onPeerDisconnect(disconnectedPeer: string) {
-    log(`Peer disconnect %s`, disconnectedPeer)
-    delete this.availablePeers[disconnectedPeer];
-  }
-
-  async findPeerInfo(peerId){
   }
 
   get TSS_THRESHOLD() {
@@ -253,10 +226,6 @@ class TssPlugin extends CallablePlugin {
     this.tssParty = party;
     log(`tss party loaded.`)
 
-    Object.keys(this.availablePeers).forEach(peerId => {
-      this.findPeerInfo(peerId);
-    })
-
     this.emit('party-load');
 
     // this.tryToFindOthers(3);
@@ -280,6 +249,24 @@ class TssPlugin extends CallablePlugin {
       let permitted = await NetworkIpc.askClusterPermission('tss-key-creation', 20000)
       if(!permitted)
         return;
+
+      log('waiting for the threshold number of deployers to get online ...')
+      while (true) {
+        let onlineDeployers = this.collateralPlugin.filterNodes({
+          list: this.tssParty!.partners,
+          isDeployer: true,
+          isOnline: true
+        })
+        if(onlineDeployers.length >= this.collateralPlugin.TssThreshold) {
+          log(`${onlineDeployers.length} number of deployers are now online.`)
+          break;
+        }
+
+        /** wait 5 seconds and retry again */
+        log("online deployers %o", onlineDeployers.map(n => n.id))
+        log(`waiting: only ${onlineDeployers.length} number of deployers are online.`)
+        await timeout(5000);
+      }
 
       const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
       if (currentNodeInfo && currentNodeInfo.id == LEADER_ID && await this.isNeedToCreateKey()) {
@@ -384,12 +371,14 @@ class TssPlugin extends CallablePlugin {
   }
 
   async isNeedToCreateKey(){
-    let myWallet = process.env.SIGN_WALLET_ADDRESS;
-    let onlinePartners = this.tssParty!.partners
-      .map(id => this.collateralPlugin.getNodeInfo(id))
-      .filter(n => !!n)
-      .filter(p => (p!.wallet !== myWallet))
-    let statuses = await Promise.all(onlinePartners.map(p => {
+    let onlineDeployers = this.collateralPlugin.filterNodes({
+      list: this.tssParty!.partners,
+      isOnline: true,
+      isDeployer: true,
+      excludeSelf: true
+    })
+
+    let statuses = await Promise.all(onlineDeployers.map(p => {
       return this.remoteCall(
         p!.peerId,
         RemoteMethods.checkTssStatus
@@ -538,6 +527,8 @@ class TssPlugin extends CallablePlugin {
 
   async tryToCreateTssKey() {
     while (!this.isReady) {
+      await timeout(5000);
+
       try {
         let key;
         do {

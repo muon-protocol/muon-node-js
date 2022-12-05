@@ -9,7 +9,6 @@ export default class CollateralInfoPlugin extends BasePlugin{
 
   groupInfo: GroupInfo;
   networkInfo: NetworkInfo;
-  private availablePeerIds: {[index: string]: boolean} = {}
   private allowedWallets: string[] = []
 
   private _nodesList: MuonNodeInfo[];
@@ -44,21 +43,24 @@ export default class CollateralInfoPlugin extends BasePlugin{
   }
 
   async onPeerDiscovery(peerId: string) {
-    log(`peer discovered %s`, peerId)
-    this.availablePeerIds[peerId] = true
+    log(`peer discovered id: ${this.getNodeInfo(peerId)!.id} %s`, peerId)
     this.updateNodeInfo(peerId, {isOnline: true});
   }
 
   async onPeerConnect(peerId: string) {
-    log(`peer connected %s`, peerId)
-    this.availablePeerIds[peerId] = true
+    log(`peer connected id: ${this.getNodeInfo(peerId)!.id} %s`, peerId)
     this.updateNodeInfo(peerId, {isOnline: true});
   }
 
   onPeerDisconnect(peerId: string) {
-    log(`peer disconnected %s`, peerId)
-    delete this.availablePeerIds[peerId]
+    log(`peer disconnected id: ${this.getNodeInfo(peerId)!.id} %s`, peerId)
     this.updateNodeInfo(peerId, {isOnline: false});
+  }
+
+  get availablePeerIds(): string[] {
+    return this._nodesList
+      .filter(n => n.isOnline)
+      .map(n => n.peerId)
   }
 
   private updateNodeInfo(index: string, dataToMerge: object, keysToDelete?:string[]) {
@@ -136,7 +138,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
     this.allowedWallets.splice(idx2, 1);
   }
 
-  async _loadCollateralInfo(){
+  private async _loadCollateralInfo(){
     let info;
     while(!info) {
       try {

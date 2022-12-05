@@ -21,13 +21,19 @@ class Network extends Events {
   configs
   libp2p
   _plugins = {}
+  private connectedPeers: {[index: string]: boolean} = {}
 
   constructor(configs) {
     super()
     this.configs = configs;
   }
 
+  getConnectedPeers(): {[index: string]: boolean} {
+    return this.connectedPeers;
+  }
+
   async _initializeLibp2p() {
+    log(`libp2p initializing ...`)
     const configs = this.configs.libp2p;
     let peerId = await PeerId.createFromJSON(configs.peerId)
     let announceFilter = (multiaddrs) => multiaddrs.filter(m => !isPrivate(m));
@@ -77,7 +83,7 @@ class Network extends Events {
   }
 
   async start() {
-    log(emoji.get('moon') + " " +chalk.green(` peer [${this.peerId.toB58String()}] starting ...`))
+    log(`libp2p starting peerId: ${this.peerId.toB58String()} ...`)
     await this.libp2p.start()
 
     if (this.configs.libp2p.natIp) {
@@ -126,11 +132,13 @@ class Network extends Events {
       emoji.get('large_blue_circle') + " " +
       chalk.blue(` ${connection.remotePeer.toB58String()}`)
     )
+    this.connectedPeers[connection.remotePeer._idB58String] = true
     this.emit('peer:connect', connection.remotePeer)
     coreIpc.fireEvent({type: "peer:connect", data: connection.remotePeer.toB58String()})
   }
 
   onPeerDisconnect(connection) {
+    delete this.connectedPeers[connection.remotePeer._idB58String]
     log(
       emoji.get('moon') + " " +
       chalk.red(' Node disconnected') + " " +
@@ -142,6 +150,7 @@ class Network extends Events {
   }
 
   async onPeerDiscovery(peerId) {
+    this.connectedPeers[peerId._idB58String] = true
     this.emit('peer:discovery', peerId)
     coreIpc.fireEvent({type: "peer:discovery", data: peerId.toB58String()})
     log('found peer');

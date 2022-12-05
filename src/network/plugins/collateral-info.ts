@@ -6,6 +6,7 @@ import NodeManagerAbi from '../../data/NodeManager-ABI.json'
 import {MuonNodeInfo} from "../../common/types";
 import * as CoreIpc from '../../core/ipc'
 import _ from 'lodash'
+const chalk = require('chalk')
 const log = require('../../common/muon-log')('muon:network:plugins:collateral')
 
 export type GroupInfo = {
@@ -46,23 +47,10 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     let {nodeManager} = this.network.configs.net;
     log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
     await this._loadCollateralInfo();
-  }
-
-  async onStart(){
-    super.onStart();
 
     this.network.on('peer:discovery', this.onPeerDiscovery.bind(this));
     this.network.on('peer:connect', this.onPeerConnect.bind(this));
     this.network.on('peer:disconnect', this.onPeerDisconnect.bind(this));
-
-    // this.network.once('peer:connect', () => {
-    //   console.log('first node connected ...')
-    //   // Listen to contract events and inform any changes.
-    //   // TODO: uncomment this. (commented for debug)
-    //   // this._watchContractEvents();
-    //
-    //   this._loadCollateralInfo();
-    // })
   }
 
   get onlinePeers(): string[] {
@@ -75,7 +63,13 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       .filter(info => !!info)
   }
 
+  private getNodeId(peerId): string {
+    const id = this.getNodeInfo(peerId._idB58String)?.id || 'unknown'
+    return `[${id}]:${peerId._idB58String}`
+  }
+
   async onPeerDiscovery(peerId) {
+    log(chalk.green(`peer discovered ${this.getNodeId(peerId)}`))
     // console.log("peer available", peerId)
     await this.waitToLoad();
 
@@ -86,6 +80,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   async onPeerConnect(peerId) {
+    log(chalk.green(`peer connected ${this.getNodeId(peerId)}`))
     await this.waitToLoad();
 
     await timeout(5000);
@@ -95,6 +90,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   onPeerDisconnect(peerId) {
+    log(chalk.red(`peer disconnected ${this.getNodeId(peerId)}`))
     // console.log("peer not available", peerId)
     delete this._onlinePeers[peerId._idB58String];
     this.updateNodeInfo(peerId._idB58String, {isOnline: false})
@@ -103,18 +99,18 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   private updateNodeInfo(index: string, dataToMerge: object) {
     let nodeInfo = this.getNodeInfo(index)!;
     if(nodeInfo) {
+      log(`updating node [${nodeInfo.id}]`, dataToMerge);
       /** update fields */
+      // console.log("((((((", JSON.stringify(this._nodesList.map(n => n.isOnline)))
+      // console.log('updating', nodeInfo)
       if(dataToMerge) {
         Object.keys(dataToMerge).forEach(key => {
           nodeInfo[key] = dataToMerge[key];
         })
       }
-      /**
-       * all three indexes id|wallet|peerId contains same object reference.
-       * by changing peerId index other two indexes, will change too.
-       */
-      // TODO: is this needed?
-      this._nodesMap.set(index, nodeInfo);
+    }
+    else {
+      log(`node info not found for ${index} to update %o`, dataToMerge)
     }
   }
 
@@ -166,7 +162,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           wallet: item.nodeAddress,
           peerId: item.peerId,
           isDeployer: item.isDeployer,
-          isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS
+          isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || !!this._onlinePeers[item.peerId]
         }))
     }
   }
@@ -304,7 +300,13 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
   async getNodesList() {
     await this.waitToLoad();
-    return this._nodesList;
+    let connectedPeers = this.network.getConnectedPeers();
+    return this._nodesList.map(n => {
+      let res = {...n};
+      if(connectedPeers[n.peerId])
+        res.isOnline = true;
+      return res;
+    });
   }
 
   waitToLoad(){
