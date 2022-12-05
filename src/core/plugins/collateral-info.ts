@@ -43,11 +43,13 @@ export default class CollateralInfoPlugin extends BasePlugin{
   }
 
   async onPeerDiscovery(peerId: string) {
+    await this.waitToLoad()
     log(`peer discovered id: ${this.getNodeInfo(peerId)!.id} %s`, peerId)
     this.updateNodeInfo(peerId, {isOnline: true});
   }
 
   async onPeerConnect(peerId: string) {
+    await this.waitToLoad()
     log(`peer connected id: ${this.getNodeInfo(peerId)!.id} %s`, peerId)
     this.updateNodeInfo(peerId, {isOnline: true});
   }
