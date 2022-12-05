@@ -37,13 +37,11 @@ class System extends CallablePlugin {
   }
 
   getAvailableNodes(): MuonNodeInfo[] {
-    const peerIds = Object.keys(this.collateralPlugin.availablePeerIds)
+    const onlineNodes = this.collateralPlugin.filterNodes({isOnline: true, excludeSelf: true})
     const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.PEER_ID!)
     return [
       currentNodeInfo!,
-      ...peerIds.map(peerId => {
-        return this.collateralPlugin.getNodeInfo(peerId)!
-      }).filter(n => !!n)
+      ...onlineNodes
     ]
   }
 

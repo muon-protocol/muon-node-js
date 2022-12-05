@@ -3,8 +3,13 @@ import { muonCall } from '../utils'
 import {getConfigs} from "./cmd-conf-mod";
 
 function expectConfirmed(response) {
-  assert.equal(response?.success, true)
-  assert.equal(response?.result?.confirmed, true)
+  try {
+    assert.equal(response?.success, true, "request not succeeded")
+    assert.equal(response?.result?.confirmed, true, "request not confirmed")
+  }catch (e) {
+    console.dir(response, {depth: null})
+    throw e
+  }
 }
 
 module.exports = {
