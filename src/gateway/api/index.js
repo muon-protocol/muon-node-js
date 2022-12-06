@@ -114,7 +114,7 @@ async function shieldConfirmedResult(requestData, request) {
   const requestHash = soliditySha3(request.data.signParams)
   if(shieldHash !== requestHash)
     throw `Shield result mismatch.`
-  // request.gwAddress = process.env.SIGN_WALLET_ADDRESS;
+  request.shieldAddress = process.env.SIGN_WALLET_ADDRESS;
   request.shieldSignature = crypto.sign(shieldHash);
 }
 

@@ -23,6 +23,6 @@ shield not enabled by default for any app. you should enable it for any app you 
 replace `http://localhost:8000/v1/` with your network url and `app1|app2` with a list of apps that you want to shield. separate each app with `|` mark.
 
 ```
-docker exec muon-node bash -c 'echo -e "\n\nSHIELD_FORWARD_URL=http://localhost:8000/v1/\nSHIELD_APPS=app1|app2" >> ".env"'
+docker exec muon-node bash -c 'echo -e "\n\nSHIELD_FORWARD_URL=http://localhost:8000/v1/\nSHIELDED_APPS=app1|app2" >> ".env"'
 ```
 
