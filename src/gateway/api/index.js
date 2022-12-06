@@ -59,6 +59,14 @@ async function isCurrentNodeInNetwork() {
   return cachedNetworkCheck.result;
 }
 
+const appTimeouts = {}
+async function getAppTimeout(app) {
+  if(appTimeouts[app] === undefined) {
+    appTimeouts[app] = await CoreIpc.getAppTimeout(app);
+  }
+  return appTimeouts[app];
+}
+
 async function callProperNode(requestData) {
   if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
     log("Deployment excerpt method call %o", requestData)
@@ -86,7 +94,8 @@ async function callProperNode(requestData) {
   } else {
     const randomIndex = Math.floor(Math.random() * partners.length);
     log(`forwarding request to id:%s`, partners[randomIndex])
-    let request = await NetworkIpc.forwardRequest(partners[randomIndex], requestData)
+    const timeout = await getAppTimeout(requestData.app);
+    let request = await NetworkIpc.forwardRequest(partners[randomIndex], requestData, timeout);
     // if(requestData.gwSign){
     //   const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
     //   const requestHash = soliditySha3(request.data.signParams)

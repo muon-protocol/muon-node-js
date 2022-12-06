@@ -225,6 +225,16 @@ class BaseAppPlugin extends CallablePlugin {
     return this.tssPlugin.getAppTssKey(this.APP_ID)
   }
 
+  /**
+   * A request need's (2 * REMOTE_CALL_TIMEOUT + 5000) millisecond to be confirmed.
+   * One REMOTE_CALL_TIMEOUT for first node
+   * One REMOTE_CALL_TIMEOUT for other nodes (all other nodes proceed parallel).
+   * 5000 for networking
+   */
+  get requestTimeout(): number {
+    return this.REMOTE_CALL_TIMEOUT * 2 + 5000;
+  }
+
   @gatewayMethod("request")
   async __onRequestArrived({method, params, nSign, mode, callId: gatewayCallId, gwSign}) {
     this.log(`request arrived %O`, {method, params})
@@ -319,13 +329,7 @@ class BaseAppPlugin extends CallablePlugin {
         newRequest = this.requestManager.getRequest(newRequest.reqId);
       }
       else {
-        /**
-         * A request need's (2 * REMOTE_CALL_TIMEOUT + 5000) millisecond to be confirmed.
-         * One REMOTE_CALL_TIMEOUT for first node
-         * One REMOTE_CALL_TIMEOUT for other nodes (all other nodes proceed parallel).
-         * 5000 for networking
-         */
-        this.requestManager.addRequest(newRequest, {requestTimeout: this.REMOTE_CALL_TIMEOUT * 2 + 5000});
+        this.requestManager.addRequest(newRequest, {requestTimeout: this.requestTimeout});
 
         newRequest.data.init = {
           ... newRequest.data.init,

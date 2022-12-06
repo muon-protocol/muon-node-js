@@ -1,10 +1,11 @@
 import BaseNetworkPlugin from './base-network-plugin';
+import RemoteCallPlugin, {RemoteCallOptions} from '../remote-call'
 const log = require('../../../common/muon-log')('muon:network:plugins:callable')
 
 export default class CallablePlugin extends BaseNetworkPlugin {
 
-  remoteCall(peer, methodName, data, options?){
-    let remoteCall = this.network.getPlugin('remote-call')
+  remoteCall(peer, methodName, data, options?: RemoteCallOptions){
+    let remoteCall: RemoteCallPlugin = this.network.getPlugin('remote-call')
     let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
     if(Array.isArray(peer)){
       return Promise.all(peer.map(p => remoteCall.call(p, remoteMethodEndpoint, data, options)))

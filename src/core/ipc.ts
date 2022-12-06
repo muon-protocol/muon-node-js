@@ -67,6 +67,14 @@ async function getAppContext(appName) {
 }
 
 /**
+ * Return minimum time the app needs to confirm the request
+ * @param appName
+ */
+async function getAppTimeout(appName) {
+  return await call(IpcMethods.GetAppTimeout, appName)
+}
+
+/**
  * If app context not found locally, it's need to query muon network to find it.
  * @param appName
  */
@@ -95,6 +103,7 @@ export {
   getTssKey,
   getAppId,
   getAppContext,
+  getAppTimeout,
   queryAppContext,
   isDeploymentExcerpt,
   shieldConfirmedRequest,

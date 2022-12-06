@@ -12,6 +12,7 @@ export const IpcMethods = {
   GetTssKey: 'get-tss-key',
   GetAppId: 'get-app-id',
   GetAppContext: 'get-app-context',
+  GetAppTimeout: 'get-app-timeout',
   QueryAppContext: 'query-app-context',
   IsDeploymentExcerpt: 'is-deployment-excerpt',
   ShieldConfirmedRequest: 'shield-confirmed-request',
@@ -77,6 +78,18 @@ class CoreIpcHandlers extends CallablePlugin {
     if(appId === '0')
       return null;
     return await this.appManager.getAppContext(appId)
+  }
+
+  /**
+   * Return local app context
+   * @param appName
+   */
+  @ipcMethod(IpcMethods.GetAppTimeout)
+  async __getAppTimeout(appName: string) {
+    const app = await this.muon.getAppByName(appName)
+    if(!app)
+      return 0;
+    return app.requestTimeout || 0
   }
 
   /**

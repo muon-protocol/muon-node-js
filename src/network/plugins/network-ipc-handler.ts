@@ -207,14 +207,16 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
-  async __forwardGateWayRequest(data: {id: string, requestData: Object}) {
+  async __forwardGateWayRequest(data: {id: string, requestData: Object, appTimeout: number}) {
     // console.log(`NetworkIpcHandler.__forwardGateWayRequest`, data);
     const nodeInfo = this.collateralPlugin.getNodeInfo(data.id)
     if(!nodeInfo) {
       throw `Unknown id ${data.id}`
     }
     const peer = await this.findPeer(nodeInfo.peerId);
-    return await this.remoteCall(peer, RemoteMethods.ExecGateWayRequest, data.requestData);
+
+    const timeout = data.appTimeout || 35000
+    return await this.remoteCall(peer, RemoteMethods.ExecGateWayRequest, data.requestData, {timeout});
   }
 
   @ipcMethod(IpcMethods.GetCurrentNodeInfo)

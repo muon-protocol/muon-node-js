@@ -53,8 +53,8 @@ function findContent(cid: string): Promise<any> {
   return call(IpcMethods.ContentRoutingFind, cid)
 }
 
-function forwardRequest(id, requestData) {
-  return call(IpcMethods.ForwardGatewayRequest, {id, requestData});
+function forwardRequest(id, requestData, appTimeout?:number) {
+  return call(IpcMethods.ForwardGatewayRequest, {id, requestData, appTimeout});
 }
 
 function getCurrentNodeInfo() {
