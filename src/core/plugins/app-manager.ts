@@ -30,6 +30,7 @@ export default class AppManager extends CallablePlugin {
     await super.onStart()
 
     this.muon.on('app-context:add', this.onAppContextAdd.bind(this))
+    this.muon.on('app-context:update', this.onAppContextUpdate.bind(this))
     this.muon.on('app-tss-key:add', this.onAppTssConfigAdd.bind(this))
 
     this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
@@ -146,6 +147,18 @@ export default class AppManager extends CallablePlugin {
       type: "app-tss-key:add",
       data: newConfig
     })
+
+    // @ts-ignore
+    const {appId, version} = appTssConfig;
+    const context = await AppContext.findOne({appId, version}).exec();
+    // @ts-ignore
+    context.publicKey = appTssConfig.publicKey
+    context.dangerousAllowToSave = true
+    await context.save();
+    CoreIpc.fireEvent({
+      type: "app-context:update",
+      data: context,
+    })
   }
 
   async deleteAppTssKey() {
@@ -153,6 +166,12 @@ export default class AppManager extends CallablePlugin {
 
   private async onAppContextAdd(doc) {
     log(`app context add %o`, doc)
+    this.appContexts[doc.appId] = doc;
+    this.contextIdToAppIdMap[doc._id] = doc.appId
+  }
+
+  private async onAppContextUpdate(doc) {
+    log(`app context update %o`, doc)
     this.appContexts[doc.appId] = doc;
     this.contextIdToAppIdMap[doc._id] = doc.appId
   }

@@ -107,12 +107,10 @@ class Explorer extends CallablePlugin {
     if(!context)
       context = await this.appManager.queryAndLoadAppContext(appId!)
 
-    const tss = !context ? null : this.tssPlugin.getAppTssKey(appId!)
-
     let statusCode = 0
     if(!!context)
       statusCode ++;
-    if(!!tss)
+    if(!!context.publicKey?.address)
       statusCode ++;
 
     return {
@@ -130,12 +128,7 @@ class Explorer extends CallablePlugin {
           t: context.party.t,
           max: context.party.max
         },
-        publicKey: !tss ? null : {
-          address: tss.address,
-          encoded: tss.publicKey?.encodeCompressed("hex"),
-          x: tss.publicKey?.getX().toBuffer('be', 32).toString('hex'),
-          yParity: tss.publicKey?.getY().isEven() ? 0 : 1
-        },
+        publicKey: context.publicKey || null
       }
     }
   }
