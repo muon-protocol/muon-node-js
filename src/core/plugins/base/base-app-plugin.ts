@@ -761,9 +761,13 @@ class BaseAppPlugin extends CallablePlugin {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let nonce = tssPlugin.getSharedKey(request.reqId)
 
-    let idx = this.collateralPlugin.getNodeInfo(owner)!.id;
+    const ownerInfo = this.collateralPlugin.getNodeInfo(owner)
+    if(!ownerInfo){
+      this.log(`invalid signature owner %s`, owner)
+      return false
+    }
     let Z_i = pubKey;
-    let K_i = nonce.getPubKey(idx);
+    let K_i = nonce.getPubKey(ownerInfo!.id);
 
     let p1 = tss.pointAdd(K_i, Z_i.mul(e.neg())).encode('hex')
     let p2 = tss.curve.g.mul(s).encode('hex');

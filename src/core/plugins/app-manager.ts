@@ -351,12 +351,13 @@ export default class AppManager extends CallablePlugin {
         return this.tssKeyQueryResult[appId].result;
     }
     let appContext = this.appContexts[appId];
-    let partnersId = appContext.party.partners;
 
     /** refresh result */
-    const remoteNodes: MuonNodeInfo[] = partnersId
-        .map(id => this.collateralPlugin.getNodeInfo(id))
-        .filter(n => (n.isOnline && n.wallet !== process.env.SIGN_WALLET_ADDRESS))
+    const remoteNodes: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+      list: appContext.party.partners,
+      isOnline: true,
+      excludeSelf: true,
+    })
 
     let callResult = await Promise.all(remoteNodes.map(node => {
       return this.remoteCall(

@@ -217,9 +217,10 @@ class TssPlugin extends CallablePlugin {
       id: 'deployers-party',
       t: networkInfo.tssThreshold,
       max: networkInfo.maxGroupSize,
-      partners: partners
-        .map(id => this.collateralPlugin.getNodeInfo(id)!)
-        .filter(n => n.isDeployer)
+      partners: this.collateralPlugin.filterNodes({
+        list: partners,
+        isDeployer: true
+      })
         .map(n => n.id)
     });
     this.parties[party.id] = party
@@ -741,14 +742,14 @@ class TssPlugin extends CallablePlugin {
     key.setSelfShare(selfWalletIndex, selfFH.f, selfFH.h, A_ik);
 
     // let keyPartners = key.partners.map(w => party.partners[w]);
-    const onlinePartners = this.collateralPlugin.filterNodes({
+    const onlinePartners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
       list: party!.partners,
       isOnline: true
     })
     let keyPartners = onlinePartners.filter(n => key.partners.includes(n.id));
     let distKeyResult = await Promise.all(
       keyPartners
-      .map(({wallet, peerId, isOnline}) => {
+      .map(({id, wallet, peerId, isOnline}) => {
         if(wallet === process.env.SIGN_WALLET_ADDRESS)
           return true
         // TODO: sometimes peer is undefined
@@ -757,7 +758,6 @@ class TssPlugin extends CallablePlugin {
         // if(!peer){
         //   console.log({wallet, peerId, peer})
         // }
-        const destinationNodeInfo = this.collateralPlugin.getNodeInfo(wallet)!;
         return this.remoteCall(
           peerId,
           RemoteMethods.distributeKey,
@@ -767,7 +767,7 @@ class TssPlugin extends CallablePlugin {
             partners: key.partners,
             commitment: key.commitment.map(c => c.encode('hex', false)),
             pubKeys: A_ik.map(pubKey => pubKey.encode('hex', false)),
-            ...key.getFH(destinationNodeInfo.id),
+            ...key.getFH(id),
           },
           {taskId: `keygen-${key.id}`}
         )
@@ -850,8 +850,7 @@ class TssPlugin extends CallablePlugin {
 
     let {tssParty, tssKey} = this
 
-    const callerId = this.collateralPlugin.getNodeInfo(callerInfo.wallet)!.id;
-    if (!Object.keys(tssParty!.partners).includes(callerId))
+    if (!Object.keys(tssParty!.partners).includes(callerInfo.id))
       throw `Not included in the global party`;
 
     let {nonce: nonceId} = data
@@ -946,7 +945,7 @@ class TssPlugin extends CallablePlugin {
     commitment = commitment.map(item => tssModule.keyFromPublic(item));
 
     const currentNodeIndex = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!.id;
-    const callerIndex = this.collateralPlugin.getNodeInfo(callerInfo.wallet)!.id;
+    const callerIndex = callerInfo.id;
     key.setPartnerShare(currentNodeIndex, callerIndex, partners, f, h, pubKeys, commitment);
 
     if (!key.keyDistributed) {
@@ -981,8 +980,7 @@ class TssPlugin extends CallablePlugin {
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
       throw {message: 'TssPlugin.__storeTssKey: key not found.'};
-    const nodeInfo = this.collateralPlugin.getNodeInfo(callerInfo.wallet)
-    if(nodeInfo && nodeInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
+    if(callerInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
       await key.waitToFulfill()
       this.saveTssConfig(party, key);
       this.tssKey = key
