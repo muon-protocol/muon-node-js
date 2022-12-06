@@ -255,6 +255,7 @@ export default class AppManager extends CallablePlugin {
     }
     /** refresh result */
     const remoteNodes: MuonNodeInfo[] = this.collateralPlugin.filterNodes({isDeployer: true, isOnline: true})
+    log(`calling nodes %o to get app status`, remoteNodes.map(n => n.id))
     let callResult = await Promise.all(remoteNodes.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
         return this.getAppStatus(appId)

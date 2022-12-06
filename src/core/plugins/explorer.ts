@@ -103,7 +103,10 @@ class Explorer extends CallablePlugin {
     if(appId === '0')
       throw `App not found`;
 
-    const context = this.appManager.getAppContext(appId!)
+    let context = this.appManager.getAppContext(appId!)
+    if(!context)
+      context = await this.appManager.queryAndLoadAppContext(appId!)
+
     const tss = !context ? null : this.tssPlugin.getAppTssKey(appId!)
 
     let statusCode = 0
