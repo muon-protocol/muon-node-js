@@ -43,8 +43,9 @@ check_for_update (){
         fi
 
         log "========== updating detected ===========";
-        log "Installing dependencies ...";
-        log `$_NPM install`
+        log "Installing dependencies: $_NODE  $_NPM install";
+        log `pwd`;
+        log `$_NODE  $_NPM install`
         log "Restarting PM2: $_NODE $_PM2 restart $_PM2_APP";
         log `$_NODE $_PM2 restart "$_PM2_APP"`
         log "============ updating done =============";
