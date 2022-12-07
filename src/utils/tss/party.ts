@@ -67,7 +67,7 @@ export default class TssParty {
   }
 
   size(){
-    return Object.keys(this.partners).length
+    return this.partners.length
   }
 
   waitToFulfill(){

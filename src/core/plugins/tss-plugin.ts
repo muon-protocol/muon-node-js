@@ -121,8 +121,10 @@ class TssPlugin extends CallablePlugin {
       this.loadTssInfo()
     }
     else {
-      if(selfInfo.isDeployer)
+      if(selfInfo.isDeployer) {
+        log(`adding the new node [%s] into the tss party.`, nodeInfo.id);
         this.tssParty!.addPartner(nodeInfo.id)
+      }
     }
   }
 
@@ -848,7 +850,7 @@ class TssPlugin extends CallablePlugin {
 
     let {tssParty, tssKey} = this
 
-    if (!Object.keys(tssParty!.partners).includes(callerInfo.id))
+    if (!tssParty!.partners.includes(callerInfo.id))
       throw `Not included in the global party`;
 
     let {nonce: nonceId} = data
