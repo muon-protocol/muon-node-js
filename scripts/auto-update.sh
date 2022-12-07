@@ -1,4 +1,6 @@
 #!/bin/bash
+. ~/.bashrc
+
 . "`dirname "$0"`/pre-run.sh"
 
 project_dir=`pwd`
