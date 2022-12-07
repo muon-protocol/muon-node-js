@@ -3,11 +3,12 @@ import { sha256 } from "multiformats/hashes/sha2";
 import * as dagPB from "@ipld/dag-pb";
 import { base16 } from "multiformats/bases/base16";
 
-const Hash = require("pure-ipfs-only-hash");
-const fs = require("fs");
+// const Hash = require("pure-ipfs-only-hash");
+// const fs = require("fs");
 
 // Returns IPFS hash of the file content in hex
 async function fileCID(fileName) {
+  return "TEST";
   const data = fs.readFileSync(fileName, "utf8");
   const hash = await Hash.of(data);
   return "0x" + Buffer.from(hash).toString("hex");
