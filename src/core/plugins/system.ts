@@ -290,7 +290,7 @@ class System extends CallablePlugin {
     if(!party)
       throw `Party not created`
 
-    let key = await this.tssPlugin.keyGen(party)
+    let key = await this.tssPlugin.keyGen(party, {lowerThanHalfN: true})
 
     return {
       id: key.id,

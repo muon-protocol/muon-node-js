@@ -60,7 +60,9 @@ export type KeyGenOptions = {
   /**
    * If you set this value, the value will be shared between partners.
    */
-  value?: BN
+  value?: BN,
+
+  lowerThanHalfN?: boolean,
 }
 
 const BroadcastMessage = {
@@ -109,10 +111,13 @@ class TssPlugin extends CallablePlugin {
     await timeout(5000);
 
     const selfInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
-    if(!selfInfo)
-      return ;
+    if(!selfInfo) {
+      log(`current node not in the network yet.`)
+      return;
+    }
 
     if(selfInfo.id === nodeInfo.id){
+      log(`current node added to the network and loading tss info.`)
       this.loadTssInfo()
     }
     else {
@@ -272,7 +277,7 @@ class TssPlugin extends CallablePlugin {
       const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
       if (currentNodeInfo && currentNodeInfo.id == LEADER_ID && await this.isNeedToCreateKey()) {
         log(`Got permission to create tss key`);
-        let key = await this.tryToCreateTssKey();
+        let key: DistributedKey = await this.tryToCreateTssKey();
         log(`TSS key generated with ${key.partners.length} partners`);
       }
       else{
@@ -526,15 +531,12 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
-  async tryToCreateTssKey() {
+  async tryToCreateTssKey(): Promise<DistributedKey> {
     while (!this.isReady) {
       await timeout(5000);
 
       try {
-        let key;
-        do {
-          key = await this.keyGen(this.tssParty)
-        } while (tssModule.HALF_N.lt(key.getTotalPubKey().x));
+        let key: DistributedKey = await this.keyGen(this.tssParty, {lowerThanHalfN: true})
 
         let keyPartners = this.collateralPlugin.filterNodes({list: key.partners})
         let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
@@ -562,12 +564,12 @@ class TssPlugin extends CallablePlugin {
         this.isReady = true;
         CoreIpc.fireEvent({type: "tss-key:generate", data: key.toSerializable()});
         log('tss ready.')
-
-        return key;
       } catch (e) {
         log('error when trying to create tss key %o %o', e, e.stack);
       }
     }
+
+    return this.tssKey!
   }
 
   async createParty(options: PartyGenOptions) {
@@ -635,24 +637,20 @@ class TssPlugin extends CallablePlugin {
     if(onlinePartners.length < party.t){
       throw {message: "No enough online node."}
     }
-    let t0 = Date.now()
     // 1- create new key
-    let key = await this.createKey(party, options)
-    let t1 = Date.now()
-    // 2- distribute key initialization
-    await this.broadcastKey(key)
-    let t2 = Date.now()
-    // 4- calculate distributed key part
-    await key.waitToFulfill()
-    let t3 = Date.now()
-    // 5- TODO: verify commitment
-    // key.verifyCommitment(2);
-    // console.log('tss-plugin.keyGen', {
-    //   t1: t1 - t0,
-    //   t2: t2 - t1,
-    //   t3: t3 - t2,
-    //   total: t3 - t0,
-    // })
+    let key
+
+    do {
+      key = await this.createKey(party, options)
+      // 2- distribute key initialization
+      await this.broadcastKey(key)
+      // 4- calculate distributed key part
+      await key.waitToFulfill()
+      let t3 = Date.now()
+      // 5- TODO: verify commitment
+      // key.verifyCommitment(2);
+    } while (options.lowerThanHalfN && tssModule.HALF_N.lt(key.getTotalPubKey().x))
+
     CoreIpc.fireEvent({type: "key:generate", data: key.toSerializable()}, {selfEmit: false});
     return key;
   }
