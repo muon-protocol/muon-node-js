@@ -1,4 +1,6 @@
 #!/bin/bash
+. ~/.bashrc
+
 . "`dirname "$0"`/pre-run.sh"
 
 project_dir=`pwd`
@@ -36,15 +38,21 @@ check_for_update (){
         ``;
     else
         # restart services
-        _NODE=`which node`;
+        if [[ -z $_NODE ]]
+            # uses env _NODE by default
+        then
+            _NODE=`which node`;
+        fi
+
         if [[ -z $_NODE ]]
         then
             _NODE=/usr/local/bin/node # node Docker
         fi
 
         log "========== updating detected ===========";
-        log "Installing dependencies ...";
-        log `$_NPM install`
+        log "Installing dependencies: $_NODE  $_NPM install";
+        log `pwd`;
+        log `$_NODE  $_NPM install`
         log "Restarting PM2: $_NODE $_PM2 restart $_PM2_APP";
         log `$_NODE $_PM2 restart "$_PM2_APP"`
         log "============ updating done =============";
