@@ -115,7 +115,9 @@ async function shieldConfirmedResult(requestData, request) {
   if(shieldHash !== requestHash)
     throw `Shield result mismatch.`
   request.shieldAddress = process.env.SIGN_WALLET_ADDRESS;
-  request.shieldSignature = crypto.sign(shieldHash);
+  let cryptoSign = crypto.sign(shieldHash);
+  request.shieldSignature = cryptoSign;
+  request.nodeSignature = cryptoSign;
 }
 
 router.use('/', async (req, res, next) => {

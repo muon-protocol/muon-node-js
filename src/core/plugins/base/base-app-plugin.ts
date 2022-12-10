@@ -377,8 +377,13 @@ class BaseAppPlugin extends CallablePlugin {
           '_id'
           // 'data.memWrite'
         ]),
-        ...((confirmed && gwSign) ? {gwSignature: crypto.sign(resultHash)} : {}),
         signatures: confirmed ? signatures : []
+      }
+
+      if(confirmed && gwSign){
+        let cryptoSign = crypto.sign(resultHash);
+        requestData.gwSignature = cryptoSign;
+        requestData.nodeSignature = cryptoSign;
       }
 
       if (confirmed && !isDuplicateRequest) {
