@@ -72,8 +72,8 @@ const BroadcastMessage = {
 const RemoteMethods = {
   recoverMyKey: 'recoverMyKey',
   createParty: 'createParty',
-  createKey: 'createKey',
-  distributeKey: 'distributeKey',
+  keyGenStep1: 'kgs1',
+  keyGenStep2: 'kgs2',
   storeTssKey: 'storeTssKey',
   iAmHere: "iAmHere",
   checkTssStatus: "checkTssStatus",
@@ -707,7 +707,7 @@ class TssPlugin extends CallablePlugin {
             return "OK";
           return this.remoteCall(
             peerId,
-            RemoteMethods.createKey,
+            RemoteMethods.keyGenStep1,
             {
               party: party.id,
               key: key.id,
@@ -760,13 +760,13 @@ class TssPlugin extends CallablePlugin {
         // }
         return this.remoteCall(
           peerId,
-          RemoteMethods.distributeKey,
+          RemoteMethods.keyGenStep2,
           {
             party: party!.id,
             key: key.id,
             partners: key.partners,
-            commitment: key.commitment.map(c => c.encode('hex', false)),
-            pubKeys: A_ik.map(pubKey => pubKey.encode('hex', false)),
+            commitment: key.commitment.map(c => c.encode('hex', true)),
+            pubKeys: A_ik.map(pubKey => pubKey.encode('hex', true)),
             ...key.getFH(id),
           },
           {taskId: `keygen-${key.id}`}
@@ -891,20 +891,21 @@ class TssPlugin extends CallablePlugin {
    * @returns {Promise<boolean>}
    * @private
    */
-  @remoteMethod(RemoteMethods.createKey)
-  async __createKey(data: {party: string, key: string, value?: string}) {
-    // console.log('TssPlugin.__createKey', data)
+  @remoteMethod(RemoteMethods.keyGenStep1)
+  async __keyGenStep1(data: {party: string, key: string, value?: string}) {
+    // log('keyGenStep1', data)
     let {parties} = this
     let {party, key: keyId} = data
     if (!parties[party]) {
-      log('TssPlugin.__createKey>> party not fount on this node id: ' + party);
+      log('keyGenStep1: party not fount on this node id: ' + party);
       throw {message: 'party not found'}
     }
     if (keysCache.has(keyId)) {
-      log(`TssPlugin.__createKey>> key already exist [${keyId}]`);
+      log(`keyGenStep1: key already exist [${keyId}]`);
       throw {message: `key already exist [${keyId}]`}
     }
-    keysCache.set(keyId, new DistributedKey(parties[party], keyId, undefined, !!data.value ? toBN(data.value) : undefined));
+    const newKey = new DistributedKey(parties[party], keyId, undefined, !!data.value ? toBN(data.value) : undefined)
+    keysCache.set(keyId, newKey);
     return "OK";
   }
 
@@ -925,12 +926,13 @@ class TssPlugin extends CallablePlugin {
    * @returns {Promise<boolean>}
    * @private
    */
-  @remoteMethod(RemoteMethods.distributeKey)
-  async __distributeKey(data = {}, callerInfo) {
+  @remoteMethod(RemoteMethods.keyGenStep2)
+  async __keyGenStep2(data = {}, callerInfo) {
     // console.log('TssPlugin.__distributeKey', data)
     let {parties} = this
     // @ts-ignore
     let {commitment, party, key: keyId, partners, pubKeys, f, h} = data
+    console.log('[tag:90jh] commitments', commitment)
     if (!parties[party]) {
       log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party)
       throw {message: 'party not found'}

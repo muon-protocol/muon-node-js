@@ -54,6 +54,7 @@ class DistributedKey {
   pubKeyParts: {[index: string]: PublicKey[]} = {};
   commitmentParts = {};
   keyDistributed = false;
+  step1FullfillPromise: TimeoutPromise;
   timeoutPromise: TimeoutPromise;
 
   share: BN | null = null;
