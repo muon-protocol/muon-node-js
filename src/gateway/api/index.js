@@ -9,6 +9,8 @@ const NetworkIpc = require('../../network/ipc')
 const axios = require('axios').default
 const crypto = require('../../utils/crypto')
 const log = require('../../common/muon-log')('muon:gateway:api')
+const Ajv = require("ajv")
+const ajv = new Ajv()
 
 const SHIELD_FORWARD_URL = process.env.SHIELD_FORWARD_URL
 const appIsShielded = (process.env.SHIELDED_APPS || "")
@@ -120,6 +122,23 @@ async function shieldConfirmedResult(requestData, request) {
   request.nodeSignature = cryptoSign;
 }
 
+const MUON_REQUEST_SCHEMA = {
+  type: "object",
+  properties: {
+    app: {type: "string"},
+    method: {type: "string"},
+    // params: {type: "object"},
+    gwSign: {type: "boolean"},
+    nSign: {type: "number"},
+    mode: {
+      enum: ["sign", "view"],
+      default: "sign",
+    }
+  },
+  required: ["app", "method"],
+  // additionalProperties: false,
+}
+
 router.use('/', async (req, res, next) => {
   let mixed = {
     ...req.query,
@@ -134,6 +153,16 @@ router.use('/', async (req, res, next) => {
   gwSign = parseBool(gwSign);
   const requestData = {app, method, params, nSign, mode, gwSign}
   log("request arrived %o", requestData);
+
+  if(!ajv.validate(MUON_REQUEST_SCHEMA, requestData)){
+    return res.json({
+      success: false,
+      error: {
+        message: "muon call validation error",
+        items: ajv.errors
+      }
+    })
+  }
 
   if(!await isCurrentNodeInNetwork()){
     log("This node in not in the network.")
