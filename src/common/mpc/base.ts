@@ -1,41 +1,55 @@
 const Events = require('events-async')
 
+const random = () => Math.floor(Math.random()*9999999)
+
 export interface IRoundBased {
   send(to: string, data: any);
 }
 
-export type RoundResultIn<T> = {
+export type MapOf<T> = {
   [index: string]: T
 }
-
-export type RoundBroadcastIn<T> = {
-  [index: string]: T
-}
-
-export type RoundResultOut<T> = {
-  [index: string]: T
-}
-
-export type RoundBroudcastOut<T> = T
 
 export type RoundOutput<ResultT, BroadcastT> = {
-  output: {[index: string]: any},
-  broadcast: any
+  /**
+   * Pi may store any kind of data
+   */
+  store: MapOf<any>,
+  /**
+   * Pi return to each participant an specific ResultT
+   */
+  send: null | MapOf <ResultT>,
+  /**
+   * Pi broadcast a BroadcastT to all other participants
+   */
+  broadcast: null | BroadcastT
 }
 
-export type RoundProcessor<T1, T2> =
-  (prevStepOutput: RoundResultIn<T1>, prevStepBroadcast: RoundBroadcastIn<T2>)
-    =>
-    RoundOutput<T1, T2>
+/**
+ * Pi receives two type of data from previous step
+ *
+ * 1) output of all other participants
+ * 2) broadcast from all participants
+ */
+export type RoundProcessor<ResultT, BroadcastT> =
+  (prevStepOutput: MapOf<ResultT>, prevStepBroadcast: MapOf<BroadcastT>) => RoundOutput<ResultT, BroadcastT>
 
 export class MultiPartyComputation extends Events {
-  private partners: string[]
-  private steps: string[]
+  public readonly id: string;
+  public readonly partners: string[]
+  public readonly rounds: string[]
 
-  constructor(partners: string[], steps: string[]) {
+  constructor(id, partners: string[], rounds: string[]) {
     super()
 
+    rounds.forEach(round => {
+      if(!this[round])
+        throw `round handler [${round}] not defined`
+    })
+
+    this.id = id || `DKG${Date.now()}${random()}`
+
     this.partners = partners
-    this.steps = steps
+    this.rounds = rounds
   }
 }
