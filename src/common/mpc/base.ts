@@ -1,5 +1,4 @@
 import LevelPromise from "./level-promise";
-import {bn2str} from './utils'
 import {Constructor} from "../types";
 
 const Events = require('events-async')

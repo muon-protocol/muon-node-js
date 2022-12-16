@@ -59,7 +59,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       send[id] = {
         Fx: this.store[0].Fx.map(pubKey => pubKey.encode('hex', true)),
         Hx: this.store[0].Hx.map(pubKey => pubKey.encode('hex', true)),
-        share: '0x'+bn2str(this.store[0].fx.calc(id))
+        share: bn2str(this.store[0].fx.calc(id))
       }
     })
 
@@ -76,6 +76,6 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
         acc.iadd(TssModule.toBN(current))
         return acc
       }, TssModule.toBN('0'))
-    return '0x'+bn2str(share.umod(TssModule.curve.n))
+    return bn2str(share.umod(TssModule.curve.n))
   }
 }
