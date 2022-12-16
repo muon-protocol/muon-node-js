@@ -191,8 +191,10 @@ class NetworkIpcHandler extends CallablePlugin {
   async __onRemoteCallRequest(data) {
     // console.log(`NetworkIpcHandler.__onRemoteCallRequest`, data);
     const peer = await this.findPeer(data?.peer);
-    if(!peer)
+    if(!peer) {
       log(`trying to call offline node %o`, data)
+      throw `peer not found peerId: ${data?.peer}`
+    }
     return await this.remoteCall(peer, "exec-ipc-remote-call", data, data?.options);
   }
 

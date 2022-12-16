@@ -7,59 +7,74 @@ import BN from 'bn.js';
 
 type Round1Result = any
 type Round1Broadcast = {
-  Fx: string[],
-  Hx: string[],
   commitment: string[]
 }
 
 type Round2Result = {
+  Fx: string[],
+  Hx: string[],
   share: string
 }
 type Round2Broadcast = any
 
 export class DistributedKeyGeneration extends MultiPartyComputation {
 
-  private fx: Polynomial;
-  private hx: Polynomial;
-  private commitment: PublicKey[] = [];
   private readonly t: number;
   private readonly value: BN | undefined;
 
   constructor(id: string, partners: string[], t: number, value?:BN) {
     super(id, partners, ['round1', 'round2']);
+    // console.log(`${this.ConstructorName} construct with`, {id, partners, t, value});
 
     this.t = t
     this.value = value
   }
 
   round1(): RoundOutput<Round1Result, Round1Broadcast> {
-    let fx = new Polynomial(this.t, TssModule.curve, this.value);
+    console.log(`round1 call.`)
+    let fx = new Polynomial(this.t, TssModule.curve, this.value ? TssModule.toBN(this.value) : undefined);
     let hx = new Polynomial(this.t, TssModule.curve);
-    this.f_x = fx
-    this.h_x = hx
 
-    const Fx = fx.coefPubKeys().map(pubKey => pubKey.encode('hex', true));
-    const Hx = hx.coefPubKeys().map(pubKey => pubKey.encode('hex', true));
-    const commitment = Fx.map((Fxi, i) => TssModule.pointAdd(Fxi, Hx[i]).encode('hex', true))
+    const Fx = fx.coefPubKeys();
+    const Hx = hx.coefPubKeys();
+    const commitment = Fx.map((Fxi, i) => TssModule.pointAdd(Fxi, Hx[i]))
 
-    const output = {},
-      broadcast= {
-        Fx,
-        Hx,
-        commitment
-      }
-
-    return {output, broadcast}
+    const store = {fx, hx, Fx, Hx, commitment}
+    const send = {}
+    const broadcast= {
+      commitment: commitment.map(pubKey => pubKey.encode('hex', true))
+    }
+    // console.log(`round1 output`, {store, send, broadcast})
+    return {store, send, broadcast}
   }
 
   round2(prevStepOutput: MapOf<Round1Result>, preStepBroadcast: MapOf<Round1Broadcast>): RoundOutput<Round2Result, Round2Broadcast> {
-    const output = {}
+    console.log(`round2 call`, {prevStepOutput, preStepBroadcast})
+    const store = {}
+    const send = {}
     const broadcast= null
 
     this.partners.forEach(id => {
-      this.output[id] = {share: this.fx.calc(id)}
+      send[id] = {
+        Fx: this.store[0].Fx.map(pubKey => pubKey.encode('hex', true)),
+        Hx: this.store[0].Hx.map(pubKey => pubKey.encode('hex', true)),
+        share: '0x'+this.store[0].fx.calc(id).toString('hex', 32)
+      }
     })
 
-    return {output, broadcast}
+    // console.log(`round2 output`, {store, send, broadcast})
+    return {store, send, broadcast}
+  }
+
+  finalize(roundArrivedMessages): string {
+    const finalRoundMessages = roundArrivedMessages[1]
+    console.log('final round receives', finalRoundMessages)
+    let share = Object.keys(finalRoundMessages)
+      .map(from => finalRoundMessages[from].send.share)
+      .reduce((acc, current) => {
+        acc.iadd(TssModule.toBN(current))
+        return acc
+      }, TssModule.toBN('0'))
+    return '0x'+share.divn(this.partners.length).umod(TssModule.curve.n).toString('hex', 32)
   }
 }

@@ -1,5 +1,5 @@
 import BasePlugin from'./base/base-plugin'
-const NetworkIpc = require('../../network/ipc')
+import * as NetworkIpc from '../../network/ipc'
 const errorLog = require('../../common/muon-log')('muon:core:plugins:remote-call:error')
 
 export default class RemoteCall extends BasePlugin {

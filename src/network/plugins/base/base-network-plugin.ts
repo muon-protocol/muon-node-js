@@ -34,7 +34,11 @@ export default class BaseNetworkPlugin extends Events {
 
   async findPeer(peerId){
     if(!PeerId.isPeerId(peerId)) {
-      peerId = PeerId.createFromB58String(peerId)
+      try {
+        peerId = PeerId.createFromB58String(peerId)
+      }catch (e) {
+        throw `Invalid string PeedID [${peerId}]: ${e.message}`;
+      }
     }
     try {
       return await this.network.libp2p.peerRouting.findPeer(peerId)
