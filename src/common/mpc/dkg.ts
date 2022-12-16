@@ -1,4 +1,5 @@
 import {MapOf, MultiPartyComputation, RoundOutput, RoundProcessor} from "./base";
+import {bn2str} from './utils'
 import DistributedKey from "../../utils/tss/distributed-key";
 import Polynomial from "../../utils/tss/polynomial";
 import * as TssModule from "../../utils/tss";
@@ -31,7 +32,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
   }
 
   round1(): RoundOutput<Round1Result, Round1Broadcast> {
-    console.log(`round1 call.`)
+    // console.log(`round1 call.`)
     let fx = new Polynomial(this.t, TssModule.curve, this.value ? TssModule.toBN(this.value) : undefined);
     let hx = new Polynomial(this.t, TssModule.curve);
 
@@ -49,7 +50,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
   }
 
   round2(prevStepOutput: MapOf<Round1Result>, preStepBroadcast: MapOf<Round1Broadcast>): RoundOutput<Round2Result, Round2Broadcast> {
-    console.log(`round2 call`, {prevStepOutput, preStepBroadcast})
+    // console.log(`round2 call`, {prevStepOutput, preStepBroadcast})
     const store = {}
     const send = {}
     const broadcast= null
@@ -58,7 +59,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       send[id] = {
         Fx: this.store[0].Fx.map(pubKey => pubKey.encode('hex', true)),
         Hx: this.store[0].Hx.map(pubKey => pubKey.encode('hex', true)),
-        share: '0x'+this.store[0].fx.calc(id).toString('hex', 32)
+        share: '0x'+bn2str(this.store[0].fx.calc(id))
       }
     })
 
@@ -68,13 +69,13 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
   finalize(roundArrivedMessages): string {
     const finalRoundMessages = roundArrivedMessages[1]
-    console.log('final round receives', finalRoundMessages)
+    // console.log('final round receives', finalRoundMessages)
     let share = Object.keys(finalRoundMessages)
       .map(from => finalRoundMessages[from].send.share)
       .reduce((acc, current) => {
         acc.iadd(TssModule.toBN(current))
         return acc
       }, TssModule.toBN('0'))
-    return '0x'+share.divn(this.partners.length).umod(TssModule.curve.n).toString('hex', 32)
+    return '0x'+bn2str(share.umod(TssModule.curve.n))
   }
 }

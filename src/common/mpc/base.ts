@@ -1,4 +1,5 @@
 import LevelPromise from "./level-promise";
+import {bn2str} from './utils'
 import {Constructor} from "../types";
 
 const Events = require('events-async')
@@ -94,7 +95,7 @@ export class MultiPartyComputation {
       this.roundsArrivedMessages[round][from] = data;
 
       if (Object.keys(this.roundsArrivedMessages[round]).length === this.partners.length) {
-        console.log(`${this.ConstructorName}[${networkId}] ${strRound} completed`);
+        // console.log(`${this.ConstructorName}[${networkId}] ${strRound} completed`);
         this.roundsPromise.resolve(round, true);
       }
       return 'OK'
@@ -106,7 +107,7 @@ export class MultiPartyComputation {
   }
 
   async process(network: MpcNetwork) {
-    console.log(`================= ID:${network.id} start =================`)
+    // console.log(`================= ID:${network.id} start =================`)
     this.registerMessageReceiveHandler(network);
 
     try {
@@ -114,7 +115,7 @@ export class MultiPartyComputation {
       for (let r = 0; r < this.rounds.length; r++) {
         const round = this.rounds[r]
 
-        console.log(`${this.ConstructorName}[${network.id}][${round}] start.`)
+        // console.log(`${this.ConstructorName}[${network.id}][${round}] start.`)
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
@@ -140,17 +141,17 @@ export class MultiPartyComputation {
               return "error"
             })
         }))
-        console.log(`${this.ConstructorName}[${network.id}][${round}] ends.`, {allPartiesResult})
+        // console.log(`${this.ConstructorName}[${network.id}][${round}] ends.`, {allPartiesResult})
         // mpc.addToStore(round, store)
 
         /** wait until the round is completed. */
         await this.roundsPromise.waitToLevelResolve(r);
       }
 
-      console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
+      // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
       return this.finalize(this.roundsArrivedMessages);
     }catch (e) {
-      console.log(`ID:${network.id}`, e);
+      // console.log(`ID:${network.id}`, e);
       throw e;
     }
   }
