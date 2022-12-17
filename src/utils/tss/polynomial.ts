@@ -1,6 +1,6 @@
 const {range, toBN} = require('./utils')
 import BN from 'bn.js'
-import { BaseCurve, KeyPair } from './types'
+import {BaseCurve, KeyPair, PublicKey} from './types'
 
 class Polynomial {
   t: number
@@ -24,7 +24,10 @@ class Polynomial {
     return result.umod(this.curve.n)
   }
 
-  coefPubKeys() {
+  coefPubKeys(basePoint?: PublicKey) {
+    if(basePoint) {
+      return this.coefficients.map(c => c.getPrivate()).map(b_k => basePoint.mul(b_k))
+    }
     return this.coefficients.map(a => a.getPublic())
   }
 }

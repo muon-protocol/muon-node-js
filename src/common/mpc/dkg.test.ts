@@ -29,22 +29,25 @@ async function run() {
     fakeNet4 = new FakeNetwork(NODE_4)
 
   const specialPrivateKeys = [
-    /** first 4 private keys */
+    /** first 5 private keys */
     '0x0000000000000000000000000000000000000000000000000000000000000001',
     '0x0000000000000000000000000000000000000000000000000000000000000002',
     '0x0000000000000000000000000000000000000000000000000000000000000003',
     '0x0000000000000000000000000000000000000000000000000000000000000004',
+    '0x0000000000000000000000000000000000000000000000000000000000000005',
 
     /** 100 random private key */
       ...(new Array(100).fill(0).map(() => bn2str(toBN(randomHex(32)).umod(N)))),
 
-    /** last 4 private keys */
+    /** last 5 private keys */
+    bn2str(TssModule.curve.n.subn(5)),
     bn2str(TssModule.curve.n.subn(4)),
     bn2str(TssModule.curve.n.subn(3)),
     bn2str(TssModule.curve.n.subn(2)),
     bn2str(TssModule.curve.n.subn(1)),
   ]
 
+  const t1 = Date.now()
   for(let i=0 ; i<specialPrivateKeys.length ; i++) {
     // const realPrivateKey = bn2str(toBN(randomHex(32)).umod(N));
     const realPrivateKey = specialPrivateKeys[i];
@@ -86,6 +89,10 @@ async function run() {
       })
     }
   }
+  const t2 = Date.now()
+  const dt = t2 - t1
+  console.log(`  total time: ${Math.round(dt)} ms`)
+  console.log(`average time: ${Math.round(dt/specialPrivateKeys.length)} ms`)
   process.exit(0)
 }
 

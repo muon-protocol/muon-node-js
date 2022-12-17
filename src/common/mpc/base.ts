@@ -122,9 +122,10 @@ export class MultiPartyComputation {
           inputs = Object.keys(prevRoundReceives).map(from => {
             return prevRoundReceives[from].send
           })
-          broadcasts = Object.keys(prevRoundReceives).map(from => {
-            return prevRoundReceives[from].broadcast
-          })
+          broadcasts = Object.keys(prevRoundReceives).reduce((obj, from) => {
+            obj[from] = prevRoundReceives[from].broadcast
+            return obj
+          }, {})
         }
         /** execute MPC round */
         const {store, send, broadcast} = await this.processRound(r, inputs, broadcasts);
@@ -148,14 +149,14 @@ export class MultiPartyComputation {
       }
 
       // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
-      return this.finalize(this.roundsArrivedMessages);
+      return this.finalize(this.roundsArrivedMessages, network.id);
     }catch (e) {
       // console.log(`ID:${network.id}`, e);
       throw e;
     }
   }
 
-  finalize(roundsArrivedMessages): string { return "" }
+  finalize(roundsArrivedMessages, networkId): string { return "" }
 
   async processRound(roundIndex: number, input: MapOf<any>, broadcast: MapOf<any>): Promise<RoundOutput<any, any>> {
     const roundMethodName = this.rounds[roundIndex]
