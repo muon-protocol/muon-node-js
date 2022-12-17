@@ -1,10 +1,11 @@
 import LevelPromise from "./level-promise";
-import {MapOf, MpcNetwork, RoundOutput} from "./types";
+import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData} from "./types";
 
 const random = () => Math.floor(Math.random()*9999999)
 
 
 export class MultiPartyComputation {
+  private readonly constructData;
   public readonly id: string;
   public readonly partners: string[]
   public readonly rounds: string[]
@@ -13,7 +14,8 @@ export class MultiPartyComputation {
   /** roundsArrivedMessages[roundId][from] = <ResultT> */
   private roundsArrivedMessages: MapOf<MapOf<any>> = {}
 
-  constructor(id, partners: string[], rounds: string[]) {
+  constructor(rounds, id, partners) {
+    this.constructData = Object.values(arguments).slice(1)
 
     rounds.forEach(round => {
       if(!this[round])
@@ -55,9 +57,7 @@ export class MultiPartyComputation {
     }
   }
 
-  async process(network: MpcNetwork) {
-    // console.log(`================= ID:${network.id} start =================`)
-    // this.registerMessageReceiveHandler(network);
+  async process(network: IMpcNetwork) {
     // network.registerMcp(this);
 
     try {
@@ -81,7 +81,12 @@ export class MultiPartyComputation {
 
         /** distribute round outputs */
         let allPartiesResult = await Promise.all(this.partners.map(partner => {
-          const dataToSend = {from: network.id, send: send![partner], broadcast}
+          let dataToSend = {
+            from: network.id,
+            send: send![partner],
+            broadcast,
+            constructData: r===0 ? this.constructData : undefined,
+          }
           return network.send(partner, this.id, r, dataToSend)
             .catch(e => {
               console.log(">>>>>", e)
@@ -89,7 +94,6 @@ export class MultiPartyComputation {
             })
         }))
         // console.log(`${this.ConstructorName}[${network.id}][${round}] ends.`, {allPartiesResult})
-        // mpc.addToStore(round, store)
 
         /** wait until the round is completed. */
         await this.roundsPromise.waitToLevelResolve(r);

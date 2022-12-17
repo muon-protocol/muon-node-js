@@ -27,12 +27,13 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
   private readonly t: number;
   private readonly value: BN | undefined;
 
-  constructor(id: string, partners: string[], t: number, value?:BN) {
-    super(id, partners, ['round1', 'round2']);
+  constructor(id: string, partners: string[], t: number, value?:string) {
+    // @ts-ignore
+    super(['round1', 'round2'], ...Object.values(arguments));
     // console.log(`${this.ConstructorName} construct with`, {id, partners, t, value});
 
     this.t = t
-    this.value = value
+    this.value = value ? Web3.utils.toBN(value) : undefined
   }
 
   round1(): RoundOutput<Round1Result, Round1Broadcast> {

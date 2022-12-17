@@ -1,9 +1,9 @@
 import QueueProducer from "../message-bus/queue-producer";
 import QueueConsumer from "../message-bus/queue-consumer";
-import {MapOf} from "./types";
+import {IMpcNetwork, MapOf} from "./types";
 import {MultiPartyComputation} from "./base";
 
-export default class FakeNetwork {
+export default class FakeNetwork implements IMpcNetwork{
   readonly id: string;
   private sendBus: MapOf<QueueProducer<any>> = {};
   private readonly receiveBus: QueueConsumer<any>;
@@ -44,6 +44,4 @@ export default class FakeNetwork {
     return await this.sendBus[toPartner].send({mpcId, round, data});
   }
 
-  async receive() {
-  }
 }

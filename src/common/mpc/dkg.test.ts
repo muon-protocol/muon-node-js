@@ -56,7 +56,7 @@ async function run() {
       id: `dkg-${realPrivateKey.substr(-10)}`,
       partners: [NODE_1, NODE_2, NODE_3, NODE_4],
       t,
-      pk: toBN(realPrivateKey)
+      pk: realPrivateKey,
     }
 
     let keyGen1 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk),

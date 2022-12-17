@@ -1,16 +1,16 @@
 import {MultiPartyComputation} from "./base";
 
-export interface MpcNetwork {
+export interface IMpcNetwork {
   id: string,
   send: (partner: string, mpcId: string, round: number, data?:any) => Promise<any>,
-  receive: () => {}
   registerMcp: (mpc: MultiPartyComputation) => void
 }
 
 export interface MPCConstructData {
   id: string,
   partners: string[],
-  otherParams?: any[]
+  rounds: string[],
+  [x: string | number | symbol]: unknown;
 }
 
 export type MapOf<T> = {

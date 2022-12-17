@@ -1,6 +1,7 @@
 import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators";
 import CallablePlugin from "./base/callable-plugin";
-import {MPCConstructData, MultiPartyComputation} from "../../common/mpc/base";
+import {MPCConstructData} from "../../common/mpc/types";
+import {MultiPartyComputation} from "../../common/mpc/base";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg";
 import CollateralInfoPlugin from "./collateral-info";
 
