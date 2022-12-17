@@ -76,6 +76,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
         acc.iadd(TssModule.toBN(current))
         return acc
       }, TssModule.toBN('0'))
+    share.imul(TssModule.toBN(this.partners.length.toString()).invm(TssModule.curve.n))
     return bn2str(share.umod(TssModule.curve.n))
   }
 }

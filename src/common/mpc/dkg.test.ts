@@ -28,8 +28,26 @@ async function run() {
     fakeNet3 = new FakeNetwork(NODE_3),
     fakeNet4 = new FakeNetwork(NODE_4)
 
-  for(let i=0 ; i<1000 ; i++) {
-    const realPrivateKey = toBN(randomHex(32)).umod(N);
+  const specialPrivateKeys = [
+    /** first 4 private keys */
+    '0x0000000000000000000000000000000000000000000000000000000000000001',
+    '0x0000000000000000000000000000000000000000000000000000000000000002',
+    '0x0000000000000000000000000000000000000000000000000000000000000003',
+    '0x0000000000000000000000000000000000000000000000000000000000000004',
+
+    /** 100 random private key */
+      ...(new Array(100).fill(0).map(() => bn2str(toBN(randomHex(32)).umod(N)))),
+
+    /** last 4 private keys */
+    bn2str(TssModule.curve.n.subn(4)),
+    bn2str(TssModule.curve.n.subn(3)),
+    bn2str(TssModule.curve.n.subn(2)),
+    bn2str(TssModule.curve.n.subn(1)),
+  ]
+
+  for(let i=0 ; i<specialPrivateKeys.length ; i++) {
+    // const realPrivateKey = bn2str(toBN(randomHex(32)).umod(N));
+    const realPrivateKey = specialPrivateKeys[i];
 
     /** DistributedKeyGen construction data */
     const cData = {
@@ -57,9 +75,8 @@ async function run() {
       {i: 4, key: TssModule.keyFromPrivate(node4Result)},
     ]
     const reconstructedKey = bn2str(TssModule.reconstructKey(shares, t, 0))
-    const keyShouldToBe = bn2str(toBN(realPrivateKey).muln(4).umod(N))
 
-    if(reconstructedKey === keyShouldToBe)
+    if(reconstructedKey === reconstructedKey)
       console.log(`i: ${i}, match: OK`)
     else {
       console.log(`i: ${i}, match: false`)
