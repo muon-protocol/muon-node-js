@@ -1,21 +1,26 @@
 import QueueProducer from "../message-bus/queue-producer";
 import QueueConsumer from "../message-bus/queue-consumer";
-import {MapOf} from "./base";
+import {MapOf} from "./types";
+import {MultiPartyComputation} from "./base";
 
-const Events = require('events-async')
-
-export default class FakeNetwork extends Events{
+export default class FakeNetwork {
   readonly id: string;
   private sendBus: MapOf<QueueProducer<any>> = {};
   private readonly receiveBus: QueueConsumer<any>;
+  private mpcMap: Map<string, MultiPartyComputation> = new Map<string, MultiPartyComputation>();
 
   constructor(id: string) {
-    super()
     this.id = id;
 
     const bus = new QueueConsumer(this.getBusBaseName(id))
     bus.on("message", this.__onMessageArrive.bind(this))
     this.receiveBus = bus;
+  }
+
+  registerMcp(mpc: MultiPartyComputation) {
+    if(this.mpcMap.has(mpc.id))
+      throw `MPC[${mpc.id}] already registered to MPCNetwork`
+    this.mpcMap.set(mpc.id, mpc);
   }
 
   private getBusBaseName(id) {
@@ -25,21 +30,20 @@ export default class FakeNetwork extends Events{
   private async __onMessageArrive(message) {
     // console.log(`ID[${this.id}].__onMessageArrive`)
     // console.dir(arguments, {depth: null})
-    const {round, data} = message;
-    return await this.emit("message", round, data, this.id)
+    const {mpcId, round, data} = message;
+    const mpc = this.mpcMap.get(mpcId);
+    if(!mpc)
+      throw `MPC [${mpcId}] not registered in MPCNetwork`
+    await mpc.onMessageArrive(round, data, this.id);
   }
 
-  async send(to: string, round:number, data: any) {
-    if(!this.sendBus[to]) {
-      this.sendBus[to] = new QueueProducer<any>(this.getBusBaseName(to))
+  async send(toPartner: string, mpcId: string, round:number, data: any) {
+    if(!this.sendBus[toPartner]) {
+      this.sendBus[toPartner] = new QueueProducer<any>(this.getBusBaseName(toPartner))
     }
-    return await this.sendBus[to].send({round, data});
+    return await this.sendBus[toPartner].send({mpcId, round, data});
   }
 
   async receive() {
-  }
-
-  on() {
-    super.on(...arguments)
   }
 }

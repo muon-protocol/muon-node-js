@@ -1,54 +1,8 @@
 import LevelPromise from "./level-promise";
-import {Constructor} from "../types";
-
-const Events = require('events-async')
+import {MapOf, MpcNetwork, RoundOutput} from "./types";
 
 const random = () => Math.floor(Math.random()*9999999)
 
-export interface IRoundBased {
-  send(to: string, data: any);
-}
-
-export interface MpcNetwork {
-  id: string,
-  send: (partner: string, round: number, data?:any) => Promise<any>,
-  receive: () => {}
-  on: (event, handler) => void
-}
-
-export interface MPCConstructData {
-  id: string,
-  partners: string[],
-  otherParams?: any[]
-}
-
-export type MapOf<T> = {
-  [index: string]: T
-}
-
-export type RoundOutput<ResultT, BroadcastT> = {
-  /**
-   * Pi may store any kind of data
-   */
-  store: MapOf<any>,
-  /**
-   * Pi return to each participant an specific ResultT
-   */
-  send: null | MapOf <ResultT>,
-  /**
-   * Pi broadcast a BroadcastT to all other participants
-   */
-  broadcast: null | BroadcastT
-}
-
-/**
- * Pi receives two type of data from previous step
- *
- * 1) output of all other participants
- * 2) broadcast from all participants
- */
-export type RoundProcessor<ResultT, BroadcastT> =
-  (prevStepOutput: MapOf<ResultT>, prevStepBroadcast: MapOf<BroadcastT>) => RoundOutput<ResultT, BroadcastT>
 
 export class MultiPartyComputation {
   public readonly id: string;
@@ -77,10 +31,6 @@ export class MultiPartyComputation {
     })
   }
 
-  registerMessageReceiveHandler(network: MpcNetwork) {
-    network.on('message', this.onMessageArrive.bind(this))
-  }
-
   async onMessageArrive(round: number, data: {from: string, send: any, broadcast: any}, networkId: string) {
     try {
       const strRound = this.rounds[round];
@@ -107,14 +57,12 @@ export class MultiPartyComputation {
 
   async process(network: MpcNetwork) {
     // console.log(`================= ID:${network.id} start =================`)
-    this.registerMessageReceiveHandler(network);
+    // this.registerMessageReceiveHandler(network);
+    // network.registerMcp(this);
 
     try {
 
       for (let r = 0; r < this.rounds.length; r++) {
-        const round = this.rounds[r]
-
-        // console.log(`${this.ConstructorName}[${network.id}][${round}] start.`)
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
@@ -131,11 +79,10 @@ export class MultiPartyComputation {
         const {store, send, broadcast} = await this.processRound(r, inputs, broadcasts);
         this.store[r] = store
 
-        // console.log(`${mpc.ConstructorName}[${network.id}][${round}] output.`, {store, send, broadcast})
         /** distribute round outputs */
         let allPartiesResult = await Promise.all(this.partners.map(partner => {
           const dataToSend = {from: network.id, send: send![partner], broadcast}
-          return network.send(partner, r, dataToSend)
+          return network.send(partner, this.id, r, dataToSend)
             .catch(e => {
               console.log(">>>>>", e)
               return "error"

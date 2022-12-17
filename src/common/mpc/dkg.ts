@@ -1,4 +1,5 @@
-import {MapOf, MultiPartyComputation, RoundOutput, RoundProcessor} from "./base";
+import {MapOf, RoundOutput, RoundProcessor} from "./types";
+import {MultiPartyComputation} from "./base";
 import {bn2str} from './utils'
 import Web3 from 'web3'
 import DistributedKey from "../../utils/tss/distributed-key";

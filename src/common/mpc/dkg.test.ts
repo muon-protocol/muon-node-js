@@ -1,4 +1,5 @@
 /**
+ * Test Distributed Key Generation module
  * Generate Distributed Key
  * Sign message
  * Verify signature
@@ -6,9 +7,7 @@
 import {DistributedKeyGeneration} from "./dkg";
 import FakeNetwork from './fake-network';
 import {bn2str} from './utils'
-const {toBN, soliditySha3, randomHex} = require('web3').utils
-const {shuffle, range} = require('lodash')
-const Polynomial = require('../../utils/tss/polynomial')
+const {toBN, randomHex} = require('web3').utils
 const TssModule = require('../../utils/tss/index')
 
 
@@ -54,21 +53,31 @@ async function run() {
 
     /** DistributedKeyGen construction data */
     const cData = {
-      id: 'dkg-1',
+      id: `dkg-${realPrivateKey.substr(-10)}`,
       partners: [NODE_1, NODE_2, NODE_3, NODE_4],
       t,
       pk: toBN(realPrivateKey)
     }
 
+    let keyGen1 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk),
+      keyGen2 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk),
+      keyGen3 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk),
+      keyGen4 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk);
+
+    fakeNet1.registerMcp(keyGen1);
+    fakeNet2.registerMcp(keyGen2);
+    fakeNet3.registerMcp(keyGen3);
+    fakeNet4.registerMcp(keyGen4);
+
     let [node1Result, node2Result, node3Result, node4Result] = await Promise.all([
       /** run partner 1 */
-      new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk).process(fakeNet1),
+      keyGen1.process(fakeNet1),
       /** run partner 2 */
-      new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk).process(fakeNet2),
+      keyGen2.process(fakeNet2),
       /** run partner 2 */
-      new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk).process(fakeNet3),
+      keyGen3.process(fakeNet3),
       /** run partner 2 */
-      new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk).process(fakeNet4),
+      keyGen4.process(fakeNet4),
     ]);
 
     const shares = [
@@ -83,10 +92,7 @@ async function run() {
       console.log(`i: ${i}, match: OK`)
     else {
       console.log(`i: ${i}, match: false`)
-      console.log({
-        PK1: realPrivateKey,
-        PK2: reconstructedKey,
-      })
+      console.log({realPrivateKey, reconstructedKey})
     }
   }
   const t2 = Date.now()
