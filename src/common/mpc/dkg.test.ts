@@ -50,6 +50,7 @@ async function run() {
   for(let i=0 ; i<specialPrivateKeys.length ; i++) {
     // const realPrivateKey = bn2str(toBN(randomHex(32)).umod(N));
     const realPrivateKey = specialPrivateKeys[i];
+    const realPubKey = TssModule.keyFromPrivate(realPrivateKey).getPublic().encode("hex", true);
 
     /** DistributedKeyGen construction data */
     const cData = {
@@ -69,7 +70,7 @@ async function run() {
     fakeNet3.registerMcp(keyGen3);
     fakeNet4.registerMcp(keyGen4);
 
-    let [node1Result, node2Result, node3Result, node4Result] = await Promise.all([
+    let allNodeResults: any[] = await Promise.all([
       /** run partner 1 */
       keyGen1.process(fakeNet1),
       /** run partner 2 */
@@ -80,19 +81,21 @@ async function run() {
       keyGen4.process(fakeNet4),
     ]);
 
-    const shares = [
-      {i: 1, key: TssModule.keyFromPrivate(node1Result)},
-      {i: 2, key: TssModule.keyFromPrivate(node2Result)},
-      {i: 3, key: TssModule.keyFromPrivate(node3Result)},
-      {i: 4, key: TssModule.keyFromPrivate(node4Result)},
-    ]
+    allNodeResults = allNodeResults.map(r => r.toJson())
+
+    const shares = allNodeResults.map(r => ({i: r.index, key: TssModule.keyFromPrivate(r.share)}))
     const reconstructedKey = bn2str(TssModule.reconstructKey(shares, t, 0))
 
-    if(reconstructedKey === reconstructedKey)
+    if(reconstructedKey === reconstructedKey && allNodeResults[0].publicKey === realPubKey)
       console.log(`i: ${i}, match: OK`)
     else {
       console.log(`i: ${i}, match: false`)
-      console.log({realPrivateKey, reconstructedKey})
+      console.log({
+        realPrivateKey,
+        reconstructedKey,
+        realPubKey,
+        resultPubKey: allNodeResults[0].publicKey
+      })
     }
   }
   const t2 = Date.now()

@@ -9,6 +9,8 @@ const RemoteMethods = {
   RunRoundN: 'run-round-n'
 }
 
+const random = () => Math.floor(Math.random()*9999999)
+
 @remoteApp
 class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
   APP_NAME="mpcnet"
@@ -63,7 +65,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
 
         mpc.process(this)
           .then(result => {
-            console.log({result})
+            console.log(result.toJson())
           })
           .catch(e => {
           // TODO
@@ -82,7 +84,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     const privateKeyToShare = '0x0000000000000000000000000000000000000000000000000000000000000001'
     /** DistributedKeyGen construction data */
     const cData = {
-        id: `dkg-${privateKeyToShare.substr(-10)}`,
+        id: `dkg-${Date.now()}${random()}`,
         partners: ['1', '2'],
         t: 2,
         pk: privateKeyToShare
@@ -91,8 +93,8 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     this.registerMcp(mpc);
 
     let result = await mpc.process(this);
-    console.log({result});
-    return result;
+    console.log(result.toJson());
+    return result.toJson();
   }
 }
 

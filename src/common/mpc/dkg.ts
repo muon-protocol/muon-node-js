@@ -22,6 +22,51 @@ type Round2Broadcast = {
   commitmentHashes: MapOf<string>
 }
 
+export class DistKey {
+  index: string;
+  share: BN;
+  address: string;
+  publicKey: PublicKey;
+  curve: {
+    t: number,
+    Fx: PublicKey[]
+  };
+
+  constructor(index: string, share: BN, address: string, publicKey : PublicKey, curve: {t: number, Fx: PublicKey[]}) {
+    this.index = index;
+    this.share = share;
+    this.address = address;
+    this.publicKey = publicKey;
+    this.curve = curve;
+  }
+
+  toJson() {
+    return {
+      index: this.index,
+      share: bn2str(this.share),
+      address: this.address,
+      publicKey: this.publicKey.encode('hex', true),
+      curve: {
+        t: this.curve.t,
+        Fx: this.curve.Fx.map(p => p.encode('hex', true))
+      }
+    }
+  }
+
+  static fromJson(key) {
+    return new DistKey(
+      key.index,
+      TssModule.toBN(key.share),
+      key.address,
+      TssModule.keyFromPublic(key.publicKey),
+      {
+        t: key.curve.t,
+        Fx: key.curve.Fx.map(p => TssModule.keyFromPublic(p))
+      },
+    );
+  }
+}
+
 export class DistributedKeyGeneration extends MultiPartyComputation {
 
   private readonly t: number;
@@ -73,7 +118,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     return {store, send, broadcast}
   }
 
-  finalize(roundArrivedMessages, networkId): string {
+  finalize(roundArrivedMessages, networkId): DistKey {
     const firstRoundMessages = roundArrivedMessages[0],
       secondRoundMessages = roundArrivedMessages[1]
 
@@ -109,7 +154,35 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
         acc.iadd(TssModule.toBN(current))
         return acc
       }, TssModule.toBN('0'))
-    share.imul(TssModule.toBN(this.partners.length.toString()).invm(TssModule.curve.n))
-    return bn2str(share.umod(TssModule.curve.n))
+    const nInv = TssModule.toBN(this.partners.length.toString()).invm(TssModule.curve.n)
+    share.imul(nInv)
+    share = share.umod(TssModule.curve.n)
+
+    let totalFx: PublicKey[] = []
+    this.partners.forEach((sender, i) => {
+      let Fx = secondRoundMessages[sender].send.Fx;
+      if(i === 0)
+        totalFx = Fx.map(pub => TssModule.keyFromPublic(pub))
+      else {
+        Fx.forEach((pub, i) => {
+          pub = TssModule.keyFromPublic(pub)
+          return totalFx[i] = TssModule.pointAdd(totalFx[i], pub)
+        })
+      }
+    })
+    totalFx.forEach((pubKey, i) => {
+      totalFx[i] = pubKey.mul(nInv)
+    })
+
+    return new DistKey(
+      networkId,
+      share,
+      TssModule.pub2addr(totalFx[0]),
+      totalFx[0],
+      {
+        t: 2,
+        Fx: totalFx
+      }
+    )
   }
 }

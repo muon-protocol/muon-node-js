@@ -107,7 +107,7 @@ export class MultiPartyComputation {
     }
   }
 
-  finalize(roundsArrivedMessages, networkId): string { return "" }
+  finalize(roundsArrivedMessages, networkId): any { return "" }
 
   async processRound(roundIndex: number, input: MapOf<any>, broadcast: MapOf<any>): Promise<RoundOutput<any, any>> {
     const roundMethodName = this.rounds[roundIndex]
