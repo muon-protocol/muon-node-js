@@ -26,7 +26,8 @@ export class MultiPartyComputation {
 
     this.partners = partners
     this.rounds = rounds
-    this.roundsPromise = new LevelPromise(rounds.length);
+    /** n for rounds, 1 fore result */
+    this.roundsPromise = new LevelPromise(rounds.length+1, 5000);
 
     rounds.forEach((roundTitle, roundIndex) => {
       this.roundsArrivedMessages[roundIndex] = {}
@@ -46,7 +47,7 @@ export class MultiPartyComputation {
       this.roundsArrivedMessages[round][from] = data;
 
       if (Object.keys(this.roundsArrivedMessages[round]).length === this.partners.length) {
-        // console.log(`${this.ConstructorName}[${networkId}] ${strRound} completed`);
+        console.log(`${this.ConstructorName}[${networkId}] ${strRound} completed`);
         this.roundsPromise.resolve(round, true);
       }
       return 'OK'
@@ -57,9 +58,13 @@ export class MultiPartyComputation {
     }
   }
 
-  async process(network: IMpcNetwork) {
-    // network.registerMcp(this);
+  runByNetwork(network: IMpcNetwork): Promise<any> {
+    this.process(network);
+    return this.roundsPromise.waitToFulFill()
+  }
 
+  private async process(network: IMpcNetwork) {
+    // network.registerMcp(this);
     try {
 
       for (let r = 0; r < this.rounds.length; r++) {
@@ -89,7 +94,7 @@ export class MultiPartyComputation {
           }
           return network.send(partner, this.id, r, dataToSend)
             .catch(e => {
-              console.log(">>>>>", e)
+              console.log(`${this.ConstructorName}[network.send] error at level ${r}`, e)
               return "error"
             })
         }))
@@ -100,11 +105,10 @@ export class MultiPartyComputation {
       }
 
       // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
-      return this.finalize(this.roundsArrivedMessages, network.id);
-    }catch (e) {
-      // console.log(`ID:${network.id}`, e);
-      throw e;
+      const result = this.finalize(this.roundsArrivedMessages, network.id);
+      this.roundsPromise.resolve(this.rounds.length, result);
     }
+    catch (e) {}
   }
 
   finalize(roundsArrivedMessages, networkId): any { return "" }
@@ -118,8 +122,12 @@ export class MultiPartyComputation {
     this.store[round] = data;
   }
 
-  get ConstructorName() {
+  protected get ConstructorName() {
     let superClass = Object.getPrototypeOf(this);
     return superClass.constructor.name
+  }
+
+  waitToFulfill(){
+    return this.roundsPromise.waitToFulFill();
   }
 }

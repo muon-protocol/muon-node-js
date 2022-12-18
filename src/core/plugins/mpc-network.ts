@@ -4,6 +4,7 @@ import {IMpcNetwork} from "../../common/mpc/types";
 import {MultiPartyComputation} from "../../common/mpc/base";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg";
 import CollateralInfoPlugin from "./collateral-info";
+const {timeout} = require('../../utils/helpers')
 
 const RemoteMethods = {
   RunRoundN: 'run-round-n'
@@ -56,6 +57,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
   async __runRoundN(message, callerInfo) {
     const {mpcId, round, data} = message;
     console.log(`============= calling round[${round}] from [${callerInfo.id}] ==============`);
+    // await timeout(5000);
     // console.dir(message, {depth: null})
     if(round === 0) {
       if(!this.mpcMap.has(mpcId)) {
@@ -63,13 +65,13 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
         let mpc = new DistributedKeyGeneration(...data.constructData)
         this.registerMcp(mpc);
 
-        mpc.process(this)
+        mpc.runByNetwork(this)
           .then(result => {
             console.log(result.toJson())
           })
           .catch(e => {
-          // TODO
-        })
+            // TODO
+          })
       }
     }
     const mpc = this.mpcMap.get(mpcId);
@@ -92,7 +94,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     const mpc = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk);
     this.registerMcp(mpc);
 
-    let result = await mpc.process(this);
+    let result = await mpc.runByNetwork(this);
     console.log(result.toJson());
     return result.toJson();
   }
