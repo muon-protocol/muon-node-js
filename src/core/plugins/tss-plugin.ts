@@ -3,30 +3,23 @@ import DistributedKey from "../../utils/tss/distributed-key";
 const {shuffle} = require('lodash')
 const tssModule = require('../../utils/tss/index')
 const {utils:{toBN}} = require('web3')
-const {timeout, stackTrace} = require('../../utils/helpers');
+const {timeout, stackTrace, uuid} = require('../../utils/helpers');
 import {remoteApp, remoteMethod, broadcastHandler} from './base/app-decorators'
 import CollateralInfoPlugin from "./collateral-info";
 const NodeCache = require('node-cache');
+import * as SharedMemory from '../../common/shared-memory'
 const NetworkIpc = require('../../network/ipc')
 import * as CoreIpc from '../ipc'
 import {MuonNodeInfo} from "../../common/types";
 import AppManager from "./app-manager";
 import BN from 'bn.js';
 import TssParty from "../../utils/tss/party";
+import {IMpcNetwork} from "../../common/mpc/types";
+import {MultiPartyComputation} from "../../common/mpc/base";
+import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg";
 const log = require('../../common/muon-log')('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
-
-const keysCache = new NodeCache({
-  stdTTL: 6*60, // Keep distributed keys in memory for 6 minutes
-  // /**
-  //  * (default: 600)
-  //  * The period in seconds, as a number, used for the automatic delete check interval.
-  //  * 0 = no periodic check.
-  //  */
-  checkperiod: 60,
-  useClones: false,
-});
 
 export type PartyGenOptions = {
   /**
@@ -94,8 +87,7 @@ class TssPlugin extends CallablePlugin {
     this.muon.on("collateral:node:edit", this.onNodeEdit.bind(this));
     this.muon.on("collateral:node:delete", this.onNodeDelete.bind(this));
 
-    this.muon.on('tss-key:generate', this.onTssKeyGenerate.bind(this));
-    this.muon.on('key:generate', this.onDKeyGenerate.bind(this));
+    this.muon.on('global-tss-key:generate', this.onTssKeyGenerate.bind(this));
     this.muon.on('party:generate', this.loadParty.bind(this));
 
     this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
@@ -225,7 +217,6 @@ class TssPlugin extends CallablePlugin {
       t: networkInfo.tssThreshold,
       max: networkInfo.maxGroupSize,
       partners: this.collateralPlugin.filterNodes({
-        list: partners,
         isDeployer: true
       })
         .map(n => n.id)
@@ -248,12 +239,12 @@ class TssPlugin extends CallablePlugin {
         publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
       }
       let key = DistributedKey.load(this.tssParty, _key);
-      keysCache.set(key.id, key, 0);
       this.tssKey = key;
       this.isReady = true
       log('tss ready');
     }
     else{
+      /** only one process allowed to create or recover Tss Key */
       let permitted = await NetworkIpc.askClusterPermission('tss-key-creation', 20000)
       if(!permitted)
         return;
@@ -292,11 +283,9 @@ class TssPlugin extends CallablePlugin {
           await timeout(5000);
           let onlinePartners: MuonNodeInfo[] = this.collateralPlugin
             .filterNodes({
-              list: this.tssParty.partners,
-              isOnline: true
-            })
-            .filter((op: MuonNodeInfo) => {
-              return op.wallet !== process.env.SIGN_WALLET_ADDRESS
+              isDeployer: true,
+              isOnline: true,
+              excludeSelf: true
             });
 
           let statuses = await Promise.all(onlinePartners.map(p => {
@@ -460,22 +449,11 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
-  onDKeyGenerate(_key, {pid}) {
-    // console.log(`TssPlugin.onDKeyGenerate`, {pid: process.pid, senderPid: pid}, _key);
-    const party = this.parties[_key.party]
-    if(!party) {
-      console.error(`TssPlugin.onDKeyGenerate: party not found.`)
-      return
-    }
-    const key = DistributedKey.load(party, _key);
-    keysCache.set(key.id, key);
-  }
-
   async tryToRecoverTssKey(partners: MuonNodeInfo[]){
     if(partners.length < this.collateralPlugin.TssThreshold)
       throw {message: "No enough online partners to recover key."};
 
-    let nonce = await this.keyGen(this.tssParty);
+    let nonce = await this.keyGen(this.tssParty, {id: `recovery-${uuid()}`});
 
     let keyResults = await Promise.all(
       partners.map(p => {
@@ -484,7 +462,7 @@ class TssPlugin extends CallablePlugin {
             p.peerId,
             RemoteMethods.recoverMyKey,
             {nonce: nonce.id},
-            {taskId: `keygen-${nonce.id}`}
+            {taskId: nonce.id}
           ).catch(e => {
             console.log(`TssPlugin.tryToRecoverTssKey ERROR:`, e)
             return null
@@ -528,7 +506,7 @@ class TssPlugin extends CallablePlugin {
     this.tssKey = tssKey
     this.isReady = true;
     this.saveTssConfig(this.tssParty, tssKey)
-    CoreIpc.fireEvent({type: "tss-key:generate", data: tssKey.toSerializable()});
+    CoreIpc.fireEvent({type: "global-tss-key:generate", data: tssKey.toSerializable()});
     log(`${process.pid} tss key recovered`);
     return true;
   }
@@ -536,7 +514,6 @@ class TssPlugin extends CallablePlugin {
   async tryToCreateTssKey(): Promise<DistributedKey> {
     while (!this.isReady) {
       await timeout(5000);
-
       try {
         let key: DistributedKey = await this.keyGen(this.tssParty, {lowerThanHalfN: true})
 
@@ -553,7 +530,7 @@ class TssPlugin extends CallablePlugin {
               party: this.tssParty!.id,
               key: key.id,
             },
-            {taskId: `keygen-${key.id}`}
+            // {taskId: `keygen-${key.id}`}
           ).catch(()=>false);
         }))
         // console.log(`key save broadcast count: ${key.partners.length}`, callResult);
@@ -561,10 +538,9 @@ class TssPlugin extends CallablePlugin {
           throw `Tss creation failed.`
         this.saveTssConfig(this.tssParty, key)
 
-        keysCache.set(key.id, key, 0);
         this.tssKey = key;
         this.isReady = true;
-        CoreIpc.fireEvent({type: "tss-key:generate", data: key.toSerializable()});
+        CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toSerializable()});
         log('tss ready.')
       } catch (e) {
         log('error when trying to create tss key %o %o', e, e.stack);
@@ -629,60 +605,12 @@ class TssPlugin extends CallablePlugin {
    * @param options
    * @param options.id: create key with specific id
    * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
-   * @param options.timeout: time need for distributed key generation.
    * @returns {Promise<DistributedKey>}
    */
-  async keyGen(party: TssParty | null | undefined, options: KeyGenOptions={}): Promise<DistributedKey> {
-    if(!party)
-      party = this.tssParty!;
-    let onlinePartners = this.collateralPlugin.filterNodes({list: party.partners, isOnline: true})
-    if(onlinePartners.length < party.t){
-      throw {message: "No enough online node."}
-    }
-    // 1- create new key
-    let key
-
-    do {
-      key = await this.createKey(party, options)
-      // 2- distribute key initialization
-      await this.broadcastKey(key)
-      // 4- calculate distributed key part
-      await key.waitToFulfill()
-      let t3 = Date.now()
-      // 5- TODO: verify commitment
-      // key.verifyCommitment(2);
-    } while (options.lowerThanHalfN && tssModule.HALF_N.lt(key.getTotalPubKey().x))
-
-    CoreIpc.fireEvent({type: "key:generate", data: key.toSerializable()}, {selfEmit: false});
-    return key;
-  }
-
-  /**
-   *
-   * @param party
-   * @param options
-   * @param options.id: create key with specific id
-   * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
-   * @returns {Promise<DistributedKey>}
-   */
-  async createKey(party, options: KeyGenOptions={}) {
+  async keyGen(party, options: KeyGenOptions={}): Promise<DistributedKey> {
+    let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, maxPartners, timeout=30000, value} = options;
-    // 1- create new key
-    let key = new DistributedKey(party, id, timeout, value)
-    let taskId = `keygen-${key.id}`;
-    let assignResponse = await NetworkIpc.assignTask(taskId);
-    if(assignResponse !== 'Ok')
-      throw "Cannot assign DKG task to itself."
-    /**
-     * TODO: check from misbehavior
-     * prevent app crash
-     */
-    key.timeoutPromise.promise.catch(console.error)
-
-    keysCache.set(key.id, key);
-
     let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: party.partners, isOnline: true})
-
     if(maxPartners && maxPartners > 0) {
       /** exclude current node and add it later */
       partners = partners.filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS))
@@ -696,96 +624,42 @@ class TssPlugin extends CallablePlugin {
       // partners = partners.slice(0, maxPartners);
     }
 
-    if(partners.length < party.t) {
-      throw {message: "No enough partners for key creation."}
+    let keyGen: MultiPartyComputation, dKey: DistKey;
+    do {
+      keyGen = new DistributedKeyGeneration(
+        id || uuid(),
+        partners.map(p => p.id),
+        party.t,
+        options.value,
+        {party: party.id}
+      );
+      dKey = await keyGen.runByNetwork(network)
     }
+    // @ts-ignore
+    while(options.lowerThanHalfN && tssModule.HALF_N.lt(dKey.publicKey.x));
 
-    let callResult = await Promise.all(
-      partners
-        .map(({peerId, wallet}) => {
-          if(wallet === process.env.SIGN_WALLET_ADDRESS)
-            return "OK";
-          return this.remoteCall(
-            peerId,
-            RemoteMethods.keyGenStep1,
-            {
-              party: party.id,
-              key: key.id,
-              value: !!value ? value.toString('hex') : undefined
-            },
-            {taskId, timeout: 15000}
-          ).catch(e => {
-            if(process.env.VERBOSE)
-              console.log(e)
-            return e.message
-          })
-        })
-    )
-    // console.log('TssPlugin.createKey '+ key.id, {remoteCallResult: callResult});
-    key.partners = partners.filter((p, i) => callResult[i]==='OK').map(p => p.id)
-    if(key.partners.length < party.t){
-      log('TssPlugin.createKey %o'+ key.id, {remoteCallResult: callResult});
-      throw {message: "Error in key creation"}
-    }
+    // @ts-ignore
+    let key = DistributedKey.load(party, {
+      id: keyGen.id,
+      share: dKey.share,
+      publicKey: dKey.publicKey,
+      partners: keyGen.partners
+    })
+
+    await SharedMemory.set(keyGen.id, key.toSerializable(), 30*60*1000)
     return key;
   }
 
-  async broadcastKey(key: DistributedKey) {
-    // console.log(`broadcasting key shares ...`, key.id)
-    key.keyDistributed = true;
-    let {party} = key;
-
-    // set key self FH
-    let selfWalletIndex = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!.id;
-    let selfFH = key.getFH(selfWalletIndex)
-    let A_ik = key.f_x!.coefPubKeys()
-    key.setSelfShare(selfWalletIndex, selfFH.f, selfFH.h, A_ik);
-
-    // let keyPartners = key.partners.map(w => party.partners[w]);
-    const onlinePartners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
-      list: party!.partners,
-      isOnline: true
-    })
-    let keyPartners = onlinePartners.filter(n => key.partners.includes(n.id));
-    let distKeyResult = await Promise.all(
-      keyPartners
-      .map(({id, wallet, peerId, isOnline}) => {
-        if(wallet === process.env.SIGN_WALLET_ADDRESS)
-          return true
-        // TODO: sometimes peer is undefined
-        if(!isOnline)
-          return 'error';
-        // if(!peer){
-        //   console.log({wallet, peerId, peer})
-        // }
-        return this.remoteCall(
-          peerId,
-          RemoteMethods.keyGenStep2,
-          {
-            party: party!.id,
-            key: key.id,
-            partners: key.partners,
-            commitment: key.commitment.map(c => c.encode('hex', true)),
-            pubKeys: A_ik.map(pubKey => pubKey.encode('hex', true)),
-            ...key.getFH(id),
-          },
-          {taskId: `keygen-${key.id}`}
-        )
-          .catch(e => {
-            log(`TssPlugin.broadcast to ${peerId} Error %o`, e)
-            return 'error'
-          });
-      }))
-    // console.log('TssPlugin.broadcastKey', {distKeyResult})
-    return distKeyResult;
+  async getSharedKey(id: string): Promise<DistributedKey> {
+    let key = await SharedMemory.waitAndGet(id, 5000)
+    let party = this.getParty(key.party);
+    if(!party)
+      throw `party [${key.party}] not found`
+    return DistributedKey.load(party, key)
   }
 
   getParty(id) {
     return this.parties[id];
-  }
-
-  getSharedKey(id): DistributedKey | undefined {
-    return keysCache.get(id);
   }
 
   async handleBroadcastMessage(msg, callerInfo) {
@@ -857,8 +731,7 @@ class TssPlugin extends CallablePlugin {
     if (!!tssKey && nonceId === tssKey!.id)
       throw `Cannot use tss key as nonce`;
 
-    let nonce = keysCache.get(nonceId);
-    await nonce.waitToFulfill()
+    let nonce = await this.getSharedKey(nonceId)
     let keyPart = tssModule.addKeys(nonce.share, tssKey!.share);
     return {
       id: tssKey!.id,
@@ -883,85 +756,6 @@ class TssPlugin extends CallablePlugin {
   }
 
   /**
-   * Before distributing a key information, it must be created on all partners.
-   *
-   * @param data: key information
-   * @param data.party: Party id that new key belongs to.
-   * @param data.key: New key id
-   * @returns {Promise<boolean>}
-   * @private
-   */
-  @remoteMethod(RemoteMethods.keyGenStep1)
-  async __keyGenStep1(data: {party: string, key: string, value?: string}) {
-    // log('keyGenStep1', data)
-    let {parties} = this
-    let {party, key: keyId} = data
-    if (!parties[party]) {
-      log('keyGenStep1: party not fount on this node id: ' + party);
-      throw {message: 'party not found'}
-    }
-    if (keysCache.has(keyId)) {
-      log(`keyGenStep1: key already exist [${keyId}]`);
-      throw {message: `key already exist [${keyId}]`}
-    }
-    const newKey = new DistributedKey(parties[party], keyId, undefined, !!data.value ? toBN(data.value) : undefined)
-    keysCache.set(keyId, newKey);
-    return "OK";
-  }
-
-  /**
-   * Handler for key info broadcast.
-   *
-   * @param data: each partner receive key info
-   * @param data.f: total key is sum of this f values.
-   * @param data.h: second key used for commitment.
-   * @param data.partners: List of wallets of partners that making this key.
-   * @param data.keyId: Each key has a unique identifier.
-   * @param data.party: Each key belongs to a Party.
-   * @param data.commitment: By this commitment current nod can verify {f,h} is generated from unique polynomial.
-   *
-   * @param callerInfo: caller node information
-   * @param callerInfo.wallet: collateral wallet of caller node
-   * @param callerInfo.peerId: PeerID of caller node
-   * @returns {Promise<boolean>}
-   * @private
-   */
-  @remoteMethod(RemoteMethods.keyGenStep2)
-  async __keyGenStep2(data = {}, callerInfo) {
-    // console.log('TssPlugin.__distributeKey', data)
-    let {parties} = this
-    // @ts-ignore
-    let {commitment, party, key: keyId, partners, pubKeys, f, h} = data
-    console.log('[tag:90jh] commitments', commitment)
-    if (!parties[party]) {
-      log('TssPlugin.__distributeKey>> party not fount on this node id: ' + party)
-      throw {message: 'party not found'}
-    }
-    if (!keysCache.has(keyId)) {
-      log('TssPlugin.__distributeKey>> key not fount on this node id: ' + keyId);
-      throw {message: 'key not found'}
-    }
-
-    let key: DistributedKey = keysCache.get(keyId);
-    pubKeys = pubKeys.map(pub => tssModule.curve.keyFromPublic(pub, 'hex').getPublic())
-    commitment = commitment.map(item => tssModule.keyFromPublic(item));
-
-    const currentNodeIndex = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!.id;
-    const callerIndex = callerInfo.id;
-    key.setPartnerShare(currentNodeIndex, callerIndex, partners, f, h, pubKeys, commitment);
-
-    if (!key.keyDistributed) {
-      this.broadcastKey(key).catch(console.error);
-      /** broadcast to other processes */
-      key.waitToFulfill()
-        .then(() => {
-          CoreIpc.fireEvent({type: "key:generate", data: key.toSerializable()}, {selfEmit: false});
-        })
-    }
-    return true;
-  }
-
-  /**
    * Node with ID:[1] inform other nodes that tss creation completed.
    *
    * @param data
@@ -977,17 +771,16 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.__storeTssKey', data)
     let {party: partyId, key: keyId} = data
     let party = this.getParty(partyId)
-    let key = this.getSharedKey(keyId);
+    let key = await this.getSharedKey(keyId);
     if (!party)
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
       throw {message: 'TssPlugin.__storeTssKey: key not found.'};
     if(callerInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
-      await key.waitToFulfill()
       this.saveTssConfig(party, key);
       this.tssKey = key
       this.isReady = true;
-      CoreIpc.fireEvent({type: "tss-key:generate", data: key.toSerializable()});
+      CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toSerializable()});
       log('save done')
       // CoreIpc.fireEvent({type: "tss:generate", })
       return true;

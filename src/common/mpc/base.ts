@@ -3,7 +3,6 @@ import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData} from "./types";
 
 const random = () => Math.floor(Math.random()*9999999)
 
-
 export class MultiPartyComputation {
   private readonly constructData;
   public readonly id: string;
@@ -14,7 +13,7 @@ export class MultiPartyComputation {
   /** roundsArrivedMessages[roundId][from] = <ResultT> */
   private roundsArrivedMessages: MapOf<MapOf<any>> = {}
 
-  constructor(rounds, id, partners) {
+  constructor(rounds: string[], id: string, partners: string[]) {
     this.constructData = Object.values(arguments).slice(1)
 
     rounds.forEach(round => {
@@ -22,12 +21,10 @@ export class MultiPartyComputation {
         throw `round handler [${round}] not defined`
     })
 
-    this.id = id || `DKG${Date.now()}${random()}`
+    this.id = id || `${Date.now()}${random()}`
 
     this.partners = partners
     this.rounds = rounds
-    /** n for rounds, 1 fore result */
-    this.roundsPromise = new LevelPromise(rounds.length+1, 5000);
 
     rounds.forEach((roundTitle, roundIndex) => {
       this.roundsArrivedMessages[roundIndex] = {}
@@ -47,7 +44,7 @@ export class MultiPartyComputation {
       this.roundsArrivedMessages[round][from] = data;
 
       if (Object.keys(this.roundsArrivedMessages[round]).length === this.partners.length) {
-        console.log(`${this.ConstructorName}[${networkId}] ${strRound} completed`);
+        // console.log(`${this.ConstructorName}[${networkId}] ${strRound} completed`);
         this.roundsPromise.resolve(round, true);
       }
       return 'OK'
@@ -58,16 +55,19 @@ export class MultiPartyComputation {
     }
   }
 
-  runByNetwork(network: IMpcNetwork): Promise<any> {
-    this.process(network);
-    return this.roundsPromise.waitToFulFill()
+  async runByNetwork(network: IMpcNetwork, timeout: number=30000): Promise<any> {
+    await network.registerMcp(this);
+    /** n for rounds, 1 fore result */
+    this.roundsPromise = new LevelPromise(this.rounds.length+1, timeout);
+    this.process(network, timeout);
+    return await this.roundsPromise.waitToFulFill()
   }
 
-  private async process(network: IMpcNetwork) {
-    // network.registerMcp(this);
+  private async process(network: IMpcNetwork, timeout: number) {
     try {
 
       for (let r = 0; r < this.rounds.length; r++) {
+        // console.log(`processing round mpc[${this.id}].${this.rounds[r]} ...`)
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
@@ -94,7 +94,7 @@ export class MultiPartyComputation {
           }
           return network.send(partner, this.id, r, dataToSend)
             .catch(e => {
-              console.log(`${this.ConstructorName}[network.send] error at level ${r}`, e)
+              // console.log(`${this.ConstructorName}[network.send] error at level ${r}`, e)
               return "error"
             })
         }))

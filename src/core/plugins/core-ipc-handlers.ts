@@ -48,8 +48,7 @@ class CoreIpcHandlers extends CallablePlugin {
 
   @ipcMethod(IpcMethods.GetTssKey)
   async __onGetTssKeyRequest(data: {keyId: string}, callerInfo) {
-    let key = this.muon.getPlugin('tss-plugin').getSharedKey(data.keyId)
-    await key.waitToFulfill()
+    let key = await this.muon.getPlugin('tss-plugin').getSharedKey(data.keyId)
     return key.toSerializable();
   }
 

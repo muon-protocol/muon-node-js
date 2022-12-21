@@ -1,7 +1,7 @@
 import { createClient, RedisClient } from 'redis'
 import redisConfig from '../redis-config'
 const Events = require('events-async')
-const {newCallId} = require('../../utils/helpers')
+const {uuid} = require('../../utils/helpers')
 
 export default class BaseMessageBus extends Events{
   /**
@@ -49,7 +49,7 @@ export default class BaseMessageBus extends Events{
   }
 
   wrapData(data: any, mix?: object) {
-    return {pid: process.pid, uid: newCallId(), data, ...mix};
+    return {pid: process.pid, uid: uuid(), data, ...mix};
   }
 
   createRedisClient() {

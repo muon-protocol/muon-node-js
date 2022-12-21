@@ -2,7 +2,6 @@ import {MapOf, RoundOutput, RoundProcessor} from "./types";
 import {MultiPartyComputation} from "./base";
 import {bn2str} from './utils'
 import Web3 from 'web3'
-import DistributedKey from "../../utils/tss/distributed-key";
 import Polynomial from "../../utils/tss/polynomial";
 import * as TssModule from "../../utils/tss";
 import {PublicKey} from "../../utils/tss/types";
@@ -72,13 +71,18 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
   private readonly t: number;
   private readonly value: BN | undefined;
 
-  constructor(id: string, partners: string[], t: number, value?:string) {
+  constructor(id: string, partners: string[], t: number, value?: BN|string, extra: object={}) {
     // @ts-ignore
     super(['round1', 'round2'], ...Object.values(arguments));
     // console.log(`${this.ConstructorName} construct with`, {id, partners, t, value});
 
     this.t = t
-    this.value = value ? Web3.utils.toBN(value) : undefined
+    if(!!value) {
+      if(BN.isBN(value))
+        this.value = value
+      else
+        this.value = Web3.utils.toBN(value);
+    }
   }
 
   round1(): RoundOutput<Round1Result, Round1Broadcast> {

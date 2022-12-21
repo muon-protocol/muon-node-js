@@ -53,7 +53,7 @@ export default class LevelPromise {
     }
   }
 
-  onTimedOut() {
+  private onTimedOut() {
     if (this.fulfilledIndex < this.count-1) {
       this.reject({message: this.timeoutMessage || `LevelPromise timed out at level [${this.fulfilledIndex+1}]`})
     }

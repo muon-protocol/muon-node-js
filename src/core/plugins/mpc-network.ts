@@ -2,9 +2,12 @@ import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators";
 import CallablePlugin from "./base/callable-plugin";
 import {IMpcNetwork} from "../../common/mpc/types";
 import {MultiPartyComputation} from "../../common/mpc/base";
-import {DistributedKeyGeneration} from "../../common/mpc/dkg";
+import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg";
 import CollateralInfoPlugin from "./collateral-info";
-const {timeout} = require('../../utils/helpers')
+import DistributedKey from "../../utils/tss/distributed-key";
+const NetworkIpc = require('../../network/ipc')
+import TssPlugin from "./tss-plugin";
+import * as SharedMemory from "../../common/shared-memory";
 
 const RemoteMethods = {
   RunRoundN: 'run-round-n'
@@ -30,10 +33,19 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     return this.muon.getPlugin('collateral');
   }
 
-  registerMcp(mpc: MultiPartyComputation) {
+  private get tssPlugin(): TssPlugin {
+    return this.muon.getPlugin('tss-plugin');
+  }
+
+  async registerMcp(mpc: MultiPartyComputation) {
     if(this.mpcMap.has(mpc.id))
       throw `MPC[${mpc.id}] already registered to MPCNetwork`
     this.mpcMap.set(mpc.id, mpc);
+
+    // console.log({mpcId: mpc.id, pid: process.pid})
+    let assignResponse = await NetworkIpc.assignTask(mpc.id);
+    if(assignResponse !== 'Ok')
+      throw "Cannot assign DKG task to itself."
   }
 
   async send(toPartner: string, mpcId: string, round:number, data: any) {
@@ -48,26 +60,50 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
         nodeInfo.peerId,
         RemoteMethods.RunRoundN,
         {mpcId, round, data},
-        // {taskId: `keygen-${nonce.id}`}
+        {taskId: mpcId}
       )
     }
+  }
+
+  waitToMpcFulFill(mpcId): Promise<any> {
+    const mpc: MultiPartyComputation = this.mpcMap.get(mpcId)!
+    if(!mpc)
+      return Promise.reject(`MultiPartyComputation [${mpcId}] not found`)
+    return mpc.waitToFulfill()
   }
 
   @remoteMethod(RemoteMethods.RunRoundN)
   async __runRoundN(message, callerInfo) {
     const {mpcId, round, data} = message;
-    console.log(`============= calling round[${round}] from [${callerInfo.id}] ==============`);
-    // await timeout(5000);
+    // console.log(`============= calling round[${round}] from [${callerInfo.id}] ==============`);
+    // await timeout(1000);
     // console.dir(message, {depth: null})
     if(round === 0) {
       if(!this.mpcMap.has(mpcId)) {
         // @ts-ignore
         let mpc = new DistributedKeyGeneration(...data.constructData)
-        this.registerMcp(mpc);
 
+        // console.log(`key generation start`, data.constructData)
         mpc.runByNetwork(this)
-          .then(result => {
-            console.log(result.toJson())
+          .then(async (dKey) => {
+            // console.log(`key generation done.`, dKey.toJson())
+            // console.log(data.constructData)
+            const extra = data.constructData[4]
+
+            const party = this.tssPlugin.getParty(extra?.party);
+            if(!party) {
+              console.log(`part not found ${extra.party}`)
+              throw `party[${extra?.party}] not found`
+            }
+
+            let key = DistributedKey.load(party, {
+              id: mpc.id,
+              share: dKey.share,
+              publicKey: dKey.publicKey,
+              partners: mpc.partners
+            })
+            // console.log(`new distributed key`, key.toSerializable());
+            await SharedMemory.set(mpc.id, key.toSerializable(), 30*60*1000)
           })
           .catch(e => {
             // TODO
@@ -76,7 +112,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     }
     const mpc = this.mpcMap.get(mpcId);
     if(!mpc)
-      throw `MPC [${mpcId}] not registered in MPCNetwork`
+      throw `pid: [${process.pid}] MPC [${mpcId}] not registered in MPCNetwork`
     await mpc.onMessageArrive(round, data, this.id);
     return 'OK'
   }
@@ -90,9 +126,17 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
         partners: ['1', '2'],
         t: 2,
         pk: privateKeyToShare
-      }
-    const mpc = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk);
-    this.registerMcp(mpc);
+      };
+    /** Generate random key */
+    // const mpc = new DistributedKeyGeneration(cData.id, cData.partners, cData.t);
+    /** Share PK between parties */
+    const mpc = new DistributedKeyGeneration(
+      cData.id,
+      cData.partners,
+      cData.t,
+      cData.pk,
+      {party: this.tssPlugin.tssParty!.id}
+    );
 
     let result = await mpc.runByNetwork(this);
     console.log(result.toJson());

@@ -350,7 +350,7 @@ class BaseAppPlugin extends CallablePlugin {
         this.requestManager.addSignature(newRequest.reqId, sign.owner, sign);
         // new Signature(sign).save()
 
-        this.broadcastNewRequest(newRequest)
+        await this.broadcastNewRequest(newRequest)
         let t4 = Date.now()
       }
 
@@ -552,7 +552,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async informRequestConfirmation(request) {
     // await this.onConfirm(request)
-    let nonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!;
+    let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
     const partners: MuonNodeInfo[] = [
       /** self */
       this.currentNodeInfo!,
@@ -610,7 +610,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     let nonce = await tssPlugin.keyGen(party, {
-      id: request.reqId,
+      id: `nonce-${request.reqId}`,
       maxPartners: nonceParticipantsCount
     })
 
@@ -677,7 +677,6 @@ class BaseAppPlugin extends CallablePlugin {
   async isOtherNodesConfirmed(newRequest) {
     let signers = {}
 
-    // let party = this.tssPlugin.getSharedKey(newRequest.reqId)!.party
     let party = this.appParty
     let verifyingPubKey = this.appTss?.publicKey!
 
@@ -754,7 +753,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  recoverSignature(request, sign) {
+  async recoverSignature(request, sign) {
     let tt0 = Date.now();
     let {owner, pubKey: pubKeyStr} = sign;
     let pubKey = tss.keyFromPublic(pubKeyStr);
@@ -768,7 +767,7 @@ class BaseAppPlugin extends CallablePlugin {
     // let sig = {s, e}
     //
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce = tssPlugin.getSharedKey(request.reqId)
+    let nonce = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
 
     const ownerInfo = this.collateralPlugin.getNodeInfo(owner)
     if(!ownerInfo){
@@ -789,9 +788,9 @@ class BaseAppPlugin extends CallablePlugin {
     return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey);
   }
 
-  broadcastNewRequest(request) {
+  async broadcastNewRequest(request) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce: DistributedKey = tssPlugin.getSharedKey(request.reqId)
+    let nonce: DistributedKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
     let party = nonce.party;
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: nonce.party has not value.`}
@@ -857,16 +856,18 @@ class BaseAppPlugin extends CallablePlugin {
     let signTimestamp = getTimestamp()
     // let signature = crypto.sign(resultHash)
 
-    let tssPlugin = this.muon.getPlugin('tss-plugin');
     let {reqId} = request;
-    let nonce = tssPlugin.getSharedKey(reqId)
+    let nonce = await this.tssPlugin.getSharedKey(`nonce-${reqId}`)
+    if(!nonce)
+      throw `nonce not found for request ${reqId}`
 
     // let tssKey = this.isBuiltInApp ? tssPlugin.tssKey : tssPlugin.getAppTssKey(this.APP_ID);
     let tssKey = this.appTss!;
     if(!tssKey)
       throw `App TSS key not found`;
+
     let k_i = nonce.share
-    let K = nonce.publicKey;
+    let K = nonce.publicKey!;
 
     await useDistributedKey(K.encodeCompressed('hex'), resultHash)
     // TODO: remove nonce after sign
@@ -909,7 +910,7 @@ class BaseAppPlugin extends CallablePlugin {
       let request = this.requestManager.getRequest(sign.request)
       if (request) {
         // TODO: check response similarity
-        // let signer = this.recoverSignature(request, sign)
+        // let signer = await this.recoverSignature(request, sign)
         // if (signer && signer === sign.owner) {
           this.requestManager.addSignature(request.reqId, sign.owner, sign)
           // // let newSignature = new Signature(sign)
@@ -1044,10 +1045,6 @@ class BaseAppPlugin extends CallablePlugin {
       throw `Missing app tss key`
 
     const [result, hash] = await this.preProcessRemoteRequest(request);
-
-    let nonce = this.tssPlugin.getSharedKey(request.reqId);
-    // wait for nonce broadcast complete
-    await nonce!.waitToFulfill()
 
     let sign = await this.makeSignature(request, result, hash)
     let memWrite = this.getMemWrite(request, result)
@@ -1188,10 +1185,9 @@ class BaseAppPlugin extends CallablePlugin {
     const contextHash = AppContext.hash(context);
     const keyId = `app-tss-key-${contextHash}-${signature}`
 
-    const key = this.tssPlugin.getSharedKey(keyId);
+    const key = await this.tssPlugin.getSharedKey(keyId);
     if(!key)
       throw `DistributedKey not generated.`
-    await key.waitToFulfill();
 
     await this.appManager.saveAppTssConfig({
       version: context.version,
