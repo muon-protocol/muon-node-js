@@ -26,8 +26,8 @@ export class MultiPartyComputation {
     this.partners = partners
     this.rounds = rounds
 
-    rounds.forEach((roundTitle, roundIndex) => {
-      this.roundsArrivedMessages[roundIndex] = {}
+    rounds.forEach(roundTitle => {
+      this.roundsArrivedMessages[roundTitle] = {}
     })
   }
 
@@ -41,9 +41,9 @@ export class MultiPartyComputation {
       }
       // console.log(`${this.ConstructorName}[${networkId}][${strRound}] processing ...`)
       const from = data.from;
-      this.roundsArrivedMessages[round][from] = data;
+      this.roundsArrivedMessages[strRound][from] = data;
 
-      if (Object.keys(this.roundsArrivedMessages[round]).length === this.partners.length) {
+      if (Object.keys(this.roundsArrivedMessages[strRound]).length === this.partners.length) {
         // console.log(`${this.ConstructorName}[${networkId}] ${strRound} completed`);
         this.roundsPromise.resolve(round, true);
       }
@@ -65,13 +65,14 @@ export class MultiPartyComputation {
 
   private async process(network: IMpcNetwork, timeout: number) {
     try {
-
+      let result;
       for (let r = 0; r < this.rounds.length; r++) {
+        const currentRound = this.rounds[r], previousRound = r>0 ? this.rounds[r-1] : null;
         // console.log(`processing round mpc[${this.id}].${this.rounds[r]} ...`)
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
-          const prevRoundReceives = this.roundsArrivedMessages[r-1];
+          const prevRoundReceives = this.roundsArrivedMessages[previousRound!];
           inputs = Object.keys(prevRoundReceives).map(from => {
             return prevRoundReceives[from].send
           })
@@ -82,7 +83,7 @@ export class MultiPartyComputation {
         }
         /** execute MPC round */
         const {store, send, broadcast} = await this.processRound(r, inputs, broadcasts);
-        this.store[r] = store
+        this.store[currentRound] = store
 
         /** distribute round outputs */
         let allPartiesResult = await Promise.all(this.partners.map(partner => {
@@ -102,24 +103,23 @@ export class MultiPartyComputation {
 
         /** wait until the round is completed. */
         await this.roundsPromise.waitToLevelResolve(r);
+
+        // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
+        const roundOnComplementResult = this.onRoundComplete(currentRound, this.roundsArrivedMessages, network.id);
+        if(r === this.rounds.length-1)
+          result = roundOnComplementResult
       }
 
-      // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
-      const result = this.finalize(this.roundsArrivedMessages, network.id);
       this.roundsPromise.resolve(this.rounds.length, result);
     }
     catch (e) {}
   }
 
-  finalize(roundsArrivedMessages, networkId): any { return "" }
+  onRoundComplete(round: string, roundsArrivedMessages, networkId): any { return "" }
 
   async processRound(roundIndex: number, input: MapOf<any>, broadcast: MapOf<any>): Promise<RoundOutput<any, any>> {
     const roundMethodName = this.rounds[roundIndex]
     return this[roundMethodName](input, broadcast)
-  }
-
-  addToStore(round: string, data: any) {
-    this.store[round] = data;
   }
 
   protected get ConstructorName() {

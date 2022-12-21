@@ -110,10 +110,10 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
     this.partners.forEach(id => {
       send[id] = {
-        Fx: this.store[0].Fx.map(pubKey => pubKey.encode('hex', true)),
-        Hx: this.store[0].Hx.map(pubKey => pubKey.encode('hex', true)),
-        f: bn2str(this.store[0].fx.calc(id)),
-        h: bn2str(this.store[0].hx.calc(id)),
+        Fx: this.store['round1'].Fx.map(pubKey => pubKey.encode('hex', true)),
+        Hx: this.store['round1'].Hx.map(pubKey => pubKey.encode('hex', true)),
+        f: bn2str(this.store['round1'].fx.calc(id)),
+        h: bn2str(this.store['round1'].hx.calc(id)),
       }
       const commitments = preStepBroadcast[id].commitment.map(v => ({t: 'bytes', v}))
       broadcast.commitmentHashes[id] = Web3.utils.soliditySha3(...commitments)
@@ -122,9 +122,13 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     return {store, send, broadcast}
   }
 
-  finalize(roundArrivedMessages, networkId): DistKey {
-    const firstRoundMessages = roundArrivedMessages[0],
-      secondRoundMessages = roundArrivedMessages[1]
+  onRoundComplete(round:string, roundArrivedMessages, networkId): any {
+    // console.log(`round complete ${round}`, roundArrivedMessages)
+    if(round !== 'round2')
+      return;
+
+    const firstRoundMessages = roundArrivedMessages['round1'],
+      secondRoundMessages = roundArrivedMessages['round2']
 
     /** Check pedersen commitment */
     this.partners.forEach(fromIndex => {
