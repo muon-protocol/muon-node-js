@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "strict": true,
-    "target": "es6",
+    "target": "es2022",
     "module": "commonjs",
     "moduleResolution": "node",
     "declaration": true,
@@ -30,7 +30,8 @@
     ],
     "lib": [
       "ES6",
-      "DOM"
+      "DOM",
+      "es2022"
     ]
   },
   "include": [
