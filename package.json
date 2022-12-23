@@ -63,6 +63,7 @@
     "libp2p-utils": "^0.4.1",
     "libp2p-websockets": "0.16.0",
     "lodash": "^4.17.21",
+    "metaapi.cloud-sdk": "^20.8.3",
     "mkdirp": "^1.0.4",
     "mongoose": "^5.12.5",
     "multiformats": "^9.6.4",
