@@ -11,7 +11,7 @@ export class MultiPartyComputation {
   protected store: MapOf<any> = {};
   private roundsPromise: LevelPromise;
   /** roundsArrivedMessages[roundId][from] = <ResultT> */
-  private roundsArrivedMessages: MapOf<MapOf<any>> = {}
+  protected roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>> = {}
 
   constructor(rounds: string[], id: string, partners: string[]) {
     this.constructData = Object.values(arguments).slice(1)
@@ -34,7 +34,7 @@ export class MultiPartyComputation {
   async onMessageArrive(round: number, data: {from: string, send: any, broadcast: any}, networkId: string) {
     try {
       const strRound = this.rounds[round];
-      // console.log(`${this.ConstructorName}[${networkId}][${strRound}] message arrive`, data)
+      // console.log(`${this.ConstructorName}[${networkId}][${strRound}] message arrive from ${data.from}`)
 
       if (round > 0) {
         await this.roundsPromise.waitToLevelResolve(round - 1);
@@ -65,7 +65,6 @@ export class MultiPartyComputation {
 
   private async process(network: IMpcNetwork, timeout: number) {
     try {
-      let result;
       for (let r = 0; r < this.rounds.length; r++) {
         const currentRound = this.rounds[r], previousRound = r>0 ? this.rounds[r-1] : null;
         // console.log(`processing round mpc[${this.id}].${this.rounds[r]} ...`)
@@ -103,19 +102,19 @@ export class MultiPartyComputation {
 
         /** wait until the round is completed. */
         await this.roundsPromise.waitToLevelResolve(r);
-
-        // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
-        const roundOnComplementResult = this.onRoundComplete(currentRound, this.roundsArrivedMessages, network.id);
-        if(r === this.rounds.length-1)
-          result = roundOnComplementResult
       }
 
+      // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
+      const result = this.onComplete(this.roundsArrivedMessages, network.id);
       this.roundsPromise.resolve(this.rounds.length, result);
     }
-    catch (e) {}
+    catch (e) {
+      this.roundsPromise.reject(e);
+      // console.log('error when processing MPC', e)
+    }
   }
 
-  onRoundComplete(round: string, roundsArrivedMessages, networkId): any { return "" }
+  onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId): any { return "" }
 
   async processRound(roundIndex: number, input: MapOf<any>, broadcast: MapOf<any>): Promise<RoundOutput<any, any>> {
     const roundMethodName = this.rounds[roundIndex]

@@ -7,11 +7,27 @@ import * as TssModule from "../../utils/tss";
 import {PublicKey} from "../../utils/tss/types";
 import BN from 'bn.js';
 
-type Round1Result = any
-type Round1Broadcast = {
-  commitment: string[]
+/**
+ * Round0 input/output types
+ */
+type Round0Result = any;
+type Round0Broadcast = {
+  fxHash: string,
+  hxHash: string,
 }
 
+/**
+ * Round1 input/output types
+ */
+type Round1Result = any
+type Round1Broadcast = {
+  commitment: string[],
+  allPartiesCommitmentHash: MapOf<string>
+}
+
+/**
+ * Round2 input/output types
+ */
 type Round2Result = {
   Fx: string[],
   Hx: string[],
@@ -73,7 +89,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
   constructor(id: string, partners: string[], t: number, value?: BN|string, extra: object={}) {
     // @ts-ignore
-    super(['round1', 'round2'], ...Object.values(arguments));
+    super(['round0', 'round1', 'round2'], ...Object.values(arguments));
     // console.log(`${this.ConstructorName} construct with`, {id, partners, t, value});
 
     this.t = t
@@ -85,7 +101,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     }
   }
 
-  round1(): RoundOutput<Round1Result, Round1Broadcast> {
+  round0(): RoundOutput<Round0Result, Round0Broadcast> {
     let fx = new Polynomial(this.t, TssModule.curve, this.value ? TssModule.toBN(this.value) : undefined);
     let hx = new Polynomial(this.t, TssModule.curve);
 
@@ -96,12 +112,60 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     const store = {fx, hx, Fx, Hx, commitment}
     const send = {}
     const broadcast= {
-      commitment: commitment.map(pubKey => pubKey.encode('hex', true))
+      fxHash: Web3.utils.soliditySha3(
+        ...Fx
+          .map(pubKey => ({t: 'bytes', v: pubKey.encode('hex', true)}))
+      )!,
+      hxHash: Web3.utils.soliditySha3(
+        ...Hx.map(pubKey => ({t: 'bytes', v: pubKey.encode('hex', true)}))
+      )!,
+    }
+    return {store, send, broadcast}
+
+  }
+
+  round1(prevStepOutput: MapOf<Round0Result>, preStepBroadcast: MapOf<Round0Broadcast>): RoundOutput<Round1Result, Round1Broadcast> {
+    const {commitment} = this.store['round0'];
+    const r0Msgs = this.roundsArrivedMessages['round0']
+    const allPartiesCommitmentHash = {}
+    Object.keys(r0Msgs).forEach(from => {
+      allPartiesCommitmentHash[from] = r0Msgs[from].broadcast
+    })
+
+    const store = {}
+    const send = {}
+    const broadcast= {
+      commitment: commitment.map(pubKey => pubKey.encode('hex', true)),
+      allPartiesCommitmentHash
     }
     return {store, send, broadcast}
   }
 
   round2(prevStepOutput: MapOf<Round1Result>, preStepBroadcast: MapOf<Round1Broadcast>): RoundOutput<Round2Result, Round2Broadcast> {
+    /**
+     * Check all partners broadcast same commitment to all other parties.
+     */
+    const allPartners = this.partners;
+    const r0Msg = this.roundsArrivedMessages['round0']
+    const r1Msg = this.roundsArrivedMessages['round1']
+
+    allPartners.forEach(sender => {
+      const {fxHash: fxHash1, hxHash: hxHash1} = r0Msg[sender].broadcast
+      /** match sent hash with Fx & Hx */
+      const realFxHash = r1Msg[sender].send
+
+      allPartners.forEach(receiver => {
+        const {fxHash: fxHash2, hxHash: hxHash2} = r1Msg[receiver].broadcast.allPartiesCommitmentHash[sender]
+        if(fxHash1 !== fxHash2 || hxHash1 !== hxHash2) {
+          console.log({fxHash1, hxHash1, fxHash2, hxHash2})
+          throw `complain about partner ${sender}`
+        }
+      })
+    })
+
+    /**
+     * Propagate data
+     */
     const store = {}
     const send = {}
     const broadcast= {
@@ -110,10 +174,10 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
     this.partners.forEach(id => {
       send[id] = {
-        Fx: this.store['round1'].Fx.map(pubKey => pubKey.encode('hex', true)),
-        Hx: this.store['round1'].Hx.map(pubKey => pubKey.encode('hex', true)),
-        f: bn2str(this.store['round1'].fx.calc(id)),
-        h: bn2str(this.store['round1'].hx.calc(id)),
+        Fx: this.store['round0'].Fx.map(pubKey => pubKey.encode('hex', true)),
+        Hx: this.store['round0'].Hx.map(pubKey => pubKey.encode('hex', true)),
+        f: bn2str(this.store['round0'].fx.calc(id)),
+        h: bn2str(this.store['round0'].hx.calc(id)),
       }
       const commitments = preStepBroadcast[id].commitment.map(v => ({t: 'bytes', v}))
       broadcast.commitmentHashes[id] = Web3.utils.soliditySha3(...commitments)
@@ -122,13 +186,10 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     return {store, send, broadcast}
   }
 
-  onRoundComplete(round:string, roundArrivedMessages, networkId): any {
-    // console.log(`round complete ${round}`, roundArrivedMessages)
-    if(round !== 'round2')
-      return;
-
-    const firstRoundMessages = roundArrivedMessages['round1'],
-      secondRoundMessages = roundArrivedMessages['round2']
+  onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId): any {
+    // console.log(`mpc complete`, roundsArrivedMessages)
+    const firstRoundMessages = roundsArrivedMessages['round1'],
+    secondRoundMessages = roundsArrivedMessages['round2']
 
     /** Check pedersen commitment */
     this.partners.forEach(fromIndex => {
