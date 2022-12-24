@@ -179,7 +179,7 @@ class BaseAppPlugin extends CallablePlugin {
   getNSign () {
     if(!this.tssPlugin.isReady)
       throw {message: 'Tss not initialized'};
-    return this.tssPlugin.tssKey!.party!.t;
+    return this.tssPlugin.tssParty!.t;
   }
 
   get tssWalletAddress(){
@@ -215,7 +215,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   private get appParty(): TssParty | null | undefined {
-    return this.appTss?.party;
+    return this.tssPlugin.getAppParty(this.APP_ID);
   }
 
   private get appTss(): DistributedKey | null {
@@ -412,7 +412,7 @@ class BaseAppPlugin extends CallablePlugin {
       /** all other online partners */
       ...this.collateralPlugin
         .filterNodes({
-          list: nonce?.party!.partners,
+          list: this.appParty!.partners,
           isOnline: true
         })
         .filter(n => n.id !== this.currentNodeInfo!.id),
@@ -644,9 +644,9 @@ class BaseAppPlugin extends CallablePlugin {
   async broadcastNewRequest(request) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let nonce: DistributedKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
-    let party = nonce.party;
+    let party = this.appParty;
     if(!party)
-      throw {message: `${this.ConstructorName}.broadcastNewRequest: nonce.party has not value.`}
+      throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
     let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: party.partners})
       .filter((op: MuonNodeInfo) => {
         return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.id)

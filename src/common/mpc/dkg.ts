@@ -37,6 +37,17 @@ type Round2Broadcast = {
   commitmentHashes: MapOf<string>
 }
 
+export type DistKeyJson = {
+  index: string,
+  share: string,
+  address: string,
+  publicKey: string,
+  curve: {
+    t: number,
+    Fx: string[]
+  }
+}
+
 export class DistKey {
   index: string;
   share: BN;
@@ -55,6 +66,16 @@ export class DistKey {
     this.curve = curve;
   }
 
+  /**
+   * Returns public key of participant with id of [idx]
+   * public key calculated from public key of local shared polynomials coefficients.
+   * @param idx
+   * @returns {[string, any]}
+   */
+  getPubKey(idx: BN | string): PublicKey{
+    return TssModule.tss.calcPolyPoint(idx, this.curve.Fx)
+  }
+
   toJson() {
     return {
       index: this.index,
@@ -68,12 +89,16 @@ export class DistKey {
     }
   }
 
-  static fromJson(key) {
+  static fromJson(key: DistKeyJson) {
+    const publicKey = TssModule.keyFromPublic(key.publicKey)
+    const address = TssModule.pub2addr(publicKey)
+    if(address.toLowerCase() !== key.address.toLowerCase())
+      throw `DistKeyJson address mismatched with publicKey`
     return new DistKey(
       key.index,
       TssModule.toBN(key.share),
-      key.address,
-      TssModule.keyFromPublic(key.publicKey),
+      address,
+      publicKey,
       {
         t: key.curve.t,
         Fx: key.curve.Fx.map(p => TssModule.keyFromPublic(p))
