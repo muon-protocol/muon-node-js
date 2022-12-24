@@ -114,9 +114,14 @@ async function run() {
   const dt = t2 - t1
   console.log(`  total time: ${Math.round(dt)} ms`)
   console.log(`average time: ${Math.round(dt/specialPrivateKeys.length)} ms`)
-  process.exit(0)
 }
 
-run();
+run()
+  .catch(e => {
+    console.log("error when running the test.", e)
+  })
+  .then(() => {
+    process.exit(0)
+  })
 
 
