@@ -28,20 +28,18 @@ export default class FakeNetwork implements IMpcNetwork{
   }
 
   private async __onMessageArrive(message) {
-    // console.log(`ID[${this.id}].__onMessageArrive`)
-    // console.dir(arguments, {depth: null})
-    const {mpcId, round, data} = message;
+    const {mpcId, round, forPartner, data} = message;
     const mpc = this.mpcMap.get(mpcId);
     if(!mpc)
       throw `MPC [${mpcId}] not registered in MPCNetwork`
-    await mpc.onMessageArrive(round, data, this.id);
+    return await mpc.getPartnerRoundData(round, forPartner);
   }
 
-  async send(toPartner: string, mpcId: string, round:number, data: any) {
-    if(!this.sendBus[toPartner]) {
-      this.sendBus[toPartner] = new QueueProducer<any>(this.getBusBaseName(toPartner))
+  async askRoundData(from: string, mpcId: string, round: number, data: any) {
+    if(!this.sendBus[from]) {
+      this.sendBus[from] = new QueueProducer<any>(this.getBusBaseName(from))
     }
-    return await this.sendBus[toPartner].send({mpcId, round, data});
+    return await this.sendBus[from].send({mpcId, round, forPartner: this.id, data});
   }
 
 }

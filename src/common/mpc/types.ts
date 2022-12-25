@@ -2,7 +2,7 @@ import {MultiPartyComputation} from "./base";
 
 export interface IMpcNetwork {
   id: string,
-  send: (partner: string, mpcId: string, round: number, data?:any) => Promise<any>,
+  askRoundData: (from: string, mpcId: string, round: number, data?:any) => Promise<PartnerRoundReceive>,
   registerMcp: (mpc: MultiPartyComputation) => void
 }
 
@@ -15,6 +15,11 @@ export interface MPCConstructData {
 
 export type MapOf<T> = {
   [index: string]: T
+}
+
+export type PartnerRoundReceive = {
+  send: any,
+  broadcast: any
 }
 
 export type RoundOutput<ResultT, BroadcastT> = {

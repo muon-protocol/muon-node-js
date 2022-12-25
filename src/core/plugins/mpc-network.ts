@@ -1,6 +1,6 @@
 import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators";
 import CallablePlugin from "./base/callable-plugin";
-import {IMpcNetwork} from "../../common/mpc/types";
+import {IMpcNetwork, PartnerRoundReceive} from "../../common/mpc/types";
 import {MultiPartyComputation} from "../../common/mpc/base";
 import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg";
 import CollateralInfoPlugin from "./collateral-info";
@@ -10,7 +10,7 @@ import TssPlugin from "./tss-plugin";
 import * as SharedMemory from "../../common/shared-memory";
 
 const RemoteMethods = {
-  RunRoundN: 'run-round-n'
+  AskRoundN: 'ask-round-n'
 }
 
 const random = () => Math.floor(Math.random()*9999999)
@@ -48,17 +48,17 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
       throw "Cannot assign DKG task to itself."
   }
 
-  async send(toPartner: string, mpcId: string, round:number, data: any) {
-    let nodeInfo = this.collateralPlugin.getNodeInfo(toPartner)!
+  async askRoundData(fromPartner: string, mpcId: string, round:number, data: any): Promise<PartnerRoundReceive> {
+    let nodeInfo = this.collateralPlugin.getNodeInfo(fromPartner)!
     if(!nodeInfo.isOnline)
       throw `node [${nodeInfo.wallet}] is not online`
     if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS) {
-      return this.__runRoundN({mpcId, round, data}, this.collateralPlugin.currentNodeInfo)
+      return this.__askRoundN({mpcId, round, data}, this.collateralPlugin.currentNodeInfo)
     }
     else {
       return this.remoteCall(
         nodeInfo.peerId,
-        RemoteMethods.RunRoundN,
+        RemoteMethods.AskRoundN,
         {mpcId, round, data},
         {taskId: mpcId}
       )
@@ -72,12 +72,9 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     return mpc.waitToFulfill()
   }
 
-  @remoteMethod(RemoteMethods.RunRoundN)
-  async __runRoundN(message, callerInfo) {
+  @remoteMethod(RemoteMethods.AskRoundN)
+  async __askRoundN(message, callerInfo): Promise<PartnerRoundReceive> {
     const {mpcId, round, data} = message;
-    // console.log(`============= calling round[${round}] from [${callerInfo.id}] ==============`);
-    // await timeout(1000);
-    // console.dir(message, {depth: null})
     if(round === 0) {
       if(!this.mpcMap.has(mpcId)) {
         // @ts-ignore
@@ -113,8 +110,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     const mpc = this.mpcMap.get(mpcId);
     if(!mpc)
       throw `pid: [${process.pid}] MPC [${mpcId}] not registered in MPCNetwork`
-    await mpc.onMessageArrive(round, data, this.id);
-    return 'OK'
+    return await mpc.getPartnerRoundData(round, callerInfo.id);
   }
 
   @gatewayMethod('test')

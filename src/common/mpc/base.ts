@@ -1,5 +1,5 @@
 import LevelPromise from "./level-promise";
-import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData} from "./types";
+import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive} from "./types";
 
 const random = () => Math.floor(Math.random()*9999999)
 
@@ -9,6 +9,8 @@ export class MultiPartyComputation {
   public readonly partners: string[]
   public readonly rounds: string[]
   protected store: MapOf<any> = {};
+  private send: MapOf<any> = {};
+  private broadcast: MapOf<any> = {};
   private roundsPromise: LevelPromise;
   /** roundsArrivedMessages[roundId][from] = <ResultT> */
   protected roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>> = {}
@@ -31,29 +33,17 @@ export class MultiPartyComputation {
     })
   }
 
-  /**
-   * call by IMpcNetwork
-   * @param round {number} - round index.
-   * @param data {object} - Data that will be send to other participant.
-   * @param networkId {string} - A string that identifies a participant (In the muon NodeInfo.id used for this purpose).
-   */
-  async onMessageArrive(round: number, data: {from: string, send: any, broadcast: any}, networkId: string) {
+  async getPartnerRoundData(round: number, partner: string): Promise<PartnerRoundReceive> {
     try {
       const strRound = this.rounds[round];
-      // console.log(`${this.ConstructorName}[${networkId}][${strRound}] message arrive from ${data.from}`)
 
-      if (round > 0) {
-        await this.roundsPromise.waitToLevelResolve(round - 1);
-      }
-      // console.log(`${this.ConstructorName}[${networkId}][${strRound}] processing ...`)
-      const from = data.from;
-      this.roundsArrivedMessages[strRound][from] = data;
+      /** wait for the round to be executed and data to be prepared. */
+      await this.roundsPromise.waitToLevelResolve(round);
 
-      if (Object.keys(this.roundsArrivedMessages[strRound]).length === this.partners.length) {
-        // console.log(`${this.ConstructorName}[${networkId}] ${strRound} completed`);
-        this.roundsPromise.resolve(round, true);
-      }
-      return 'OK'
+      return {
+        send: this.send[strRound][partner],
+        broadcast: this.broadcast[strRound],
+      };
     }
     catch (e) {
       console.log(e)
@@ -62,10 +52,17 @@ export class MultiPartyComputation {
   }
 
   async runByNetwork(network: IMpcNetwork, timeout: number=30000): Promise<any> {
-    await network.registerMcp(this);
     /** n for rounds, 1 fore result */
     this.roundsPromise = new LevelPromise(this.rounds.length+1, timeout);
+    /** assign MPC task to this process */
+    try {
+      await network.registerMcp(this);
+    }catch (e) {
+      this.roundsPromise.reject(e);
+    }
+    /** process the mpc */
     this.process(network, timeout);
+    /** return the mpc task promise */
     return await this.roundsPromise.waitToFulFill()
   }
 
@@ -73,7 +70,7 @@ export class MultiPartyComputation {
     try {
       for (let r = 0; r < this.rounds.length; r++) {
         const currentRound = this.rounds[r], previousRound = r>0 ? this.rounds[r-1] : null;
-        // console.log(`processing round mpc[${this.id}].${this.rounds[r]} ...`)
+        // console.log(`processing round mpc[${this.id}].${currentRound} ...`)
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
@@ -89,25 +86,27 @@ export class MultiPartyComputation {
         /** execute MPC round */
         const {store, send, broadcast} = await this.processRound(r, inputs, broadcasts);
         this.store[currentRound] = store
+        this.send[currentRound] = send
+        this.broadcast[currentRound] = broadcast
+        // console.log(`round executed [${network.id}].mpc[${this.id}].${currentRound} ...`, {currentRound, store, send, broadcast})
+        this.roundsPromise.resolve(r, true);
 
-        /** distribute round outputs */
-        let allPartiesResult = await Promise.all(this.partners.map(partner => {
-          let dataToSend = {
-            from: network.id,
-            send: send![partner],
-            broadcast,
-            constructData: r===0 ? this.constructData : undefined,
-          }
-          return network.send(partner, this.id, r, dataToSend)
+        /** Gather other partners data */
+        const dataToSend = {
+          constructData: r===0 ? this.constructData : undefined,
+        }
+        let allPartiesResult: (PartnerRoundReceive|string)[] = await Promise.all(this.partners.map(partner => {
+          return network.askRoundData(partner, this.id, r, dataToSend)
             .catch(e => {
               // console.log(`${this.ConstructorName}[network.send] error at level ${r}`, e)
               return "error"
             })
         }))
-        // console.log(`${this.ConstructorName}[${network.id}][${round}] ends.`, {allPartiesResult})
-
-        /** wait until the round is completed. */
-        await this.roundsPromise.waitToLevelResolve(r);
+        this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {
+          if(typeof curr !== 'string')
+            obj[this.partners[i]] = curr;
+          return obj
+        }, {})
       }
 
       // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
