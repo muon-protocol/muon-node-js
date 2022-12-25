@@ -31,6 +31,12 @@ export class MultiPartyComputation {
     })
   }
 
+  /**
+   * call by IMpcNetwork
+   * @param round {number} - round index.
+   * @param data {object} - Data that will be send to other participant.
+   * @param networkId {string} - A string that identifies a participant (In the muon NodeInfo.id used for this purpose).
+   */
   async onMessageArrive(round: number, data: {from: string, send: any, broadcast: any}, networkId: string) {
     try {
       const strRound = this.rounds[round];
