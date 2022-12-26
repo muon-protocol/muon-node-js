@@ -84,7 +84,7 @@ export class MultiPartyComputation {
           }, {})
         }
         /** execute MPC round */
-        const {store, send, broadcast} = await this.processRound(r, inputs, broadcasts);
+        const {store, send, broadcast} = await this.processRound(r, inputs, broadcasts, network.id);
         this.store[currentRound] = store
         this.send[currentRound] = send
         this.broadcast[currentRound] = broadcast
@@ -95,15 +95,15 @@ export class MultiPartyComputation {
         const dataToSend = {
           constructData: r===0 ? this.constructData : undefined,
         }
-        let allPartiesResult: (PartnerRoundReceive|string)[] = await Promise.all(this.partners.map(partner => {
+        let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(this.partners.map(partner => {
           return network.askRoundData(partner, this.id, r, dataToSend)
             .catch(e => {
-              // console.log(`${this.ConstructorName}[network.send] error at level ${r}`, e)
-              return "error"
+              console.log(`${this.ConstructorName}[network.askRoundData] error at level ${r}`, e)
+              return null
             })
         }))
         this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {
-          if(typeof curr !== 'string')
+          if(curr !== null)
             obj[this.partners[i]] = curr;
           return obj
         }, {})
@@ -121,9 +121,9 @@ export class MultiPartyComputation {
 
   onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId): any { return "" }
 
-  async processRound(roundIndex: number, input: MapOf<any>, broadcast: MapOf<any>): Promise<RoundOutput<any, any>> {
+  async processRound(roundIndex: number, input: MapOf<any>, broadcast: MapOf<any>, networkId: string): Promise<RoundOutput<any, any>> {
     const roundMethodName = this.rounds[roundIndex]
-    return this[roundMethodName](input, broadcast)
+    return this[roundMethodName](input, broadcast, networkId)
   }
 
   protected get ConstructorName() {

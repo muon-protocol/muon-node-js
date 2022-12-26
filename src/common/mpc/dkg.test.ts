@@ -98,7 +98,7 @@ async function run() {
     const reconstructedPubKey = TssModule.keyFromPrivate(reconstructedKey).getPublic().encode('hex', true)
 
     if(resultOk(realPrivateKey, realPubKey, allNodeResults[0].publicKey, reconstructedKey, reconstructedPubKey))
-      console.log(`i: ${i}, match: OK`)
+      console.log(`i: ${i}, match: OK, key party: ${allNodeResults[0].partners}`)
     else {
       console.log(`i: ${i}, match: false`)
       console.log({

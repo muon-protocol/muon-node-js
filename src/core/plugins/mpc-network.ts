@@ -119,7 +119,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     /** DistributedKeyGen construction data */
     const cData = {
         id: `dkg-${Date.now()}${random()}`,
-        partners: ['1', '2'],
+        partners: ['1', '2', '3'],
         t: 2,
         pk: privateKeyToShare
       };
