@@ -82,25 +82,24 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
 
         // console.log(`key generation start`, data.constructData)
         mpc.runByNetwork(this)
-          .then(async (dKey) => {
-            // console.log(`key generation done.`, dKey.toJson())
-            // console.log(data.constructData)
-            const extra = data.constructData[4]
+          .then(async (dKey: DistKey) => {
+            if(mpc.extraParams.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
+              return;
 
-            const party = this.tssPlugin.getParty(extra?.party);
+            const party = this.tssPlugin.getParty(mpc.extraParams.party);
             if(!party) {
-              console.log(`part not found ${extra.party}`)
-              throw `party[${extra?.party}] not found`
+              console.log(`part not found ${mpc.extraParams.party}`)
+              throw `party[${mpc.extraParams.party}] not found`
             }
 
             let key = DistributedKey.load(party, {
-              id: mpc.id,
+              id: mpc.extraParams.keyId,
               share: dKey.share,
               publicKey: dKey.publicKey,
               partners: mpc.partners
             })
             // console.log(`new distributed key`, key.toSerializable());
-            await SharedMemory.set(mpc.id, key.toSerializable(), 30*60*1000)
+            await SharedMemory.set(mpc.extraParams.keyId, key.toSerializable(), 30*60*1000)
           })
           .catch(e => {
             // TODO

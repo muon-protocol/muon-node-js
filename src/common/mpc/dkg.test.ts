@@ -9,6 +9,7 @@ import FakeNetwork from './fake-network';
 import {bn2str} from './utils'
 const {toBN, randomHex} = require('web3').utils
 const TssModule = require('../../utils/tss/index')
+import {uniq} from 'lodash'
 
 
 /**
@@ -97,11 +98,13 @@ async function run() {
     const reconstructedKey = bn2str(TssModule.reconstructKey(shares, t, 0))
     const reconstructedPubKey = TssModule.keyFromPrivate(reconstructedKey).getPublic().encode('hex', true)
 
-    if(resultOk(realPrivateKey, realPubKey, allNodeResults[0].publicKey, reconstructedKey, reconstructedPubKey))
+    const pubKeyList = allNodeResults.map(key => key.publicKey)
+    if(uniq(pubKeyList).length===1 && resultOk(realPrivateKey, realPubKey, allNodeResults[0].publicKey, reconstructedKey, reconstructedPubKey))
       console.log(`i: ${i}, match: OK, key party: ${allNodeResults[0].partners}`)
     else {
       console.log(`i: ${i}, match: false`)
       console.log({
+        partnersPubKeys: pubKeyList,
         realPrivateKey,
         realPubKey,
         resultPubKey: allNodeResults[0].publicKey,

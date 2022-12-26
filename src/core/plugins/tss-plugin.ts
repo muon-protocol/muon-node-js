@@ -624,29 +624,28 @@ class TssPlugin extends CallablePlugin {
       // partners = partners.slice(0, maxPartners);
     }
 
-    let keyGen: MultiPartyComputation, dKey: DistKey;
+    let keyGen: DistributedKeyGeneration, dKey: DistKey;
     do {
       keyGen = new DistributedKeyGeneration(
-        id || uuid(),
+        uuid(),
         partners.map(p => p.id),
         party.t,
         options.value,
-        {party: party.id}
+        {party: party.id, keyId: id || uuid(), lowerThanHalfN: options.lowerThanHalfN}
       );
-      dKey = await keyGen.runByNetwork(network)
+      dKey = await keyGen.runByNetwork(network, timeout)
     }
-    // @ts-ignore
-    while(options.lowerThanHalfN && tssModule.HALF_N.lt(dKey.publicKey.x));
+    while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
 
     // @ts-ignore
     let key = DistributedKey.load(party, {
-      id: keyGen.id,
+      id: keyGen.extraParams.keyId!,
       share: dKey.share,
       publicKey: dKey.publicKey,
       partners: keyGen.partners
     })
 
-    await SharedMemory.set(keyGen.id, key.toSerializable(), 30*60*1000)
+    await SharedMemory.set(keyGen.extraParams.keyId, key.toSerializable(), 30*60*1000)
     return key;
   }
 

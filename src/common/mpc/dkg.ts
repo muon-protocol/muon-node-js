@@ -85,6 +85,10 @@ export class DistKey {
     return TssModule.tss.calcPolyPoint(idx, this.curve.Fx)
   }
 
+  publicKeyLargerThanHalfN() {
+    return TssModule.HALF_N.lt(this.publicKey.getX())
+  }
+
   toJson(): DistKeyJson {
     return {
       index: this.index,
@@ -122,12 +126,14 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
   private readonly t: number;
   private readonly value: BN | undefined;
+  public readonly extraParams: any;
 
-  constructor(id: string, partners: string[], t: number, value?: BN|string, extra: object={}) {
+  constructor(id: string, partners: string[], t: number, value?: BN|string, extra: any={}) {
     // @ts-ignore
     super(['round0', 'round1', 'round2', 'round3'], ...Object.values(arguments));
     // console.log(`${this.ConstructorName} construct with`, {id, partners, t, value});
 
+    this.extraParams = extra;
     this.t = t
     if(!!value) {
       if(BN.isBN(value))
