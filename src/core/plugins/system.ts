@@ -115,16 +115,15 @@ class System extends CallablePlugin {
     if(!context)
       throw `App deployment info not found.`
     const id = this.getAppTssKeyId(appId, context.seed)
-    let key = this.tssPlugin.getSharedKey(id)
+    let key = await this.tssPlugin.getSharedKey(id)
     return key
   }
 
   @appApiMethod({})
   async getDistributedKey(keyId) {
-    let key = this.tssPlugin.getSharedKey(keyId)
+    let key = await this.tssPlugin.getSharedKey(keyId)
     if(!key)
       throw `Distributed key not found.`
-    await key.waitToFulfill();
     return key
   }
 
@@ -162,7 +161,7 @@ class System extends CallablePlugin {
       isOnline: true
     });
 
-    let requestNonce: DistributedKey = this.tssPlugin.getSharedKey(request.reqId)!
+    let requestNonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!
 
     if(request.owner === process.env.SIGN_WALLET_ADDRESS){
 
@@ -207,7 +206,7 @@ class System extends CallablePlugin {
       throw `App tss key already generated`
 
     /** store tss key */
-    let key: DistributedKey = this.tssPlugin.getSharedKey(keyId)!
+    let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
     await useDistributedKey(key.publicKey!.encodeCompressed('hex'), `app-${appId}-tss`)
     await this.appManager.saveAppTssConfig({
       version: context.version,

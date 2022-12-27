@@ -188,6 +188,13 @@ export default class CollateralInfoPlugin extends BasePlugin{
     return this._nodesMap.get(index);
   }
 
+  /**
+   * @param index {string} - id/wallet/peerId of node
+   */
+  get currentNodeInfo(): MuonNodeInfo|undefined {
+    return this._nodesMap.get(process.env.SIGN_WALLET_ADDRESS!);
+  }
+
   get TssThreshold(): number{
     if(this.networkInfo)
       return this.networkInfo?.tssThreshold;

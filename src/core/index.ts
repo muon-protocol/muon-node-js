@@ -218,6 +218,16 @@ async function start() {
           module: (await import("./plugins/system")).default,
           config: {},
         },
+        {
+          name: "mpc",
+          module: (await import("./plugins/mpc-runner")).default,
+          config: {},
+        },
+        {
+          name: "mpcnet",
+          module: (await import("./plugins/mpc-network")).default,
+          config: {},
+        },
         ...(await getEnvPlugins()),
         ...getCustomApps(),
         ...getGeneralApps(),

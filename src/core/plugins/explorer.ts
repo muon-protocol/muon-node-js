@@ -110,7 +110,7 @@ class Explorer extends CallablePlugin {
     let statusCode = 0
     if(!!context)
       statusCode ++;
-    if(!!context.publicKey?.address)
+    if(!!context?.publicKey?.address)
       statusCode ++;
 
     return {

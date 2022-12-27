@@ -1,6 +1,6 @@
 import BaseNetworkPlugin from './base/base-network-plugin'
 const pipe = require('it-pipe')
-const {newCallId} = require('../../utils/helpers')
+const {uuid} = require('../../utils/helpers')
 import TimeoutPromise from '../../common/timeout-promise'
 import CollateralInfoPlugin from "./collateral-info";
 import {RemoteMethodOptions} from "../../common/types"
@@ -223,7 +223,7 @@ class RemoteCall extends BaseNetworkPlugin {
       ...(!!options ? options : {})
     };
 
-    let callId = newCallId();
+    let callId = uuid();
     this.send({callId, method, params}, connection, peer)
     let resultPromise = new TimeoutPromise(options.timeout, options.timeoutMessage)
     // this._calls[callId] = remoteResult;
