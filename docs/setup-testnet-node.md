@@ -42,14 +42,14 @@ The [test token](https://mumbai.polygonscan.com/address/0xb6ba20951acd0b5bd092e6
 
 ### Approve staking contract to use your tokens
 
-Use the `approve` function of the [token contract](https://mumbai.polygonscan.com/address/0xb6ba20951acd0b5bd092e61052c54d3f783d1008#code) to approve staking contract at `0x44325D08C455adf634866f8c4cE5035352a745e1` to stake your test tokens.
-
-### Stake tokens on MuonNodesStaking contract
-
-Use the`stake` function of the [staking contract](https://mumbai.polygonscan.com/address/0x44325D08C455adf634866f8c4cE5035352a745e1#code) to stake at least 1000 test tokens for your node.
+Use the `approve` function of the [token contract](https://mumbai.polygonscan.com/address/0xb6ba20951acd0b5bd092e61052c54d3f783d1008#code) to approve staking contract at `0xb80d30686B69cefF364Bd152a57Cac5fd7053539` to stake your test tokens.
 
 ### Add the node on MuonNodesStaking contract
 
-Add your node to the test network by calling the `addMuonNode` function on the [staking contract](https://mumbai.polygonscan.com/address/0x44325D08C455adf634866f8c4cE5035352a745e1#code) with the `PEER_ID` and `SIGN_WALLET_ADDRESS` of your node.
+Add your node to the test network by calling the `addMuonNode` function on the [staking contract](https://mumbai.polygonscan.com/address/0xb80d30686B69cefF364Bd152a57Cac5fd7053539#writeContract) with the `PEER_ID` and `SIGN_WALLET_ADDRESS` of your node.
+
+`intialStakeAmount` is the amount of the tokens that you want to stake for running your node. Minimum amount is 1000 tokens.
+
+You can stake more later using the `stakeMore` function. The rewards will be distributed based on the total staked amounts.
 
 After above steps, the node will be running and the gateway will be visible on `http://your-ip:8000/v1/`
