@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "strict": true,
-    "target": "es2022",
-    "module": "commonjs",
+    "module": "ESNext",
+    "target": "ES2015",
     "moduleResolution": "node",
     "declaration": true,
     "noImplicitAny": false /* Raise error on expressions and declarations with an implied 'any' type. */,
@@ -29,10 +29,11 @@
       "jest"
     ],
     "lib": [
-      "ES6",
-      "DOM",
-      "es2022"
+      "es2015"
     ]
+  },
+  "ts-node": {
+    "esm": true
   },
   "include": [
     "src/**/*.ts"

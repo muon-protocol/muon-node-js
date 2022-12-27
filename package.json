@@ -2,6 +2,7 @@
   "name": "muon-node-js",
   "version": "1.0.0",
   "description": "Muon protocol javascript implementation",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "help": "node help.js",
@@ -30,6 +31,7 @@
     "@libp2p/pubsub-peer-discovery": "^7.0.0",
     "@libp2p/tcp": "^6.0.0",
     "@nodeutils/defaults-deep": "^1.1.0",
+    "@types/body-parser": "^1.19.2",
     "aegir": "^36.0.0",
     "ajv": "^8.11.0",
     "axios": "^0.21.1",
