@@ -151,7 +151,15 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   async loadNetworkInfo(nodeManagerInfo): Promise<{lastUpdateTime: number, allNodes: MuonNodeInfo[]}>{
     const {address, network} = nodeManagerInfo;
 
-    let rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
+    let rawResult;
+    do {
+      try {
+        rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
+      }catch (e) {
+        log('loading network info failed. %o', e)
+        await timeout(5000)
+      }
+    }while(!rawResult)
 
     return {
       lastUpdateTime: parseInt(rawResult._lastUpdateTime),
