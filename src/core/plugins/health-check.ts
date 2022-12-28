@@ -1,6 +1,7 @@
 import CallablePlugin from './base/callable-plugin'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
 import TssPlugin from "./tss-plugin";
+import * as NetworkIpc from '../../network/ipc'
 import {MuonNodeInfo} from "../../common/types";
 const {timeout} = require('../../utils/helpers')
 const OS = require('os')
@@ -63,7 +64,8 @@ class HealthCheck extends CallablePlugin {
     return {
       numCpus: OS.cpus().length,
       loadAvg: uptimeStdOut.split('load average')[1].substr(2).trim(),
-      memory: `${freeCols[6]}/${freeCols[1]}`
+      memory: `${freeCols[6]}/${freeCols[1]}`,
+      uptime: await NetworkIpc.getUptime(),
     }
   }
 

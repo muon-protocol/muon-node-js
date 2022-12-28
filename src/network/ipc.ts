@@ -73,6 +73,10 @@ function subscribeToBroadcastChannel(channel: string) {
   return call(IpcMethods.SubscribeToBroadcastChannel, channel)
 }
 
+function getUptime() {
+  return call(IpcMethods.GetUptime)
+}
+
 export {
   call,
   getCollateralInfo,
@@ -89,4 +93,5 @@ export {
   allowRemoteCallByShieldNode,
   isCurrentNodeInNetwork,
   subscribeToBroadcastChannel,
+  getUptime,
 }

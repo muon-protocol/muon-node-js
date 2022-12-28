@@ -151,7 +151,15 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   async loadNetworkInfo(nodeManagerInfo): Promise<{lastUpdateTime: number, allNodes: MuonNodeInfo[]}>{
     const {address, network} = nodeManagerInfo;
 
-    let rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
+    let rawResult;
+    do {
+      try {
+        rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
+      }catch (e) {
+        log('loading network info failed. %o', e)
+        await timeout(5000)
+      }
+    }while(!rawResult)
 
     return {
       lastUpdateTime: parseInt(rawResult._lastUpdateTime),
@@ -191,7 +199,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     const newIdList = allNodes.map(n => n.id);
     const nodesToRemove = this._nodesList
       .map(n => n.id)
-      .filter(id => !newIdList.includes(id))
+      .filter(id => !newIdList.includes(id));
     nodesToRemove.forEach(id => {
       let oldNode = this._nodesMap.get(id)!;
       this._nodesMap.delete(oldNode.id)
@@ -248,7 +256,15 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       /** every 20 seconds */
       await timeout(20000);
       try {
-        let lastUpdateTime = await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
+        let lastUpdateTime;
+        do {
+          try {
+            lastUpdateTime = await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
+          }catch (e) {
+            log('loading lastUpdateTime failed. %o', e)
+            await timeout(5000)
+          }
+        }while (!lastUpdateTime)
         lastUpdateTime = parseInt(lastUpdateTime);
 
         if(lastUpdateTime !== this.lastNodesUpdateTime) {
