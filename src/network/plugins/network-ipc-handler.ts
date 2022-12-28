@@ -40,6 +40,7 @@ export const IpcMethods = {
   GetCurrentNodeInfo: "get-current-node-info",
   AllowRemoteCallByShieldNode: "allow-remote-call-by-shield-node",
   IsCurrentNodeInNetwork: "is-current-node-in-network",
+  GetUptime: "get-uptime",
 } as const;
 
 export const RemoteMethods = {
@@ -238,6 +239,22 @@ class NetworkIpcHandler extends CallablePlugin {
     await this.collateralPlugin.waitToLoad();
     const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
     return !!currentNodeInfo;
+  }
+
+  @ipcMethod(IpcMethods.GetUptime)
+  async __getUptime() {
+    const sec_num = Math.floor(process.uptime()); // don't forget the second param
+    let hours   = Math.floor(sec_num / 3600);
+    let minutes = Math.floor((sec_num - (hours * 3600)) / 60);
+    let seconds = sec_num - (hours * 3600) - (minutes * 60);
+
+    // @ts-ignore
+    if (hours   < 10) {hours   = "0"+hours;}
+    // @ts-ignore
+    if (minutes < 10) {minutes = "0"+minutes;}
+    // @ts-ignore
+    if (seconds < 10) {seconds = "0"+seconds;}
+    return hours+':'+minutes+':'+seconds;
   }
 
   /** ==================== remote methods ===========================*/
