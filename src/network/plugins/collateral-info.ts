@@ -199,7 +199,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     const newIdList = allNodes.map(n => n.id);
     const nodesToRemove = this._nodesList
       .map(n => n.id)
-      .filter(id => !newIdList.includes(id))
+      .filter(id => !newIdList.includes(id));
     nodesToRemove.forEach(id => {
       let oldNode = this._nodesMap.get(id)!;
       this._nodesMap.delete(oldNode.id)
