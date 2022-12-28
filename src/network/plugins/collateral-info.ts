@@ -256,7 +256,15 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       /** every 20 seconds */
       await timeout(20000);
       try {
-        let lastUpdateTime = await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
+        let lastUpdateTime;
+        do {
+          try {
+            lastUpdateTime = await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
+          }catch (e) {
+            log('loading lastUpdateTime failed. %o', e)
+            await timeout(5000)
+          }
+        }while (!lastUpdateTime)
         lastUpdateTime = parseInt(lastUpdateTime);
 
         if(lastUpdateTime !== this.lastNodesUpdateTime) {
