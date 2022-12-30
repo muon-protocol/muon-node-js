@@ -1,5 +1,5 @@
-const {BN, toBN, randomHex} = require('./utils');
-const Point = require('./point')
+import {BN, toBN, randomHex} from './utils.js'
+import Point from './point.js'
 
 class Curve {
   constructor(name, p, a, b, g, n, h) {
@@ -23,7 +23,7 @@ class Curve {
   }
 }
 
-module.exports.secp256k1 = new Curve(
+export const secp256k1 = new Curve(
   'secp256k1',
   '0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f',
   0,

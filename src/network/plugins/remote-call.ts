@@ -1,10 +1,13 @@
-import BaseNetworkPlugin from './base/base-network-plugin'
-const pipe = require('it-pipe')
-const {uuid} = require('../../utils/helpers')
-import TimeoutPromise from '../../common/timeout-promise'
-import CollateralInfoPlugin from "./collateral-info";
+import BaseNetworkPlugin from './base/base-network-plugin.js'
+import pipe from 'it-pipe'
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
+import {uuid} from '../../utils/helpers.js'
+import TimeoutPromise from '../../common/timeout-promise.js'
+import CollateralInfoPlugin from "./collateral-info.js";
 import {RemoteMethodOptions} from "../../common/types"
-const NodeCache = require('node-cache');
+import NodeCache from 'node-cache'
+import {peerId2Str} from "../utils.js";
 
 const callCache = new NodeCache({
   stdTTL: 6*60, // Keep call in memory for 6 minutes
@@ -46,6 +49,7 @@ class RemoteCall extends BaseNetworkPlugin {
   }
 
   handleCall(callId, method, params, callerInfo, responseStream){
+    // @ts-ignore
     return this.emit(`${method}`, params, callerInfo)
       .then(result => {
         let response = {
@@ -74,7 +78,7 @@ class RemoteCall extends BaseNetworkPlugin {
     let collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
     try {
       message = message.toString()
-      let nodeInfo = collateralPlugin.getNodeInfo(peerId._idB58String)
+      let nodeInfo = collateralPlugin.getNodeInfo(peerId2Str(peerId))
       if(!nodeInfo){
         /** TODO: check shield node allowed methods */
         throw {message: `Unrecognized request owner`}
@@ -90,7 +94,7 @@ class RemoteCall extends BaseNetworkPlugin {
         // TODO: what to do?
       }
     }catch (e) {
-      console.error("network.RemoteCall.handleIncomingMessage", e, peerId._idB58String, message);
+      console.error("network.RemoteCall.handleIncomingMessage", e, peerId2Str(peerId), message);
     }
   }
 
@@ -101,13 +105,17 @@ class RemoteCall extends BaseNetworkPlugin {
         stream,
         async (source) => {
           for await (const message of source) {
-            response = await this.handleIncomingMessage(message, stream, connection.remotePeer)
+            response = await this.handleIncomingMessage(uint8ArrayToString(message.subarray()), stream, connection.remotePeer)
           }
         }
       )
       if(response) {
-        await pipe([this.prepareSendData(response)], stream)
+        await pipe(
+          [this.prepareSendData(response)],
+          stream
+        )
       }
+      // stream.close();
     } catch (err) {
       console.error("network.RemoteCall.handler", err)
     }
@@ -119,19 +127,18 @@ class RemoteCall extends BaseNetworkPlugin {
 
   prepareSendData(data) {
     let strData = JSON.stringify(data)
-    // let signature = crypto.sign(strData)
-    // return Buffer.from(`${signature}|${strData}`);
-    return Buffer.from(strData);
+    // return Buffer.from(strData);
+    return uint8ArrayFromString(strData);
   }
 
-  async send (data, connection, peer) {
+  async send (data, stream, peer) {
     try {
       await pipe(
         [this.prepareSendData(data)],
-        connection.stream,
+        stream,
         async (source) => {
           for await (const message of source) {
-            await this.handleSendResponse(message, peer.id)
+            await this.handleSendResponse(uint8ArrayToString(message.subarray()), peer.id)
           }
         }
       )
@@ -152,7 +159,7 @@ class RemoteCall extends BaseNetworkPlugin {
     try {
       let message = signAndMessage.toString()
 
-      let nodeInfo = collateralPlugin.getNodeInfo(peerId._idB58String)
+      let nodeInfo = collateralPlugin.getNodeInfo(peerId2Str(peerId))
       if(!nodeInfo){
         throw {message: `Unrecognized message owner`}
         // let {responseId} = data;
@@ -165,6 +172,7 @@ class RemoteCall extends BaseNetworkPlugin {
       if('responseId' in data){
         let {responseId, response=undefined, error=undefined} = data;
         // let remoteResult = this._calls[responseId]
+        // @ts-ignore
         let {resultPromise=null} = callCache.get(responseId);
         if(resultPromise) {
           if (!error)
@@ -186,7 +194,7 @@ class RemoteCall extends BaseNetworkPlugin {
     }
   }
 
-  getPeerConnection(peer){
+  getPeerStream(peer){
     return this.network.libp2p.dialProtocol(peer.id, [PROTOCOL])
   }
 
@@ -195,17 +203,20 @@ class RemoteCall extends BaseNetworkPlugin {
     if(!peer){
       return Promise.reject({message: `network.RemoteCall.call: peer is null for method ${method}`})
     }
-    return this.getPeerConnection(peer)
-      .then(connection => {
-        if(!connection?.stream)
+    return this.getPeerStream(peer)
+      .then(stream => {
+        if(!stream) {
           console.log('network.RemoteCall.call: no stream call ... ')
-        return this.callConnection(connection, peer, method, params, options)
+        }
+        return this.callConnection(stream, peer, method, params, options)
       })
       .catch(e => {
         if(!options?.silent) {
-          console.error(`network.RemoteCall.call(peer, '${method}', params)`, `peer: ${peer.id._idB58String}`, e)
+          console.error(`network.RemoteCall.call(peer, '${method}', params)`, `peer: ${peerId2Str(peer.id)}`, e)
         }
+        // @ts-ignore
         if(this.listenerCount('error') > 0) {
+          // @ts-ignore
           this.emit({catch: true}, 'error', {peerId: peer.id, method, onRemoteSide: e.onRemoteSide})
             .catch(e => {
               console.log("network.RemoteCall.call: error handler failed", e);
@@ -215,7 +226,7 @@ class RemoteCall extends BaseNetworkPlugin {
       })
   }
 
-  callConnection(connection, peer, method: string, params: any, options: RemoteCallOptions){
+  callConnection(stream, peer, method: string, params: any, options: RemoteCallOptions){
     options = {
       silent: false,
       timeout: 5000,
@@ -224,7 +235,7 @@ class RemoteCall extends BaseNetworkPlugin {
     };
 
     let callId = uuid();
-    this.send({callId, method, params}, connection, peer)
+    this.send({callId, method, params}, stream, peer)
     let resultPromise = new TimeoutPromise(options.timeout, options.timeoutMessage)
     // this._calls[callId] = remoteResult;
     callCache.set(callId, {
@@ -241,6 +252,7 @@ class RemoteCall extends BaseNetworkPlugin {
     // console.log(`network.RemoteCall.on registering call handler`, {method, options})
     if(options.allowShieldNode)
       this.shieldNodeAllowedMethods[method] = options;
+    // @ts-ignore
     super.on(method, handler)
   }
 

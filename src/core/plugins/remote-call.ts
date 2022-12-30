@@ -1,10 +1,13 @@
-import BasePlugin from'./base/base-plugin'
-import * as NetworkIpc from '../../network/ipc'
-const errorLog = require('../../common/muon-log')('muon:core:plugins:remote-call:error')
+import BasePlugin from'./base/base-plugin.js'
+import * as NetworkIpc from '../../network/ipc.js'
+import Log from '../../common/muon-log.js'
+
+const errorLog = Log('muon:core:plugins:remote-call:error')
 
 export default class RemoteCall extends BasePlugin {
   async handleCall(callId, method, params, callerInfo, responseStream){
     try {
+      // @ts-ignore
       return await this.emit(`${method}`, params, callerInfo)
     }catch (e) {
       errorLog("error happened %o %o", {method, params, callerInfo}, e)
@@ -34,6 +37,7 @@ export default class RemoteCall extends BasePlugin {
         console.log(`network.RemoteCall.on: IPC call failed`, e)
       })
     }
+    // @ts-ignore
     super.on(method, handler)
   }
 }

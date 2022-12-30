@@ -1,4 +1,4 @@
-const {BN, toBN} = require('./utils')
+import {BN, toBN} from './utils.js'
 
 class Point {
   constructor(x, y){
@@ -16,4 +16,4 @@ class Point {
   }
 }
 
-module.exports = Point;
+export default Point;

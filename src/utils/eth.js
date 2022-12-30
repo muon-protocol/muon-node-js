@@ -1,11 +1,14 @@
-const Web3 = require('web3')
-const EventEmbitter = require('events')
+import Web3 from 'web3'
+import EventEmbitter from 'events'
+import { sortObject, getTimestamp } from './helpers.js'
+import * as crypto from './crypto.js'
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const ERC20_ABI =require('../data/ERC20-ABI.json')
+const ERC721_ABI = require('../data/ERC721-ABI.json')
+
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
-const { sortObject, getTimestamp } = require('./helpers')
-const crypto = require('./crypto')
-const ERC20_ABI = require('../data/ERC20-ABI')
-const ERC721_ABI = require('../data/ERC721-ABI')
 
 const _generalWeb3Instance = new Web3()
 const soliditySha3 = _generalWeb3Instance.utils.soliditySha3
@@ -237,7 +240,7 @@ class Subscribe extends EventEmbitter {
   }
 }
 
-module.exports = {
+export {
   getWeb3,
   getBlock,
   getBlockNumber,

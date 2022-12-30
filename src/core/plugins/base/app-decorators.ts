@@ -1,5 +1,5 @@
 import {GlobalBroadcastChannel, RemoteMethodOptions} from '../../../common/types'
-import CoreBroadcastPlugin from "../../../core/plugins/broadcast";
+import CoreBroadcastPlugin from "../../../core/plugins/broadcast.js";
 
 function classNames(target): string[] {
   let names: string[] = []
@@ -123,6 +123,7 @@ export function remoteApp (constructor): any {
         for (let i = 0; i < constructor.prototype.__globalBroadcastHandlers.length; i++) {
           let item = constructor.prototype.__globalBroadcastHandlers[i];
           await broadcastPlugin.subscribe(item.title)
+          // @ts-ignore
           broadcastPlugin.on(item.title, this[item.property].bind(this))
         }
       }

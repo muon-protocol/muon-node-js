@@ -1,7 +1,7 @@
-var mongoose = require('mongoose');
-const {MODEL_REQUEST} = require('./constants')
+import mongoose from 'mongoose'
+import {MODEL_REQUEST} from './constants.js'
 
-var modelSchema = mongoose.Schema({
+const modelSchema = mongoose.Schema({
   reqId: {type: String, trim: true, /**required: true*/},
   app: {type: String, trim: true, required: true},
   appId: {type: String, trim: true},
@@ -17,4 +17,6 @@ var modelSchema = mongoose.Schema({
   confirmedAt: {type: Number},
 }, {minimize: false});
 
-var Model = module.exports = mongoose.model(MODEL_REQUEST, modelSchema);
+const Model = mongoose.model(MODEL_REQUEST, modelSchema);
+
+export default Model

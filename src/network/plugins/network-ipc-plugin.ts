@@ -1,16 +1,21 @@
-import BaseNetworkPlugin from './base/base-network-plugin'
-const { QueueConsumer } = require('../../common/message-bus')
+import BaseNetworkPlugin from './base/base-network-plugin.js'
+import { QueueConsumer } from '../../common/message-bus/index.js'
 
 export const IPC_CHANNEL = '/muon/network/ipc';
+
+type NetworkIpcMessage = {
+  method: string,
+  params: any
+}
 
 export default class NetworkIpcPlugin extends BaseNetworkPlugin {
   /**
    * @type {QueueConsumer}
    */
-  bus = null;
+  bus: QueueConsumer<NetworkIpcMessage>;
 
   async onStart() {
-    const bus = new QueueConsumer(IPC_CHANNEL);
+    const bus = new QueueConsumer<NetworkIpcMessage>(IPC_CHANNEL);
     bus.on("message", this.onMessageReceived.bind(this));
     this.bus = bus
   }
@@ -21,7 +26,9 @@ export default class NetworkIpcPlugin extends BaseNetworkPlugin {
     if(!method)
       throw "ipc method not defined";
 
+    // @ts-ignore
     if(this.listenerCount(`call/${method}`) > 0){
+      // @ts-ignore
       return await this.emit(`call/${method}`, params, callerInfo);
     }
     else {

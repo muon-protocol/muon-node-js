@@ -1,6 +1,6 @@
-const BaseMessageQueue = require('./base-message-queue')
+import BaseMessageQueue from './base-message-queue.js'
 import { IpcCallConfig } from './types'
-const { promisify } = require("util");
+import { promisify } from "util"
 
 export default class QueueConsumer<MessageType> extends BaseMessageQueue {
 
@@ -13,7 +13,8 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
     this.options = options;
   }
 
-  on(eventName: string, listener: (arg:MessageType) => Promise<any>) {
+  on(eventName: string, listener: (arg:MessageType, {pid: number, uid: string}) => Promise<any>) {
+    // @ts-ignore
     super.on(eventName, listener);
     if(!this._reading){
       this._reading = true;
@@ -39,12 +40,16 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
     let {pid, uid, data} = JSON.parse(strMessage)
     let response, error;
     try {
+      // @ts-ignore
       response = await this.emit("message", data, {pid, uid})
     } catch (e) {
-      // console.log(`QueueConsumer.onMessageReceived`, e);
+      console.log(`QueueConsumer.onMessageReceived`, e);
       if(typeof e === "string")
         e = {message: e};
-      error = e;
+      error = {
+        message: e.message,
+        ...e
+      };
     }
     this.responseTo(pid, uid, {response, error});
   }

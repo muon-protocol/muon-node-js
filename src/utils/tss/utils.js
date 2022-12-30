@@ -1,7 +1,12 @@
-const {utils: {BN, toBN, randomHex, sha3, soliditySha3, keccak256}} = require('web3')
-const {range} = require('lodash');
+import Web3 from 'web3'
+import lodash from 'lodash'
 
-module.exports = {
+const {range} = lodash
+const {utils: {BN, toBN, randomHex, sha3, soliditySha3, keccak256}} = Web3;
+const ZERO = toBN(0)
+const ONE = toBN(1)
+
+export {
   BN,
   toBN,
   sha3,
@@ -9,6 +14,6 @@ module.exports = {
   keccak256,
   range,
   randomHex,
-  ZERO: toBN(0),
-  ONE: toBN(1),
+  ZERO,
+  ONE,
 }

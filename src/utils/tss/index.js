@@ -1,18 +1,14 @@
-const ethJsUtil = require('ethereumjs-util')
-const {BN, toBN, keccak256, range} = require('./utils')
-const assert = require('assert')
-const elliptic = require('elliptic');
-// const BigNumber = require('bignumber.js')
-// BigNumber.set({DECIMAL_PLACES: 300})
-const Point = require('./point');
-const Curve = require('./curve');
+import ethJsUtil from 'ethereumjs-util'
+import {BN, toBN, keccak256, range} from './utils.js'
+import assert from 'assert'
+import elliptic from 'elliptic'
+import Point from './point.js'
 const ZERO = toBN(0)
 const ONE = toBN(1)
 const TWO = toBN(2)
 const THREE = toBN(3)
 
-const EC = require('elliptic').ec;
-const curve = new EC('secp256k1');
+const curve = new elliptic.ec('secp256k1');
 const HALF_N = curve.n.shrn(1).addn(1);
 /**
  * Let H be elements of G, such that nobody knows log, h
@@ -400,7 +396,7 @@ function schnorrAggregateSigs(t, sigs, indices){
   return {s, e}
 }
 
-module.exports = {
+export {
   curve,
   random,
   pointAdd,

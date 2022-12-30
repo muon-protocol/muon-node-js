@@ -1,4 +1,4 @@
-const redis = require('redis');
+import redis from 'redis'
 
 class RedisDependency {
   constructor(prefix){
@@ -48,4 +48,4 @@ function make(app) {
   return new RedisDependency(prefix);
 }
 
-module.exports = make;
+export default make;

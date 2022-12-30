@@ -1,13 +1,14 @@
 import Muon from "../../muon";
 import {MuonNodeInfo} from "../../../common/types";
 import CollateralInfoPlugin from "../collateral-info";
-const log = require('../../../common/muon-log')('muon:core:plugins:base')
+import Log from '../../../common/muon-log.js'
+import Events from 'events-async'
+import PeerId from 'peer-id'
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
+import * as SharedMem from '../../../common/shared-memory/index.js'
 
-const Events = require('events-async')
-const PeerId = require('peer-id')
-const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
-const uint8ArrayToString = require('uint8arrays/to-string').toString;
-const SharedMem = require('../../../common/shared-memory')
+const log = Log('muon:core:plugins:base')
 
 export default class BasePlugin extends Events{
   private readonly _muon;
@@ -49,8 +50,10 @@ export default class BasePlugin extends Events{
   }
 
   protected get BROADCAST_CHANNEL(){
+    // @ts-ignore
     if(this.__broadcastHandlerMethod === undefined)
       return null;
+    // @ts-ignore
     return `muon.core.${this.ConstructorName}.${this.__broadcastHandlerMethod}`
   }
 
@@ -62,11 +65,13 @@ export default class BasePlugin extends Events{
         log('Subscribing to broadcast channel %s', this.BROADCAST_CHANNEL)
       }
       this.muon.getPlugin('broadcast').subscribe(this.BROADCAST_CHANNEL);
+      // @ts-ignore
       this.muon.getPlugin('broadcast').on(broadcastChannel, this[this.__broadcastHandlerMethod].bind(this))
     }
   }
 
   broadcast(data){
+    // @ts-ignore
     if(this.__broadcastHandlerMethod === undefined) {
       throw `core.${this.ConstructorName} plugin is not declared broadcast handler`;
     }

@@ -6,58 +6,58 @@ import { kadDHT } from "@libp2p/kad-dht";
 import { bootstrap } from "@libp2p/bootstrap";
 import { pubsubPeerDiscovery } from '@libp2p/pubsub-peer-discovery';
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
-import { defaultsDeep } from '@nodeutils/defaults-deep';
+import defaultsDeep from '@nodeutils/defaults-deep';
 
 const DEFAULT_OPTS = {
-  modules: {
-    transports: [
-      tcp(),
-      // WS, TODO: enable WS
-    ],
-    peerDiscovery: [
-      bootstrap,
-      pubsubPeerDiscovery,
-    ],
-    connectionEncryption: [
-      noise(),
-    ],
-    streamMuxers: [
-      mplex()
-    ],
-    pubsub: gossipsub(),
-    dht: kadDHT({
-      // validators: {
-      //   muon: (data, key) => {
-      //     console.log(
-      //       `node ${port} validator:data,key`,
-      //       uint8ArrayToString(data),
-      //       uint8ArrayToString(key)
-      //     );
-      //     return true; // this record is always valid
-      //   },
-      // },
-      // selectors: {
-      //   muon: (data1, data2) => {
-      //     console.log(
-      //       `node ${port} selector:data1,data2`,
-      //       uint8ArrayToString(data1),
-      //       data2
-      //     );
-      //     return 1; // when multiple records are found for a given key, just select the first one
-      //   },
-      // },
+  transports: [
+    tcp(),
+    // WS, TODO: enable WS
+  ],
+  peerDiscovery: [
+    // bootstrap,
+    pubsubPeerDiscovery({
+      interval: 1000
     })
-  },
-  config: {
-    peerDiscovery: {
-    },
-    dht: {
-      enabled: true
-    },
-    // pubsub: {
-    //   emitSelf: false
-    // }
-  }
+  ],
+  connectionEncryption: [
+    noise(),
+  ],
+  streamMuxers: [
+    mplex()
+  ],
+  pubsub: gossipsub(),
+  dht: kadDHT({
+    // validators: {
+    //   muon: (data, key) => {
+    //     console.log(
+    //       `node ${port} validator:data,key`,
+    //       uint8ArrayToString(data),
+    //       uint8ArrayToString(key)
+    //     );
+    //     return true; // this record is always valid
+    //   },
+    // },
+    // selectors: {
+    //   muon: (data1, data2) => {
+    //     console.log(
+    //       `node ${port} selector:data1,data2`,
+    //       uint8ArrayToString(data1),
+    //       data2
+    //     );
+    //     return 1; // when multiple records are found for a given key, just select the first one
+    //   },
+    // },
+  }),
+  // config: {
+  //   peerDiscovery: {
+  //   },
+  //   dht: {
+  //     enabled: true
+  //   },
+  //   // pubsub: {
+  //   //   emitSelf: false
+  //   // }
+  // }
 }
 
 function create(opts) {

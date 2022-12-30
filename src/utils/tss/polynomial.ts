@@ -1,4 +1,4 @@
-const {range, toBN} = require('./utils')
+import {range, toBN} from './utils.js'
 import BN from 'bn.js'
 import {BaseCurve, KeyPair, PublicKey} from './types'
 

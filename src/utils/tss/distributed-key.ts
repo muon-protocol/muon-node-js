@@ -1,12 +1,13 @@
-import Polynomial from './polynomial'
-import Party from './party'
+import Polynomial from './polynomial.js'
+import Party from './party.js'
 import BN from 'bn.js';
 import { PublicKey } from './types'
-const tss = require('./index')
-const {utils:{toBN}} = require('web3')
-import TimeoutPromise from '../../common/timeout-promise'
-const assert = require('assert')
+import * as tss from './index.js'
+import Web3 from 'web3'
+import TimeoutPromise from '../../common/timeout-promise.js'
+import assert from 'assert'
 
+const {utils:{toBN}} = Web3
 const random = () => Math.floor(Math.random()*9999999)
 
 export type KeyPart = {
@@ -175,7 +176,9 @@ class DistributedKey {
     let f = toBN(0)
     let h = toBN(0)
     for(const [i, {f: _f, h: _h}] of Object.entries(this.keyParts)){
+      // @ts-ignore
       f.iadd(toBN(_f))
+      // @ts-ignore
       h.iadd(toBN(_h))
     }
     return {f:f.umod(tss.curve.n), h: h.umod(tss.curve.n)}

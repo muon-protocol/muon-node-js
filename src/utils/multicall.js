@@ -1,5 +1,5 @@
-const { Multicall } = require('ethereum-multicall')
-const { getWeb3 } = require('./eth')
+import { Multicall } from 'ethereum-multicall'
+import { getWeb3 } from './eth.js'
 
 async function multiCall(chainId, contractCallContext, tryAggregate = false, multicallCustomContractAddress) {
   try {
@@ -34,7 +34,7 @@ async function multiCall(chainId, contractCallContext, tryAggregate = false, mul
   }
 }
 
-module.exports = { multiCall }
+export { multiCall }
 
 // Example
 

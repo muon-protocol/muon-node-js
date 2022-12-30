@@ -84,6 +84,7 @@ export function remoteApp (constructor): any {
         for (let i = 0; i < constructor.prototype.__globalBroadcastHandlers.length; i++) {
           let item = constructor.prototype.__globalBroadcastHandlers[i];
           await broadcastPlugin.subscribe(item.title)
+          // @ts-ignore
           broadcastPlugin.on(item.title, this[item.property].bind(this))
         }
       }

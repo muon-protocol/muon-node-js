@@ -1,19 +1,19 @@
-import CallablePlugin from './base/callable-plugin'
-import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators'
+import CallablePlugin from './base/callable-plugin.js'
+import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
-const soliditySha3 = require('../../utils/soliditySha3');
-const {toBN} = require('../../utils/tss/utils');
-const tssModule = require('../../utils/tss');
-const AppContext = require("../../common/db-models/AppContext")
-const AppTssConfig = require("../../common/db-models/AppTssConfig")
-import * as NetworkIpc from '../../network/ipc'
-import DistributedKey from "../../utils/tss/distributed-key";
-import AppManager from "./app-manager";
-import useDistributedKey from "../../utils/tss/use-distributed-key";
-const { timeout } = require('../../utils/helpers')
-const { promisify } = require("util");
+import soliditySha3 from '../../utils/soliditySha3.js'
+import {toBN} from '../../utils/tss/utils.js'
+import * as tssModule from '../../utils/tss/index.js'
+import AppContext from "../../common/db-models/AppContext.js"
+import AppTssConfig from "../../common/db-models/AppTssConfig.js"
+import * as NetworkIpc from '../../network/ipc.js'
+import DistributedKey from "../../utils/tss/distributed-key.js";
+import AppManager from "./app-manager.js";
+import useDistributedKey from "../../utils/tss/use-distributed-key.js";
+import { timeout } from '../../utils/helpers.js'
+import { promisify } from "util"
 
 const RemoteMethods = {
   InformAppDeployed: "informAppDeployed",

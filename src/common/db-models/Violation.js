@@ -1,7 +1,7 @@
-var mongoose = require('mongoose');
-const {MODEL_VIOLATION} = require('./constants')
+import mongoose from 'mongoose'
+import {MODEL_VIOLATION} from './constants.js'
 
-var modelSchema = mongoose.Schema({
+const modelSchema = mongoose.Schema({
   cid: {type: String, required: true},
   description: {type: String},
   content: {type: String},
@@ -9,4 +9,4 @@ var modelSchema = mongoose.Schema({
   actualResult: {type: Object},
 }, {timestamps: true});
 
-module.exports = mongoose.model(MODEL_VIOLATION, modelSchema);
+export default mongoose.model(MODEL_VIOLATION, modelSchema);

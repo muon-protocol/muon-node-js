@@ -1,25 +1,27 @@
-import NetworkContentPlugin from "./plugins/content-plugin";
-let mongoose = require("mongoose");
-const Events = require("events-async");
-import { create, bootstrap } from "./libp2p_bundle";
-const loadConfigs = require("./configurations");
-const PeerId = require("peer-id");
-const chalk = require("chalk");
-const emoji = require("node-emoji");
-const isPrivate = require("libp2p-utils/src/multiaddr/is-private");
-const coreIpc = require("../core/ipc");
-const { MessagePublisher } = require("../common/message-bus");
-const log = require("../common/muon-log")("muon:network");
+import NetworkContentPlugin from "./plugins/content-plugin.js";
+import mongoose from "mongoose"
+import Events from "events-async"
+import { create, bootstrap } from "./libp2p_bundle.js";
+import loadConfigs from "./configurations.js"
+import { createFromJSON } from '@libp2p/peer-id-factory'
+import chalk from "chalk"
+import emoji from "node-emoji"
+import {isPrivate, peerId2Str} from "./utils.js"
+import * as CoreIpc from "../core/ipc.js"
+import { MessagePublisher } from "../common/message-bus/index.js"
+import CollateralPlugin from "./plugins/collateral-info.js";
+import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
+import IpcPlugin from "./plugins/network-ipc-plugin.js";
+import RemoteCallPlugin from "./plugins/remote-call.js";
+import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
+import Log from "../common/muon-log.js"
 
-import CollateralPlugin from "./plugins/collateral-info";
-import IpcHandlerPlugin from "./plugins/network-ipc-handler";
-import IpcPlugin from "./plugins/network-ipc-plugin";
-import RemoteCallPlugin from "./plugins/remote-call";
-import NetworkBroadcastPlugin from "./plugins/network-broadcast";
+const log = Log("muon:network");
 
 class Network extends Events {
   configs;
   libp2p;
+  peerId;
   _plugins = {};
   private connectedPeers: { [index: string]: boolean } = {};
 
@@ -35,10 +37,19 @@ class Network extends Events {
   async _initializeLibp2p() {
     log(`libp2p initializing ...`);
     const configs = this.configs.libp2p;
-    let peerId = await PeerId.createFromJSON(configs.peerId);
+    let peerId = await createFromJSON(configs.peerId);
     let announceFilter = (multiaddrs) =>
       multiaddrs.filter((m) => !isPrivate(m));
     if (process.env.DISABLE_ANNOUNCE_FILTER) announceFilter = (mas) => mas;
+
+    const peerDiscovery: any[] = []
+    if(configs.bootstrap.length>0) {
+      peerDiscovery.push(
+        bootstrap({
+          list: configs.bootstrap,
+        })
+      )
+    }
 
     const libp2p = await create({
       peerId,
@@ -50,15 +61,16 @@ class Network extends Events {
         ],
         announceFilter,
       },
-      config: {
-        peerDiscovery: {
-          // [Libp2pBundle.Bootstrap.tag]: {
-          //   list: [...configs.bootstrap],
-          //   interval: 5000, // default is 10 ms,
-          //   enabled: configs.bootstrap.length > 0,
-          // },
-        },
-      },
+      peerDiscovery,
+      // config: {
+      //   peerDiscovery: {
+      //     // [Libp2pBundle.Bootstrap.tag]: {
+      //     //   list: [...configs.bootstrap],
+      //     //   interval: 5000, // default is 10 ms,
+      //     //   enabled: configs.bootstrap.length > 0,
+      //     // },
+      //   },
+      // },
     });
     libp2p.connectionManager.addEventListener("peer:connect", this.onPeerConnect.bind(this));
     libp2p.connectionManager.addEventListener(
@@ -86,13 +98,13 @@ class Network extends Events {
   }
 
   async start() {
-    log(`libp2p starting peerId: ${this.peerId.toB58String()} ...`);
+    log(`libp2p starting peerId: ${peerId2Str(this.peerId)} ...`);
     await this.libp2p.start();
 
     if (this.configs.libp2p.natIp) {
       let { port, natIp } = this.configs.libp2p;
       this.libp2p.addressManager.addObservedAddr(
-        `/ip4/${natIp}/tcp/${port}/p2p/${this.peerId.toB58String()}`
+        `/ip4/${natIp}/tcp/${port}/p2p/${peerId2Str(this.peerId)}`
       );
     }
 
@@ -108,9 +120,9 @@ class Network extends Events {
 
     // if(process.env.VERBOSE) {
     log("====================== Bindings ====================");
-    this.libp2p.multiaddrs.forEach((ma) => {
+    this.libp2p.getMultiaddrs().forEach((ma) => {
       log(ma.toString());
-      // console.log(`${ma.toString()}/p2p/${this.libp2p.peerId.toB58String()}`)
+      // console.log(`${ma.toString()}/p2p/${peerId2Str(this.libp2p.peerId)}`)
     });
     log("====================================================");
     // }
@@ -136,7 +148,28 @@ class Network extends Events {
     }
   }
 
-  onPeerConnect(connection) {
+  async onPeerDiscovery(evt) {
+    const peer = evt.detail;
+    const peerId = peer.id;
+    this.connectedPeers[peerId2Str(peerId)] = true;
+    // @ts-ignore
+    this.emit("peer:discovery", peerId);
+    CoreIpc.fireEvent({ type: "peer:discovery", data: peerId2Str(peerId) });
+    log("found peer");
+    try {
+      const peerInfo = await this.libp2p.peerRouting.findPeer(peerId);
+      log("discovered peer info %O", {
+        peerId: peerId2Str(peerId),
+        multiaddrs: peerInfo.multiaddrs,
+        // peerInfo,
+      });
+    } catch (e) {
+      console.log("Error Muon.onPeerDiscovery", e);
+    }
+  }
+
+  onPeerConnect(evt) {
+    const connection = evt.detail;
     log(
       emoji.get("moon") +
         " " +
@@ -144,18 +177,20 @@ class Network extends Events {
         " " +
         emoji.get("large_blue_circle") +
         " " +
-        chalk.blue(` ${connection.remotePeer.toB58String()}`)
+        chalk.blue(` ${peerId2Str(connection.remotePeer)}`)
     );
-    this.connectedPeers[connection.remotePeer._idB58String] = true;
+    this.connectedPeers[peerId2Str(connection.remotePeer)] = true;
+    // @ts-ignore
     this.emit("peer:connect", connection.remotePeer);
-    coreIpc.fireEvent({
+    CoreIpc.fireEvent({
       type: "peer:connect",
-      data: connection.remotePeer.toB58String(),
+      data: peerId2Str(connection.remotePeer),
     });
   }
 
-  onPeerDisconnect(connection) {
-    delete this.connectedPeers[connection.remotePeer._idB58String];
+  onPeerDisconnect(evt) {
+    const connection = evt.detail;
+    delete this.connectedPeers[peerId2Str(connection.remotePeer)];
     log(
       emoji.get("moon") +
         " " +
@@ -163,30 +198,14 @@ class Network extends Events {
         " " +
         emoji.get("large_blue_circle") +
         " " +
-        chalk.red(` ${connection.remotePeer.toB58String()}`)
+        chalk.red(` ${peerId2Str(connection.remotePeer)}`)
     );
+    // @ts-ignore
     this.emit("peer:disconnect", connection.remotePeer);
-    coreIpc.fireEvent({
+    CoreIpc.fireEvent({
       type: "peer:disconnect",
-      data: connection.remotePeer.toB58String(),
+      data: peerId2Str(connection.remotePeer),
     });
-  }
-
-  async onPeerDiscovery(peerId) {
-    this.connectedPeers[peerId._idB58String] = true;
-    this.emit("peer:discovery", peerId);
-    coreIpc.fireEvent({ type: "peer:discovery", data: peerId.toB58String() });
-    log("found peer");
-    try {
-      const peerInfo = await this.libp2p.peerRouting.findPeer(peerId);
-      console.log({
-        peerId: peerId.toB58String(),
-        multiaddrs: peerInfo.multiaddrs,
-        // peerInfo,
-      });
-    } catch (e) {
-      console.log("Error Muon.onPeerDiscovery", e);
-    }
   }
 }
 
@@ -213,7 +232,7 @@ function clearMessageBus() {
 
 async function start() {
   log("connecting to mongodb ...");
-  await mongoose.connect(process.env.MONGODB_CS, {
+  await mongoose.connect(process.env.MONGODB_CS!, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   });

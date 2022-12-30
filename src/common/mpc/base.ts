@@ -1,4 +1,4 @@
-import LevelPromise from "./level-promise";
+import LevelPromise from "./level-promise.js";
 import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive} from "./types";
 
 const random = () => Math.floor(Math.random()*9999999)

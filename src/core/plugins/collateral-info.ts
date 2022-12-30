@@ -1,9 +1,11 @@
-import BasePlugin from './base/base-plugin'
-import TimeoutPromise from '../../common/timeout-promise'
-import * as NetworkIpc from '../../network/ipc'
-import {GroupInfo, NetworkInfo, NodeFilterOptions} from '../../network/plugins/collateral-info'
+import BasePlugin from './base/base-plugin.js'
+import TimeoutPromise from '../../common/timeout-promise.js'
+import * as NetworkIpc from '../../network/ipc.js'
+import {GroupInfo, NetworkInfo, NodeFilterOptions} from '../../network/plugins/collateral-info.js'
 import {MuonNodeInfo} from "../../common/types";
-const log = require('../../common/muon-log')('muon:core:plugins:collateral')
+import Log from '../../common/muon-log.js'
+
+const log = Log('muon:core:plugins:collateral')
 
 export default class CollateralInfoPlugin extends BasePlugin{
 
@@ -168,6 +170,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
     })
 
     log('Collateral info loaded.');
+    // @ts-ignore
     this.emit('loaded');
     this.loading.resolve(true);
   }

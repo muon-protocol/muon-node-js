@@ -1,6 +1,7 @@
-const ethers = require('ethers')
-const Web3 = require('web3')
-const {hashCallOutput} = require('./eth')
+import ethers from 'ethers'
+import Web3 from 'web3'
+import {hashCallOutput} from './eth.js'
+
 const BN = Web3.utils.BN
 const web3 = new Web3();
 const PRIVATE_KEY = process.env.SIGN_WALLET_PRIVATE_KEY
@@ -75,7 +76,7 @@ function toBaseUnit(value, decimals) {
   return new BN(wei.toString(10), 10);
 }
 
-module.exports = {
+export {
   hashCallOutput,
   toFixedHex,
   soliditySha3,

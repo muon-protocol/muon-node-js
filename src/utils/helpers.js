@@ -1,25 +1,28 @@
-const BigNumber = require('bignumber.js');
+import BigNumber from 'bignumber.js'
 BigNumber.set({DECIMAL_PLACES: 26})
-const toBN = require('web3').utils.toBN;
+import Web3 from 'web3'
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const toBN = Web3.utils.toBN;
 
-module.exports.timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-module.exports.getTimestamp = () => Math.floor(Date.now() / 1000);
-module.exports.uuid = () => {
+export const timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export const getTimestamp = () => Math.floor(Date.now() / 1000);
+export const uuid = () => {
   return Date.now().toString(32) + Math.floor(Math.random()*999999999).toString(32);
 }
-module.exports.sortObject = o => Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {})
-module.exports.floatToBN = (num, decimals) => {
+export const sortObject = o => Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {})
+export const floatToBN = (num, decimals) => {
   let n0 = new BigNumber(num).multipliedBy(`1e${decimals}`);
   let n1 = n0.decimalPlaces(decimals).integerValue();
   return toBN(`0x${n1.toString(16)}`);
 }
-module.exports.parseBool = v => {
+export const parseBool = v => {
   if(typeof v === 'string')
     v = v.toLowerCase();
   return v === '1' || v==='true' || v === true || v === 1;
 }
 
-const flattenObject = (obj, prefix="") => {
+export const flattenObject = (obj, prefix="") => {
   let result = {}
   if(Array.isArray(obj)){
     for(let i=0 ; i<obj.length ; i++){
@@ -44,11 +47,11 @@ const flattenObject = (obj, prefix="") => {
   }
   return result
 }
-module.exports.flattenObject = flattenObject
-// https://stackoverflow.com/questions/28222228/javascript-es6-test-for-arrow-function-built-in-function-regular-function
-module.exports.isArrowFn = (fn) => (typeof fn === 'function') && !/^(?:(?:\/\*[^(?:\*\/)]*\*\/\s*)|(?:\/\/[^\r\n]*))*\s*(?:(?:(?:async\s(?:(?:\/\*[^(?:\*\/)]*\*\/\s*)|(?:\/\/[^\r\n]*))*\s*)?function|class)(?:\s|(?:(?:\/\*[^(?:\*\/)]*\*\/\s*)|(?:\/\/[^\r\n]*))*)|(?:[_$\w][\w0-9_$]*\s*(?:\/\*[^(?:\*\/)]*\*\/\s*)*\s*\()|(?:\[\s*(?:\/\*[^(?:\*\/)]*\*\/\s*)*\s*(?:(?:['][^']+['])|(?:["][^"]+["]))\s*(?:\/\*[^(?:\*\/)]*\*\/\s*)*\s*\]\())/.test(fn.toString());
 
-module.exports.deepFreeze = function deepFreeze (object) {
+// https://stackoverflow.com/questions/28222228/javascript-es6-test-for-arrow-function-built-in-function-regular-function
+export const isArrowFn = (fn) => (typeof fn === 'function') && !/^(?:(?:\/\*[^(?:\*\/)]*\*\/\s*)|(?:\/\/[^\r\n]*))*\s*(?:(?:(?:async\s(?:(?:\/\*[^(?:\*\/)]*\*\/\s*)|(?:\/\/[^\r\n]*))*\s*)?function|class)(?:\s|(?:(?:\/\*[^(?:\*\/)]*\*\/\s*)|(?:\/\/[^\r\n]*))*)|(?:[_$\w][\w0-9_$]*\s*(?:\/\*[^(?:\*\/)]*\*\/\s*)*\s*\()|(?:\[\s*(?:\/\*[^(?:\*\/)]*\*\/\s*)*\s*(?:(?:['][^']+['])|(?:["][^"]+["]))\s*(?:\/\*[^(?:\*\/)]*\*\/\s*)*\s*\]\())/.test(fn.toString());
+
+export const deepFreeze = function deepFreeze (object) {
   // Retrieve the property names defined on object
   const propNames = Object.getOwnPropertyNames(object);
 
@@ -65,7 +68,14 @@ module.exports.deepFreeze = function deepFreeze (object) {
   return Object.freeze(object);
 }
 
-module.exports.stackTrace = function() {
+export const stackTrace = function() {
   let err = new Error();
   return err.stack;
+}
+
+export function filePathInfo(importMeta) {
+  const __filename = fileURLToPath(importMeta.url);
+  const __dirname = dirname(__filename);
+
+  return {__filename, __dirname};
 }

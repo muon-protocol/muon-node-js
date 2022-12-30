@@ -1,13 +1,18 @@
-import BaseNetworkPlugin from './base/base-network-plugin'
-import TimeoutPromise from '../../common/timeout-promise'
-const eth = require('../../utils/eth')
-const {stackTrace, timeout} = require('../../utils/helpers')
-import NodeManagerAbi from '../../data/NodeManager-ABI.json'
+import BaseNetworkPlugin from './base/base-network-plugin.js'
+import TimeoutPromise from '../../common/timeout-promise.js'
+import * as eth from '../../utils/eth.js'
+import {stackTrace, timeout} from '../../utils/helpers.js'
 import {MuonNodeInfo} from "../../common/types";
-import * as CoreIpc from '../../core/ipc'
+import * as CoreIpc from '../../core/ipc.js'
 import _ from 'lodash'
-const chalk = require('chalk')
-const log = require('../../common/muon-log')('muon:network:plugins:collateral')
+import chalk from 'chalk'
+import Log from '../../common/muon-log.js'
+import { createRequire } from "module";
+import {peerId2Str} from "../utils.js";
+
+const require = createRequire(import.meta.url);
+const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
+const log = Log('muon:network:plugins:collateral')
 
 export type GroupInfo = {
   isValid: boolean,
@@ -48,8 +53,11 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
     await this._loadCollateralInfo();
 
+    // @ts-ignore
     this.network.on('peer:discovery', this.onPeerDiscovery.bind(this));
+    // @ts-ignore
     this.network.on('peer:connect', this.onPeerConnect.bind(this));
+    // @ts-ignore
     this.network.on('peer:disconnect', this.onPeerDisconnect.bind(this));
   }
 
@@ -64,8 +72,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   private getNodeId(peerId): string {
-    const id = this.getNodeInfo(peerId._idB58String)?.id || 'unknown'
-    return `[${id}]:${peerId._idB58String}`
+    const id = this.getNodeInfo(peerId2Str(peerId))?.id || 'unknown'
+    return `[${id}]:${peerId2Str(peerId)}`
   }
 
   async onPeerDiscovery(peerId) {
@@ -75,8 +83,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
     await timeout(5000);
 
-    this._onlinePeers[peerId._idB58String] = await this.findPeer(peerId)
-    this.updateNodeInfo(peerId._idB58String, {isOnline: true})
+    this._onlinePeers[peerId2Str(peerId)] = await this.findPeer(peerId)
+    this.updateNodeInfo(peerId2Str(peerId), {isOnline: true})
   }
 
   async onPeerConnect(peerId) {
@@ -85,15 +93,15 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
     await timeout(5000);
 
-    this._onlinePeers[peerId._idB58String] = await this.findPeer(peerId);
-    this.updateNodeInfo(peerId._idB58String, {isOnline: true})
+    this._onlinePeers[peerId2Str(peerId)] = await this.findPeer(peerId);
+    this.updateNodeInfo(peerId2Str(peerId), {isOnline: true})
   }
 
   onPeerDisconnect(peerId) {
     log(chalk.red(`peer disconnected ${this.getNodeId(peerId)}`))
     // console.log("peer not available", peerId)
-    delete this._onlinePeers[peerId._idB58String];
-    this.updateNodeInfo(peerId._idB58String, {isOnline: false})
+    delete this._onlinePeers[peerId2Str(peerId)];
+    this.updateNodeInfo(peerId2Str(peerId), {isOnline: false})
   }
 
   private updateNodeInfo(index: string, dataToMerge: object) {
@@ -144,6 +152,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
 
     log('Collateral info loaded.');
 
+    // @ts-ignore
     this.emit('loaded');
     this.loading.resolve(true);
   }
@@ -206,6 +215,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
       this._nodesMap.delete(oldNode.wallet)
       this._nodesMap.delete(oldNode.peerId)
       log(`Node info deleted from chain %o`, oldNode)
+      // @ts-ignore
       this.emit("collateral:node:delete", oldNode)
       CoreIpc.fireEvent({type: "collateral:node:delete", data: _.omit(oldNode, ['peer'])})
     })
@@ -219,6 +229,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           .set(n.wallet, n)
           .set(n.peerId, n)
         log(`New node info added to chain %o`, n)
+        // @ts-ignore
         this.emit("collateral:node:add", n)
         CoreIpc.fireEvent({type: "collateral:node:add", data: n})
         return;
@@ -234,6 +245,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           .set(n.wallet, n)
           .set(n.peerId, n)
         log(`Node info changed on chain %o`, {old: oldNode, new: n})
+        // @ts-ignore
         this.emit("collateral:node:edit", n, oldNode)
         CoreIpc.fireEvent({
           type: "collateral:node:edit",
@@ -284,8 +296,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   getNodeInfo(index: string): MuonNodeInfo|undefined {
     if(typeof index !== 'string') {
       console.log(`Expected string index but got non-string`, index);
-      stackTrace();
-      throw `Expected string index but got non-string`
+      console.log(stackTrace());
+      throw `muon.network.CollateralPlugin.getNodeInfo Expected string index but got non-string`
     }
     return this._nodesMap.get(index);
   }

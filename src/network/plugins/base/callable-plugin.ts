@@ -1,6 +1,8 @@
-import BaseNetworkPlugin from './base-network-plugin';
-import RemoteCallPlugin, {RemoteCallOptions} from '../remote-call'
-const log = require('../../../common/muon-log')('muon:network:plugins:callable')
+import BaseNetworkPlugin from './base-network-plugin.js';
+import RemoteCallPlugin, {RemoteCallOptions} from '../remote-call.js'
+import Log from '../../../common/muon-log.js'
+
+const log = Log('muon:network:plugins:callable')
 
 export default class CallablePlugin extends BaseNetworkPlugin {
 

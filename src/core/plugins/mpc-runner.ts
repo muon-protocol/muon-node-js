@@ -1,9 +1,9 @@
-import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators";
-import CallablePlugin from "./base/callable-plugin";
+import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators.js";
+import CallablePlugin from "./base/callable-plugin.js";
 import {MPCConstructData} from "../../common/mpc/types";
-import {MultiPartyComputation} from "../../common/mpc/base";
-import {DistributedKeyGeneration} from "../../common/mpc/dkg";
-import CollateralInfoPlugin from "./collateral-info";
+import {MultiPartyComputation} from "../../common/mpc/base.js";
+import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
+import CollateralInfoPlugin from "./collateral-info.js";
 
 const RemoteMethods = {
   RunRoundN: 'run-round-n'

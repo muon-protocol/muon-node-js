@@ -1,8 +1,8 @@
 import NodeCache from 'node-cache';
-import { QueueProducer, QueueConsumer, IpcCallConfig } from '../message-bus'
-import { MemoryRequest } from './types'
-import TimeoutPromise from "../timeout-promise";
-const { deepFreeze } = require('../../utils/helpers')
+import { QueueProducer, QueueConsumer, IpcCallConfig } from '../message-bus/index.js'
+import { MemoryRequest } from './types.js'
+import TimeoutPromise from "../timeout-promise.js"
+import { deepFreeze } from '../../utils/helpers.js'
 
 const CHANNEL = `muon-shared-memory-${process.env.SIGN_WALLET_ADDRESS}`
 /**
@@ -19,7 +19,7 @@ let defaultConfig:IpcCallConfig = {
 };
 deepFreeze(defaultConfig);
 
-function startServer(config:IpcCallConfig) {
+function startServer(config:IpcCallConfig={}) {
   defaultConfig = {
     ...defaultConfig,
     ... config
@@ -63,7 +63,7 @@ async function requestHandler(req:MemoryRequest) {
   }
 }
 
-async function set(key: string, value: any, ttl: number) {
+async function set(key: string, value: any, ttl?: number) {
   return await requestSender.send({action: 'SET', key, value, ttl}, defaultConfig.request)
 }
 
@@ -91,7 +91,7 @@ async function clear(key: string) {
   return await requestSender.send({action: 'CLEAR', key}, defaultConfig.request)
 }
 
-export * from './types';
+export * from './types.js';
 export {
   startServer,
   get,

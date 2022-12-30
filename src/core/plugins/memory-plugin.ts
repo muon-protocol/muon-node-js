@@ -22,14 +22,14 @@
  * Any node on the network can query for app|node types of data.
  */
 
-import CallablePlugin from './base/callable-plugin'
-const crypto = require('../../utils/crypto')
-const {getTimestamp} = require('../../utils/helpers')
-const Memory = require('../../common/db-models/Memory')
-import { remoteApp, broadcastHandler } from './base/app-decorators'
-import CollateralInfoPlugin from "./collateral-info";
+import CallablePlugin from './base/callable-plugin.js'
+import * as crypto from '../../utils/crypto.js'
+import {getTimestamp} from '../../utils/helpers.js'
+import Memory from '../../common/db-models/Memory.js'
+import { remoteApp, broadcastHandler } from './base/app-decorators.js'
+import CollateralInfoPlugin from "./collateral-info.js";
 import { createClient, RedisClient } from 'redis'
-import redisConfig from '../../common/redis-config'
+import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
 import Web3 from 'web3'
 

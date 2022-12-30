@@ -1,7 +1,6 @@
-import {NetworkIpcMethod, IpcMethods} from "./plugins/network-ipc-handler";
-
-const { QueueProducer } = require('../common/message-bus')
-const { IPC_CHANNEL } = require('./plugins/network-ipc-plugin')
+import {NetworkIpcMethod, IpcMethods} from "./plugins/network-ipc-handler.js";
+import { QueueProducer } from '../common/message-bus/index.js'
+import { IPC_CHANNEL } from './plugins/network-ipc-plugin.js'
 import {IpcCallOptions} from "../common/types";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)

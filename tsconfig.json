@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
     "strict": true,
-    "module": "ESNext",
     "target": "ES2015",
+    "module": "ESNext",
+//    "target": "es5",
+//    "module": "commonjs",
     "moduleResolution": "node",
     "declaration": true,
     "noImplicitAny": false /* Raise error on expressions and declarations with an implied 'any' type. */,
@@ -36,7 +38,8 @@
     "esm": true
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.json"
   ],
   "exclude": [
     "node_modules",

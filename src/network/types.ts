@@ -1,6 +1,8 @@
 import { JSONPeerId } from 'peer-id'
 import {PeerInfo} from "@libp2p/interface-peer-info";
-export { PeerId } from '@libp2p/interface-peer-id';
+export { PeerId, isPeerId } from '@libp2p/interface-peer-id';
+
+export type Libp2pPeerInfo = PeerInfo
 
 export interface INetworkPlugin {
 

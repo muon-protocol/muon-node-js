@@ -1,12 +1,14 @@
 import {MapOf, RoundOutput, RoundProcessor} from "./types";
-import {MultiPartyComputation} from "./base";
-import {bn2str} from './utils'
+import {MultiPartyComputation} from "./base.js";
+import {bn2str} from './utils.js'
 import Web3 from 'web3'
-import Polynomial from "../../utils/tss/polynomial";
-import * as TssModule from "../../utils/tss";
+import Polynomial from "../../utils/tss/polynomial.js";
+import * as TssModule from "../../utils/tss/index.js";
 import {PublicKey} from "../../utils/tss/types";
 import BN from 'bn.js';
-import {countBy} from 'lodash'
+import lodash from 'lodash'
+
+const {countBy} = lodash;
 
 /**
  * Round0 input/output types

@@ -1,9 +1,9 @@
-import CallablePlugin from './base/callable-plugin'
-const Content = require('../../common/db-models/Content')
-import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
+import CallablePlugin from './base/callable-plugin.js'
+import Content from '../../common/db-models/Content.js'
+import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
 import {GatewayCallData} from "../../gateway/types";
-import * as NetworkIpc from '../../network/ipc';
-import ContentVerifyPlugin from "./content-verify-plugin";
+import * as NetworkIpc from '../../network/ipc.js';
+import ContentVerifyPlugin from "./content-verify-plugin.js";
 
 @remoteApp
 class ContentApp extends CallablePlugin {

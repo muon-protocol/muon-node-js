@@ -2,32 +2,31 @@
  * Libraries for import inside user Apps
  */
 
-const axios = require('axios')
-const Web3 = require('web3')
-const tron = require('../utils/tron')
-const { flatten, groupBy } = require('lodash')
-const { BigNumber } = require('bignumber.js')
+import axios from 'axios'
+import Web3 from 'web3'
+import * as tron from '../utils/tron.js'
+import lodash from 'lodash'
+import BigNumber from 'bignumber.js'
+import { toBaseUnit } from '../utils/crypto.js'
+import { timeout, floatToBN } from '../utils/helpers.js'
+import util from 'ethereumjs-util'
+import ws from 'ws'
+import ethSigUtil from 'eth-sig-util'
+import {
+  getBlock as ethGetBlock,
+  getBlockNumber as ethGetBlockNumber,
+  getPastEvents as ethGetPastEvents,
+  read as ethRead,
+  call as ethCall,
+  getTokenInfo as ethGetTokenInfo,
+  getNftInfo as ethGetNftInfo,
+  hashCallOutput as ethHashCallOutput
+} from '../utils/eth.js'
+import soliditySha3 from '../utils/soliditySha3.js'
+import { multiCall } from '../utils/multicall.js'
+import { BNSqrt } from'../utils/bn-sqrt.js'
 
-const { toBaseUnit } = require('../utils/crypto')
-const { timeout, floatToBN } = require('../utils/helpers')
-const util = require('ethereumjs-util')
-const ws = require('ws')
-const ethSigUtil = require('eth-sig-util')
-const {
-  getBlock: ethGetBlock,
-  getBlockNumber: ethGetBlockNumber,
-  getPastEvents: ethGetPastEvents,
-  read: ethRead,
-  call: ethCall,
-  getTokenInfo: ethGetTokenInfo,
-  getNftInfo: ethGetNftInfo,
-  hashCallOutput: ethHashCallOutput
-} = require('../utils/eth')
-
-const soliditySha3 = require('../utils/soliditySha3');
-
-const { multiCall } = require('../utils/multicall')
-const { BNSqrt } = require('../utils/bn-sqrt')
+const { flatten, groupBy } = lodash;
 
 global.MuonAppUtils = {
   axios,

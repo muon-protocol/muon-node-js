@@ -1,13 +1,13 @@
-var mongoose = require('mongoose');
-const {MODEL_MEMORY} = require('./constants')
+import mongoose from 'mongoose'
+import {MODEL_MEMORY} from './constants.js'
 
-const types = {
+export const types = {
   App: 'app',
   Node: 'node',
   Local: 'local'
 }
 
-var modelSchema = mongoose.Schema({
+const modelSchema = mongoose.Schema({
   type: {type: String, enum: Object.values(types)},
   title: {type: String},
   owner: {type: String},
@@ -23,5 +23,4 @@ var modelSchema = mongoose.Schema({
 modelSchema.index({expireAt: 1},{expireAfterSeconds: 0});
 
 const Model = mongoose.model(MODEL_MEMORY, modelSchema);
-module.exports = Model;
-module.exports.types = types;
+export default Model;

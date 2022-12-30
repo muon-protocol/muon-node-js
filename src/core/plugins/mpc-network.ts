@@ -1,13 +1,13 @@
-import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators";
-import CallablePlugin from "./base/callable-plugin";
+import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators.js";
+import CallablePlugin from "./base/callable-plugin.js";
 import {IMpcNetwork, PartnerRoundReceive} from "../../common/mpc/types";
-import {MultiPartyComputation} from "../../common/mpc/base";
-import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg";
-import CollateralInfoPlugin from "./collateral-info";
-import DistributedKey from "../../utils/tss/distributed-key";
-const NetworkIpc = require('../../network/ipc')
-import TssPlugin from "./tss-plugin";
-import * as SharedMemory from "../../common/shared-memory";
+import {MultiPartyComputation} from "../../common/mpc/base.js";
+import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg.js";
+import CollateralInfoPlugin from "./collateral-info.js";
+import DistributedKey from "../../utils/tss/distributed-key.js";
+import * as NetworkIpc from '../../network/ipc.js'
+import TssPlugin from "./tss-plugin.js";
+import * as SharedMemory from "../../common/shared-memory/index.js";
 
 const RemoteMethods = {
   AskRoundN: 'ask-round-n'

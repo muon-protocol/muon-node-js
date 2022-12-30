@@ -1,7 +1,10 @@
-import BasePlugin from './base/base-plugin'
-const {createCIDFromString, cid2str} = require('../../utils/cid')
-const Violation = require('../../common/db-models/Violation')
-const { subscribeLogEvent } = require('../../utils/eth')
+import BasePlugin from './base/base-plugin.js'
+import {createCIDFromString, cid2str} from '../../utils/cid.js'
+import Violation from '../../common/db-models/Violation.js'
+import { subscribeLogEvent } from '../../utils/eth.js'
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
 const muonAbi = require('../../utils/muon-abi')
 
 const unique = (value, index, self) => {
@@ -9,6 +12,7 @@ const unique = (value, index, self) => {
 }
 
 export default class ContentVerifyPlugin extends BasePlugin {
+  subscribes: Array<()=>void>;
   async onStart() {
     let subscribes = []
 

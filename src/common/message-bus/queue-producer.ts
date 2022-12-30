@@ -1,12 +1,21 @@
-const BaseMessageQueue = require('./base-message-queue')
+import BaseMessageQueue from './base-message-queue.js'
 import { IpcCallOptions } from "../types";
-import TimeoutPromise from '../timeout-promise'
-const NodeCache = require('node-cache');
+import TimeoutPromise from '../timeout-promise.js'
+import NodeCache from 'node-cache'
+import Log from '../muon-log.js'
+
+const logError = Log("muon:queue-produces:error")
 
 const callCache = new NodeCache({
   stdTTL: 15*60, // Keep call in memory for 15 minutes
   useClones: false,
 });
+
+type CacheContent<T> = {
+  message: T,
+  options: IpcCallOptions,
+  promise: TimeoutPromise
+}
 
 export default class QueueProducer<MessageType> extends BaseMessageQueue {
 
@@ -34,36 +43,48 @@ export default class QueueProducer<MessageType> extends BaseMessageQueue {
     };
 
     let wMsg = this.wrapData(message)
-    let resultPromise = new TimeoutPromise(options.timeout, options.timeoutMessage)
+    let promise = new TimeoutPromise(options.timeout, options.timeoutMessage)
     // this._calls[callId] = remoteResult;
-    callCache.set(wMsg.uid, {
+    const content: CacheContent<MessageType> = {
       message,
       options,
-      resultPromise
-    });
+      promise
+    }
+    callCache.set(wMsg.uid, content);
     if(options.pid && options.pid > -1)
       this.sendRedis.lpush(`${this.channelName}@${options.pid}`, JSON.stringify(wMsg));
     else
       this.sendRedis.lpush(this.channelName, JSON.stringify(wMsg));
-    return resultPromise.promise;
+    return promise.promise;
   }
 
   async onResponseReceived(channel: string, strMessage: string) {
     const rawResponse = JSON.parse(strMessage);
     let {pid, uid, data: {error=undefined, response=undefined}} = rawResponse;
-    let {resultPromise=null} = callCache.get(uid) || {};
-    if(resultPromise) {
+    let content:CacheContent<MessageType> = callCache.get(uid)!;
+    if(content) {
       if (!error) {
-        resultPromise.resolve(response)
+        content.promise.resolve(response)
       }
       else {
-        //console.log('QueueProducer.onResponseReceived', rawResponse.data);
-        resultPromise.reject({...error, onRemoteSide: true})
+        logError(
+          `${this.ConstructorName}[${this.busName}] result contains error %O`,
+          {
+            message: content.message,
+            rawResponse
+          },
+        );
+        content.promise.reject({...error, onRemoteSide: true})
       }
     }
     else{
-      console.log(`[${process.pid}] Result promise not found`, rawResponse);
+      logError(`${this.ConstructorName}[${this.busName}] Result promise not found: %O`, rawResponse);
       // TODO: what to do? it may timed out.
     }
+  }
+
+  get ConstructorName() {
+    let superClass = Object.getPrototypeOf(this);
+    return superClass.constructor.name
   }
 }

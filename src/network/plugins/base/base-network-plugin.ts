@@ -1,11 +1,12 @@
-import CollateralInfoPlugin from "../collateral-info";
-import {Network} from "../../index";
-import NetworkBroadcastPlugin from "../network-broadcast";
-
-const Events = require('events-async')
-const PeerId = require('peer-id')
-const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
-const uint8ArrayToString = require('uint8arrays/to-string').toString;
+import CollateralInfoPlugin from "../collateral-info.js";
+import {Network} from "../../index.js";
+import NetworkBroadcastPlugin from "../network-broadcast.js";
+import Events from 'events-async'
+import {isPeerId, PeerId} from '../../types.js';
+import {peerIdFromString} from '@libp2p/peer-id'
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string';
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
+import {peerId2Str} from "../../utils.js";
 
 export default class BaseNetworkPlugin extends Events {
   network: Network;
@@ -33,9 +34,9 @@ export default class BaseNetworkPlugin extends Events {
   }
 
   async findPeer(peerId){
-    if(!PeerId.isPeerId(peerId)) {
+    if(!isPeerId(peerId)) {
       try {
-        peerId = PeerId.createFromB58String(peerId)
+        peerId = peerIdFromString(peerId)
       }catch (e) {
         throw `Invalid string PeedID [${peerId}]: ${e.message}`;
       }
@@ -46,7 +47,7 @@ export default class BaseNetworkPlugin extends Events {
     catch (e) {
       // TODO: what to do?
       // if(process.env.VERBOSE)
-        console.error("BaseNetworkPlugin.findPeer", peerId.toB58String(), e.stack)
+        console.error("BaseNetworkPlugin.findPeer", peerId2Str(peerId), e.stack)
       return null;
     }
   }
@@ -65,13 +66,16 @@ export default class BaseNetworkPlugin extends Events {
   }
 
   get BROADCAST_CHANNEL(){
+    // @ts-ignore
     if(this.__broadcastHandlerMethod === undefined)
       return null;
+    // @ts-ignore
     return `muon.network.${this.ConstructorName}.${this.__broadcastHandlerMethod}`
   }
 
   async registerBroadcastHandler(){
     await this.__broadcastPlugin.subscribe(this.BROADCAST_CHANNEL)
+    // @ts-ignore
     this.__broadcastPlugin.on(this.BROADCAST_CHANNEL, this.__onPluginBroadcastReceived.bind(this))
   }
 
@@ -91,7 +95,7 @@ export default class BaseNetworkPlugin extends Events {
   async __onPluginBroadcastReceived(data, callerInfo){
     // console.log("BaseNetworkPlugin.__onPluginBroadcastReceived", {data, callerInfo})
     try{
-
+      // @ts-ignore
       let broadcastHandler = this[this.__broadcastHandlerMethod].bind(this);
       await broadcastHandler(data, callerInfo);
     }

@@ -1,10 +1,14 @@
-import BaseNetworkPlugin from './base/base-network-plugin';
-const Content = require('../../common/db-models/Content')
-import CollateralInfoPlugin from "./collateral-info";
-const {loadCID} = require('../../utils/cid')
-const {timeout} = require('../../utils/helpers')
-const all = require('it-all')
-const log = require('../../common/muon-log')('muon:network:plugins:content')
+import BaseNetworkPlugin from './base/base-network-plugin.js';
+import Content from '../../common/db-models/Content.js'
+import CollateralInfoPlugin from "./collateral-info.js";
+import {loadCID} from '../../utils/cid.js'
+import {timeout} from '../../utils/helpers.js'
+import all from 'it-all'
+import Log from '../../common/muon-log.js'
+import {Libp2pPeerInfo} from "../types";
+import {peerId2Str} from "../utils.js";
+
+const log = Log('muon:network:plugins:content')
 
 export default class NetworkContentPlugin extends BaseNetworkPlugin {
 
@@ -16,6 +20,7 @@ export default class NetworkContentPlugin extends BaseNetworkPlugin {
       this.provideContents()
     }
     else{
+      // @ts-ignore
       this.network.once('peer:connect', () => {
         this.provideContents();
       })
@@ -50,7 +55,8 @@ export default class NetworkContentPlugin extends BaseNetworkPlugin {
 
   async find(cid: string) {
     log(`Finding content ...`, cid);
-    let providers = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
-    return providers.map(p => p.id._idB58String)
+    let providers: Libp2pPeerInfo[] = await all(this.network.libp2p.contentRouting.findProviders(loadCID(cid), {timeout: 5000}))
+    // @ts-ignore
+    return providers.map(p => peerId2Str(p.id))
   }
 }

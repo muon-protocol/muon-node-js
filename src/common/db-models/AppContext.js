@@ -1,6 +1,6 @@
-var mongoose = require('mongoose');
-const {MODEL_APP_CONTEXT} = require('./constants')
-const soliditySha3 = require('../../utils/soliditySha3')
+import mongoose from 'mongoose'
+import {MODEL_APP_CONTEXT} from './constants.js'
+import soliditySha3 from '../../utils/soliditySha3.js'
 
 const TssPartyInfo = mongoose.Schema({
   t: {type: Number, required: true},
@@ -15,7 +15,7 @@ const TssPublicKeyInfo = mongoose.Schema({
   yParity: {type: Number, enum: [0, 1], required: true},
 }, {_id: false})
 
-var modelSchema = mongoose.Schema({
+const modelSchema = mongoose.Schema({
   version: {type: Number},
   appId: {type: String, required: true},
   appName: {type: String, required: true},
@@ -48,7 +48,7 @@ modelSchema.virtual('hash').get(function () {
 
 // modelSchema.index({ owner: 1, version: 1, appId: 1}, { unique: true });
 
-function hash(context) {
+export function hash(context) {
   return soliditySha3([
     {t: "uint32", v: context.version},
     {t: "uint256", v: context.appId},
@@ -57,5 +57,4 @@ function hash(context) {
   ])
 }
 
-module.exports = mongoose.model(MODEL_APP_CONTEXT, modelSchema);
-module.exports.hash = hash;
+export default mongoose.model(MODEL_APP_CONTEXT, modelSchema);
