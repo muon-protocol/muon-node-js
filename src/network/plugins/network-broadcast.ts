@@ -12,6 +12,12 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 
   private handlerRegistered: {[index: string]: boolean} = {}
 
+  async onStart() {
+    await super.onStart()
+
+    this.network.libp2p.pubsub.addEventListener("message", this.__onBroadcastReceived.bind(this))
+  }
+
   async subscribe(channel){
     if (channel) {
       log('Subscribing to broadcast channel %s', channel)
@@ -19,8 +25,6 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
       if(!this.handlerRegistered[channel]) {
         this.handlerRegistered[channel] = true;
         await this.network.libp2p.pubsub.subscribe(channel)
-        // this.network.libp2p.pubsub.on(channel, this.__onBroadcastReceived.bind(this))
-        this.network.libp2p.pubsub.addEventListener("message", this.__onBroadcastReceived.bind(this))
       }
     }
   }
@@ -36,7 +40,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 
   // async __onBroadcastReceived({data: rawData, from, topicIDs, ...otherItems}){
   async __onBroadcastReceived(evt){
-    console.log("NetworkBroadcastPlugin.__onBroadcastReceived %s %o")
+    // console.log("NetworkBroadcastPlugin.__onBroadcastReceived %s %o")
     const {detail: {data: rawData, from: peerId, topic, ...otherItems}} = evt;
     let from = peerId2Str(peerId);
     try{
