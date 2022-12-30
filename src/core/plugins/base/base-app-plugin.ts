@@ -417,7 +417,6 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-
   async informRequestConfirmation(request) {
     // await this.onConfirm(request)
     let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;

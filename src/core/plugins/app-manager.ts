@@ -7,7 +7,7 @@ import BaseAppPlugin from "./base/base-app-plugin.js";
 import CollateralInfoPlugin from "./collateral-info.js";
 import * as CoreIpc from "../ipc.js";
 import * as TssModule from '../../utils/tss/index.js'
-import AppContext from "../../common/db-models/AppContext.js"
+import AppContext, {hash as hashAppContext} from "../../common/db-models/AppContext.js"
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
 import _ from 'lodash'
 import Log from '../../common/muon-log.js'
@@ -265,7 +265,7 @@ export default class AppManager extends CallablePlugin {
       deployed: true,
       version: context.version,
       reqId: context.deploymentRequest.reqId,
-      contextHash: AppContext.hash(context),
+      contextHash: hashAppContext(context),
     }
   }
 
