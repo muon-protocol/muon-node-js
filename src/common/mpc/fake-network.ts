@@ -1,7 +1,7 @@
-import QueueProducer from "../message-bus/queue-producer";
-import QueueConsumer from "../message-bus/queue-consumer";
-import {IMpcNetwork, MapOf} from "./types";
-import {MultiPartyComputation} from "./base";
+import QueueProducer from "../message-bus/queue-producer.js";
+import QueueConsumer from "../message-bus/queue-consumer.js";
+import {IMpcNetwork, MapOf} from "./types.js";
+import {MultiPartyComputation} from "./base.js";
 
 export default class FakeNetwork implements IMpcNetwork{
   readonly id: string;

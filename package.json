@@ -27,6 +27,7 @@
     "@ipld/dag-pb": "^2.1.16",
     "@libp2p/bootstrap": "^5.0.0",
     "@libp2p/kad-dht": "^6.0.0",
+    "@libp2p/mdns": "^5.1.1",
     "@libp2p/mplex": "^7.0.0",
     "@libp2p/pubsub-peer-discovery": "^7.0.0",
     "@libp2p/tcp": "^6.0.0",

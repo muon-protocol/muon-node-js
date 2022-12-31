@@ -13,19 +13,22 @@ import { LevelDatastore } from "datastore-level";
 const DEFAULT_OPTS = {
   // TODO: move path to env
   datastore: new LevelDatastore("./muon-data/"),
-  transports: [tcp(), webSockets()],
-  peerDiscovery: [
-    // bootstrap,
-    pubsubPeerDiscovery({
-      interval: 1000,
-    }),
+  transports: [
+    tcp(),
+    webSockets()
   ],
-  connectionEncryption: [noise()],
-  connectionManager: {
-    autoDial: true,
+  connectionEncryption: [
+    noise(),
+  ]
+  ,connectionManager: {
+    autoDial: true
   },
-  streamMuxers: [mplex()],
-  pubsub: gossipsub(),
+  streamMuxers: [
+    mplex()
+  ],
+  pubsub: gossipsub({
+    allowPublishToZeroPeers: true,
+  }),
   dht: kadDHT({
     validators: {
       muon: async (key, data) => {
@@ -57,4 +60,6 @@ function create(opts) {
   return createLibp2p(defaultsDeep(opts, DEFAULT_OPTS));
 }
 
-export { create, bootstrap };
+export {
+  create
+}
