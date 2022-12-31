@@ -5,52 +5,41 @@ import { mplex } from "@libp2p/mplex";
 import { noise } from "@chainsafe/libp2p-noise";
 import { kadDHT } from "@libp2p/kad-dht";
 import { bootstrap } from "@libp2p/bootstrap";
-import { pubsubPeerDiscovery } from '@libp2p/pubsub-peer-discovery';
-import { gossipsub } from '@chainsafe/libp2p-gossipsub';
-import defaultsDeep from '@nodeutils/defaults-deep';
+import { pubsubPeerDiscovery } from "@libp2p/pubsub-peer-discovery";
+import { gossipsub } from "@chainsafe/libp2p-gossipsub";
+import defaultsDeep from "@nodeutils/defaults-deep";
+import { LevelDatastore } from "datastore-level";
 
 const DEFAULT_OPTS = {
-  transports: [
-    tcp(),
-    webSockets()
-  ],
+  // TODO: move path to env
+  datastore: new LevelDatastore("./muon-data/"),
+  transports: [tcp(), webSockets()],
   peerDiscovery: [
     // bootstrap,
     pubsubPeerDiscovery({
-      interval: 1000
-    })
+      interval: 1000,
+    }),
   ],
-  connectionEncryption: [
-    noise(),
-  ]
-  ,connectionManager: {
-    autoDial: true
+  connectionEncryption: [noise()],
+  connectionManager: {
+    autoDial: true,
   },
-  streamMuxers: [
-    mplex()
-  ],
+  streamMuxers: [mplex()],
   pubsub: gossipsub(),
   dht: kadDHT({
-    // validators: {
-    //   muon: (data, key) => {
-    //     console.log(
-    //       `node ${port} validator:data,key`,
-    //       uint8ArrayToString(data),
-    //       uint8ArrayToString(key)
-    //     );
-    //     return true; // this record is always valid
-    //   },
-    // },
-    // selectors: {
-    //   muon: (data1, data2) => {
-    //     console.log(
-    //       `node ${port} selector:data1,data2`,
-    //       uint8ArrayToString(data1),
-    //       data2
-    //     );
-    //     return 1; // when multiple records are found for a given key, just select the first one
-    //   },
-    // },
+    validators: {
+      muon: async (key, data) => {
+        //TODO: validate data
+        // throw an err when data is not valid
+        return;
+      },
+    },
+    selectors: {
+      muon: (key, dataList) => {
+        //TODO: select correct record
+        return 0;
+      },
+    },
   }),
   // config: {
   //   peerDiscovery: {
@@ -62,13 +51,10 @@ const DEFAULT_OPTS = {
   //   //   emitSelf: false
   //   // }
   // }
-}
+};
 
 function create(opts) {
-  return createLibp2p(defaultsDeep(opts, DEFAULT_OPTS))
+  return createLibp2p(defaultsDeep(opts, DEFAULT_OPTS));
 }
 
-export {
-  create,
-  bootstrap
-}
+export { create, bootstrap };
