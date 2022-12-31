@@ -4,13 +4,15 @@
  * Sign message
  * Verify signature
  */
-import {DistributedKeyGeneration} from "./dkg";
-import FakeNetwork from './fake-network';
-import {bn2str} from './utils'
-const {toBN, randomHex} = require('web3').utils
-const TssModule = require('../../utils/tss/index')
-import {uniq} from 'lodash'
+import {DistributedKeyGeneration} from "./dkg.js";
+import FakeNetwork from './fake-network.js';
+import {bn2str} from './utils.js'
+import Web3 from 'web3'
+import * as TssModule from '../../utils/tss/index.js'
+import lodash from 'lodash'
 
+const {uniq} = lodash
+const {toBN, randomHex} = Web3.utils
 
 /**
  * Share privateKey between 5 individuals
