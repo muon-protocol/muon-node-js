@@ -1,5 +1,6 @@
 import { createLibp2p } from "libp2p";
 import { tcp } from "@libp2p/tcp";
+import { webSockets } from "@libp2p/websockets";
 import { mplex } from "@libp2p/mplex";
 import { noise } from "@chainsafe/libp2p-noise";
 import { kadDHT } from "@libp2p/kad-dht";
@@ -11,7 +12,7 @@ import defaultsDeep from '@nodeutils/defaults-deep';
 const DEFAULT_OPTS = {
   transports: [
     tcp(),
-    // WS, TODO: enable WS
+    webSockets()
   ],
   peerDiscovery: [
     // bootstrap,
@@ -21,7 +22,10 @@ const DEFAULT_OPTS = {
   ],
   connectionEncryption: [
     noise(),
-  ],
+  ]
+  ,connectionManager: {
+    autoDial: true
+  },
   streamMuxers: [
     mplex()
   ],

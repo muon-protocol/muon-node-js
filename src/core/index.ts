@@ -51,7 +51,7 @@ function prepareApp(app, fileName, isBuiltInApp = false, filePath = "")
     if (isV3(app)) {
       app.APP_ID = sha3(fileName);
     } else {
-      console.log(
+      log(
         chalk.yellow(
           `Deprecated app version: ${app.APP_NAME} app has old version and need to upgrade to v3.`
         )
