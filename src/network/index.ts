@@ -1,7 +1,10 @@
 import NetworkContentPlugin from "./plugins/content-plugin.js";
 import mongoose from "mongoose"
 import Events from "events-async"
-import { create, bootstrap } from "./libp2p_bundle.js";
+import { create } from "./libp2p_bundle.js";
+import { bootstrap } from "@libp2p/bootstrap";
+import {pubsubPeerDiscovery} from "@libp2p/pubsub-peer-discovery";
+import { mdns } from '@libp2p/mdns'
 import loadConfigs from "./configurations.js"
 import { createFromJSON } from '@libp2p/peer-id-factory'
 import chalk from "chalk"
@@ -42,10 +45,18 @@ class Network extends Events {
       multiaddrs.filter((m) => !isPrivate(m));
     if (process.env.DISABLE_ANNOUNCE_FILTER) announceFilter = (mas) => mas;
 
-    const peerDiscovery: any[] = []
+    const peerDiscovery: any[] = [
+      // mdns({
+      //   interval: 15e3
+      // }),
+      pubsubPeerDiscovery({
+        interval: 30e3
+      })
+    ]
     if(configs.bootstrap.length>0) {
       peerDiscovery.push(
         bootstrap({
+          timeout: 2e3,
           list: configs.bootstrap,
         })
       )

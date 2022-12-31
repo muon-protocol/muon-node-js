@@ -4,8 +4,6 @@ import { webSockets } from "@libp2p/websockets";
 import { mplex } from "@libp2p/mplex";
 import { noise } from "@chainsafe/libp2p-noise";
 import { kadDHT } from "@libp2p/kad-dht";
-import { bootstrap } from "@libp2p/bootstrap";
-import { pubsubPeerDiscovery } from '@libp2p/pubsub-peer-discovery';
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
 import defaultsDeep from '@nodeutils/defaults-deep';
 
@@ -13,12 +11,6 @@ const DEFAULT_OPTS = {
   transports: [
     tcp(),
     webSockets()
-  ],
-  peerDiscovery: [
-    // bootstrap,
-    pubsubPeerDiscovery({
-      interval: 1000
-    })
   ],
   connectionEncryption: [
     noise(),
@@ -29,7 +21,9 @@ const DEFAULT_OPTS = {
   streamMuxers: [
     mplex()
   ],
-  pubsub: gossipsub(),
+  pubsub: gossipsub({
+    allowPublishToZeroPeers: true,
+  }),
   dht: kadDHT({
     // validators: {
     //   muon: (data, key) => {
@@ -70,5 +64,4 @@ function create(opts) {
 
 export {
   create,
-  bootstrap
 }
