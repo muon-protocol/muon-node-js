@@ -1,7 +1,13 @@
 import LevelPromise from "./level-promise.js";
+import Ajv from 'ajv';
 import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive} from "./types";
 
 const random = () => Math.floor(Math.random()*9999999)
+const ajv = new Ajv()
+// for(let round of this.rounds) {
+//   if(this.InputSchema[round])
+//     ajv.addSchema(this.InputSchema[round], round);
+// }
 
 export class MultiPartyComputation {
   private readonly constructData;
@@ -14,6 +20,7 @@ export class MultiPartyComputation {
   private roundsPromise: LevelPromise;
   /** roundsArrivedMessages[roundId][from] = <ResultT> */
   protected roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>> = {}
+  protected InputSchema: object;
 
   constructor(rounds: string[], id: string, partners: string[]) {
     this.constructData = Object.values(arguments).slice(1)
@@ -97,6 +104,14 @@ export class MultiPartyComputation {
         }
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(this.partners.map(partner => {
           return network.askRoundData(partner, this.id, r, dataToSend)
+            .then(result => {
+              if(this.InputSchema[currentRound] && !ajv.validate(this.InputSchema[currentRound], result)){
+                // console.dir({r,currentRound, result}, {depth: null})
+                // @ts-ignore
+                throw ajv.errors.map(e => e.message).join("\n");
+              }
+              return result;
+            })
             .catch(e => {
               console.log(`${this.ConstructorName}[network.askRoundData] error at level ${r}`, e)
               return null

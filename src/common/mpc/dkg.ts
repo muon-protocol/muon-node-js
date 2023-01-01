@@ -124,11 +124,100 @@ export class DistKey {
   }
 }
 
+const pattern_id = "^[1-9][0-9]*$";
+const schema_uint32 = {type: 'string', pattern: `^0x[0-9A-Fa-f]{64}$`};
+const schema_public_key = {type: 'string', pattern: `^[0-9A-Fa-f]{66}$`};
+const InputSchema = {
+  'round0': {
+    type: 'object',
+    properties: {
+      broadcast: {
+        type: 'object',
+        properties: {
+          commitmentHash: schema_uint32
+        },
+        required: ['commitmentHash'],
+      }
+    },
+    required: ['broadcast'],
+  },
+  'round1': {
+    type: 'object',
+    properties: {
+      send: {
+        type: 'object',
+        properties: {
+          f: schema_uint32,
+          h: schema_uint32,
+        },
+        required: ['f', 'h']
+      },
+      broadcast: {
+        type: 'object',
+        properties: {
+          commitment: {
+            type: 'array',
+            items: schema_public_key
+          },
+          available: {
+            type: 'array',
+            items: { type: "string" }
+          },
+          allPartiesCommitmentHash: {
+            type: 'object',
+            patternProperties: {
+              [pattern_id]: schema_uint32
+            }
+          }
+        },
+        required: []
+      },
+    },
+    required: ['send', 'broadcast']
+  },
+  'round2':{
+    type: 'object',
+    properties: {
+      broadcast: {
+        type: 'object',
+        properties: {
+          Fx: {
+            type: 'array',
+            items: schema_public_key
+          }
+        },
+        required: ['Fx']
+      }
+    },
+    required: ['broadcast']
+  },
+  'round3': {
+    type: 'object',
+    properties: {
+      broadcast: {
+        type: 'object',
+        properties: {
+          malignant: {
+            type: 'array',
+            items: {
+              type: 'string',
+              pattern: pattern_id
+            }
+          }
+        },
+        required: ['malignant']
+      }
+    },
+    required: ['broadcast']
+  }
+}
+
 export class DistributedKeyGeneration extends MultiPartyComputation {
 
   private readonly t: number;
   private readonly value: BN | undefined;
   public readonly extraParams: any;
+  protected InputSchema: object = InputSchema;
 
   constructor(id: string, partners: string[], t: number, value?: BN|string, extra: any={}) {
     // @ts-ignore
@@ -360,3 +449,4 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     )
   }
 }
+
