@@ -82,6 +82,10 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.network.getPlugin('content');
   }
 
+  get RemoteCallExecEndPoint(): string {
+    return this.remoteMethodEndpoint(RemoteMethods.ExecIpcRemoteCall);
+  }
+
   /**
    * @private
    * @ returns {Promise<string[]>} - list of online peers peerId

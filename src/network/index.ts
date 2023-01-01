@@ -47,10 +47,10 @@ class Network extends Events {
 
     const peerDiscovery: any[] = [
       // mdns({
-      //   interval: 15e3
+      //   interval: 60e3
       // }),
       pubsubPeerDiscovery({
-        interval: 30e3
+        interval: 60e3
       })
     ]
     if(configs.bootstrap.length>0) {
@@ -166,12 +166,8 @@ class Network extends Events {
     CoreIpc.fireEvent({ type: "peer:discovery", data: peerId2Str(peerId) });
     log("found peer");
     try {
-      const peerInfo = await this.libp2p.peerRouting.findPeer(peerId);
-      log("discovered peer info %O", {
-        peerId: peerId2Str(peerId),
-        multiaddrs: peerInfo.multiaddrs,
-        // peerInfo,
-      });
+      // const peerInfo = await this.libp2p.peerRouting.findPeer(peerId);
+      log("discovered peer info %s", peerId2Str(peerId))
     } catch (e) {
       console.log("Error Muon.onPeerDiscovery", e);
     }

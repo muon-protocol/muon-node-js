@@ -8,6 +8,10 @@ import CollateralInfoPlugin from "./collateral-info.js";
 import {RemoteMethodOptions} from "../../common/types"
 import NodeCache from 'node-cache'
 import {peerId2Str} from "../utils.js";
+import Log from '../../common/muon-log.js'
+import NetworkIpcHandler from "./network-ipc-handler";
+
+const log = Log("muon:network:remote-call")
 
 const callCache = new NodeCache({
   stdTTL: 6*60, // Keep call in memory for 6 minutes
@@ -46,6 +50,10 @@ class RemoteCall extends BaseNetworkPlugin {
 
   async onStart() {
     this.network.libp2p.handle(PROTOCOL, this.handler.bind(this))
+  }
+
+  private get IpcHandler(): NetworkIpcHandler {
+    return this.network.getPlugin('ipc-handler')
   }
 
   handleCall(callId, method, params, callerInfo, responseStream){
@@ -199,6 +207,7 @@ class RemoteCall extends BaseNetworkPlugin {
   }
 
   call(peer, method: string, params: any, options: RemoteCallOptions={}){
+    log(`calling peer %s : %s`, peerId2Str(peer.id), method===this.IpcHandler.RemoteCallExecEndPoint ? params.method : method)
     // TODO: need more check
     if(!peer){
       return Promise.reject({message: `network.RemoteCall.call: peer is null for method ${method}`})
