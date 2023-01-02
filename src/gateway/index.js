@@ -3,6 +3,7 @@ var cors = require('cors')
 let bodyParser = require('body-parser')
 let mongoose = require('mongoose')
 let api = require('./api')
+let status = require('./status')
 const log = require('../common/muon-log')('muon:gateway')
 
 let app = express()
@@ -32,11 +33,7 @@ async function start(options) {
   log(`MongoDB successfully connected.`)
 
   app.use('/v1/', api)
-  app.use('/status', (req, res, next) => {
-    res.json({
-      running: true
-    })
-  })
+  app.use('/status', status)
 
   app.listen(port, host, function () {
     log(`Running gateway on port ${port} at ${host}`)
