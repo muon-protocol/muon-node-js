@@ -103,6 +103,7 @@ class NetworkIpcHandler extends CallablePlugin {
 
     let {groupInfo, networkInfo} = collateralPlugin;
     return {
+      contract: this.network.configs.net.nodeManager,
       groupInfo,
       networkInfo,
       nodesList: await collateralPlugin.getNodesList(),

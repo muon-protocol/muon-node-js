@@ -3,6 +3,7 @@ import cors from 'cors'
 import bodyParser from 'body-parser'
 import mongoose from 'mongoose'
 import api from './api/index.js'
+import status from './status.js'
 import Log from '../common/muon-log.js'
 
 const log = Log('muon:gateway')
@@ -33,11 +34,7 @@ async function start(options) {
   log(`MongoDB successfully connected.`)
 
   app.use('/v1/', api)
-  app.use('/status', (req, res, next) => {
-    res.json({
-      running: true
-    })
-  })
+  app.use('/status', status)
 
   app.listen(port, host, function () {
     log(`Running gateway on port ${port} at ${host}`)
