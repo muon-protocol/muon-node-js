@@ -421,7 +421,7 @@ class TssPlugin extends CallablePlugin {
         // shared part of distributedKey
         share: `0x${key.share.toString(16)}`,
         // distributedKey public
-        publicKey: `${key.publicKey.encode('hex')}`,
+        publicKey: `${key.publicKey.toHex(true)}`,
         // distributed key address
         address: tssModule.pub2addr(key.publicKey)
       }

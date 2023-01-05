@@ -14,7 +14,10 @@ const DEFAULT_OPTS = {
   // TODO: move path to env
   datastore: new LevelDatastore(`./muon-data/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
   transports: [
-    tcp(),
+    tcp({
+      outboundSocketInactivityTimeout: 0,
+      inboundSocketInactivityTimeout: 0
+    }),
     webSockets()
   ],
   connectionEncryption: [
