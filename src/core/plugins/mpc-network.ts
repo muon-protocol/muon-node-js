@@ -8,6 +8,7 @@ import DistributedKey from "../../utils/tss/distributed-key.js";
 import * as NetworkIpc from '../../network/ipc.js'
 import TssPlugin from "./tss-plugin.js";
 import * as SharedMemory from "../../common/shared-memory/index.js";
+import {bigint2hex} from "../../utils/tss/utils.js";
 
 const RemoteMethods = {
   AskRoundN: 'ask-round-n'
@@ -94,7 +95,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
 
             let key = DistributedKey.load(party, {
               id: mpc.extraParams.keyId,
-              share: dKey.share,
+              share: bigint2hex(dKey.share),
               publicKey: dKey.publicKey,
               partners: mpc.partners
             })

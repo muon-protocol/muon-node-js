@@ -18,6 +18,7 @@ import {IMpcNetwork} from "../../common/mpc/types";
 import {MultiPartyComputation} from "../../common/mpc/base.js";
 import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import Log from '../../common/muon-log.js'
+import {bigint2hex} from "../../utils/tss/utils.js";
 
 const {shuffle} = lodash;
 const {utils:{toBN}} = Web3;
@@ -57,7 +58,7 @@ export type KeyGenOptions = {
   /**
    * If you set this value, the value will be shared between partners.
    */
-  value?: BN,
+  value?: string,
 
   lowerThanHalfN?: boolean,
 }
@@ -495,10 +496,10 @@ class TssPlugin extends CallablePlugin {
     }
 
     let myIndex = this.currentNodeInfo!.id;
-    let reconstructed = tssModule.reconstructKey(shares, this.TSS_THRESHOLD, myIndex)
+    let reconstructed = tssModule.reconstructKey(shares, this.TSS_THRESHOLD, BigInt(myIndex))
     // console.log({recon: reconstructed.toString(16)})
 
-    let myKey = tssModule.subKeys(reconstructed, nonce.share)
+    let myKey = tssModule.mod(reconstructed - nonce.share!)
     // console.log({myKey: '0x'+myKey.toString(16)})
     // this.parties[party.id] = party
     let tssKey = DistributedKey.load(this.tssParty, {
@@ -646,7 +647,7 @@ class TssPlugin extends CallablePlugin {
     // @ts-ignore
     let key = DistributedKey.load(party, {
       id: keyGen.extraParams.keyId!,
-      share: dKey.share,
+      share: bigint2hex(dKey.share),
       publicKey: dKey.publicKey,
       partners: keyGen.partners
     })
@@ -737,14 +738,14 @@ class TssPlugin extends CallablePlugin {
       throw `Cannot use tss key as nonce`;
 
     let nonce = await this.getSharedKey(nonceId)
-    let keyPart = tssModule.addKeys(nonce.share, tssKey!.share);
+    let keyPart = tssModule.mod(nonce.share! + tssKey.share!);
     return {
       id: tssKey!.id,
       recoveryShare: `0x${keyPart.toString(16)}`,
       // distributedKey public
-      publicKey: `${tssKey!.publicKey!.encode('hex', true)}`,
+      publicKey: `${tssKey!.publicKey!.toHex(true)}`,
       // distributed key address
-      address: tssModule.pub2addr(tssKey!.publicKey)
+      address: tssModule.pub2addr(tssKey!.publicKey!)
     }
   }
 

@@ -24,6 +24,7 @@ import useDistributedKey from "../../../utils/tss/use-distributed-key.js";
 import chalk from 'chalk'
 import Ajv from "ajv"
 import Log from '../../../common/muon-log.js'
+import {bigint2hex} from "../../../utils/tss/utils.js";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
@@ -554,7 +555,7 @@ class BaseAppPlugin extends CallablePlugin {
     let allSignatures = owners.map(w => signers[w]);
 
     let schnorrSigns = allSignatures.map(({signature}) => {
-      let [s, e] = signature.split(',').map(toBN)
+      let [s, e] = signature.split(',');
       return {s, e};
     })
 
@@ -578,14 +579,14 @@ class BaseAppPlugin extends CallablePlugin {
       confirmed ? [{
         owner: tss.pub2addr(verifyingPubKey),
         ownerPubKey: {
-          x: '0x' + verifyingPubKey.getX().toBuffer('be', 32).toString('hex'),
-          yParity: verifyingPubKey.getY().mod(toBN(2)).toString(),
+          x: bigint2hex(verifyingPubKey.x),
+          yParity: (verifyingPubKey.y % 2n).toString(),
         },
         // signers: signersIndices,
         timestamp: getTimestamp(),
         result: newRequest.data.result,
         // signature: `0x${aggregatedSign.s.toString(16)},0x${aggregatedSign.e.toString(16)}`,
-        signature: '0x' + aggregatedSign.s.toBuffer('be', 32).toString('hex'),
+        signature: aggregatedSign.s,
         // sign: {
         //   s: `0x${aggregatedSign.s.toString(16)}`,
         //   e: `0x${aggregatedSign.e.toString(16)}`
@@ -645,15 +646,16 @@ class BaseAppPlugin extends CallablePlugin {
     let Z_i = pubKey;
     let K_i = nonce.getPubKey(ownerInfo!.id);
 
-    let p1 = tss.pointAdd(K_i, Z_i.mul(e.neg())).encode('hex')
-    let p2 = tss.curve.g.mul(s).encode('hex');
+    const eInv = tss.invert(BigInt(e))
+    let p1 = tss.pointAdd(K_i, Z_i.multiply(eInv)).toHex(true)
+    let p2 = tss.G.multiply(s).toHex(true);
     return p1 === p2 ? owner : null;
   }
 
   verify(hash: string, signature: string, nonceAddress: string): boolean {
     let tssKey = this.appTss;
     const signingPubKey = tssKey!.publicKey;
-    return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey);
+    return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey!);
   }
 
   async broadcastNewRequest(request) {
@@ -737,9 +739,9 @@ class BaseAppPlugin extends CallablePlugin {
     let k_i = nonce.share
     let K = nonce.publicKey!;
 
-    await useDistributedKey(K.encodeCompressed('hex'), resultHash)
+    await useDistributedKey(K.toHex(true), resultHash)
     // TODO: remove nonce after sign
-    let signature = tss.schnorrSign(tssKey.share, k_i, K, resultHash)
+    let signature = tss.schnorrSign(tssKey.share!, k_i!, K, resultHash)
 
     if(!process.env.SIGN_WALLET_ADDRESS){
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
@@ -753,7 +755,7 @@ class BaseAppPlugin extends CallablePlugin {
       pubKey: tssKey.sharePubKey!,
       timestamp: signTimestamp,
       result,
-      signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`
+      signature:`${bigint2hex(signature.s)},${bigint2hex(signature.e)}`
     }
   }
 

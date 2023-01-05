@@ -7,7 +7,7 @@ import * as nobel from '@noble/secp256k1'
 import Web3 from 'web3'
 import TimeoutPromise from '../../common/timeout-promise.js'
 import assert from 'assert'
-import {bigint2hex, buf2bigint, buf2str} from "./utils";
+import {bigint2hex, buf2str} from "./utils.js";
 
 const {utils:{toBN}} = Web3
 const random = () => Math.floor(Math.random()*9999999)
@@ -97,7 +97,7 @@ class DistributedKey {
     key.id = _key.id;
     key.f_x = null;
     key.h_x = null;
-    key.share = buf2bigint(Buffer.from(_key.share));
+    key.share = BigInt(_key.share);
     key.sharePubKey = buf2str(nobel.getPublicKey(tss.keyFromPrivate(_key.share)));
     key.publicKey = this.loadPubKey(_key.publicKey)
     key.address = tss.pub2addr(key.publicKey)

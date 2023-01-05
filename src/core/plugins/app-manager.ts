@@ -11,6 +11,7 @@ import AppContext, {hash as hashAppContext} from "../../common/db-models/AppCont
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
 import _ from 'lodash'
 import Log from '../../common/muon-log.js'
+import {bigint2hex} from "../../utils/tss/utils.js";
 
 const log = Log('muon:core:plugins:app-manager')
 
@@ -411,15 +412,15 @@ export default class AppManager extends CallablePlugin {
 
     let [version, publicKeyEncoded] = maxHash.split('.');
 
-    const publicKey = TssModule.keyFromPublic(publicKeyEncoded.replace("0x", ""), "hex")
+    const publicKey = TssModule.keyFromPublic(publicKeyEncoded.replace("0x", ""))
     const result = {
       appId,
       version: parseInt(version),
       publicKey: {
         address: TssModule.pub2addr(publicKey),
         encoded: publicKeyEncoded,
-        x: '0x' + publicKey.getX().toBuffer('be', 32).toString('hex'),
-        yParity: publicKey.getY().isEven() ? 0 : 1
+        x: bigint2hex(publicKey.x),
+        yParity: ((publicKey.y & 1n) === 0n) ? 0 : 1
       }
     }
     this.tssKeyQueryResult[appId] = {

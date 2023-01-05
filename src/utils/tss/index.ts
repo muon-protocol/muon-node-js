@@ -1,5 +1,6 @@
+import ethJsUtil from 'ethereumjs-util'
 import * as noble from "@noble/secp256k1"
-import {buf2bigint, keccak256, range} from './utils.js'
+import {bigint2buffer, bigint2hex, buf2bigint, hex2buffer, keccak256, range} from './utils.js'
 import assert from 'assert'
 import Polynomial from './polynomial.js'
 
@@ -101,8 +102,17 @@ function subKeys(key1: bigint, key2: bigint) {
 
 function pub2addr(publicKey: noble.Point) {
   let pubKeyHex = publicKey.toHex(false).substr(2);
-  let pub_hash = keccak256(pubKeyHex)
+  // @ts-ignore
+  let pub_hash = keccak256(hex2buffer(pubKeyHex))
   return toChecksumAddress('0x' + pub_hash.substr(-40));
+}
+
+function invert(num: bigint): bigint {
+  return noble.utils.invert(num, curve.n);
+}
+
+function mod(num: bigint): bigint {
+  return noble.utils.mod(num, curve.n);
 }
 
 function toChecksumAddress(address) {
@@ -121,46 +131,72 @@ function toChecksumAddress(address) {
 
 function schnorrHash(publicKey: noble.Point, msg) {
   let address = pub2addr(publicKey)
-  let addressBuff = Buffer.from(address.replace(/^0x/i, ''), 'hex');
-  let msgBuff = Buffer.from(msg.replace(/^0x/i, ''), 'hex');
-  let totalBuff = Buffer.concat([addressBuff, msgBuff])
-  return keccak256(totalBuff.toString())
+  const concated = bigint2hex(BigInt(address)<<256n | BigInt(msg), 52)
+  // @ts-ignore
+  return keccak256(hex2buffer(concated));
 }
 
-function schnorrSign(sharedPrivateKey: bigint, sharedK: bigint, kPub: noble.Point, msg) {
+function schnorrSign(sharedPrivateKey: bigint, sharedK: bigint, kPub: noble.Point, msg): {s: bigint, e: bigint} {
   let e = BigInt(schnorrHash(kPub, msg))
-  let s = noble.utils.mod(sharedK - (sharedPrivateKey * e), noble.CURVE.n);
+  let s = noble.utils.mod(sharedK - (sharedPrivateKey * e), curve.n);
   return {s, e}
 }
 
 const G = new noble.Point(noble.CURVE.Gx, noble.CURVE.Gy);
 Object.freeze(G);
 
-function schnorrVerify(pubKey: noble.Point, msg: string, sig: {s: bigint, e:bigint}) {
-  let r_v = pointAdd(G.multiply(sig.s), pubKey.multiply(sig.e))
+function schnorrVerify(pubKey: noble.Point, msg: string, sig: {s: string, e:string}) {
+  let r_v = pointAdd(G.multiply(BigInt(sig.s)), pubKey.multiply(BigInt(sig.e)))
   let e_v = schnorrHash(r_v, msg)
-  if(BigInt(e_v) !== sig.e) {
+  if(BigInt(e_v) !== BigInt(sig.e)) {
     console.log({
       msg,
       pubKey: pubKey.toHex(),
       rv: r_v.toHex(),
       e_v: e_v,
-      e: sig.e.toString(16)
+      e: sig.e
     })
   }
-  return BigInt(e_v) == sig.e;
+  return BigInt(e_v) == BigInt(sig.e);
 }
 
-function schnorrAggregateSigs(t, sigs, indices){
+function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey: noble.Point) {
+  nonceAddress = nonceAddress.toLowerCase();
+  const _nonce: bigint = BigInt(nonceAddress)
+  const _hash: bigint = BigInt(hash)
+  const _signature: bigint = BigInt(signature)
+
+  if(_signature >= curve.n)
+    throw "signature must be reduced modulo N"
+
+  if(_nonce===0n || _signature===0n || _hash===0n)
+    throw `no zero inputs allowed`
+
+  // @ts-ignore
+  const e: bigint = BigInt(keccak256(bigint2buffer(_nonce << 256n | _hash, 52)))
+
+  let recoveredPubKey = ethJsUtil.ecrecover(
+    bigint2buffer(curve.n - noble.utils.mod(signingPubKey.x * _signature, curve.n)),
+    ((signingPubKey.y & 1n) === 0n) ? 27 : 28,
+    bigint2buffer(signingPubKey.x),
+    bigint2buffer(noble.utils.mod(e * signingPubKey.x, curve.n))
+  );
+  const addrBuf = ethJsUtil.pubToAddress(recoveredPubKey);
+  const addr    = ethJsUtil.bufferToHex(addrBuf);
+
+  return nonceAddress === addr;
+}
+
+function schnorrAggregateSigs(t, sigs, indices): {s: string, e: string}{
   assert(sigs.length >= t);
   let ts = 0n;
   range(0, t).map(j => {
     let coef = lagrangeCoef(j, t, indices.map(i => ({i})), 0n);
-    ts += sigs[j].s * coef
+    ts += BigInt(sigs[j].s) * coef
   })
-  let s = noble.utils.mod(ts, noble.CURVE.n)
+  let s = noble.utils.mod(ts, curve.n)
   let e = sigs[0].e;
-  return {s, e}
+  return {s: bigint2hex(s), e}
 }
 
 function keyFromPrivate(key: string): bigint {
@@ -182,6 +218,8 @@ function sumMod(arr: bigint[], modulo?: bigint) {
 export {
   curve,
   random,
+  invert,
+  mod,
   sumMod,
   pointAdd,
   keyFromPrivate,
@@ -196,6 +234,7 @@ export {
   schnorrHash,
   schnorrSign,
   schnorrVerify,
+  schnorrVerifyWithNonceAddress,
   schnorrAggregateSigs,
   // use
   G,

@@ -4,7 +4,7 @@ import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
 import soliditySha3 from '../../utils/soliditySha3.js'
-import {toBN} from '../../utils/tss/utils.js'
+import {bigint2hex, toBN} from '../../utils/tss/utils.js'
 import * as tssModule from '../../utils/tss/index.js'
 import AppContext from "../../common/db-models/AppContext.js"
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
@@ -207,17 +207,17 @@ class System extends CallablePlugin {
 
     /** store tss key */
     let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
-    await useDistributedKey(key.publicKey!.encodeCompressed('hex'), `app-${appId}-tss`)
+    await useDistributedKey(key.publicKey!.toHex(true), `app-${appId}-tss`)
     await this.appManager.saveAppTssConfig({
       version: context.version,
       appId: appId,
       publicKey: {
         address: key.address,
-        encoded: '0x' + key.publicKey?.encodeCompressed('hex'),
-        x: '0x' + key.publicKey?.getX().toBuffer('be',32).toString('hex'),
-        yParity: key.publicKey?.getY().isEven() ? 0 : 1,
+        encoded: '0x' + key.publicKey?.toHex(true),
+        x: bigint2hex(key.publicKey?.x!),
+        yParity: ((key.publicKey?.y! % 2n) === 0n) ? 0 : 1,
       },
-      keyShare: key.share?.toBuffer('be', 32).toString('hex'),
+      keyShare: bigint2hex(key.share!),
     })
   }
 
@@ -231,7 +231,7 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async generateReshareNonce(appId, reqId) {
-    let key = await this.tssPlugin.keyGen(undefined, {id: `reshare-${appId}-${reqId}`, value: toBN('2')})
+    let key = await this.tssPlugin.keyGen(undefined, {id: `reshare-${appId}-${reqId}`, value: '1'})
     /**
      * Ethereum addresses
      * [0]: 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf
@@ -240,7 +240,7 @@ class System extends CallablePlugin {
      */
     console.log({
       expected: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
-      calculated: tssModule.pub2addr(key.publicKey)
+      calculated: tssModule.pub2addr(key.publicKey!)
     })
     return key.publicKey
   }
@@ -295,9 +295,9 @@ class System extends CallablePlugin {
       id: key.id,
       publicKey: {
         address: key.address,
-        encoded: key.publicKey?.encodeCompressed("hex"),
-        x: key.publicKey?.getX().toBuffer('be', 32).toString('hex'),
-        yParity: key.publicKey?.getY().isEven() ? 0 : 1
+        encoded: key.publicKey?.toHex(true),
+        x: bigint2hex(key.publicKey?.x!),
+        yParity: ((key.publicKey?.y! & 1n) === 0n) ? 0 : 1
       }
     }
   }

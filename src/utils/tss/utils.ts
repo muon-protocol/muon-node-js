@@ -21,6 +21,14 @@ function bigint2hex(num: bigint, size: number = 32) {
   return '0x' + num.toString(16).padStart(size*2, '0')
 }
 
+function bigint2buffer(num: bigint, size: number = 32) {
+  return Buffer.from(num.toString(16).padStart(size*2, '0'), 'hex')
+}
+
+function hex2buffer(hex: string): Buffer {
+  return Buffer.from(hex.replace(/^0x/i, ''), 'hex')
+}
+
 function buf2str(buf: Uint8Array | Buffer) {
   let temp: Buffer = Buffer.from(buf)
   return temp.toString('hex')
@@ -30,6 +38,8 @@ export {
   buf2bigint,
   buf2str,
   bigint2hex,
+  bigint2buffer,
+  hex2buffer,
   BN,
   toBN,
   sha3,
