@@ -32,6 +32,7 @@
     "@libp2p/pubsub-peer-discovery": "^7.0.0",
     "@libp2p/tcp": "^6.0.0",
     "@libp2p/websockets": "^5.0.2",
+    "@noble/secp256k1": "^1.6.3",
     "@nodeutils/defaults-deep": "^1.1.0",
     "@types/body-parser": "^1.19.2",
     "aegir": "^36.0.0",

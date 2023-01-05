@@ -3,16 +3,18 @@ import Party from './party.js'
 import BN from 'bn.js';
 import { PublicKey } from './types'
 import * as tss from './index.js'
+import * as nobel from '@noble/secp256k1'
 import Web3 from 'web3'
 import TimeoutPromise from '../../common/timeout-promise.js'
 import assert from 'assert'
+import {bigint2hex, buf2bigint, buf2str} from "./utils";
 
 const {utils:{toBN}} = Web3
 const random = () => Math.floor(Math.random()*9999999)
 
 export type KeyPart = {
-  f: BN,
-  h: BN,
+  f: bigint,
+  h: bigint,
 }
 
 class DistributedKey {
@@ -58,13 +60,13 @@ class DistributedKey {
   step1FullfillPromise: TimeoutPromise;
   timeoutPromise: TimeoutPromise;
 
-  share: BN | null = null;
-  sharePubKey = null;
+  share: bigint | null = null;
+  sharePubKey: string;
   publicKey: PublicKey | null = null
   partnersPubKey = {}
-  address = null
+  address: string
 
-  constructor(party, id, timeout?: number, value?: BN){
+  constructor(party, id, timeout?: number, value?: bigint){
     this.id = id || `K${Date.now()}${random()}`
     if(!!party) {
       this.party = party;
@@ -75,15 +77,15 @@ class DistributedKey {
       this.h_x = hx
       // pedersen commitment
       let fxCoefPubKeys = fx.coefPubKeys();
-      let hxCoefPubKeys = hx.coefficients.map(c => c.getPrivate()).map(b_k => tss.H.mul(b_k))
+      let hxCoefPubKeys = hx.coefPubKeys(tss.H)
       this.commitment = fxCoefPubKeys.map((A, index) => tss.pointAdd(A, hxCoefPubKeys[index]));
     }
     this.timeoutPromise = new TimeoutPromise(timeout, "DistributedKey timeout")
   }
 
-  static loadPubKey(publicKey) {
+  static loadPubKey(publicKey): PublicKey {
     if(typeof publicKey === "string")
-      return tss.keyFromPublic(publicKey.replace("0x", ""), "hex")
+      return tss.keyFromPublic(publicKey.replace("0x", ""))
     else if(Array.isArray(publicKey))
       return tss.keyFromPublic({x: publicKey[0], y: publicKey[1]})
     else
@@ -95,8 +97,8 @@ class DistributedKey {
     key.id = _key.id;
     key.f_x = null;
     key.h_x = null;
-    key.share = toBN(_key.share);
-    key.sharePubKey = tss.keyFromPrivate(_key.share).getPublic().encode('hex');
+    key.share = buf2bigint(Buffer.from(_key.share));
+    key.sharePubKey = buf2str(nobel.getPublicKey(tss.keyFromPrivate(_key.share)));
     key.publicKey = this.loadPubKey(_key.publicKey)
     key.address = tss.pub2addr(key.publicKey)
     if(_key.partners)
@@ -114,11 +116,11 @@ class DistributedKey {
     return {
       id: this.id,
       party: this.party?.id,
-      share: !this.share ? null : this.share.toBuffer('be', 32).toString('hex'),
-      publicKey: !this.publicKey ? null : this.publicKey.encode('hex', true),
+      share: !this.share ? null : bigint2hex(this.share),
+      publicKey: !this.publicKey ? null : this.publicKey.toHex(true),
       partners: [...this.partners],
       pubKeyParts: Object.keys(this.pubKeyParts).reduce((res, partner) => {
-        res[partner] = this.pubKeyParts[partner].map(pubKey => pubKey.encode('hex', true))
+        res[partner] = this.pubKeyParts[partner].map(pubKey => pubKey.toHex(true))
         return res;
       }, {}),
     }
@@ -135,54 +137,52 @@ class DistributedKey {
     }
   }
 
-  setPartnerShare(currentNodeIndex, fromIndex, keyPartners, f, h, publicKeys, commitment) {
-    /**
-     * Check pedersen commitment
-     */
-    let p1 = tss.calcPolyPoint(currentNodeIndex, commitment)
-    let p2 = tss.pointAdd(tss.curve.g.mul(f), tss.H.mul(h));
-    if(!p1.eq(p2)) {
-      throw `DistributedKey partial data verification failed from partner ${fromIndex}.`
-    }
-    this.commitmentParts[fromIndex] = commitment;
+  // setPartnerShare(currentNodeIndex, fromIndex, keyPartners, f, h, publicKeys, commitment) {
+  //   /**
+  //    * Check pedersen commitment
+  //    */
+  //   let p1: PublicKey = tss.calcPolyPoint(currentNodeIndex, commitment)
+  //   let p2: PublicKey = tss.pointAdd(tss.curve.g.multiply(f), tss.H.multiply(h));
+  //   if(!p1.equals(p2)) {
+  //     throw `DistributedKey partial data verification failed from partner ${fromIndex}.`
+  //   }
+  //   this.commitmentParts[fromIndex] = commitment;
+  //
+  //   this.partners = keyPartners;
+  //   this.keyParts[fromIndex] = {f:BigInt(f), h: BigInt(h)}
+  //   this.pubKeyParts[fromIndex] = publicKeys
+  //
+  //   this.checkKeyFinalization()
+  // }
 
-    this.partners = keyPartners;
-    this.keyParts[fromIndex] = {f:toBN(f), h: toBN(h)}
-    this.pubKeyParts[fromIndex] = publicKeys
+  // setSelfShare(selfIndex, f, h, publicKeys) {
+  //   this.keyParts[selfIndex] = {f:BigInt(f), h: BigInt(h)}
+  //   this.pubKeyParts[selfIndex] = publicKeys
+  //
+  //   this.checkKeyFinalization()
+  // }
 
-    this.checkKeyFinalization()
-  }
+  // checkKeyFinalization() {
+  //   if(this.isKeyDistributed()){
+  //     let fh = this.getTotalFH()
+  //     this.share = fh.f;
+  //     this.sharePubKey = buf2str(nobel.getPublicKey(fh.f));
+  //     this.publicKey = this.getTotalPubKey();
+  //     this.address = tss.pub2addr(this.publicKey)
+  //     this.timeoutPromise.resolve(this)
+  //   }
+  // }
 
-  setSelfShare(selfIndex, f, h, publicKeys) {
-    this.keyParts[selfIndex] = {f:toBN(f), h: toBN(h)}
-    this.pubKeyParts[selfIndex] = publicKeys
-
-    this.checkKeyFinalization()
-  }
-
-  checkKeyFinalization() {
-    if(this.isKeyDistributed()){
-      let fh = this.getTotalFH()
-      this.share = fh.f;
-      this.sharePubKey = tss.keyFromPrivate(fh.f).getPublic().encode('hex')
-      this.publicKey = this.getTotalPubKey();
-      this.address = tss.pub2addr(this.publicKey)
-      this.timeoutPromise.resolve(this)
-    }
-  }
-
-  getTotalFH(){
-    // calculate shared key
-    let f = toBN(0)
-    let h = toBN(0)
-    for(const [i, {f: _f, h: _h}] of Object.entries(this.keyParts)){
-      // @ts-ignore
-      f.iadd(toBN(_f))
-      // @ts-ignore
-      h.iadd(toBN(_h))
-    }
-    return {f:f.umod(tss.curve.n), h: h.umod(tss.curve.n)}
-  }
+  // getTotalFH(){
+  //   // calculate shared key
+  //   let f = 0n
+  //   let h = 0n
+  //   for(const [i, {f: _f, h: _h}] of Object.entries(this.keyParts)){
+  //     f = f + BigInt(_f)
+  //     h = h + BigInt(_h)
+  //   }
+  //   return {f:nobel.utils.mod(f, tss.curve.n), h: nobel.utils.mod(h, tss.curve.n)}
+  // }
 
   /**
    * Returns public key of participant with id of [idx]
@@ -191,28 +191,28 @@ class DistributedKey {
    * @returns {[string, any]}
    */
   getPubKey(idx){
-    if(!this.partnersPubKey[idx]) {
-      this.partnersPubKey[idx] = Object.entries(this.pubKeyParts)
-      // .filter(([i, A_ik]) => parseInt(i) !== idx)
-        .reduce((acc, [i, A_ik]) => {
-          return tss.pointAdd(acc, tss.calcPolyPoint(idx, A_ik))
-        }, null)
-    }
-    return this.partnersPubKey[idx]
+    // if(!this.partnersPubKey[idx]) {
+    //   this.partnersPubKey[idx] = Object.entries(this.pubKeyParts)
+    //   // .filter(([i, A_ik]) => parseInt(i) !== idx)
+    //     .reduce((acc, [i, A_ik]) => {
+    //       return tss.pointAdd(acc, tss.calcPolyPoint(idx, A_ik))
+    //     }, null)
+    // }
+    // return this.partnersPubKey[idx]
   }
 
-  getTotalPubKey(){
+  getTotalPubKey(): PublicKey{
     assert(
       // TODO: replace with this.partners.length
       this.party && Object.keys(this.pubKeyParts).length >= this.party.t,
       `DistributedKey is not completed for computing totalPubKey. {t: ${this?.party?.t}, n: ${Object.keys(this.pubKeyParts).length}}`
     )
     // calculate shared key
-    let totalPubKey = null
+    let totalPubKey: PublicKey|null = null
     for(const [i, A_ik] of Object.entries(this.pubKeyParts)){
       totalPubKey = tss.pointAdd(totalPubKey, A_ik[0])
     }
-    return totalPubKey
+    return totalPubKey!
   }
 
   isKeyDistributed(){
