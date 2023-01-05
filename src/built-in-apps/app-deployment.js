@@ -115,8 +115,8 @@ module.exports = {
                 return {
                     address: key.address,
                     publicKey: "0x" + key.publicKey.toHex(true),
-                    x: "0x" + key.publicKey.x.toString('hex'),
-                    yParity: key.publicKey.y.isEven() ? 0 : 1,
+                    x: '0x' + key.publicKey.x.toString(16).padStart(64, '0'),
+                    yParity: ((key.publicKey.y & 1n) === 0n) ? 0 : 1,
                 }
             }
 
