@@ -11,7 +11,7 @@ import AppContext, {hash as hashAppContext} from "../../common/db-models/AppCont
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
 import _ from 'lodash'
 import Log from '../../common/muon-log.js'
-import {bigint2hex} from "../../utils/tss/utils.js";
+import {pub2json} from "../../utils/helpers.js";
 
 const log = Log('muon:core:plugins:app-manager')
 
@@ -416,12 +416,7 @@ export default class AppManager extends CallablePlugin {
     const result = {
       appId,
       version: parseInt(version),
-      publicKey: {
-        address: TssModule.pub2addr(publicKey),
-        encoded: publicKeyEncoded,
-        x: bigint2hex(publicKey.x),
-        yParity: ((publicKey.y & 1n) === 0n) ? 0 : 1
-      }
+      publicKey: pub2json(publicKey)
     }
     this.tssKeyQueryResult[appId] = {
       time: Date.now(),

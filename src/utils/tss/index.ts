@@ -1,49 +1,62 @@
+import {PublicKey} from "./types";
 import ethJsUtil from 'ethereumjs-util'
-import * as noble from "@noble/secp256k1"
-import {bigint2buffer, bigint2hex, buf2bigint, hex2buffer, keccak256, range} from './utils.js'
+import {BN, toBN, keccak256, range, pub2addr} from './utils.js'
 import assert from 'assert'
-import Polynomial from './polynomial.js'
+import elliptic from 'elliptic'
+const ZERO = toBN(0)
+const ONE = toBN(1)
+const TWO = toBN(2)
+const THREE = toBN(3)
 
-const curve = noble.CURVE
-const HALF_N = (noble.CURVE.n >> 1n) + 1n;
-// /**
-//  * Let H be elements of G, such that nobody knows log, h
-//  * used for pedersen commitment
-//  * @type {Point}
-//  */
-const H: noble.Point = new noble.Point(
-  BigInt('0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'),
-  BigInt('0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8')
-);
+const EC = elliptic.ec;
+const curve = new EC('secp256k1');
+const HALF_N = curve.n!.shrn(1).addn(1);
+/**
+ * Let H be elements of G, such that nobody knows log, h
+ * used for pedersen commitment
+ * @type {Point}
+ */
+// const H = new Point(
+//   '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+//   '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
+// );
+const H = curve.keyFromPublic("04206ae271fa934801b55f5144bec8416be0b85f22d452ad410f3f0fca1083dc7ae41249696c446f8c5b166760377115943662991c35ff02f9585f892970af89ed", 'hex').getPublic()
 
-function pointAdd(point1: noble.Point | null | undefined, point2: noble.Point | null | undefined): noble.Point {
-  if (!point1) {
-    if(!point2)
-      throw `Two null point cannot be added.`
-    return point2;
-  }
-  if (!point2) {
-    return point1;
-  }
+function pointAdd(point1?: PublicKey, point2?: PublicKey): PublicKey {
+  if (point1 === null)
+    return point2!;
+  if (point2 === null)
+    return point1!;
 
-  return point1.add(point2);
+  return point1!.add(point2!);
 }
 
-function calcPolyPoint(x: bigint | string, polynomial: noble.Point[]): noble.Point {
-  if (typeof x !== 'bigint')
-    x = BigInt(x);
-  let result: any = null;
+function calcPoly(x, polynomial) {
+  if (!BN.isBN(x))
+    x = toBN(x);
+  let result = toBN(0);
   for (let i = 0; i < polynomial.length; i++) {
-    result = pointAdd(result, polynomial[i].multiply(x ** BigInt(i)));
+    result = result.add(polynomial[i].mul(x.pow(toBN(i))));
   }
-  return result;
+  return result.umod(curve.n!)
+  // return result;
 }
 
-function random():bigint {
-  return buf2bigint(noble.utils.randomPrivateKey());
+function calcPolyPoint(x, polynomial): PublicKey {
+  if (!BN.isBN(x))
+    x = toBN(x);
+  let result: PublicKey | null = null;
+  for (let i = 0; i < polynomial.length; i++) {
+    result = pointAdd(result!, polynomial[i].mul(x.pow(toBN(i))));
+  }
+  return result!;
 }
 
-function shareKey(privateKey: bigint, t, n, indices, polynomial: Polynomial) {
+function random() {
+  return curve.genKeyPair().getPrivate();
+}
+
+function shareKey(privateKey, t, n, indices, polynomial) {
   if(indices){
     assert(indices.length === n)
   }
@@ -54,132 +67,119 @@ function shareKey(privateKey: bigint, t, n, indices, polynomial: Polynomial) {
     // indices = range(1, n + 1).map(i => i * 10 + Math.floor(Math.random() * 9))
   }
   if(polynomial)
-    assert(polynomial.t === t)
+    assert(polynomial.length === t)
   else
-    polynomial = new Polynomial(t, null, privateKey);
+    polynomial = [privateKey, ...(range(1, t).map(random))]
   return {
     polynomial: polynomial,
     shares: indices.map(i => {
       // TODO: key % n will prevent reconstructing of main key
-      let privateKey = polynomial.calc(BigInt(i))
-      return {i, key: privateKey}
+      let privateKey = calcPoly(i, polynomial)//.umod(curve.n)
+      // @ts-ignore
+      return {i, key: curve.keyFromPrivate(privateKey)}
     })
   }
 }
 
-function lagrangeCoef(j, t, shares, index: bigint): bigint {
-  let _x = index;
-  let prod = arr => arr.reduce((acc, current) => (acc * current), 1n);
-  let x_j = BigInt(shares[j].i)
-  let arr = range(0, t).filter(k => k!=j).map(k => {
-    let x_k = BigInt(shares[k].i)
+function lagrangeCoef(j, t, shares, index) {
+  let _x = BN.isBN(index) ? index : toBN(index);
+  let prod = arr => arr.reduce((acc, current) => acc.mul(current), toBN(1));
+  let x_j = toBN(shares[j].i)
+  let arr = range(0, t).filter(k => k!==j).map(k => {
+    let x_k = toBN(shares[k].i)
     // [numerator, denominator]
-    return [_x - x_k, x_j - x_k]
+    return [_x.sub(x_k), x_j.sub(x_k)]
   });
   let numerator = prod(arr.map(a => a[0]))
   let denominator = prod(arr.map(a => a[1]))
-  return numerator * noble.utils.invert(denominator, noble.CURVE.n);
+  return numerator.mul(denominator.invm(curve.n));
 }
 
-function reconstructKey(shares, t, index=0n) {
+function reconstructKey(shares, t, index=0) {
   assert(shares.length >= t);
-  let sum = 0n;
+  let sum = toBN(0);
   for (let j = 0; j < t; j++) {
     let coef = lagrangeCoef(j, t, shares, index)
-    let key = shares[j].key
-    sum += key * coef
+    let key = shares[j].key.getPrivate()
+    sum = sum.add(key.mul(coef))
   }
-  return noble.utils.mod(sum, noble.CURVE.n);
+  return sum.umod(curve.n!);
 }
 
-function addKeys(key1: bigint, key2: bigint) {
-  return noble.utils.mod(key1 + key2, noble.CURVE.n)
+function addKeys(key1, key2) {
+  return key1.add(key2).umod(curve.n)
 }
 
-function subKeys(key1: bigint, key2: bigint) {
-  return noble.utils.mod(key1- key2, noble.CURVE.n)
+function subKeys(key1, key2) {
+  return key1.sub(key2).umod(curve.n)
 }
 
-function pub2addr(publicKey: noble.Point) {
-  let pubKeyHex = publicKey.toHex(false).substr(2);
-  // @ts-ignore
-  let pub_hash = keccak256(hex2buffer(pubKeyHex))
-  return toChecksumAddress('0x' + pub_hash.substr(-40));
+function keyFromPrivate(prv) {
+  if(typeof prv === 'string')
+    prv = prv.replace(/^0x/i, '')
+  return curve.keyFromPrivate(prv)
 }
 
-function invert(num: bigint): bigint {
-  return noble.utils.invert(num, curve.n);
+function keyFromPublic(pubKeyStr, encoding='hex') {
+  return curve.keyFromPublic(pubKeyStr, encoding).getPublic()
 }
 
-function mod(num: bigint): bigint {
-  return noble.utils.mod(num, curve.n);
+// function key2pub(privateKey) {
+//   let _PK = BN.isBN(privateKey) ? privateKey : toBN(privateKey)
+//   let {x, y} = curve.g.mul(_PK);
+//   return new Point(x, y);
+// }
+
+function key2pub(privateKey) {
+  let _PK = BN.isBN(privateKey) ? privateKey : toBN(privateKey)
+  return curve.g.mul(_PK);
 }
 
-function toChecksumAddress(address) {
-  address = address.toLowerCase().replace(/^0x/i, '')
-  let hash = keccak256(address).replace(/^0x/i, '');
-  let ret = '0x'
-  for (let i = 0; i < address.length; i++) {
-    if (parseInt(hash[i], 16) >= 8) {
-      ret += address[i].toUpperCase()
-    } else {
-      ret += address[i]
-    }
-  }
-  return ret
-}
-
-function schnorrHash(publicKey: noble.Point, msg) {
+function schnorrHash(publicKey, msg) {
   let address = pub2addr(publicKey)
-  const concated = bigint2hex(BigInt(address)<<256n | BigInt(msg), 52)
+  let addressBuff = Buffer.from(address.replace(/^0x/i, ''), 'hex');
+  let msgBuff = Buffer.from(msg.replace(/^0x/i, ''), 'hex');
+  let totalBuff = Buffer.concat([addressBuff, msgBuff])
   // @ts-ignore
-  return keccak256(hex2buffer(concated));
+  return keccak256(totalBuff)
 }
 
-function schnorrSign(sharedPrivateKey: bigint, sharedK: bigint, kPub: noble.Point, msg): {s: bigint, e: bigint} {
-  let e = BigInt(schnorrHash(kPub, msg))
-  let s = noble.utils.mod(sharedK - (sharedPrivateKey * e), curve.n);
+function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
+  let _sharedPrivateKey = BN.isBN(sharedPrivateKey) ? sharedPrivateKey : toBN(sharedPrivateKey);
+  let e = toBN(schnorrHash(kPub, msg))
+  let s = sharedK.sub(_sharedPrivateKey.mul(e)).umod(curve.n);
   return {s, e}
 }
 
-const G = new noble.Point(noble.CURVE.Gx, noble.CURVE.Gy);
-Object.freeze(G);
-
-function schnorrVerify(pubKey: noble.Point, msg: string, sig: {s: string, e:string}) {
-  let r_v = pointAdd(G.multiply(BigInt(sig.s)), pubKey.multiply(BigInt(sig.e)))
+function schnorrVerify(pubKey, msg, sig) {
+  let r_v = pointAdd(curve.g.mul(sig.s), pubKey.mul(sig.e))
   let e_v = schnorrHash(r_v, msg)
-  if(BigInt(e_v) !== BigInt(sig.e)) {
-    console.log({
-      msg,
-      pubKey: pubKey.toHex(),
-      rv: r_v.toHex(),
-      e_v: e_v,
-      e: sig.e
-    })
-  }
-  return BigInt(e_v) == BigInt(sig.e);
+  return toBN(e_v).eq(sig.e);
 }
 
-function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey: noble.Point) {
+function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey) {
   nonceAddress = nonceAddress.toLowerCase();
-  const _nonce: bigint = BigInt(nonceAddress)
-  const _hash: bigint = BigInt(hash)
-  const _signature: bigint = BigInt(signature)
+  const nonce = toBN(nonceAddress)
+  hash = toBN(hash)
+  signature = toBN(signature)
 
-  if(_signature >= curve.n)
+  if(!signature.lt(curve.n))
     throw "signature must be reduced modulo N"
 
-  if(_nonce===0n || _signature===0n || _hash===0n)
+  if(nonce.isZero() || signature.isZero() || hash.isZero())
     throw `no zero inputs allowed`
 
   // @ts-ignore
-  const e: bigint = BigInt(keccak256(bigint2buffer(_nonce << 256n | _hash, 52)))
+  const e = toBN(keccak256(Buffer.concat([
+    nonce.toBuffer('be', 20),
+    hash.toBuffer('be', 32)
+  ])))
 
   let recoveredPubKey = ethJsUtil.ecrecover(
-    bigint2buffer(curve.n - noble.utils.mod(signingPubKey.x * _signature, curve.n)),
-    ((signingPubKey.y & 1n) === 0n) ? 27 : 28,
-    bigint2buffer(signingPubKey.x),
-    bigint2buffer(noble.utils.mod(e * signingPubKey.x, curve.n))
+    curve.n!.sub(signingPubKey.getX().mul(signature).umod(curve.n)).toBuffer('be', 32),
+    signingPubKey.getY().isEven() ? 27 : 28,
+    signingPubKey.getX().toBuffer('be', 32),
+    e.mul(signingPubKey.getX()).umod(curve.n!).toBuffer('be', 32)
   );
   const addrBuf = ethJsUtil.pubToAddress(recoveredPubKey);
   const addr    = ethJsUtil.bufferToHex(addrBuf);
@@ -187,49 +187,33 @@ function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPub
   return nonceAddress === addr;
 }
 
-function schnorrAggregateSigs(t, sigs, indices): {s: string, e: string}{
+function schnorrAggregateSigs(t, sigs, indices){
   assert(sigs.length >= t);
-  let ts = 0n;
+  let ts = toBN(0)
   range(0, t).map(j => {
-    let coef = lagrangeCoef(j, t, indices.map(i => ({i})), 0n);
-    ts += BigInt(sigs[j].s) * coef
+    let coef = lagrangeCoef(j, t, indices.map(i => ({i})), 0);
+    ts.iadd(sigs[j].s.mul(coef))
   })
-  let s = noble.utils.mod(ts, curve.n)
-  let e = sigs[0].e;
-  return {s: bigint2hex(s), e}
-}
-
-function keyFromPrivate(key: string): bigint {
-  return BigInt(key);
-}
-
-function keyFromPublic(key: string|{x:bigint, y:bigint}): noble.Point {
-  if(typeof key === 'string')
-    return noble.Point.fromHex(key);
-  else
-    return new noble.Point(key.x, key.y);
-}
-
-function sumMod(arr: bigint[], modulo?: bigint) {
-  const sum = arr.reduce((sum, val) => (sum + val), 0n);
-  return noble.utils.mod(sum, modulo);
+  let s = ts.umod(curve.n!)
+  let e = sigs[0].e.clone();
+  return {s, e}
 }
 
 export {
   curve,
   random,
-  invert,
-  mod,
-  sumMod,
   pointAdd,
+  calcPoly,
   keyFromPrivate,
   keyFromPublic,
   calcPolyPoint,
   shareKey,
   lagrangeCoef,
   reconstructKey,
+  toBN,
   addKeys,
   subKeys,
+  key2pub,
   pub2addr,
   schnorrHash,
   schnorrSign,
@@ -237,7 +221,6 @@ export {
   schnorrVerifyWithNonceAddress,
   schnorrAggregateSigs,
   // use
-  G,
   H,
   HALF_N,
 }

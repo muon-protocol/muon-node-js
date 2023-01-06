@@ -4,7 +4,6 @@ import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
 import soliditySha3 from '../../utils/soliditySha3.js'
-import {bigint2hex, toBN} from '../../utils/tss/utils.js'
 import * as tssModule from '../../utils/tss/index.js'
 import AppContext from "../../common/db-models/AppContext.js"
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
@@ -12,8 +11,9 @@ import * as NetworkIpc from '../../network/ipc.js'
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import AppManager from "./app-manager.js";
 import useDistributedKey from "../../utils/tss/use-distributed-key.js";
-import { timeout } from '../../utils/helpers.js'
+import {pub2json, timeout} from '../../utils/helpers.js'
 import { promisify } from "util"
+import {bn2hex} from "../../utils/tss/utils.js";
 
 const RemoteMethods = {
   InformAppDeployed: "informAppDeployed",
@@ -207,17 +207,12 @@ class System extends CallablePlugin {
 
     /** store tss key */
     let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
-    await useDistributedKey(key.publicKey!.toHex(true), `app-${appId}-tss`)
+    await useDistributedKey(key.publicKey!.encode('hex', true), `app-${appId}-tss`)
     await this.appManager.saveAppTssConfig({
       version: context.version,
       appId: appId,
-      publicKey: {
-        address: key.address,
-        encoded: '0x' + key.publicKey?.toHex(true),
-        x: bigint2hex(key.publicKey?.x!),
-        yParity: ((key.publicKey?.y! % 2n) === 0n) ? 0 : 1,
-      },
-      keyShare: bigint2hex(key.share!),
+      publicKey: pub2json(key.publicKey!),
+      keyShare: bn2hex(key.share!),
     })
   }
 
@@ -293,12 +288,7 @@ class System extends CallablePlugin {
 
     return {
       id: key.id,
-      publicKey: {
-        address: key.address,
-        encoded: key.publicKey?.toHex(true),
-        x: bigint2hex(key.publicKey?.x!),
-        yParity: ((key.publicKey?.y! & 1n) === 0n) ? 0 : 1
-      }
+      publicKey: pub2json(key.publicKey!)
     }
   }
 }

@@ -4,7 +4,7 @@ import Request from '../../../common/db-models/Request.js'
 import AppContext from "../../../common/db-models/AppContext.js"
 import AppTssConfig from "../../../common/db-models/AppTssConfig.js"
 import {makeAppDependency} from './app-dependencies/index.js'
-import { getTimestamp, timeout } from '../../../utils/helpers.js'
+import {getTimestamp, pub2json, timeout} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
 import soliditySha3 from '../../../utils/soliditySha3.js'
 import * as tss from '../../../utils/tss/index.js'
@@ -24,7 +24,7 @@ import useDistributedKey from "../../../utils/tss/use-distributed-key.js";
 import chalk from 'chalk'
 import Ajv from "ajv"
 import Log from '../../../common/muon-log.js'
-import {bigint2hex} from "../../../utils/tss/utils.js";
+import {bn2hex} from "../../../utils/tss/utils.js";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
@@ -555,7 +555,7 @@ class BaseAppPlugin extends CallablePlugin {
     let allSignatures = owners.map(w => signers[w]);
 
     let schnorrSigns = allSignatures.map(({signature}) => {
-      let [s, e] = signature.split(',');
+      let [s, e] = signature.split(',').map(toBN);
       return {s, e};
     })
 
@@ -578,15 +578,10 @@ class BaseAppPlugin extends CallablePlugin {
       confirmed,
       confirmed ? [{
         owner: tss.pub2addr(verifyingPubKey),
-        ownerPubKey: {
-          x: bigint2hex(verifyingPubKey.x),
-          yParity: (verifyingPubKey.y % 2n).toString(),
-        },
+        ownerPubKey: pub2json(verifyingPubKey, true),
         // signers: signersIndices,
         timestamp: getTimestamp(),
-        result: newRequest.data.result,
-        // signature: `0x${aggregatedSign.s.toString(16)},0x${aggregatedSign.e.toString(16)}`,
-        signature: aggregatedSign.s,
+        signature: bn2hex(aggregatedSign.s),
         // sign: {
         //   s: `0x${aggregatedSign.s.toString(16)}`,
         //   e: `0x${aggregatedSign.e.toString(16)}`
@@ -646,9 +641,9 @@ class BaseAppPlugin extends CallablePlugin {
     let Z_i = pubKey;
     let K_i = nonce.getPubKey(ownerInfo!.id);
 
-    const eInv = tss.invert(BigInt(e))
-    let p1 = tss.pointAdd(K_i, Z_i.multiply(eInv)).toHex(true)
-    let p2 = tss.G.multiply(s).toHex(true);
+    const eInv = e.invm(tss.curve.n!)
+    let p1 = tss.pointAdd(K_i, Z_i.mul(eInv)).encode('hex', true)
+    let p2 = tss.curve.g.multiply(s).encode("hex", true);
     return p1 === p2 ? owner : null;
   }
 
@@ -739,7 +734,7 @@ class BaseAppPlugin extends CallablePlugin {
     let k_i = nonce.share
     let K = nonce.publicKey!;
 
-    await useDistributedKey(K.toHex(true), resultHash)
+    await useDistributedKey(K.encode('hex', true), resultHash)
     // TODO: remove nonce after sign
     let signature = tss.schnorrSign(tssKey.share!, k_i!, K, resultHash)
 
@@ -755,7 +750,7 @@ class BaseAppPlugin extends CallablePlugin {
       pubKey: tssKey.sharePubKey!,
       timestamp: signTimestamp,
       result,
-      signature:`${bigint2hex(signature.s)},${bigint2hex(signature.e)}`
+      signature:`${bn2hex(signature.s)},${bn2hex(signature.e)}`
     }
   }
 

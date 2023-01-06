@@ -3,6 +3,8 @@ BigNumber.set({DECIMAL_PLACES: 26})
 import Web3 from 'web3'
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import {PublicKey} from "./tss/types.js";
+import {pub2addr} from "./tss/utils.js";
 const toBN = Web3.utils.toBN;
 
 export const timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -78,4 +80,16 @@ export function filePathInfo(importMeta) {
   const __dirname = dirname(__filename);
 
   return {__filename, __dirname};
+}
+
+export function pub2json(pubkey: PublicKey, minimal: boolean=false): {address?: string, encoded?: string, x: string, yParity: string} {
+  let extra = minimal ? {} : {
+    address: pub2addr(pubkey),
+    encoded: pubkey.encode('hex', true),
+  }
+  return {
+    ...extra,
+    x: '0x' + pubkey.getX().toBuffer('be', 32).toString('hex'),
+    yParity: pubkey.getY().mod(toBN(2)).toString(),
+  }
 }

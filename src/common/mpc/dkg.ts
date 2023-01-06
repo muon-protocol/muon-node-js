@@ -1,13 +1,12 @@
 import {MapOf, RoundOutput, RoundProcessor} from "./types";
 import {MultiPartyComputation} from "./base.js";
+import {bn2str} from './utils.js'
 import Web3 from 'web3'
-import * as noble from "@noble/secp256k1"
 import Polynomial from "../../utils/tss/polynomial.js";
 import * as TssModule from "../../utils/tss/index.js";
 import {PublicKey} from "../../utils/tss/types";
 import BN from 'bn.js';
 import lodash from 'lodash'
-import {bigint2hex} from "../../utils/tss/utils.js";
 
 const {countBy} = lodash;
 
@@ -60,7 +59,7 @@ export type DistKeyJson = {
 
 export class DistKey {
   index: string;
-  share: bigint;
+  share: BN;
   address: string;
   publicKey: PublicKey;
   partners: string[];
@@ -69,13 +68,13 @@ export class DistKey {
     Fx: PublicKey[]
   };
 
-  constructor(index: string, share: bigint, address: string, publicKey : PublicKey, partners: string[], curve: {t: number, Fx: PublicKey[]}) {
+  constructor(index: string, share: BN, address: string, publicKey : PublicKey, partners: string[], curve: {t: number, Fx: PublicKey[]}) {
     this.index = index;
     this.share = share;
     this.address = address;
     this.publicKey = publicKey;
     this.partners = partners,
-    this.curve = curve;
+      this.curve = curve;
   }
 
   /**
@@ -84,24 +83,24 @@ export class DistKey {
    * @param idx {string | BN} - index of participant
    * @returns PublicKey
    */
-  getPublicKey(idx: string | bigint): PublicKey{
+  getPublicKey(idx: BN | string): PublicKey{
     return TssModule.calcPolyPoint(idx, this.curve.Fx)
   }
 
-  publicKeyLargerThanHalfN(): boolean {
-    return TssModule.HALF_N < this.publicKey.x
+  publicKeyLargerThanHalfN() {
+    return TssModule.HALF_N.lt(this.publicKey.getX())
   }
 
   toJson(): DistKeyJson {
     return {
       index: this.index,
-      share: bigint2hex(this.share),
+      share: bn2str(this.share),
       address: this.address,
-      publicKey: this.publicKey.toHex(true),
+      publicKey: this.publicKey.encode('hex', true),
       partners: this.partners,
       curve: {
         t: this.curve.t,
-        Fx: this.curve.Fx.map(p => p.toHex(true))
+        Fx: this.curve.Fx.map(p => p.encode('hex', true))
       }
     }
   }
@@ -113,7 +112,7 @@ export class DistKey {
       throw `DistKeyJson address mismatched with publicKey`
     return new DistKey(
       key.index,
-      BigInt(key.share),
+      TssModule.toBN(key.share),
       address,
       publicKey,
       key.partners,
@@ -216,11 +215,11 @@ const InputSchema = {
 export class DistributedKeyGeneration extends MultiPartyComputation {
 
   private readonly t: number;
-  private readonly value: bigint | undefined;
+  private readonly value: BN | undefined;
   public readonly extraParams: any;
   protected InputSchema: object = InputSchema;
 
-  constructor(id: string, partners: string[], t: number, value?: string, extra: any={}) {
+  constructor(id: string, partners: string[], t: number, value?: BN|string, extra: any={}) {
     // @ts-ignore
     super(['round0', 'round1', 'round2', 'round3'], ...Object.values(arguments));
     // console.log(`${this.ConstructorName} construct with`, {id, partners, t, value});
@@ -228,7 +227,10 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     this.extraParams = extra;
     this.t = t
     if(!!value) {
-      this.value = BigInt(value)
+      if(BN.isBN(value))
+        this.value = value
+      else
+        this.value = Web3.utils.toBN(value);
     }
   }
 
@@ -240,12 +242,13 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
   }
 
   round0(_, __, networkId: string): RoundOutput<Round0Result, Round0Broadcast> {
-    let fx = new Polynomial(this.t, TssModule.curve, this.value);
+    // @ts-ignore
+    let fx = new Polynomial(this.t, TssModule.curve, this.value ? TssModule.toBN(this.value) : undefined);
     let hx = new Polynomial(this.t, TssModule.curve);
 
     const Fx = fx.coefPubKeys();
     const Hx = hx.coefPubKeys(TssModule.H)
-    const commitment = Fx.map((Fxi, i) => TssModule.pointAdd(Fxi, Hx[i])).map(k => k.toHex(true))
+    const commitment = Fx.map((Fxi, i) => TssModule.pointAdd(Fxi, Hx[i])).map(k => k.encode('hex', true))
 
     const store = {fx, hx, Fx, Hx, commitment}
     const send = {}
@@ -272,10 +275,9 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     const send = {}
 
     available.forEach(id => {
-      const idn = BigInt(id);
       send[id] = {
-        f: bigint2hex(this.store['round0'].fx.calc(idn)),
-        h: bigint2hex(this.store['round0'].hx.calc(idn)),
+        f: bn2str(this.store['round0'].fx.calc(id)),
+        h: bn2str(this.store['round0'].hx.calc(id)),
       }
     })
 
@@ -290,7 +292,6 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
   round2(prevStepOutput: MapOf<Round1Result>, preStepBroadcast: MapOf<Round1Broadcast>, networkId: string):
     RoundOutput<Round2Result, Round2Broadcast> {
-    const currentId = BigInt(networkId);
     /**
      * Check all partners broadcast same commitment to all other parties.
      */
@@ -333,13 +334,13 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
       /** check the f & h matches with commitment */
       const {f, h} = r1Msg[sender].send
-      const commitment: PublicKey[] = r1Msg[sender].broadcast.commitment.map(pubKey => TssModule.keyFromPublic(pubKey))
-      let p1 = TssModule.calcPolyPoint(currentId, commitment)
+      const commitment = r1Msg[sender].broadcast.commitment.map(pubKey => TssModule.keyFromPublic(pubKey))
+      let p1 = TssModule.calcPolyPoint(networkId, commitment)
       let p2 = TssModule.pointAdd(
-        TssModule.G.multiply(BigInt(f)),
-        TssModule.H.multiply(BigInt(h))
+        TssModule.curve.g.mul(TssModule.toBN(f)),
+        TssModule.H.mul(TssModule.toBN(h))
       );
-      if(!p1.equals(p2)) {
+      if(!p1.eq(p2)) {
         // throw `DistributedKey partial data verification failed from partner ${sender}.`
         console.log(`partner [${sender}] founded malignant at round2 commitment matching`)
         malignant.push(sender)
@@ -352,7 +353,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     const store = {available, malignant}
     const send = {}
     const broadcast= {
-      Fx: this.store['round0'].Fx.map(pubKey => pubKey.toHex(true)),
+      Fx: this.store['round0'].Fx.map(pubKey => pubKey.encode('hex', true)),
     }
     return {store, send, broadcast}
   }
@@ -374,8 +375,8 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     nonMalignant.map(sender => {
       const Fx = r2Msgs[sender].broadcast.Fx.map(k => TssModule.keyFromPublic(k))
       const p1 = TssModule.calcPolyPoint(networkId, Fx);
-      const p2 = TssModule.G.multiply(BigInt(r1Msgs[sender].send.f))
-      if(!p1.equals(p2)) {
+      const p2 = TssModule.curve.g.mul(TssModule.toBN(r1Msgs[sender].send.f))
+      if(!p1.eq(p2)) {
         console.log(`partner [${sender}] founded malignant at round3 Fx check`)
         malignant.push(sender);
       }
@@ -396,8 +397,8 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
   onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId): any {
     // console.log(`mpc complete`, roundsArrivedMessages)
     const r1Msgs = roundsArrivedMessages['round1'],
-    r2Msgs = roundsArrivedMessages['round2'],
-    r3Msgs = roundsArrivedMessages['round3']
+      r2Msgs = roundsArrivedMessages['round2'],
+      r3Msgs = roundsArrivedMessages['round3']
 
     const {available} = this.store['round2']
     const malignantList = available.map(sender => r3Msgs[sender].broadcast.malignant);
@@ -411,9 +412,13 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     /** share calculation */
     let share = nonMalignant
       .map(from => r1Msgs[from].send.f)
-      .reduce((acc, current) => acc + BigInt(current), 0n)
-    const nInv = noble.utils.invert(BigInt(nonMalignant.length.toString()), TssModule.curve.n)
-    share = noble.utils.mod(share * nInv, TssModule.curve.n)
+      .reduce((acc, current) => {
+        acc.iadd(TssModule.toBN(current))
+        return acc
+      }, TssModule.toBN('0'))
+    const nInv = TssModule.toBN(nonMalignant.length.toString()).invm(TssModule.curve.n!)
+    share.imul(nInv)
+    share = share.umod(TssModule.curve.n)
 
     let totalFx: PublicKey[] = []
     nonMalignant.forEach((sender, i) => {
@@ -428,7 +433,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       }
     })
     totalFx.forEach((pubKey, i) => {
-      totalFx[i] = pubKey.multiply(nInv)
+      totalFx[i] = pubKey.mul(nInv)
     })
 
     return new DistKey(

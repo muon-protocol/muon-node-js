@@ -7,45 +7,40 @@ const {utils: {toBN, randomHex, sha3, soliditySha3, keccak256}} = Web3;
 const ZERO = toBN(0)
 const ONE = toBN(1)
 
-function buf2bigint (buf: Uint8Array): bigint {
-  let ret = BigInt(0)
+function pub2addr(publicKey) {
+  let pubKeyHex = publicKey.encode('hex').substr(2);
   // @ts-ignore
-  for (const i of (buf as Buffer).values()) {
-    const bi = BigInt(i)
-    ret = (ret << BigInt(8)) + bi
+  let pub_hash = keccak256(Buffer.from(pubKeyHex, 'hex'))
+  return toChecksumAddress('0x' + pub_hash.substr(-40));
+}
+
+function toChecksumAddress(address) {
+  address = address.toLowerCase().replace(/^0x/i, '')
+  let hash = keccak256(address).replace(/^0x/i, '');
+  let ret = '0x'
+  for (let i = 0; i < address.length; i++) {
+    if (parseInt(hash[i], 16) >= 8) {
+      ret += address[i].toUpperCase()
+    } else {
+      ret += address[i]
+    }
   }
   return ret
 }
 
-function bigint2hex(num: bigint, size: number = 32) {
-  return '0x' + num.toString(16).padStart(size*2, '0')
-}
-
-function bigint2buffer(num: bigint, size: number = 32) {
-  return Buffer.from(num.toString(16).padStart(size*2, '0'), 'hex')
-}
-
-function hex2buffer(hex: string): Buffer {
-  return Buffer.from(hex.replace(/^0x/i, ''), 'hex')
-}
-
-function buf2str(buf: Uint8Array | Buffer) {
-  let temp: Buffer = Buffer.from(buf)
-  return temp.toString('hex')
+function bn2hex(num: BN, byteLength: number=32): string {
+  return '0x' + num.toBuffer('be', byteLength).toString('hex');
 }
 
 export {
-  buf2bigint,
-  buf2str,
-  bigint2hex,
-  bigint2buffer,
-  hex2buffer,
   BN,
   toBN,
+  bn2hex,
   sha3,
   soliditySha3,
   keccak256,
   range,
+  pub2addr,
   randomHex,
   ZERO,
   ONE,
