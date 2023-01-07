@@ -68,6 +68,7 @@ async function run() {
 
   const t1 = Date.now()
   for(let i=0 ; i<specialPrivateKeys.length ; i++) {
+    const startTime = Date.now();
     // const realPrivateKey = bn2str(toBN(randomHex(32)).umod(N));
     const realPrivateKey = specialPrivateKeys[i];
     const realPubKey = realPrivateKey ? TssModule.keyFromPrivate(realPrivateKey).getPublic().encode("hex", true) : null;
@@ -104,7 +105,7 @@ async function run() {
 
     const pubKeyList = allNodeResults.map(key => key.publicKey)
     if(uniq(pubKeyList).length===1 && resultOk(realPrivateKey, realPubKey, allNodeResults[0].publicKey, reconstructedKey, reconstructedPubKey))
-      console.log(`i: ${i}, match: OK, key party: ${allNodeResults[0].partners}`)
+      console.log(`i: ${i}, match: OK, key party: ${allNodeResults[0].partners} time: ${Date.now() - startTime} ms`)
     else {
       console.log(`i: ${i}, match: false`)
       console.log({

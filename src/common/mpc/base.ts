@@ -138,7 +138,7 @@ export class MultiPartyComputation {
 
   async processRound(roundIndex: number, input: MapOf<any>, broadcast: MapOf<any>, networkId: string): Promise<RoundOutput<any, any>> {
     const roundMethodName = this.rounds[roundIndex]
-    return this[roundMethodName](input, broadcast, networkId)
+    return await this[roundMethodName](input, broadcast, networkId)
   }
 
   protected get ConstructorName() {
