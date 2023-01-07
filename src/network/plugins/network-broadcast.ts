@@ -42,6 +42,10 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
   async __onBroadcastReceived(evt){
     // console.log("NetworkBroadcastPlugin.__onBroadcastReceived %s %o")
     const {detail: {data: rawData, from: peerId, topic, ...otherItems}} = evt;
+    if(!this.handlerRegistered[topic]) {
+      log(`unknown broadcast topic: ${topic}`)
+      return;
+    }
     let from = peerId2Str(peerId);
     try{
       let strData = uint8ArrayToString(rawData)
@@ -67,6 +71,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
         })
     }
     catch (e) {
+      // console.log(`broadcast message: topic: ${topic}`, uint8ArrayToString(rawData))
       log('NetworkBroadcastPlugin.__onBroadcastReceived #2 %O', e)
     }
   }
