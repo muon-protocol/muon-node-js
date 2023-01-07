@@ -1,15 +1,11 @@
-const dotenv = require("dotenv");
+import * as dotenv from "dotenv"
 dotenv.config();
-const PeerId = require("peer-id");
-const emoji = require("node-emoji");
-const fs = require("fs");
-const Web3 = require("web3");
-const parseArgv = require("./src/utils/parseArgv");
+import PeerId from 'peer-id'
+import * as  fs from "fs"
+import Web3 from "web3"
 const web3 = new Web3();
 
 const createEnv = async () => {
-  let params = parseArgv();
-
   if(fs.existsSync('./.env')) {
     console.log('.env file already exists.');
     process.exit(1);
