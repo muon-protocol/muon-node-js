@@ -650,7 +650,7 @@ class TssPlugin extends CallablePlugin {
       id: keyGen.extraParams.keyId!,
       share: bn2hex(dKey.share),
       publicKey: dKey.publicKey,
-      partners: keyGen.partners
+      partners: dKey.partners
     })
 
     await SharedMemory.set(keyGen.extraParams.keyId, key.toSerializable(), 30*60*1000)

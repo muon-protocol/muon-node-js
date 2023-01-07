@@ -6,9 +6,6 @@ import Polynomial from "../../utils/tss/polynomial.js";
 import * as TssModule from "../../utils/tss/index.js";
 import {PublicKey} from "../../utils/tss/types";
 import BN from 'bn.js';
-import lodash from 'lodash'
-
-const {countBy} = lodash;
 
 /**
  * Round0 input/output types
@@ -27,8 +24,6 @@ type Round1Result = {
 }
 type Round1Broadcast = {
   commitment: string[],
-  /** available partners */
-  available: string[]
   allPartiesCommitmentHash: MapOf<string>
 }
 
@@ -38,6 +33,7 @@ type Round1Broadcast = {
 type Round2Result = any
 type Round2Broadcast = {
   Fx: string[],
+  malignant: string[]
 }
 
 type Round3Result = any;
@@ -159,10 +155,6 @@ const InputSchema = {
             type: 'array',
             items: schema_public_key
           },
-          available: {
-            type: 'array',
-            items: { type: "string" }
-          },
           allPartiesCommitmentHash: {
             type: 'object',
             patternProperties: {
@@ -170,7 +162,7 @@ const InputSchema = {
             }
           }
         },
-        required: []
+        required: ['commitment', 'allPartiesCommitmentHash']
       },
     },
     required: ['send', 'broadcast']
@@ -184,9 +176,16 @@ const InputSchema = {
           Fx: {
             type: 'array',
             items: schema_public_key
+          },
+          malignant: {
+            type: "array",
+            items: {
+              type: 'string',
+              pattern: pattern_id
+            }
           }
         },
-        required: ['Fx']
+        required: ['Fx', 'malignant']
       }
     },
     required: ['broadcast']
@@ -214,7 +213,6 @@ const InputSchema = {
 
 export class DistributedKeyGeneration extends MultiPartyComputation {
 
-  private readonly t: number;
   private readonly value: BN | undefined;
   public readonly extraParams: any;
   protected InputSchema: object = InputSchema;
@@ -234,14 +232,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     }
   }
 
-  private makeUnique(lists: string[][], threshold) {
-    // @ts-ignore
-    let arr = [].concat(...lists);
-    const counts = countBy(arr);
-    return Object.keys(counts).filter(item => counts[item] >= threshold);
-  }
-
-  round0(_, __, networkId: string): RoundOutput<Round0Result, Round0Broadcast> {
+  round0(_, __, networkId: string, qualified: string[]): RoundOutput<Round0Result, Round0Broadcast> {
     // @ts-ignore
     let fx = new Polynomial(this.t, TssModule.curve, this.value ? TssModule.toBN(this.value) : undefined);
     let hx = new Polynomial(this.t, TssModule.curve);
@@ -260,53 +251,46 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     return {store, send, broadcast}
   }
 
-  round1(prevStepOutput: MapOf<Round0Result>, preStepBroadcast: MapOf<Round0Broadcast>, networkId: string):
-    RoundOutput<Round1Result, Round1Broadcast> {
-    const r0Msgs = this.roundsArrivedMessages['round0']
+  async round1(prevStepOutput: MapOf<Round0Result>, preStepBroadcast: MapOf<Round0Broadcast>, networkId: string, qualified: string[]):
+    Promise<RoundOutput<Round1Result, Round1Broadcast>> {
+    const r0Msgs = this.getRoundReceives('round0')
 
     /** broadcast all commitment hashes received from other participants */
     const allPartiesCommitmentHash = {}
     Object.keys(r0Msgs).forEach(from => {
       allPartiesCommitmentHash[from] = r0Msgs[from].broadcast.commitmentHash
     })
-    const available = Object.keys(r0Msgs)
 
     const store = {}
     const send = {}
 
-    available.forEach(id => {
+    qualified.forEach(id => {
       send[id] = {
-        f: bn2str(this.store['round0'].fx.calc(id)),
-        h: bn2str(this.store['round0'].hx.calc(id)),
+        f: bn2str(this.getStore('round0').fx.calc(id)),
+        h: bn2str(this.getStore('round0').hx.calc(id)),
       }
     })
 
     const broadcast= {
-      commitment: this.store['round0'].commitment,
-      available,
+      commitment: this.getStore('round0').commitment,
       allPartiesCommitmentHash
     }
 
-    return {store, send, broadcast}
+    return {store, send, broadcast, qualifieds: qualified}
   }
 
-  round2(prevStepOutput: MapOf<Round1Result>, preStepBroadcast: MapOf<Round1Broadcast>, networkId: string):
+  round2(prevStepOutput: MapOf<Round1Result>, preStepBroadcast: MapOf<Round1Broadcast>, networkId: string, qualified: string[]):
     RoundOutput<Round2Result, Round2Broadcast> {
     /**
      * Check all partners broadcast same commitment to all other parties.
      */
-    const r0Msg = this.roundsArrivedMessages['round0']
-    const r1Msg = this.roundsArrivedMessages['round1']
+    const r0Msg = this.getRoundReceives('round0')
+    const r1Msg = this.getRoundReceives('round1')
 
-    const availablePartnersList = Object.keys(r1Msg)
-      .map(from => r1Msg[from].broadcast.available);
-    const available = this.makeUnique(availablePartnersList, this.t)
     const malignant: string[] = [];
 
-    // console.log({availablePartnersList, available})
-
     /** check each node's commitments sent to all nodes are the same. */
-    available.forEach(sender => {
+    qualified.forEach(sender => {
       const {commitmentHash: hash1} = r0Msg[sender].broadcast
       /** match sent hash with commitment */
       const realHash = Web3.utils.soliditySha3(
@@ -321,7 +305,11 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       }
 
       /** check for the same commitment sent to all parties */
-      available.every(receiver => {
+      qualified.every(receiver => {
+        if(!r1Msg[receiver]) {
+          console.log(`======= receiver: ${receiver} ======`, {qualified})
+          console.dir(r1Msg, {depth: 4})
+        }
         const hash2 = r1Msg[receiver].broadcast.allPartiesCommitmentHash[sender]
         if(hash1 !== hash2) {
           // throw `complain #1 about partner ${sender}`
@@ -350,29 +338,31 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     /**
      * Propagate data
      */
-    const store = {available, malignant}
+
+    /** exclude malignant from qualified list */
+    const newQualified = qualified
+      .filter(id => !malignant.includes(id))
+
+    const store = {}
     const send = {}
     const broadcast= {
-      Fx: this.store['round0'].Fx.map(pubKey => pubKey.encode('hex', true)),
+      Fx: this.getStore('round0').Fx.map(pubKey => pubKey.encode('hex', true)),
+      malignant,
     }
-    return {store, send, broadcast}
+    return {store, send, broadcast, qualifieds: newQualified}
   }
 
-  round3(prevStepOutput: MapOf<Round2Result>, preStepBroadcast: MapOf<Round2Broadcast>, networkId: string):
+  round3(prevStepOutput: MapOf<Round2Result>, preStepBroadcast: MapOf<Round2Broadcast>, networkId: string, qualified: string[]):
     RoundOutput<Round3Result, Round3Broadcast> {
     /**
      * Check all partners broadcast same commitment to all other parties.
      */
-    const r0Msgs = this.roundsArrivedMessages['round0']
-    const r1Msgs = this.roundsArrivedMessages['round1']
-    const r2Msgs = this.roundsArrivedMessages['round2']
+    const r1Msgs = this.getRoundReceives('round1')
+    const r2Msgs = this.getRoundReceives('round2')
 
-    const {available, malignant: oldMalignant} = this.store['round2']
-    const nonMalignant = available.filter(id => !oldMalignant.includes(id))
-
-    const malignant = [...oldMalignant]
+    const malignant: string[] = []
     /** verify round2.broadcast.Fx received from all partners */
-    nonMalignant.map(sender => {
+    qualified.map(sender => {
       const Fx = r2Msgs[sender].broadcast.Fx.map(k => TssModule.keyFromPublic(k))
       const p1 = TssModule.calcPolyPoint(networkId, Fx);
       const p2 = TssModule.curve.g.mul(TssModule.toBN(r1Msgs[sender].send.f))
@@ -385,43 +375,39 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     /**
      * Propagate data
      */
-    const store = {malignant}
+    const newQualified = qualified.filter(id => !malignant.includes(id));
+
+    const store = {}
     const send = {}
     const broadcast= {
-      malignant
+      malignant,
     }
 
-    return {store, send, broadcast}
+    return {store, send, broadcast, qualifieds: newQualified}
   }
 
-  onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId): any {
+  onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId: string, qualified: string[]): any {
     // console.log(`mpc complete`, roundsArrivedMessages)
-    const r1Msgs = roundsArrivedMessages['round1'],
-      r2Msgs = roundsArrivedMessages['round2'],
-      r3Msgs = roundsArrivedMessages['round3']
+    const r1Msgs = this.getRoundReceives('round1')
+    const r2Msgs = this.getRoundReceives('round2')
 
-    const {available} = this.store['round2']
-    const malignantList = available.map(sender => r3Msgs[sender].broadcast.malignant);
-    const malignant = this.makeUnique(malignantList, this.t);
-    const nonMalignant = available.filter(id => !malignant.includes(id))
-
-    if(nonMalignant.length < this.t) {
+    if(qualified.length < this.t) {
       throw `Insufficient partner to create the Key.`
     }
 
     /** share calculation */
-    let share = nonMalignant
+    let share = qualified
       .map(from => r1Msgs[from].send.f)
       .reduce((acc, current) => {
         acc.iadd(TssModule.toBN(current))
         return acc
       }, TssModule.toBN('0'))
-    const nInv = TssModule.toBN(nonMalignant.length.toString()).invm(TssModule.curve.n!)
+    const nInv = TssModule.toBN(qualified.length.toString()).invm(TssModule.curve.n!)
     share.imul(nInv)
     share = share.umod(TssModule.curve.n)
 
     let totalFx: PublicKey[] = []
-    nonMalignant.forEach((sender, i) => {
+    qualified.forEach((sender, i) => {
       let Fx = r2Msgs[sender].broadcast.Fx;
       if(i === 0)
         totalFx = Fx.map(pub => TssModule.keyFromPublic(pub))
@@ -441,7 +427,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       share,
       TssModule.pub2addr(totalFx[0]),
       totalFx[0],
-      nonMalignant,
+      [...qualified],
       {
         t: 2,
         Fx: totalFx
