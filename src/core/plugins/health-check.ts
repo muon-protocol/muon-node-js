@@ -80,7 +80,8 @@ class HealthCheck extends CallablePlugin {
     return await this.remoteCall(
       node.peerId,
       RemoteMethods.CheckHealth,
-      {log: true}
+      {log: true},
+      {timeout: 5000}
     )
   }
 
