@@ -58,6 +58,8 @@
     "into-stream": "^6.0.0",
     "ipfs-http-client": "^54.0.2",
     "it-concat": "^2.0.0",
+    "it-drain": "^2.0.0",
+    "it-last": "^2.0.0",
     "it-length-prefixed": "^3.1.0",
     "it-pair": "^1.0.0",
     "it-pipe": "^1.1.0",

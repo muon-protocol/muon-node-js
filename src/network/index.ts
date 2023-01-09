@@ -17,6 +17,7 @@ import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
 import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
+import NetworkDHTPlugin from "./plugins/network-dht.js";
 import Log from "../common/muon-log.js"
 
 const log = Log("muon:network");
@@ -280,6 +281,7 @@ async function start() {
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],
       "ipc-handler": [IpcHandlerPlugin, {}],
+      dht: [NetworkDHTPlugin, {}]
     },
     net,
     // TODO: pass it into the tss-plugin
