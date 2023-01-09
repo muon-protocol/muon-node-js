@@ -635,11 +635,25 @@ class TssPlugin extends CallablePlugin {
     let keyGen: DistributedKeyGeneration, dKey: DistKey;
     do {
       keyGen = new DistributedKeyGeneration(
+        /** MPC ID */
         uuid(),
+        /**
+         * starter of MPC
+         * starter have higher priority than others when selecting MPC fully connected sub set.
+         */
+        this.collateralPlugin.currentNodeInfo!.id,
+        /** partners list */
         partners.map(p => p.id),
+        /** DKG threshold */
         party.t,
+        /** DKG value to be shared between partners */
         options.value,
-        {party: party.id, keyId: id || uuid(), lowerThanHalfN: options.lowerThanHalfN}
+        /** extra values usable in DKG */
+        {
+          party: party.id,
+          keyId: id || uuid(),
+          lowerThanHalfN: options.lowerThanHalfN,
+        }
       );
       dKey = await keyGen.runByNetwork(network, timeout)
     }

@@ -16,6 +16,7 @@ export class MultiPartyComputation {
   private readonly constructData;
   protected t: number;
   public readonly id: string;
+  public readonly starter: string
   public readonly partners: string[]
   public readonly rounds: string[]
   private roundsOutput: MapOf<RoundOutput<any, any>> = {};
@@ -24,7 +25,7 @@ export class MultiPartyComputation {
   private roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>> = {}
   protected InputSchema: object;
 
-  constructor(rounds: string[], id: string, partners: string[]) {
+  constructor(rounds: string[], id: string, starter: string, partners: string[]) {
     this.constructData = Object.values(arguments).slice(1)
 
     rounds.forEach(round => {
@@ -34,6 +35,7 @@ export class MultiPartyComputation {
 
     this.id = id || `${Date.now()}${random()}`
 
+    this.starter = starter;
     this.partners = partners
     this.rounds = rounds
 
@@ -119,6 +121,13 @@ export class MultiPartyComputation {
         obj[id] = roundReceivedMsgs[id].qualifieds || defaultQualified
         return obj
       }, {});
+
+    /** remove nodes that not connected with starter node */
+    Object.keys(connectionGraph).forEach(node => {
+      if(!connectionGraph[this.starter].includes(node)) {
+        delete connectionGraph[node];
+      }
+    })
 
     /** find an optimal fully connected sub-graph */
     const fullyConnectedSubGraph = this.findFullyConnectedSubGraph(connectionGraph);

@@ -128,6 +128,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     /** Share PK between parties */
     const mpc = new DistributedKeyGeneration(
       cData.id,
+      this.collateralPlugin.currentNodeInfo!.id,
       cData.partners,
       cData.t,
       cData.pk,

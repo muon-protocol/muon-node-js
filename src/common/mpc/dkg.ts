@@ -217,7 +217,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
   public readonly extraParams: any;
   protected InputSchema: object = InputSchema;
 
-  constructor(id: string, partners: string[], t: number, value?: BN|string, extra: any={}) {
+  constructor(id: string, starter: string, partners: string[], t: number, value?: BN|string, extra: any={}) {
     // @ts-ignore
     super(['round0', 'round1', 'round2', 'round3'], ...Object.values(arguments));
     // console.log(`${this.ConstructorName} construct with`, {id, partners, t, value});
