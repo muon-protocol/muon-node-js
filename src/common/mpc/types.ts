@@ -19,7 +19,8 @@ export type MapOf<T> = {
 
 export type PartnerRoundReceive = {
   send: any,
-  broadcast: any
+  broadcast: any,
+  qualifieds?: string[]
 }
 
 export type RoundOutput<ResultT, BroadcastT> = {
@@ -40,6 +41,8 @@ export type RoundOutput<ResultT, BroadcastT> = {
    */
   qualifieds?: string[]
 }
+
+export type PartyConnectivityGraph = {[index: string]: string[]}
 
 /**
  * Pi receives two type of data from previous step

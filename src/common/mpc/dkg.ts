@@ -427,7 +427,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       share,
       TssModule.pub2addr(totalFx[0]),
       totalFx[0],
-      [...qualified],
+      qualified,
       {
         t: 2,
         Fx: totalFx

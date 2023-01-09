@@ -1,6 +1,6 @@
 import LevelPromise from "./level-promise.js";
 import Ajv from 'ajv';
-import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive} from "./types";
+import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive, PartyConnectivityGraph} from "./types";
 import lodash from 'lodash'
 
 const {countBy} = lodash;
@@ -49,15 +49,82 @@ export class MultiPartyComputation {
     return Object.keys(counts).filter(item => counts[item] >= threshold);
   }
 
-  protected extractQualifiedList(roundReceivedMsgs, defaultQualified) {
-    const availablePartnersList = Object.keys(roundReceivedMsgs)
-      .filter(sender => !!roundReceivedMsgs[sender])
-      .map(from => {
-        return roundReceivedMsgs[from]?.broadcast?.qualifieds || defaultQualified
+  private removeGraphNode(graph: PartyConnectivityGraph, removingNode: string) {
+    delete graph[removingNode]
+    Object.keys(graph).forEach(node => {
+      let index = graph[node].indexOf(removingNode)
+      if(index >= 0)
+        graph[node].splice(index, 1);
+    })
+  }
+
+  private isGraphFullyConnected(graph: PartyConnectivityGraph): boolean {
+    const nodes = Object.keys(graph)
+    // @ts-ignore
+    let connectionsCount = countBy([].concat(...Object.values(graph)))
+
+    /** there is a node without connection */
+    if(nodes.length != Object.keys(connectionsCount).length)
+      return true;
+
+    /** each node is connected with it self too */
+    let numConnections = nodes.length;
+    for(let node of nodes) {
+      if(connectionsCount[node] != numConnections)
+        return false;
+    }
+
+    return true;
+  }
+
+  private findFullyConnectedSubGraph(inputGraph: PartyConnectivityGraph): PartyConnectivityGraph {
+    let graph: PartyConnectivityGraph;
+
+    /** clone input graph */
+    try {
+      graph = JSON.parse(JSON.stringify(inputGraph))
+    }catch (e) {
+      return {}
+    }
+
+    /** remove Unidirectional edges */
+    Object.keys(graph).forEach(node => {
+      graph[node] = graph[node].filter(connection => graph[connection]?.includes(node))
+    })
+
+    /**
+     * sort nodes order by connections|ID
+     * nodes with larger amounts of connections or lower ID have more priority to be selected.
+     */
+    // @ts-ignore
+    const arr = [].concat(...Object.values(graph));
+    const connectionCounts = countBy(arr);
+    let sortedNodes = Object.entries(connectionCounts)
+      .sort((a, b) => {
+        return a[1] > b[1] || parseInt(a[0]) < parseInt(b[0]) ? 1 : -1
       })
-    const qualifieds = this.makeUnique(availablePartnersList, this.t)
-      .filter(sender => !!roundReceivedMsgs[sender])
-    return qualifieds
+      .map(entry => entry[0])
+
+    /** remove low priority nodes one by one, in order to graph be fully connected. */
+    for(let i=0 ; i<sortedNodes.length && !this.isGraphFullyConnected(graph) ; i++) {
+      this.removeGraphNode(graph, sortedNodes[i]);
+    }
+    return graph;
+  }
+
+  private extractQualifiedList(roundReceivedMsgs, defaultQualified) {
+    /** make graph of connection between nodes */
+    let connectionGraph = Object.keys(roundReceivedMsgs).reduce(
+      (obj, id) => {
+        obj[id] = roundReceivedMsgs[id].qualifieds || defaultQualified
+        return obj
+      }, {});
+
+    /** find an optimal fully connected sub-graph */
+    const fullyConnectedSubGraph = this.findFullyConnectedSubGraph(connectionGraph);
+
+    /** return nodes of fully connected sub-graph */
+    return Object.keys(fullyConnectedSubGraph);
   }
 
   async getPartnerRoundData(round: number, partner: string): Promise<PartnerRoundReceive> {
@@ -67,11 +134,12 @@ export class MultiPartyComputation {
       /** wait for the round to be executed and data to be prepared. */
       await this.roundsPromise.waitToLevelResolve(round);
 
-      const {send, broadcast} = this.roundsOutput[strRound]
+      const {send, broadcast, qualifieds} = this.roundsOutput[strRound]
 
       return {
         send: !!send ? send[partner] : undefined,
         broadcast,
+        qualifieds,
       };
     }
     catch (e) {
@@ -114,6 +182,10 @@ export class MultiPartyComputation {
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
+          /** update qualified list based on previous round outputs */
+          qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[previousRound!], qualifiedPartners);
+
+          /** prepare current round input based on previous round output */
           const prevRoundReceives = this.roundsArrivedMessages[previousRound!];
           inputs = qualifiedPartners.map(from => {
             return prevRoundReceives[from].send
@@ -124,6 +196,7 @@ export class MultiPartyComputation {
           }, {})
         }
         /** execute MPC round */
+        console.log(`MPC.processRound[${currentRound}] with qualified list: `, qualifiedPartners);
         this.roundsOutput[currentRound] = await this.processRound(r, inputs, broadcasts, network.id, qualifiedPartners);
         // console.log(`round executed [${network.id}].mpc[${this.id}].${currentRound} ...`, {currentRound, store, send, broadcast})
         this.roundsPromise.resolve(r, true);
@@ -149,13 +222,12 @@ export class MultiPartyComputation {
               })
           })
         )
+        /** store partners output for current round */
         this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {
           if(curr !== null)
             obj[qualifiedPartners[i]] = curr;
           return obj
         }, {})
-
-        qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[currentRound], qualifiedPartners);
       }
 
       // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
