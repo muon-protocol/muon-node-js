@@ -2,6 +2,7 @@ import LevelPromise from "./level-promise.js";
 import Ajv from 'ajv';
 import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive, PartyConnectivityGraph} from "./types";
 import lodash from 'lodash'
+import {timeout} from "../../utils/helpers.js";
 
 const {countBy} = lodash;
 
@@ -180,6 +181,32 @@ export class MultiPartyComputation {
     return this.roundsOutput[round].store;
   }
 
+  private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any) {
+    const roundTitle = this.rounds[roundIndex];
+    let lastError: any;
+    let result: any;
+    for(let i=0 ; i<2 ; i++) {
+      lastError = undefined;
+      try {
+        result = await network.askRoundData(from, this.id, roundIndex, dataToSend);
+        break;
+      }catch (e) {
+        lastError = e;
+        await timeout(1000)
+      }
+    }
+    if(lastError)
+      throw lastError;
+
+    if(this.InputSchema[roundTitle] && !ajv.validate(this.InputSchema[roundTitle], result)){
+      // console.dir({r,currentRound, result}, {depth: null})
+      // @ts-ignore
+      throw ajv.errors.map(e => e.message).join("\n");
+    }
+
+    return result;
+  }
+
   private async process(network: IMpcNetwork, timeout: number) {
     try {
       /** Some partners may be excluded during the MPC process. */
@@ -191,9 +218,6 @@ export class MultiPartyComputation {
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
-          /** update qualified list based on previous round outputs */
-          qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[previousRound!], qualifiedPartners);
-
           /** prepare current round input based on previous round output */
           const prevRoundReceives = this.roundsArrivedMessages[previousRound!];
           inputs = qualifiedPartners.map(from => {
@@ -205,7 +229,7 @@ export class MultiPartyComputation {
           }, {})
         }
         /** execute MPC round */
-        console.log(`MPC.processRound[${currentRound}] with qualified list: `, qualifiedPartners);
+        //console.log(`MPC[${this.id}][${currentRound}] with qualified list: `, qualifiedPartners);
         this.roundsOutput[currentRound] = await this.processRound(r, inputs, broadcasts, network.id, qualifiedPartners);
         // console.log(`round executed [${network.id}].mpc[${this.id}].${currentRound} ...`, {currentRound, store, send, broadcast})
         this.roundsPromise.resolve(r, true);
@@ -216,17 +240,9 @@ export class MultiPartyComputation {
         }
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
           qualifiedPartners.map(partner => {
-            return network.askRoundData(partner, this.id, r, dataToSend)
-              .then(result => {
-                if(this.InputSchema[currentRound] && !ajv.validate(this.InputSchema[currentRound], result)){
-                  // console.dir({r,currentRound, result}, {depth: null})
-                  // @ts-ignore
-                  throw ajv.errors.map(e => e.message).join("\n");
-                }
-                return result;
-              })
+            return this.tryToGetRoundDate(network, partner, r, dataToSend)
               .catch(e => {
-                console.log(`${this.ConstructorName}[network.askRoundData] error at level ${r}`, e)
+                console.log(`${this.ConstructorName}[${this.id}][${currentRound}] error at level ${r}`, e)
                 return null
               })
           })
@@ -237,6 +253,9 @@ export class MultiPartyComputation {
             obj[qualifiedPartners[i]] = curr;
           return obj
         }, {})
+
+        /** update qualified list based on current round outputs */
+        qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[currentRound!], qualifiedPartners);
       }
 
       // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)

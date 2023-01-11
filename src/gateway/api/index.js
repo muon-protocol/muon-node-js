@@ -55,7 +55,7 @@ let cachedNetworkCheck = {
 };
 async function isCurrentNodeInNetwork() {
   /** check every 5 minute */
-  if(Date.now() - cachedNetworkCheck.time > 5*60*1000) {
+  if(Date.now() - cachedNetworkCheck.time > 30e3) {
     cachedNetworkCheck.time = Date.now()
     cachedNetworkCheck.result = await NetworkIpc.isCurrentNodeInNetwork()
   }

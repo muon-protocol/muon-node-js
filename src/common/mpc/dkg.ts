@@ -422,6 +422,8 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       totalFx[i] = pubKey.mul(nInv)
     })
 
+    //console.log(`dkg[${this.id}].onComplete`, {keyId: this.extraParams?.keyId, qualified})
+
     return new DistKey(
       networkId,
       share,
