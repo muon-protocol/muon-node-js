@@ -77,7 +77,12 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
   }
 
   async onPeerDiscovery(peerId) {
-    log(chalk.green(`peer discovered ${this.getNodeId(peerId)}`))
+    const peerInfo: MuonNodeInfo|undefined = this.getNodeInfo(peerId);
+    if(!peerInfo){
+      log(`unknown peer discovered ${peerId2Str(peerId)}`)
+      return;
+    }
+    log(chalk.green(`peer discovered ${peerInfo.id}`))
     // console.log("peer available", peerId)
     await this.waitToLoad();
 
