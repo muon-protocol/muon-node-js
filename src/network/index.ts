@@ -112,7 +112,7 @@ class Network extends Events {
 
     if (this.configs.libp2p.natIp) {
       let { port, natIp } = this.configs.libp2p;
-      this.libp2p.addressManager.addObservedAddr(
+      this.libp2p.components.addressManager.addObservedAddr(
         `/ip4/${natIp}/tcp/${port}/p2p/${peerId2Str(this.peerId)}`
       );
     }
