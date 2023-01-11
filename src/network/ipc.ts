@@ -28,6 +28,14 @@ function broadcastToChannel(channel, message) {
   return call(IpcMethods.BroadcastToChannel, {channel, message})
 }
 
+function putDHT(key, value) {
+  return call(IpcMethods.PutDHT, {key, value})
+}
+
+function getDHT(key) {
+  return call(IpcMethods.GetDHT, {key})
+}
+
 function forwardRemoteCall(peer, method, params, options) {
   return call(IpcMethods.RemoteCall, {peer, method, params, options})
 }
@@ -93,4 +101,6 @@ export {
   isCurrentNodeInNetwork,
   subscribeToBroadcastChannel,
   getUptime,
+  putDHT,
+  getDHT
 }

@@ -224,6 +224,11 @@ async function start() {
           config: {},
         },
         {
+          name: "dht",
+          module: (await import("./plugins/dht.js")).default,
+          config: {},
+        },
+        {
           name: "system",
           module: (await import("./plugins/system.js")).default,
           config: {},
