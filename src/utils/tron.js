@@ -1,7 +1,7 @@
 //It is recommended to use ethers4.0.47 version
-var ethers = require('ethers')
-const TronWeb = require('tronweb')
-const Web3 = require('web3');
+import ethers from 'ethers'
+import TronWeb from 'tronweb'
+import Web3 from 'web3'
 
 // console.log(TronWeb.utils)
 
@@ -98,7 +98,7 @@ function soliditySha3(inputs) {
   return Web3.utils.soliditySha3(...inputs)
 }
 
-module.exports = {
+export {
   TronWeb,
   soliditySha3,
   encodeParams,

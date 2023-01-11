@@ -1,7 +1,7 @@
-var mongoose = require('mongoose');
-const {MODEL_REQ_LOG} = require('./constants')
+import mongoose from 'mongoose'
+import {MODEL_REQ_LOG} from './constants.js'
 
-var modelSchema = mongoose.Schema({
+const modelSchema = mongoose.Schema({
   time: {type: Date},
   ip: {type: String},
   app: {type: String},
@@ -15,4 +15,4 @@ var modelSchema = mongoose.Schema({
   extra: {type: Object},
 });
 
-module.exports = mongoose.model(MODEL_REQ_LOG, modelSchema);
+export default mongoose.model(MODEL_REQ_LOG, modelSchema);

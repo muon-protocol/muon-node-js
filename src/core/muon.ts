@@ -1,17 +1,16 @@
 'use strict'
 /* eslint-disable no-console */
-import {CoreGlobalEvent} from "./ipc";
-
-const Events = require('events')
-const chalk = require('chalk')
-const emoji = require('node-emoji')
-const fs = require('fs')
-const { MessagePublisher, MessageSubscriber } = require('../common/message-bus')
-const { GLOBAL_EVENT_CHANNEL, fireEvent } = require('./ipc')
-import * as NetworkIpc from '../network/ipc'
-import MuonBasePlugin from './plugins/base/base-plugin';
-import BaseAppPlugin from "./plugins/base/base-app-plugin";
-import BasePlugin from "./plugins/base/base-plugin";
+import {CoreGlobalEvent} from "./ipc.js";
+import Events from 'events'
+import chalk from 'chalk'
+import emoji from 'node-emoji'
+import fs from 'fs'
+import { MessagePublisher, MessageSubscriber } from '../common/message-bus/index.js'
+import { GLOBAL_EVENT_CHANNEL, fireEvent } from './ipc.js'
+import * as NetworkIpc from '../network/ipc.js'
+import MuonBasePlugin from './plugins/base/base-plugin.js';
+import BaseAppPlugin from "./plugins/base/base-app-plugin.js";
+import BasePlugin from "./plugins/base/base-plugin.js";
 import {Constructor} from "../common/types";
 
 export type MuonPluginConfigs = any
@@ -118,6 +117,7 @@ export default class Muon extends Events {
   // }
 
   async start() {
+    // @ts-ignore
     this.globalEventBus.on("message", this.onGlobalEventReceived.bind(this));
     this._onceStarted();
 

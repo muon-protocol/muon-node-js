@@ -1,4 +1,4 @@
-import TimeoutPromise from '../../common/timeout-promise'
+import TimeoutPromise from '../../common/timeout-promise.js'
 
 type PartyLoadParams = {
   id?: string,

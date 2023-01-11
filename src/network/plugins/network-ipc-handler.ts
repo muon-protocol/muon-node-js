@@ -1,18 +1,19 @@
-import CallablePlugin from './base/callable-plugin'
-import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
+import CallablePlugin from './base/callable-plugin.js'
+import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
 import {IpcCallOptions} from "../../common/types";
-import CollateralInfoPlugin from "./collateral-info";
-import QueueProducer from "../../common/message-bus/queue-producer";
-let requestQueue = new QueueProducer(`gateway-requests`);
+import CollateralInfoPlugin from "./collateral-info.js";
+import QueueProducer from "../../common/message-bus/queue-producer.js";
 import _ from 'lodash';
-import RemoteCall from "./remote-call";
-import NetworkBroadcastPlugin from "./network-broadcast";
-import NetworkContentPlugin from "./content-plugin";
+import RemoteCall from "./remote-call.js";
+import NetworkBroadcastPlugin from "./network-broadcast.js";
+import NetworkContentPlugin from "./content-plugin.js";
+import {timeout} from '../../utils/helpers.js'
+import NodeCache from 'node-cache'
+import * as CoreIpc from '../../core/ipc.js'
+import Log from '../../common/muon-log.js'
 
-const {timeout} = require('../../utils/helpers')
-const NodeCache = require('node-cache');
-const coreIpc = require('../../core/ipc')
-const log = require('../../common/muon-log')('muon:network:plugins:ipc-handler')
+const log = Log('muon:network:plugins:ipc-handler')
+let requestQueue = new QueueProducer(`gateway-requests`);
 
 const tasksCache = new NodeCache({
   stdTTL: 6 * 60, // Keep distributed keys in memory for 6 minutes
@@ -59,6 +60,7 @@ class NetworkIpcHandler extends CallablePlugin {
   async onStart() {
     super.onStart()
 
+    // @ts-ignore
     this.network.once('peer:connect', async (peerId) => {
       await timeout(5000);
     })
@@ -78,6 +80,10 @@ class NetworkIpcHandler extends CallablePlugin {
 
   get contentPlugin(): NetworkContentPlugin {
     return this.network.getPlugin('content');
+  }
+
+  get RemoteCallExecEndPoint(): string {
+    return this.remoteMethodEndpoint(RemoteMethods.ExecIpcRemoteCall);
   }
 
   /**
@@ -125,10 +131,6 @@ class NetworkIpcHandler extends CallablePlugin {
     let pList = Object.values(this.clustersPids);
     const index = Math.floor(Math.random() * pList.length)
     return pList[index]
-  }
-
-  getTaskProcess(taskId: string): number {
-    return tasksCache.get(taskId);
   }
 
   @ipcMethod(IpcMethods.ReportClusterStatus)
@@ -288,7 +290,8 @@ class NetworkIpcHandler extends CallablePlugin {
         this.assignTaskToProcess(taskId, options.pid);
       }
     }
-    return await coreIpc.forwardRemoteCall(data, _.omit(callerInfo, ['peer']), options);
+    // @ts-ignore
+    return await CoreIpc.forwardRemoteCall(data, _.omit(callerInfo, ['peer']), options);
   }
 
   @remoteMethod(RemoteMethods.ExecGateWayRequest)

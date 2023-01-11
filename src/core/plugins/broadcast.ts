@@ -1,6 +1,6 @@
-import BasePlugin from './base/base-plugin'
-import * as NetworkIpc from '../../network/ipc'
-import QueueConsumer from '../../common/message-bus/queue-consumer'
+import BasePlugin from './base/base-plugin.js'
+import * as NetworkIpc from '../../network/ipc.js'
+import QueueConsumer from '../../common/message-bus/queue-consumer.js'
 
 export const BROADCAST_CHANNEL = 'core-broadcast';
 
@@ -34,6 +34,7 @@ export default class CoreBroadcastPlugin extends BasePlugin {
       throw "broadcast channel not defined";
 
     // if(this.listenerCount(`${channel}`) > 0){
+      // @ts-ignore
       return await this.emit(channel, message, callerInfo);
     // }
     // else {

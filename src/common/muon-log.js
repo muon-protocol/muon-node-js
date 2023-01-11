@@ -1,9 +1,9 @@
-const Log = require('debug')
+import debug from 'debug'
 
 function makeLog(title) {
-  let log = Log(title)
+  let log = debug(title)
   log.log = console.log.bind(console);
   return log
 }
 
-module.exports = makeLog;
+export default makeLog;

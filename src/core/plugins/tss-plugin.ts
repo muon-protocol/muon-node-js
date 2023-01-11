@@ -1,23 +1,28 @@
-import CallablePlugin from './base/callable-plugin'
-import DistributedKey from "../../utils/tss/distributed-key";
-const {shuffle} = require('lodash')
-const tssModule = require('../../utils/tss/index')
-const {utils:{toBN}} = require('web3')
-const {timeout, stackTrace, uuid} = require('../../utils/helpers');
-import {remoteApp, remoteMethod, broadcastHandler} from './base/app-decorators'
-import CollateralInfoPlugin from "./collateral-info";
-const NodeCache = require('node-cache');
-import * as SharedMemory from '../../common/shared-memory'
-const NetworkIpc = require('../../network/ipc')
-import * as CoreIpc from '../ipc'
+import CallablePlugin from './base/callable-plugin.js'
+import DistributedKey from "../../utils/tss/distributed-key.js";
+import lodash from 'lodash'
+import * as tssModule from '../../utils/tss/index.js'
+import Web3 from 'web3'
+import {timeout, stackTrace, uuid} from '../../utils/helpers.js'
+import {remoteApp, remoteMethod, broadcastHandler} from './base/app-decorators.js'
+import CollateralInfoPlugin from "./collateral-info.js";
+import NodeCache from 'node-cache'
+import * as SharedMemory from '../../common/shared-memory/index.js'
+import * as NetworkIpc from '../../network/ipc.js'
+import * as CoreIpc from '../ipc.js'
 import {MuonNodeInfo} from "../../common/types";
-import AppManager from "./app-manager";
+import AppManager from "./app-manager.js";
 import BN from 'bn.js';
-import TssParty from "../../utils/tss/party";
+import TssParty from "../../utils/tss/party.js";
 import {IMpcNetwork} from "../../common/mpc/types";
-import {MultiPartyComputation} from "../../common/mpc/base";
-import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg";
-const log = require('../../common/muon-log')('muon:core:plugins:tss')
+import {MultiPartyComputation} from "../../common/mpc/base.js";
+import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg.js";
+import Log from '../../common/muon-log.js'
+import {bn2hex} from "../../utils/tss/utils.js";
+
+const {shuffle} = lodash;
+const {utils:{toBN}} = Web3;
+const log = Log('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
 
@@ -53,7 +58,7 @@ export type KeyGenOptions = {
   /**
    * If you set this value, the value will be shared between partners.
    */
-  value?: BN,
+  value?: string,
 
   lowerThanHalfN?: boolean,
 }
@@ -90,6 +95,7 @@ class TssPlugin extends CallablePlugin {
     this.muon.on('global-tss-key:generate', this.onTssKeyGenerate.bind(this));
     this.muon.on('party:generate', this.loadParty.bind(this));
 
+    // @ts-ignore
     this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
 
     await this.collateralPlugin.waitToLoad()
@@ -225,6 +231,7 @@ class TssPlugin extends CallablePlugin {
     this.tssParty = party;
     log(`tss party loaded.`)
 
+    // @ts-ignore
     this.emit('party-load');
 
     // this.tryToFindOthers(3);
@@ -414,7 +421,7 @@ class TssPlugin extends CallablePlugin {
         // shared part of distributedKey
         share: `0x${key.share.toString(16)}`,
         // distributedKey public
-        publicKey: `${key.publicKey.encode('hex')}`,
+        publicKey: `${key.publicKey.encode('hex', true)}`,
         // distributed key address
         address: tssModule.pub2addr(key.publicKey)
       }
@@ -429,7 +436,7 @@ class TssPlugin extends CallablePlugin {
     // console.log(`TssPlugin.loadParty`, party)
     if(party.partners.lengh > 0 && typeof party.partners[0] !== "string") {
       console.log("TssPlugin.loadParty.partners most be string array", party.partners)
-      stackTrace()
+      console.log(stackTrace())
     }
     try {
       let p = TssParty.load(party)
@@ -489,10 +496,11 @@ class TssPlugin extends CallablePlugin {
     }
 
     let myIndex = this.currentNodeInfo!.id;
+    // @ts-ignore
     let reconstructed = tssModule.reconstructKey(shares, this.TSS_THRESHOLD, myIndex)
     // console.log({recon: reconstructed.toString(16)})
 
-    let myKey = tssModule.subKeys(reconstructed, nonce.share)
+    let myKey = reconstructed.sub(nonce.share!).mod(tssModule.curve.n!)
     // console.log({myKey: '0x'+myKey.toString(16)})
     // this.parties[party.id] = party
     let tssKey = DistributedKey.load(this.tssParty, {
@@ -616,7 +624,7 @@ class TssPlugin extends CallablePlugin {
       partners = partners.filter(({wallet}) => (wallet !== process.env.SIGN_WALLET_ADDRESS))
       partners = [
         /** self */
-        this.currentNodeInfo,
+        this.currentNodeInfo!,
         /** randomly select (maxPartners - 1) from others */
         ...shuffle(partners).slice(0, maxPartners - 1)
       ];
@@ -627,11 +635,25 @@ class TssPlugin extends CallablePlugin {
     let keyGen: DistributedKeyGeneration, dKey: DistKey;
     do {
       keyGen = new DistributedKeyGeneration(
+        /** MPC ID */
         uuid(),
+        /**
+         * starter of MPC
+         * starter have higher priority than others when selecting MPC fully connected sub set.
+         */
+        this.collateralPlugin.currentNodeInfo!.id,
+        /** partners list */
         partners.map(p => p.id),
+        /** DKG threshold */
         party.t,
+        /** DKG value to be shared between partners */
         options.value,
-        {party: party.id, keyId: id || uuid(), lowerThanHalfN: options.lowerThanHalfN}
+        /** extra values usable in DKG */
+        {
+          party: party.id,
+          keyId: id || uuid(),
+          lowerThanHalfN: options.lowerThanHalfN,
+        }
       );
       dKey = await keyGen.runByNetwork(network, timeout)
     }
@@ -640,9 +662,9 @@ class TssPlugin extends CallablePlugin {
     // @ts-ignore
     let key = DistributedKey.load(party, {
       id: keyGen.extraParams.keyId!,
-      share: dKey.share,
+      share: bn2hex(dKey.share),
       publicKey: dKey.publicKey,
-      partners: keyGen.partners
+      partners: dKey.partners
     })
 
     await SharedMemory.set(keyGen.extraParams.keyId, key.toSerializable(), 30*60*1000)
@@ -731,14 +753,14 @@ class TssPlugin extends CallablePlugin {
       throw `Cannot use tss key as nonce`;
 
     let nonce = await this.getSharedKey(nonceId)
-    let keyPart = tssModule.addKeys(nonce.share, tssKey!.share);
+    let keyPart = nonce.share!.add(tssKey.share!).mod(tssModule.curve.n!);
     return {
       id: tssKey!.id,
       recoveryShare: `0x${keyPart.toString(16)}`,
       // distributedKey public
       publicKey: `${tssKey!.publicKey!.encode('hex', true)}`,
       // distributed key address
-      address: tssModule.pub2addr(tssKey!.publicKey)
+      address: tssModule.pub2addr(tssKey!.publicKey!)
     }
   }
 

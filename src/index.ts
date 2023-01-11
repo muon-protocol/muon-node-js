@@ -1,12 +1,16 @@
 import cluster, {Worker} from 'cluster'
 import * as os from 'os'
-const log = require('./common/muon-log')('muon:boot')
+import Log from './common/muon-log.js'
+import * as Gateway from './gateway/index.js'
+import * as Network from './network/index.js'
+import * as Core from './core/index.js'
+import * as NetworkIpc from './network/ipc.js'
+import * as SharedMemory from './common/shared-memory/index.js'
+import { parseBool, timeout } from './utils/helpers.js'
+import { createRequire } from "module";
 
-const Gateway = require('./gateway')
-const Network = require('./network');
-const NetworkIpc = require('./network/ipc');
-const SharedMemory = require('./common/shared-memory')
-const { parseBool, timeout } = require('./utils/helpers')
+// const require = createRequire(import.meta.url);
+const log = Log('muon:boot')
 
 process.on('unhandledRejection', function(reason, _promise) {
   console.log("Unhandled promise rejection", reason, _promise);
@@ -95,10 +99,11 @@ async function boot() {
     }
   } else {
     log(`application cluster start pid:${process.pid}`)
-    require('./core').start();
+    // require('./core').start();
+    Core.start();
   }
 
-  // require('./core').start();
+  // Core.start();
 }
 
 boot();

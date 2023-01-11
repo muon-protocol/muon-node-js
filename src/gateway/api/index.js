@@ -1,16 +1,18 @@
-let router = require('express').Router();
-const RequestLog = require('../../common/db-models/RequestLog')
-const {QueueProducer} = require('../../common/message-bus')
-let requestQueue = new QueueProducer(`gateway-requests`);
-let {parseBool} = require('../../utils/helpers')
-let soliditySha3 = require('../../utils/soliditySha3')
-const CoreIpc = require('../../core/ipc')
-const NetworkIpc = require('../../network/ipc')
-const axios = require('axios').default
-const crypto = require('../../utils/crypto')
-const log = require('../../common/muon-log')('muon:gateway:api')
-const Ajv = require("ajv")
+import {Router} from 'express'
+import RequestLog from '../../common/db-models/RequestLog.js'
+import {QueueProducer} from '../../common/message-bus/index.ts'
+import {parseBool} from '../../utils/helpers.js'
+import soliditySha3 from '../../utils/soliditySha3.js'
+import * as CoreIpc from '../../core/ipc.ts'
+import * as NetworkIpc from '../../network/ipc.ts'
+import axios from 'axios'
+import * as crypto from '../../utils/crypto.js'
+import Log from '../../common/muon-log.js'
+import Ajv from "ajv"
+
+const log = Log('muon:gateway:api')
 const ajv = new Ajv()
+let requestQueue = new QueueProducer(`gateway-requests`);
 
 const SHIELD_FORWARD_URL = process.env.SHIELD_FORWARD_URL
 const appIsShielded = (process.env.SHIELDED_APPS || "")
@@ -53,7 +55,7 @@ let cachedNetworkCheck = {
 };
 async function isCurrentNodeInNetwork() {
   /** check every 5 minute */
-  if(Date.now() - cachedNetworkCheck.time > 5*60*1000) {
+  if(Date.now() - cachedNetworkCheck.time > 30e3) {
     cachedNetworkCheck.time = Date.now()
     cachedNetworkCheck.result = await NetworkIpc.isCurrentNodeInNetwork()
   }
@@ -138,6 +140,8 @@ const MUON_REQUEST_SCHEMA = {
   required: ["app", "method"],
   // additionalProperties: false,
 }
+
+let router = Router();
 
 router.use('/', async (req, res, next) => {
   let mixed = {
@@ -245,4 +249,4 @@ router.use('/', async (req, res, next) => {
   }
 })
 
-module.exports = router
+export default router

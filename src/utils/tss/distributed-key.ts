@@ -1,12 +1,13 @@
-import Polynomial from './polynomial'
-import Party from './party'
+import Polynomial from './polynomial.js'
+import Party from './party.js'
 import BN from 'bn.js';
 import { PublicKey } from './types'
-const tss = require('./index')
-const {utils:{toBN}} = require('web3')
-import TimeoutPromise from '../../common/timeout-promise'
-const assert = require('assert')
+import * as tss from './index.js'
+import Web3 from 'web3'
+import TimeoutPromise from '../../common/timeout-promise.js'
+import assert from 'assert'
 
+const {utils:{toBN}} = Web3
 const random = () => Math.floor(Math.random()*9999999)
 
 export type KeyPart = {
@@ -58,10 +59,10 @@ class DistributedKey {
   timeoutPromise: TimeoutPromise;
 
   share: BN | null = null;
-  sharePubKey = null;
+  sharePubKey: string;
   publicKey: PublicKey | null = null
   partnersPubKey = {}
-  address = null
+  address: string
 
   constructor(party, id, timeout?: number, value?: BN){
     this.id = id || `K${Date.now()}${random()}`
@@ -80,7 +81,7 @@ class DistributedKey {
     this.timeoutPromise = new TimeoutPromise(timeout, "DistributedKey timeout")
   }
 
-  static loadPubKey(publicKey) {
+  static loadPubKey(publicKey): PublicKey {
     if(typeof publicKey === "string")
       return tss.keyFromPublic(publicKey.replace("0x", ""), "hex")
     else if(Array.isArray(publicKey))
@@ -95,7 +96,7 @@ class DistributedKey {
     key.f_x = null;
     key.h_x = null;
     key.share = toBN(_key.share);
-    key.sharePubKey = tss.keyFromPrivate(_key.share).getPublic().encode('hex');
+    key.sharePubKey = tss.keyFromPrivate(_key.share).getPublic().encode('hex', true);
     key.publicKey = this.loadPubKey(_key.publicKey)
     key.address = tss.pub2addr(key.publicKey)
     if(_key.partners)
@@ -163,7 +164,7 @@ class DistributedKey {
     if(this.isKeyDistributed()){
       let fh = this.getTotalFH()
       this.share = fh.f;
-      this.sharePubKey = tss.keyFromPrivate(fh.f).getPublic().encode('hex')
+      this.sharePubKey = tss.keyFromPrivate(fh.f).getPublic().encode('hex', true)
       this.publicKey = this.getTotalPubKey();
       this.address = tss.pub2addr(this.publicKey)
       this.timeoutPromise.resolve(this)
@@ -175,10 +176,12 @@ class DistributedKey {
     let f = toBN(0)
     let h = toBN(0)
     for(const [i, {f: _f, h: _h}] of Object.entries(this.keyParts)){
+      // @ts-ignore
       f.iadd(toBN(_f))
+      // @ts-ignore
       h.iadd(toBN(_h))
     }
-    return {f:f.umod(tss.curve.n), h: h.umod(tss.curve.n)}
+    return {f:f.umod(tss.curve.n!), h: h.umod(tss.curve.n!)}
   }
 
   /**
@@ -191,25 +194,26 @@ class DistributedKey {
     if(!this.partnersPubKey[idx]) {
       this.partnersPubKey[idx] = Object.entries(this.pubKeyParts)
       // .filter(([i, A_ik]) => parseInt(i) !== idx)
+        // @ts-ignore
         .reduce((acc, [i, A_ik]) => {
-          return tss.pointAdd(acc, tss.calcPolyPoint(idx, A_ik))
+          return tss.pointAdd(acc!, tss.calcPolyPoint(idx, A_ik))
         }, null)
     }
     return this.partnersPubKey[idx]
   }
 
-  getTotalPubKey(){
+  getTotalPubKey(): PublicKey{
     assert(
       // TODO: replace with this.partners.length
       this.party && Object.keys(this.pubKeyParts).length >= this.party.t,
       `DistributedKey is not completed for computing totalPubKey. {t: ${this?.party?.t}, n: ${Object.keys(this.pubKeyParts).length}}`
     )
     // calculate shared key
-    let totalPubKey = null
+    let totalPubKey: PublicKey
     for(const [i, A_ik] of Object.entries(this.pubKeyParts)){
-      totalPubKey = tss.pointAdd(totalPubKey, A_ik[0])
+      totalPubKey = tss.pointAdd(totalPubKey!, A_ik[0])
     }
-    return totalPubKey
+    return totalPubKey!
   }
 
   isKeyDistributed(){

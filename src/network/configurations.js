@@ -1,5 +1,10 @@
-const mkdirp = require('mkdirp')
-const path = require('path')
+import mkdirp from 'mkdirp'
+import path from 'path'
+import {filePathInfo} from "../utils/helpers.js";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const {__dirname} = filePathInfo(import.meta)
 
 const getConfDir = () => {
   let baseDir = `../../config/`
@@ -41,4 +46,4 @@ async function configurations(){
   }
 }
 
-module.exports = configurations;
+export default configurations;

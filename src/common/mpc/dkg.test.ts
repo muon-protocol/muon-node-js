@@ -4,13 +4,17 @@
  * Sign message
  * Verify signature
  */
-import {DistributedKeyGeneration} from "./dkg";
-import FakeNetwork from './fake-network';
-import {bn2str} from './utils'
-const {toBN, randomHex} = require('web3').utils
-const TssModule = require('../../utils/tss/index')
-import {uniq} from 'lodash'
+import {DistributedKeyGeneration} from "./dkg.js";
+import FakeNetwork from './fake-network.js';
+import {bn2str} from './utils.js'
+import Web3 from 'web3'
+import elliptic from 'elliptic'
+import * as TssModule from '../../utils/tss/index.js'
+import lodash from 'lodash'
 
+const {uniq} = lodash
+const {toBN, randomHex} = Web3.utils
+const ellipticCurve = new elliptic.ec('secp256k1');
 
 /**
  * Share privateKey between 5 individuals
@@ -52,18 +56,19 @@ async function run() {
     ...(new Array(100).fill(null)),
 
     /** 100 random and known private key */
-      ...(new Array(100).fill(0).map(() => bn2str(toBN(randomHex(32)).umod(N)))),
+    ...(new Array(100).fill(0).map(() => bn2str(toBN(randomHex(32)).umod(N!)))),
 
     /** last 5 private keys */
-    bn2str(TssModule.curve.n.subn(5)),
-    bn2str(TssModule.curve.n.subn(4)),
-    bn2str(TssModule.curve.n.subn(3)),
-    bn2str(TssModule.curve.n.subn(2)),
-    bn2str(TssModule.curve.n.subn(1)),
+    bn2str(TssModule.curve.n!.subn(5)),
+    bn2str(TssModule.curve.n!.subn(4)),
+    bn2str(TssModule.curve.n!.subn(3)),
+    bn2str(TssModule.curve.n!.subn(2)),
+    bn2str(TssModule.curve.n!.subn(1)),
   ]
 
   const t1 = Date.now()
   for(let i=0 ; i<specialPrivateKeys.length ; i++) {
+    const startTime = Date.now();
     // const realPrivateKey = bn2str(toBN(randomHex(32)).umod(N));
     const realPrivateKey = specialPrivateKeys[i];
     const realPubKey = realPrivateKey ? TssModule.keyFromPrivate(realPrivateKey).getPublic().encode("hex", true) : null;
@@ -100,7 +105,7 @@ async function run() {
 
     const pubKeyList = allNodeResults.map(key => key.publicKey)
     if(uniq(pubKeyList).length===1 && resultOk(realPrivateKey, realPubKey, allNodeResults[0].publicKey, reconstructedKey, reconstructedPubKey))
-      console.log(`i: ${i}, match: OK, key party: ${allNodeResults[0].partners}`)
+      console.log(`i: ${i}, match: OK, key party: ${allNodeResults[0].partners} time: ${Date.now() - startTime} ms`)
     else {
       console.log(`i: ${i}, match: false`)
       console.log({
@@ -126,5 +131,3 @@ run()
   .then(() => {
     process.exit(0)
   })
-
-

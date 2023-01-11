@@ -1,8 +1,8 @@
-var mongoose = require('mongoose');
-const {MODEL_CONTENT} = require('./constants')
-const {createCIDFromString, cid2str} = require('../../utils/cid')
+import mongoose from 'mongoose'
+import {MODEL_CONTENT} from './constants.js'
+import {createCIDFromString, cid2str} from '../../utils/cid.js'
 
-var modelSchema = mongoose.Schema({
+const modelSchema = mongoose.Schema({
   cid: {type: String, required: true},
   reqId: {type: String, /**required: true*/},
   content: {type: String, required: true},
@@ -10,9 +10,10 @@ var modelSchema = mongoose.Schema({
 }, {timestamps: true});
 modelSchema.index({createdAt: 1},{expireAfterSeconds: 60 * 60});
 
-const Model = module.exports = mongoose.model(MODEL_CONTENT, modelSchema);
+const Model = mongoose.model(MODEL_CONTENT, modelSchema);
+export default Model;
 
-module.exports.create = async data => {
+export const create = async data => {
   let content = typeof data === 'string' ? data : JSON.stringify(data);
   let cid = await createCIDFromString(content)
 

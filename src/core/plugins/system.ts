@@ -1,19 +1,19 @@
-import CallablePlugin from './base/callable-plugin'
-import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators'
+import CallablePlugin from './base/callable-plugin.js'
+import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
-const soliditySha3 = require('../../utils/soliditySha3');
-const {toBN} = require('../../utils/tss/utils');
-const tssModule = require('../../utils/tss');
-const AppContext = require("../../common/db-models/AppContext")
-const AppTssConfig = require("../../common/db-models/AppTssConfig")
-import * as NetworkIpc from '../../network/ipc'
-import DistributedKey from "../../utils/tss/distributed-key";
-import AppManager from "./app-manager";
-import useDistributedKey from "../../utils/tss/use-distributed-key";
-const { timeout } = require('../../utils/helpers')
-const { promisify } = require("util");
+import soliditySha3 from '../../utils/soliditySha3.js'
+import * as tssModule from '../../utils/tss/index.js'
+import AppContext from "../../common/db-models/AppContext.js"
+import AppTssConfig from "../../common/db-models/AppTssConfig.js"
+import * as NetworkIpc from '../../network/ipc.js'
+import DistributedKey from "../../utils/tss/distributed-key.js";
+import AppManager from "./app-manager.js";
+import useDistributedKey from "../../utils/tss/use-distributed-key.js";
+import {pub2json, timeout} from '../../utils/helpers.js'
+import { promisify } from "util"
+import {bn2hex} from "../../utils/tss/utils.js";
 
 const RemoteMethods = {
   InformAppDeployed: "informAppDeployed",
@@ -207,17 +207,12 @@ class System extends CallablePlugin {
 
     /** store tss key */
     let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
-    await useDistributedKey(key.publicKey!.encodeCompressed('hex'), `app-${appId}-tss`)
+    await useDistributedKey(key.publicKey!.encode('hex', true), `app-${appId}-tss`)
     await this.appManager.saveAppTssConfig({
       version: context.version,
       appId: appId,
-      publicKey: {
-        address: key.address,
-        encoded: '0x' + key.publicKey?.encodeCompressed('hex'),
-        x: '0x' + key.publicKey?.getX().toBuffer('be',32).toString('hex'),
-        yParity: key.publicKey?.getY().isEven() ? 0 : 1,
-      },
-      keyShare: key.share?.toBuffer('be', 32).toString('hex'),
+      publicKey: pub2json(key.publicKey!),
+      keyShare: bn2hex(key.share!),
     })
   }
 
@@ -231,7 +226,7 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async generateReshareNonce(appId, reqId) {
-    let key = await this.tssPlugin.keyGen(undefined, {id: `reshare-${appId}-${reqId}`, value: toBN('2')})
+    let key = await this.tssPlugin.keyGen(undefined, {id: `reshare-${appId}-${reqId}`, value: '1'})
     /**
      * Ethereum addresses
      * [0]: 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf
@@ -240,7 +235,7 @@ class System extends CallablePlugin {
      */
     console.log({
       expected: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
-      calculated: tssModule.pub2addr(key.publicKey)
+      calculated: tssModule.pub2addr(key.publicKey!)
     })
     return key.publicKey
   }
@@ -293,12 +288,7 @@ class System extends CallablePlugin {
 
     return {
       id: key.id,
-      publicKey: {
-        address: key.address,
-        encoded: key.publicKey?.encodeCompressed("hex"),
-        x: key.publicKey?.getX().toBuffer('be', 32).toString('hex'),
-        yParity: key.publicKey?.getY().isEven() ? 0 : 1
-      }
+      publicKey: pub2json(key.publicKey!)
     }
   }
 }

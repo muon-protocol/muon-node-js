@@ -6,8 +6,8 @@
  *
  */
 
-import TimeoutPromise from '../../../common/timeout-promise'
-const NodeCache = require('node-cache');
+import TimeoutPromise from '../../../common/timeout-promise.js'
+import NodeCache from 'node-cache'
 
 const requestCache = new NodeCache({
   /**
@@ -24,12 +24,21 @@ const requestCache = new NodeCache({
   useClones: false,
 });
 
+type CacheItem = {
+  partnerCount: number,
+  requestTimeout: number,
+  request: object,
+  signatures: object,
+  errors: object,
+  promise: TimeoutPromise,
+}
+
 export default class AppRequestManager{
 
   constructor(){
   }
 
-  getItem(reqId){
+  getItem(reqId): CacheItem | undefined{
     return requestCache.get(reqId.toString());
   }
 
@@ -55,22 +64,25 @@ export default class AppRequestManager{
     }
   }
 
-  hasRequest(reqId){
+  hasRequest(reqId): boolean{
     return requestCache.has(reqId);
   }
 
   setPartnerCount(reqId, partnerCount) {
-    let item = this.getItem(reqId);
-    item.partnerCount = partnerCount
+    let item:CacheItem|undefined = this.getItem(reqId);
+    if(item) {
+      item.partnerCount = partnerCount
+    }
   }
 
-  getRequest(reqId){
-    return requestCache.get(reqId).request
+  getRequest(reqId): object | undefined{
+    const item: CacheItem | undefined = requestCache.get(reqId)
+    return !!item ? item.request : undefined
   }
 
   addSignature(reqId, owner, sign){
-    let item = this.getItem(reqId);
-    if(item.signatures[owner] === undefined){
+    let item: CacheItem | undefined = this.getItem(reqId);
+    if(item && item.signatures[owner] === undefined){
       item.signatures[owner] = sign
       if(this.isRequestFullFilled(reqId)){
         if(item.promise)
@@ -81,18 +93,21 @@ export default class AppRequestManager{
 
   addError(reqId, owner, error) {
     // console.log('AppRequestManager.addError: request error', reqId, owner, error);
-    let item = this.getItem(reqId);
-    if(item.errors[owner] === undefined){
+    let item: CacheItem | undefined = this.getItem(reqId);
+    if(item && item.errors[owner] === undefined){
       item.errors[owner] = error
       if(this.isRequestFailed(reqId)){
-        const req = this.getRequest(reqId);
+        const req = this.getRequest(reqId)!;
         if(item.promise)
           item.promise.reject({
             message: "Request failed to confirm.",
             data: {
               app: {
+                // @ts-ignore
                 name: req.app,
+                // @ts-ignore
                 method: req.method,
+                // @ts-ignore
                 params: req.data.params,
               },
               responses: item.signatures,
@@ -104,13 +119,19 @@ export default class AppRequestManager{
   }
 
   isRequestFullFilled(reqId){
-    let item = this.getItem(reqId);
+    let item: CacheItem|undefined = this.getItem(reqId);
+    if(!item)
+      return false
+    // @ts-ignore
     let {request: {nSign}, signatures: sigs} = item
     return !!sigs && Object.keys(sigs).length >= nSign;
   }
 
   isRequestFailed(reqId){
-    let item = this.getItem(reqId);
+    let item: CacheItem | undefined = this.getItem(reqId);
+    if(!item)
+      return false
+    // @ts-ignore
     let {request: {nSign}, errors, signatures} = item
     const signCount = Object.keys(signatures).length
     const needMoreSignature = nSign - signCount;
@@ -126,6 +147,7 @@ export default class AppRequestManager{
       return Promise.reject({message: "RequestManager: request not added to RequestManager"})
 
     let {request, signatures} = item;
+    // @ts-ignore
     if(signatures && Object.keys(signatures).length >= request.nSign){
       return Promise.resolve(signatures)
     }

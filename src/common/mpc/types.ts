@@ -19,7 +19,8 @@ export type MapOf<T> = {
 
 export type PartnerRoundReceive = {
   send: any,
-  broadcast: any
+  broadcast: any,
+  qualifieds?: string[]
 }
 
 export type RoundOutput<ResultT, BroadcastT> = {
@@ -34,8 +35,14 @@ export type RoundOutput<ResultT, BroadcastT> = {
   /**
    * Pi broadcast a BroadcastT to all other participants
    */
-  broadcast: null | BroadcastT
+  broadcast: null | BroadcastT,
+  /**
+   * non-responding and malignant partners excluded from mail list
+   */
+  qualifieds?: string[]
 }
+
+export type PartyConnectivityGraph = {[index: string]: string[]}
 
 /**
  * Pi receives two type of data from previous step

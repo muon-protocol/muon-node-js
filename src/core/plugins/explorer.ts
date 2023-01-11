@@ -1,15 +1,15 @@
-import CallablePlugin from './base/callable-plugin'
-const Content = require('../../common/db-models/Content')
-import {remoteApp, remoteMethod, gatewayMethod, globalBroadcastHandler, broadcastHandler} from './base/app-decorators'
-import TssPlugin from "./tss-plugin";
+import CallablePlugin from './base/callable-plugin.js'
+import Content from '../../common/db-models/Content.js'
+import {remoteApp, remoteMethod, gatewayMethod, globalBroadcastHandler, broadcastHandler} from './base/app-decorators.js'
+import TssPlugin from "./tss-plugin.js";
 import {MuonNodeInfo, Override} from "../../common/types";
-import HealthCheck from "./health-check";
+import HealthCheck from "./health-check.js";
 import {GatewayCallData} from "../../gateway/types";
-import AppManager from "./app-manager";
-import * as NetworkIpc from '../../network/ipc'
-import {GlobalBroadcastChannels} from "../../common/contantes";
-import CollateralInfoPlugin from "./collateral-info";
-const {timeout} = require('../../utils/helpers')
+import AppManager from "./app-manager.js";
+import * as NetworkIpc from '../../network/ipc.js'
+import {GlobalBroadcastChannels} from "../../common/contantes.js";
+import CollateralInfoPlugin from "./collateral-info.js";
+import {timeout} from '../../utils/helpers.js'
 
 type GetTransactionData = Override<GatewayCallData, {params: { reqId: string }}>
 

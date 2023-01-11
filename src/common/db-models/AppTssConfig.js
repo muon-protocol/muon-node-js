@@ -1,8 +1,5 @@
-var mongoose = require('mongoose');
-const {
-    MODEL_APP_CONTEXT,
-    MODEL_APP_TSS_CONFIG
-} = require('./constants')
+import mongoose from 'mongoose'
+import {MODEL_APP_CONTEXT, MODEL_APP_TSS_CONFIG} from './constants.js'
 
 const TssPublicKeyInfo = mongoose.Schema({
     address: {type: String, required: true},
@@ -11,7 +8,7 @@ const TssPublicKeyInfo = mongoose.Schema({
     yParity: {type: Number, enum: [0, 1], required: true},
 },{_id: false})
 
-var modelSchema = mongoose.Schema({
+const modelSchema = mongoose.Schema({
     version: {type: Number},
     appId: {type: String, required: true},
     publicKey: {type: TssPublicKeyInfo, required: true},
@@ -25,4 +22,4 @@ modelSchema.pre('save', function (next) {
     next();
 })
 
-module.exports = mongoose.model(MODEL_APP_TSS_CONFIG, modelSchema);
+export default mongoose.model(MODEL_APP_TSS_CONFIG, modelSchema);

@@ -1,7 +1,7 @@
-import BasePlugin from './base/base-plugin'
-const { QueueConsumer } = require('../../common/message-bus')
-const { promisify } = require("util");
-const Redis = require('redis');
+import BasePlugin from './base/base-plugin.js'
+import { QueueConsumer } from '../../common/message-bus/index.js'
+import { promisify } from "util"
+import Redis from 'redis'
 
 const GATEWAY_CALL_REQUEST  = `/muon/gateway/${process.env.GATEWAY_PORT}/call/request`
 const GATEWAY_CALL_RESPONSE = `/muon/gateway/${process.env.GATEWAY_PORT}/call/response`
@@ -43,6 +43,7 @@ export default class GatewayInterface extends BasePlugin{
       return ;
     if(response?.confirmed){
       try {
+        // @ts-ignore
         await this.emit('confirmed', response)
       }
       catch (e) {}
@@ -51,9 +52,11 @@ export default class GatewayInterface extends BasePlugin{
 
   getActualHandlerMethod(app, method) {
     if(app){
+      // @ts-ignore
       if(this.listenerCount(`call/${app}/${method}`) > 0){
         return method
       }
+      // @ts-ignore
       else if(this.listenerCount(`call/${app}/request`) > 0){
         return 'request'
       }
@@ -72,10 +75,14 @@ export default class GatewayInterface extends BasePlugin{
       let response
       const callingArgs = {app, method, params, nSign, mode, callId, gwSign}
       if(app){
+        // @ts-ignore
         if(this.listenerCount(`call/${app}/${method}`) > 0){
+          // @ts-ignore
           response = await this.emit(`call/${app}/${method}`, callingArgs)
         }
+        // @ts-ignore
         else if(this.listenerCount(`call/${app}/request`) > 0){
+          // @ts-ignore
           response = await this.emit(`call/${app}/request`, callingArgs)
         }
         else{
@@ -83,6 +90,7 @@ export default class GatewayInterface extends BasePlugin{
         }
       }
       else{
+        // @ts-ignore
         response = await this.emit(`call/muon/${method}`, callingArgs)
       }
       await this.__handleCallResponse(callingArgs, response);
@@ -105,10 +113,12 @@ export default class GatewayInterface extends BasePlugin{
   }
 
   registerAppCall(app, method, callback){
+    // @ts-ignore
     this.on(`call/${app}/${method}`, callback)
   }
 
   registerMuonCall(method, callback){
+    // @ts-ignore
     this.on(`call/muon/${method}`, callback)
   }
 }

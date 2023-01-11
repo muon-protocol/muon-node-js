@@ -1,6 +1,6 @@
-const {range, toBN} = require('./utils')
+import {range, toBN} from './utils.js'
 import BN from 'bn.js'
-import {BaseCurve, KeyPair, PublicKey} from './types'
+import {BaseCurve, KeyPair, PublicKey} from './types.js'
 
 class Polynomial {
   t: number

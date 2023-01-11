@@ -1,10 +1,10 @@
-import CallablePlugin from './base/callable-plugin'
-import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators'
-import System from "./system";
-import AppManager from "./app-manager";
-import GatewayInterface from "./gateway-Interface";
-import BaseAppPlugin from "./base/base-app-plugin";
-const {timeout} = require('../../utils/helpers')
+import CallablePlugin from './base/callable-plugin.js'
+import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
+import System from "./system.js";
+import AppManager from "./app-manager.js";
+import GatewayInterface from "./gateway-Interface.js";
+import BaseAppPlugin from "./base/base-app-plugin.js";
+import {timeout} from '../../utils/helpers.js'
 
 export const IpcMethods = {
   ForwardRemoteCall: 'forward-remote-call',

@@ -1,7 +1,7 @@
-var mongoose = require('mongoose');
-const {MODEL_SIGNATURE} = require('./constants')
+import mongoose from 'mongoose'
+import {MODEL_SIGNATURE} from './constants.js'
 
-var modelSchema = mongoose.Schema({
+const modelSchema = mongoose.Schema({
   request: {type: mongoose.ObjectId, required: true, index: { background: false }},
   timestamp: {type: Number, required: true},
   owner: {type: String, required: true},
@@ -11,4 +11,5 @@ var modelSchema = mongoose.Schema({
   memWriteSignature: {type: String},
 });
 
-var Model = module.exports = mongoose.model(MODEL_SIGNATURE, modelSchema);
+const Model = mongoose.model(MODEL_SIGNATURE, modelSchema);
+export default Model

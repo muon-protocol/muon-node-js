@@ -1,19 +1,31 @@
-import Muon, { MuonPlugin, MuonPluginConfigs } from "./muon";
-let mongoose = require("mongoose");
-const path = require("path");
-const fs = require("fs");
-const { dynamicExtend } = require("./utils");
-const { fileCID } = require("../utils/cid");
-import BaseApp from "./plugins/base/base-app-plugin";
-require("./global");
-const loadConfigs = require("../network/configurations");
-const {
-  utils: { sha3 },
-} = require("web3");
-const chalk = require("chalk");
+import Muon, { MuonPlugin, MuonPluginConfigs } from "./muon.js";
+import mongoose from "mongoose"
+import path from "path"
+import fs from "fs"
+import { dynamicExtend } from "./utils.js"
+import { fileCID } from "../utils/cid.js"
+import BaseApp from "./plugins/base/base-app-plugin.js";
+import "./global.js"
+import loadConfigs from "../network/configurations.js"
+import Web3 from 'web3'
+import chalk from "chalk"
 import { Constructor } from "../common/types";
-import BasePlugin from "./plugins/base/base-plugin";
-const log = require("../common/muon-log")("muon:core");
+import BasePlugin from "./plugins/base/base-plugin.js";
+import Log from "../common/muon-log.js"
+import { createRequire } from "module";
+import {filePathInfo} from "../utils/helpers.js";
+
+const {__dirname} = filePathInfo(import.meta)
+const {utils: { sha3 }} = Web3
+const log = Log("muon:core");
+
+const muonAppRequire = createRequire(import.meta.url);
+// override .js loader
+muonAppRequire.extensions[".js"] = function(module, filename) {
+  const content = fs.readFileSync(filename, "utf8");
+  // @ts-ignore
+  module._compile(content, filename);
+};
 
 async function getEnvPlugins(): Promise<MuonPlugin[]> {
   let pluginsStr = process.env["MUON_PLUGINS"];
@@ -33,21 +45,18 @@ function isV3(app) {
   return !!app.signParams;
 }
 
-function prepareApp(
-  app,
-  fileName,
-  isBuiltInApp = false,
-  filePath = ""
-): [Constructor<BasePlugin>, MuonPluginConfigs] {
+function prepareApp(app, fileName, isBuiltInApp = false, filePath = "")
+  : [Constructor<BasePlugin>, MuonPluginConfigs] {
   if (!app.APP_ID) {
     if (isV3(app)) {
       app.APP_ID = sha3(fileName);
     } else {
-      console.log(
+      log(
         chalk.yellow(
           `Deprecated app version: ${app.APP_NAME} app has old version and need to upgrade to v3.`
         )
       );
+      // @ts-ignore
       app.APP_ID = "0x" + sha3(fileName).slice(-8);
     }
   }
@@ -62,8 +71,8 @@ function prepareApp(
 
 function loadApp(path) {
   try {
-    require.resolve(path);
-    return require(path);
+    muonAppRequire.resolve(path);
+    return muonAppRequire(path);
   } catch (e) {
     console.error(chalk.red(`Error when loading app from path [${path}]`));
     console.error(e);
@@ -95,16 +104,17 @@ function getBuiltInApps(): MuonPlugin[] {
   const appDir = path.join(__dirname, "../built-in-apps");
   let result: MuonPlugin[] = [];
   let files = fs.readdirSync(appDir);
-  files.forEach((file) => {
+  for(let i=0 ; i<files.length ; i++) {
+    const file = files[i]
     let ext = file.split(".").pop();
-    if (ext.toLowerCase() === "js") {
+    if (ext && ext.toLowerCase() === "js") {
       let app = loadApp(`../built-in-apps/${file}`);
       if (app && !!app.APP_NAME) {
         const [module, config] = prepareApp(app, file, true);
         result.push({ name: app.APP_NAME, module, config });
       }
     }
-  });
+  };
   return result;
 }
 
@@ -114,7 +124,7 @@ function getGeneralApps(): MuonPlugin[] {
   let files = fs.readdirSync(appDir);
   files.forEach((file) => {
     let ext = file.split(".").pop();
-    if (ext.toLowerCase() === "js") {
+    if (ext && ext.toLowerCase() === "js") {
       let appPath = `../../apps/general/${file}`;
       let app = loadApp(appPath);
       if (app && !!app.APP_NAME) {
@@ -131,7 +141,7 @@ var muon;
 
 async function start() {
   log("starting ...");
-  await mongoose.connect(process.env.MONGODB_CS, {
+  await mongoose.connect(process.env.MONGODB_CS!, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   });
@@ -150,82 +160,82 @@ async function start() {
       plugins: [
         {
           name: "collateral",
-          module: (await import("./plugins/collateral-info")).default,
+          module: (await import("./plugins/collateral-info.js")).default,
           config: {},
         },
         {
           name: "app-manager",
-          module: (await import("./plugins/app-manager")).default,
+          module: (await import("./plugins/app-manager.js")).default,
           config: {},
         },
         {
           name: "remote-call",
-          module: (await import("./plugins/remote-call")).default,
+          module: (await import("./plugins/remote-call.js")).default,
           config: {},
         },
         {
           name: "gateway-interface",
-          module: (await import("./plugins/gateway-Interface")).default,
+          module: (await import("./plugins/gateway-Interface.js")).default,
           config: {},
         },
         {
           name: "ipc",
-          module: (await import("./plugins/core-ipc-plugin")).default,
+          module: (await import("./plugins/core-ipc-plugin.js")).default,
           config: {},
         },
         {
           name: "ipc-handlers",
-          module: (await import("./plugins/core-ipc-handlers")).default,
+          module: (await import("./plugins/core-ipc-handlers.js")).default,
           config: {},
         },
         {
           name: "broadcast",
-          module: (await import("./plugins/broadcast")).default,
+          module: (await import("./plugins/broadcast.js")).default,
           config: {},
         },
         {
           name: "content-verify",
-          module: (await import("./plugins/content-verify-plugin")).default,
+          module: (await import("./plugins/content-verify-plugin.js")).default,
           config: {},
         },
         {
           name: "content",
-          module: (await import("./plugins/content-app")).default,
+          module: (await import("./plugins/content-app.js")).default,
           config: {},
         },
         {
           name: "memory",
-          module: (await import("./plugins/memory-plugin")).default,
+          module: (await import("./plugins/memory-plugin.js")).default,
           config: {},
         },
         {
           name: "tss-plugin",
-          module: (await import("./plugins/tss-plugin")).default,
+          module: (await import("./plugins/tss-plugin.js")).default,
           config: {},
         },
         {
           name: "health-check",
-          module: (await import("./plugins/health-check")).default,
+          module: (await import("./plugins/health-check.js")).default,
           config: {},
         },
         {
           name: "explorer",
-          module: (await import("./plugins/explorer")).default,
+          module: (await import("./plugins/explorer.js")).default,
           config: {},
         },
         {
           name: "system",
-          module: (await import("./plugins/system")).default,
+          module: (await import("./plugins/system.js")).default,
           config: {},
         },
         {
           name: "mpc",
-          module: (await import("./plugins/mpc-runner")).default,
+          module: (await import("./plugins/mpc-runner.js")).default,
           config: {},
         },
         {
           name: "mpcnet",
-          module: (await import("./plugins/mpc-network")).default,
+          module: (await import("./plugins/mpc-network.js")).default,
           config: {},
         },
         ...(await getEnvPlugins()),
@@ -247,6 +257,6 @@ async function start() {
   }
 }
 
-module.exports = {
+export {
   start,
 };

@@ -1,7 +1,9 @@
-const fs = require('fs')
+import fs from 'fs'
 import * as path from 'path';
-const _ = require('lodash')
+import _ from 'lodash'
+import {filePathInfo} from "../../utils/helpers.js";
 
+const {__dirname} = filePathInfo(import.meta)
 const CONF_PATH = path.join(__dirname, "../cmd.conf.json")
 
 export type CmdConfigs = {
@@ -11,7 +13,7 @@ export type CmdConfigs = {
 export function getConfigs(): CmdConfigs {
   let configs = {};
   if(fs.existsSync(CONF_PATH)) {
-    let content = fs.readFileSync(CONF_PATH);
+    let content = fs.readFileSync(CONF_PATH).toString();
     configs = JSON.parse(content)
   }
   return configs

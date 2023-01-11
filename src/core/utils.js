@@ -18,6 +18,6 @@ function dynamicExtend(superclass, proto) {
   return Extended;
 }
 
-module.exports = {
+export {
   dynamicExtend,
 }

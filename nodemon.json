@@ -6,6 +6,7 @@
   "ext": "js,ts,json",
   "ignore": [
     "*.test.js",
+    "muon-data/",
     "src/cmd/**/*.*",
     "__test__/*",
     "config/",

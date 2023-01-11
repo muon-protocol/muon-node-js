@@ -1,11 +1,12 @@
-let express = require('express')
-var cors = require('cors')
-let bodyParser = require('body-parser')
-let mongoose = require('mongoose')
-let api = require('./api')
-let status = require('./status')
-const log = require('../common/muon-log')('muon:gateway')
+import express from 'express'
+import cors from 'cors'
+import bodyParser from 'body-parser'
+import mongoose from 'mongoose'
+import api from './api/index.js'
+import status from './status.js'
+import Log from '../common/muon-log.js'
 
+const log = Log('muon:gateway')
 let app = express()
 
 async function start(options) {
@@ -40,6 +41,6 @@ async function start(options) {
   })
 }
 
-module.exports = {
+export {
   start
 }

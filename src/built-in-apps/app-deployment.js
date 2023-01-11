@@ -114,9 +114,9 @@ module.exports = {
                     throw `App new tss key not found`;
                 return {
                     address: key.address,
-                    publicKey: "0x" + key.publicKey.encode('hex', true),
-                    x: "0x" + key.publicKey.x.toString('hex'),
-                    yParity: key.publicKey.y.isEven() ? 0 : 1,
+                    publicKey: "0x" + key.publicKey.encode("hex", true),
+                    x: '0x' + key.publicKey.getX().toString(16).padStart(64, '0'),
+                    yParity: key.publicKey.getY().isEven() ? 0 : 1,
                 }
             }
 

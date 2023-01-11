@@ -1,7 +1,7 @@
 import { createClient, RedisClient } from 'redis'
-import redisConfig from '../redis-config'
-const Events = require('events-async')
-const {uuid} = require('../../utils/helpers')
+import redisConfig from '../redis-config.js'
+import Events from 'events-async'
+import {uuid} from '../../utils/helpers.js'
 
 export default class BaseMessageBus extends Events{
   /**

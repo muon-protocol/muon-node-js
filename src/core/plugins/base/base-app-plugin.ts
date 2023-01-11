@@ -1,33 +1,36 @@
-import CallablePlugin from './callable-plugin'
+import CallablePlugin from './callable-plugin.js'
 import { createClient, RedisClient } from 'redis'
-const Request = require('../../../common/db-models/Request')
-const AppContext = require("../../../common/db-models/AppContext")
-const AppTssConfig = require("../../../common/db-models/AppTssConfig")
-const {makeAppDependency} = require('./app-dependencies')
-const { getTimestamp, timeout } = require('../../../utils/helpers')
-const crypto = require('../../../utils/crypto')
-const soliditySha3 = require('../../../utils/soliditySha3')
-const tss = require('../../../utils/tss');
-const {utils: {toBN}} = require('web3')
-const { omit } = require('lodash')
-import AppRequestManager from './app-request-manager'
-import {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} from './app-decorators'
-import MemoryPlugin, {MemWrite, MemWriteOptions} from '../memory-plugin'
-const { isArrowFn, deepFreeze } = require('../../../utils/helpers')
-const Web3 = require('web3')
-import DistributedKey from "../../../utils/tss/distributed-key";
-import TssPlugin from "../tss-plugin";
-import AppManager from "../app-manager";
-import TssParty from "../../../utils/tss/party";
-import CollateralInfoPlugin from "../collateral-info";
+import Request from '../../../common/db-models/Request.js'
+import AppContext from "../../../common/db-models/AppContext.js"
+import AppTssConfig from "../../../common/db-models/AppTssConfig.js"
+import {makeAppDependency} from './app-dependencies/index.js'
+import {getTimestamp, pub2json, timeout} from '../../../utils/helpers.js'
+import * as crypto from '../../../utils/crypto.js'
+import soliditySha3 from '../../../utils/soliditySha3.js'
+import * as tss from '../../../utils/tss/index.js'
+import Web3 from 'web3'
+import lodash from 'lodash'
+import AppRequestManager from './app-request-manager.js'
+import {remoteApp, remoteMethod, gatewayMethod, broadcastHandler} from './app-decorators.js'
+import MemoryPlugin, {MemWrite, MemWriteOptions} from '../memory-plugin.js'
+import { isArrowFn, deepFreeze } from '../../../utils/helpers.js'
+import DistributedKey from "../../../utils/tss/distributed-key.js";
+import TssPlugin from "../tss-plugin.js";
+import AppManager from "../app-manager.js";
+import TssParty from "../../../utils/tss/party.js";
+import CollateralInfoPlugin from "../collateral-info.js";
 import {MuonNodeInfo} from "../../../common/types";
-import useDistributedKey from "../../../utils/tss/use-distributed-key";
-const chalk = require('chalk')
-const Ajv = require("ajv")
+import useDistributedKey from "../../../utils/tss/use-distributed-key.js";
+import chalk from 'chalk'
+import Ajv from "ajv"
+import Log from '../../../common/muon-log.js'
+import {bn2hex} from "../../../utils/tss/utils.js";
+
+const { omit } = lodash;
+const {utils: {toBN}} = Web3
 const ajv = new Ajv()
 const web3 = new Web3();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
-const Log = require('../../../common/muon-log')
 
 export type AppRequestSignature = {
   /**
@@ -67,10 +70,22 @@ const RemoteMethods = {
 
 @remoteApp
 class BaseAppPlugin extends CallablePlugin {
+  /**=================================*/
+  APP_ID: string;
+  dependencies: string[];
+  readOnlyMethods: string[] = [];
+  onAppInit: () => void;
+  validateRequest: (request: any) => void;
+  onArrive: (request: any) => any;
+  onRequest: (request: any) => any;
+  signParams: (request: object, result: any) => any[];
+  onMemWrite: (request: object, result: any) => object;
+  onConfirm: (request: object, result: any, signatures: any[]) => void;
+  METHOD_PARAMS_SCHEMA: object = {};
+  /**=================================*/
   APP_NAME: string | null = null
   REMOTE_CALL_TIMEOUT = 15000
   requestManager = new AppRequestManager();
-  readOnlyMethods = []
   /** initialize when loading */
   isBuiltInApp: boolean
   private log;
@@ -260,7 +275,8 @@ class BaseAppPlugin extends CallablePlugin {
 
     if(this.METHOD_PARAMS_SCHEMA){
       if(this.METHOD_PARAMS_SCHEMA[method]){
-        if(!ajv.validate(this.APP_METHOD_PARAMS_SCHEMA[method], params)){
+        if(!ajv.validate(this.METHOD_PARAMS_SCHEMA[method], params)){
+          // @ts-ignore
           throw ajv.errors.map(e => e.message).join("\n");
         }
       }
@@ -367,7 +383,7 @@ class BaseAppPlugin extends CallablePlugin {
         newRequest['confirmedAt'] = getTimestamp()
       }
 
-      let requestData = {
+      let requestData: {[index: string]: any} = {
         confirmed,
         ...omit(newRequest._doc, [
           '__v',
@@ -401,7 +417,6 @@ class BaseAppPlugin extends CallablePlugin {
       return requestData
     }
   }
-
 
   async informRequestConfirmation(request) {
     // await this.onConfirm(request)
@@ -482,6 +497,7 @@ class BaseAppPlugin extends CallablePlugin {
       let appMem = this.onMemWrite(request, result)
       if (!appMem)
         return null;
+      // @ts-ignore
       let { key, ttl, data } = appMem
 
       if(!this.APP_NAME)
@@ -539,7 +555,7 @@ class BaseAppPlugin extends CallablePlugin {
     let allSignatures = owners.map(w => signers[w]);
 
     let schnorrSigns = allSignatures.map(({signature}) => {
-      let [s, e] = signature.split(',').map(toBN)
+      let [s, e] = signature.split(',').map(toBN);
       return {s, e};
     })
 
@@ -562,15 +578,10 @@ class BaseAppPlugin extends CallablePlugin {
       confirmed,
       confirmed ? [{
         owner: tss.pub2addr(verifyingPubKey),
-        ownerPubKey: {
-          x: '0x' + verifyingPubKey.getX().toBuffer('be', 32).toString('hex'),
-          yParity: verifyingPubKey.getY().mod(toBN(2)).toString(),
-        },
+        ownerPubKey: pub2json(verifyingPubKey, true),
         // signers: signersIndices,
         timestamp: getTimestamp(),
-        result: newRequest.data.result,
-        // signature: `0x${aggregatedSign.s.toString(16)},0x${aggregatedSign.e.toString(16)}`,
-        signature: '0x' + aggregatedSign.s.toBuffer('be', 32).toString('hex'),
+        signature: bn2hex(aggregatedSign.s),
         // sign: {
         //   s: `0x${aggregatedSign.s.toString(16)}`,
         //   e: `0x${aggregatedSign.e.toString(16)}`
@@ -630,15 +641,16 @@ class BaseAppPlugin extends CallablePlugin {
     let Z_i = pubKey;
     let K_i = nonce.getPubKey(ownerInfo!.id);
 
-    let p1 = tss.pointAdd(K_i, Z_i.mul(e.neg())).encode('hex')
-    let p2 = tss.curve.g.mul(s).encode('hex');
+    const eInv = e.invm(tss.curve.n!)
+    let p1 = tss.pointAdd(K_i, Z_i.mul(eInv)).encode('hex', true)
+    let p2 = tss.curve.g.multiply(s).encode("hex", true);
     return p1 === p2 ? owner : null;
   }
 
   verify(hash: string, signature: string, nonceAddress: string): boolean {
     let tssKey = this.appTss;
     const signingPubKey = tssKey!.publicKey;
-    return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey);
+    return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey!);
   }
 
   async broadcastNewRequest(request) {
@@ -722,9 +734,9 @@ class BaseAppPlugin extends CallablePlugin {
     let k_i = nonce.share
     let K = nonce.publicKey!;
 
-    await useDistributedKey(K.encodeCompressed('hex'), resultHash)
+    await useDistributedKey(K.encode('hex', true), resultHash)
     // TODO: remove nonce after sign
-    let signature = tss.schnorrSign(tssKey.share, k_i, K, resultHash)
+    let signature = tss.schnorrSign(tssKey.share!, k_i!, K, resultHash)
 
     if(!process.env.SIGN_WALLET_ADDRESS){
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
@@ -738,7 +750,7 @@ class BaseAppPlugin extends CallablePlugin {
       pubKey: tssKey.sharePubKey!,
       timestamp: signTimestamp,
       result,
-      signature:`0x${signature.s.toString(16)},0x${signature.e.toString(16)}`
+      signature:`${bn2hex(signature.s)},${bn2hex(signature.e)}`
     }
   }
 
@@ -765,6 +777,7 @@ class BaseAppPlugin extends CallablePlugin {
         // TODO: check response similarity
         // let signer = await this.recoverSignature(request, sign)
         // if (signer && signer === sign.owner) {
+          // @ts-ignore
           this.requestManager.addSignature(request.reqId, sign.owner, sign)
           // // let newSignature = new Signature(sign)
           // // await newSignature.save()
@@ -816,7 +829,8 @@ class BaseAppPlugin extends CallablePlugin {
      */
     if(this.METHOD_PARAMS_SCHEMA){
       if(this.METHOD_PARAMS_SCHEMA[method]){
-        if(!ajv.validate(this.APP_METHOD_PARAMS_SCHEMA[method], params)){
+        if(!ajv.validate(this.METHOD_PARAMS_SCHEMA[method], params)){
+          // @ts-ignore
           throw ajv.errors.map(e => e.message).join("\n");
         }
       }

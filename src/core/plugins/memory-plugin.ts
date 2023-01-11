@@ -22,14 +22,14 @@
  * Any node on the network can query for app|node types of data.
  */
 
-import CallablePlugin from './base/callable-plugin'
-const crypto = require('../../utils/crypto')
-const {getTimestamp} = require('../../utils/helpers')
-const Memory = require('../../common/db-models/Memory')
-import { remoteApp, broadcastHandler } from './base/app-decorators'
-import CollateralInfoPlugin from "./collateral-info";
+import CallablePlugin from './base/callable-plugin.js'
+import * as crypto from '../../utils/crypto.js'
+import {getTimestamp} from '../../utils/helpers.js'
+import Memory, {types as MemoryTypes} from '../../common/db-models/Memory.js'
+import { remoteApp, broadcastHandler } from './base/app-decorators.js'
+import CollateralInfoPlugin from "./collateral-info.js";
 import { createClient, RedisClient } from 'redis'
-import redisConfig from '../../common/redis-config'
+import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
 import Web3 from 'web3'
 
@@ -146,7 +146,7 @@ class MemoryPlugin extends CallablePlugin {
 
   hashMemWrite(memWrite: MemWrite) {
     let {type, owner, timestamp, ttl, nSign, data} = memWrite;
-    let ownerIsWallet = type === Memory.types.Node;
+    let ownerIsWallet = type === MemoryTypes.Node;
     return crypto.soliditySha3([
       {type: 'string', value: type},
       {type: ownerIsWallet ? 'address' : 'string', value: owner},
@@ -170,7 +170,7 @@ class MemoryPlugin extends CallablePlugin {
     let {key, timestamp, ttl, nSign, data, hash} = request.data.memWrite;
     let signatures = request.signatures.map(sign => sign.memWriteSignature)
     let memWrite: MemWrite = {
-      type: Memory.types.App,
+      type: MemoryTypes.App,
       key,
       owner: request.app,
       timestamp,
@@ -194,7 +194,7 @@ class MemoryPlugin extends CallablePlugin {
     let nSign=1,
       timestamp=getTimestamp();
     let memWrite: MemWrite = {
-      type: Memory.types.Node,
+      type: MemoryTypes.Node,
       key,
       owner: process.env.SIGN_WALLET_ADDRESS!,
       timestamp,
@@ -213,7 +213,7 @@ class MemoryPlugin extends CallablePlugin {
 
   async writeLocalMem(key: string, data: any, ttl: number=0, options:MemWriteOptions={}) {
     let memWrite: MemWrite = {
-      type: Memory.types.Local,
+      type: MemoryTypes.Local,
       key,
       owner: process.env.SIGN_WALLET_ADDRESS!,
       timestamp: getTimestamp(),

@@ -1,5 +1,5 @@
 import { createClient, RedisClient } from 'redis'
-import redisConfig from '../../common/redis-config'
+import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
 
 const redis = createClient(redisConfig)

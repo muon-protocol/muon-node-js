@@ -1,16 +1,19 @@
-import CallablePlugin from './base/callable-plugin'
-import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators'
-import TimeoutPromise from "../../common/timeout-promise";
+import CallablePlugin from './base/callable-plugin.js'
+import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
+import TimeoutPromise from "../../common/timeout-promise.js";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
-import TssPlugin from "./tss-plugin";
-import BaseAppPlugin from "./base/base-app-plugin";
-import CollateralInfoPlugin from "./collateral-info";
-import * as CoreIpc from "../ipc";
-const TssModule = require('../../utils/tss');
-const AppContext = require("../../common/db-models/AppContext")
-const AppTssConfig = require("../../common/db-models/AppTssConfig")
-const _ = require('lodash');
-const log = require('../../common/muon-log')('muon:core:plugins:app-manager')
+import TssPlugin from "./tss-plugin.js";
+import BaseAppPlugin from "./base/base-app-plugin.js";
+import CollateralInfoPlugin from "./collateral-info.js";
+import * as CoreIpc from "../ipc.js";
+import * as TssModule from '../../utils/tss/index.js'
+import AppContext, {hash as hashAppContext} from "../../common/db-models/AppContext.js"
+import AppTssConfig from "../../common/db-models/AppTssConfig.js"
+import _ from 'lodash'
+import Log from '../../common/muon-log.js'
+import {pub2json} from "../../utils/helpers.js";
+
+const log = Log('muon:core:plugins:app-manager')
 
 const RemoteMethods = {
   AppStatus: "app-status",
@@ -205,6 +208,7 @@ export default class AppManager extends CallablePlugin {
 
         try {
           /** TssPlugin needs to refresh tss key info */
+          // @ts-ignore
           await this.emit("app-tss:delete", doc.appId, doc)
         }
         catch (e) {
@@ -222,6 +226,7 @@ export default class AppManager extends CallablePlugin {
           }
           const appTssConfig = this.appTssConfigs[appId]
           delete this.appTssConfigs[appId]
+          // @ts-ignore
           await this.emit("app-tss:delete", appId, appTssConfig)
         }
         catch (e) {
@@ -261,7 +266,7 @@ export default class AppManager extends CallablePlugin {
       deployed: true,
       version: context.version,
       reqId: context.deploymentRequest.reqId,
-      contextHash: AppContext.hash(context),
+      contextHash: hashAppContext(context),
     }
   }
 
@@ -407,16 +412,11 @@ export default class AppManager extends CallablePlugin {
 
     let [version, publicKeyEncoded] = maxHash.split('.');
 
-    const publicKey = TssModule.keyFromPublic(publicKeyEncoded.replace("0x", ""), "hex")
+    const publicKey = TssModule.keyFromPublic(publicKeyEncoded.replace("0x", ""))
     const result = {
       appId,
       version: parseInt(version),
-      publicKey: {
-        address: TssModule.pub2addr(publicKey),
-        encoded: publicKeyEncoded,
-        x: '0x' + publicKey.getX().toBuffer('be', 32).toString('hex'),
-        yParity: publicKey.getY().isEven() ? 0 : 1
-      }
+      publicKey: pub2json(publicKey)
     }
     this.tssKeyQueryResult[appId] = {
       time: Date.now(),
