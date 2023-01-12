@@ -10,22 +10,26 @@ import * as NetworkIpc from '../../network/ipc.js'
 import {GlobalBroadcastChannels} from "../../common/contantes.js";
 import CollateralInfoPlugin from "./collateral-info.js";
 import {timeout} from '../../utils/helpers.js'
-
 import * as NetworkDHTPlugin from '../../network/plugins/network-dht.js'
+
+type DHTReqData = Override<GatewayCallData, {params: { key: string, data?: string }}>
+
 
 @remoteApp
 class DHT extends CallablePlugin {
   APP_NAME="dht"
 
   @gatewayMethod("put")
-  async __onPut(data){
-    let ret = await NetworkIpc.putDHT("/muon/hello", "world");
+  async __onPut(req: DHTReqData){
+    let {key, data={}} = req?.params || {}
+    await NetworkIpc.putDHT(`/muon/${key}`, data);
     return {success: true}
   }
 
   @gatewayMethod("get")
-  async __onGet(data) {
-    let val = await NetworkIpc.getDHT('/muon/hello');
+  async __onGet(req: DHTReqData) {
+    let {key} = req?.params || {}
+    let val = await NetworkIpc.getDHT(`/muon/${key}`);
     return {data: val}
   }
 }

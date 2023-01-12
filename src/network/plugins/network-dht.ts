@@ -28,7 +28,6 @@ export default class NetworkDHTPlugin extends BaseNetworkPlugin {
     let ret: { value: Uint8Array } | undefined = await last(
       this.network.libp2p.dht.get(uint8ArrayFromString(key))
     );
-
     return ret?.value ? uint8ArrayToString(ret?.value) : null;
   }
 }
