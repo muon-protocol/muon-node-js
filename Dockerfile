@@ -36,5 +36,5 @@ RUN npm i -g pm2
 RUN apt-get update && apt-get -y install cron
 RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-testnet'
 
-CMD [ "bash", "-c", "service cron start;pm2-runtime start ecosystem.config.js" ]
+CMD [ "bash", "-c", "service cron start;pm2-runtime start ecosystem.config.cjs" ]
 #
