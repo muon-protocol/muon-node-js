@@ -6,6 +6,7 @@ import QueueProducer from "../../common/message-bus/queue-producer.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
+import NetworkDHTPlugin from "./network-dht.js";
 import NetworkContentPlugin from "./content-plugin.js";
 import {timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
@@ -31,6 +32,8 @@ export const IpcMethods = {
   GetCollateralInfo: "get-collateral-info",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
   BroadcastToChannel: "broadcast-to-channel",
+  PutDHT: "put-dht",
+  GetDHT: "get-dht",
   ReportClusterStatus: "report-cluster-status",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
@@ -68,6 +71,10 @@ class NetworkIpcHandler extends CallablePlugin {
 
   get broadcastPlugin(): NetworkBroadcastPlugin {
     return this.network.getPlugin('broadcast')
+  }
+
+  get DHTPlugin(): NetworkDHTPlugin {
+    return this.network.getPlugin('dht')
   }
 
   get collateralPlugin(): CollateralInfoPlugin {
@@ -121,6 +128,17 @@ class NetworkIpcHandler extends CallablePlugin {
     // console.log("NetworkIpcHandler.__broadcastToChannel", data);
     this.broadcastToChannel(data.channel, data.message);
     return "Ok"
+  }
+
+  @ipcMethod(IpcMethods.PutDHT)
+  async __putDHT(data: {key: string, value: any}) {
+    let ret = await this.DHTPlugin.put(data.key, data.value);
+    return ret
+  }
+
+  @ipcMethod(IpcMethods.GetDHT)
+  async __getDHT(data: {key: string}) {
+    return await this.DHTPlugin.get(data.key);
   }
 
   assignTaskToProcess(taskId: string, pid: number) {
