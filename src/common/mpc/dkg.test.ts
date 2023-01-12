@@ -81,10 +81,10 @@ async function run() {
       pk: realPrivateKey,
     }
 
-    let keyGen1 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk),
-      keyGen2 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk),
-      keyGen3 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk),
-      keyGen4 = new DistributedKeyGeneration(cData.id, cData.partners, cData.t, cData.pk);
+    let keyGen1 = new DistributedKeyGeneration(cData.id, NODE_1, cData.partners, cData.t, cData.pk),
+      keyGen2 = new DistributedKeyGeneration(cData.id, NODE_1, cData.partners, cData.t, cData.pk),
+      keyGen3 = new DistributedKeyGeneration(cData.id, NODE_1, cData.partners, cData.t, cData.pk),
+      keyGen4 = new DistributedKeyGeneration(cData.id, NODE_1, cData.partners, cData.t, cData.pk);
 
     let allNodeResults: any[] = await Promise.all([
       /** run partner 1 */

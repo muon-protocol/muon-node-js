@@ -182,17 +182,19 @@ export class MultiPartyComputation {
   }
 
   private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any) {
+    const NumReTry = 3;
     const roundTitle = this.rounds[roundIndex];
     let lastError: any;
     let result: any;
-    for(let i=0 ; i<2 ; i++) {
+    for(let i=1 ; i<=NumReTry ; i++) {
       lastError = undefined;
       try {
         result = await network.askRoundData(from, this.id, roundIndex, dataToSend);
         break;
       }catch (e) {
         lastError = e;
-        await timeout(1000)
+        if(i != NumReTry)
+          await timeout(i*1000)
       }
     }
     if(lastError)
