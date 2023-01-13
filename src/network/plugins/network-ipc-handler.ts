@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
-import {IpcCallOptions} from "../../common/types";
-import CollateralInfoPlugin from "./collateral-info.js";
+import {IpcCallOptions, MuonNodeInfo} from "../../common/types";
+import CollateralInfoPlugin, {NodeFilterOptions} from "./collateral-info.js";
 import QueueProducer from "../../common/message-bus/queue-producer.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
@@ -28,6 +28,7 @@ const tasksCache = new NodeCache({
 });
 
 export const IpcMethods = {
+  FilterNodes: "filter-nodes",
   GetOnlinePeers: "get-online-peers",
   GetCollateralInfo: "get-collateral-info",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
@@ -91,6 +92,16 @@ class NetworkIpcHandler extends CallablePlugin {
 
   get RemoteCallExecEndPoint(): string {
     return this.remoteMethodEndpoint(RemoteMethods.ExecIpcRemoteCall);
+  }
+
+  /**
+   * @private
+   * @ returns {Promise<MuonNodeInfo[]>} - Filter and get nodes list
+   */
+  @ipcMethod(IpcMethods.FilterNodes)
+  async __filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
+    return this.collateralPlugin.filterNodes(filter)
+      .map(({id, wallet, peerId, isOnline, isDeployer}) => ({id, wallet, peerId, isOnline, isDeployer}));
   }
 
   /**

@@ -1,7 +1,8 @@
 import {NetworkIpcMethod, IpcMethods} from "./plugins/network-ipc-handler.js";
 import { QueueProducer } from '../common/message-bus/index.js'
 import { IPC_CHANNEL } from './plugins/network-ipc-plugin.js'
-import {IpcCallOptions} from "../common/types";
+import {IpcCallOptions, MuonNodeInfo} from "../common/types";
+import {NodeFilterOptions} from "./plugins/collateral-info";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 
@@ -18,6 +19,10 @@ function getCollateralInfo(options?: IpcCallOptions) {
       timeoutMessage: "Getting collateral info timed out",
       ...options
     })
+}
+
+function filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
+  return call(IpcMethods.FilterNodes, filter);
 }
 
 function getOnlinePeers(): Promise<string[]> {
@@ -64,7 +69,7 @@ function forwardRequest(id, requestData, appTimeout?:number) {
   return call(IpcMethods.ForwardGatewayRequest, {id, requestData, appTimeout});
 }
 
-function getCurrentNodeInfo() {
+function getCurrentNodeInfo(): Promise<MuonNodeInfo|undefined> {
   return call(IpcMethods.GetCurrentNodeInfo);
 }
 
@@ -87,6 +92,7 @@ function getUptime() {
 export {
   call,
   getCollateralInfo,
+  filterNodes,
   getOnlinePeers,
   broadcastToChannel,
   forwardRemoteCall,

@@ -79,7 +79,7 @@ export default class AppManager extends CallablePlugin {
           appName: "deployment",
           isBuiltIn: true,
           party: {
-            partners: this.collateralPlugin.groupInfo.partners,
+            partners: this.collateralPlugin.filterNodes({isDeployer: true}).map(({id})=>id),
             t: this.collateralPlugin.TssThreshold,
             max: this.collateralPlugin.MaxGroupSize
           }

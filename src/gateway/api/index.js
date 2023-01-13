@@ -72,6 +72,19 @@ async function getAppTimeout(app) {
 }
 
 async function callProperNode(requestData) {
+  /** forward deployment app request to Deployer node */
+  if(requestData.app === 'deployment'){
+    const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
+    if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
+      log(`current node is not deployer`)
+      let deployers = await NetworkIpc.filterNodes({isOnline: true, isDeployer: true});
+      const randomIndex = Math.floor(Math.random() * deployers.length);
+      log(`forwarding request to id:%s`, deployers[randomIndex].id)
+      const timeout = await getAppTimeout(requestData.app);
+      return await NetworkIpc.forwardRequest(deployers[randomIndex].id, requestData, timeout);
+    }
+  }
+
   if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
     log("Deployment excerpt method call %o", requestData)
     return await requestQueue.send(requestData)
