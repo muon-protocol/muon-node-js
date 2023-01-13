@@ -39,13 +39,10 @@ class Explorer extends CallablePlugin {
 
   @gatewayMethod("list-nodes")
   async __onListNodes(data){
-    let tssPlugin: TssPlugin = this.muon.getPlugin('tss-plugin')
-
-    if(tssPlugin.tssParty === null)
-      throw `TSS module not loaded yet`
-
     if(!process.env.SIGN_WALLET_ADDRESS)
       throw `process.env.SIGN_WALLET_ADDRESS is not defined`
+
+    await this.collateralPlugin.waitToLoad();
 
     // TODO: replace with onlinePartners
     // TODO: this returns only deployer nodes
