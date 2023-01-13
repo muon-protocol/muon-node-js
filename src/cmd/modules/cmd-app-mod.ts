@@ -37,35 +37,51 @@ export async function handler(argv) {
   switch (action) {
     case 'deploy': {
       console.log('retrieving app ID ...')
-      const idResponse = await muonCall(configs.url, {app, method: `dummy-method`})
-      assert('appId' in idResponse, "appId not exist in ID response")
-      const { appId } = idResponse
+      const statusResult = await muonCall(configs.url, {
+        app: 'explorer',
+        method: "app",
+        params: {
+          appName: app,
+        }
+      })
+      const appStatus = statusResult?.result?.status
+      const appId = statusResult?.result?.appId
+      if (!appStatus) {
+        console.log(statusResult);
+        throw "Error when retrieving app info";
+      }
+
       console.log('App Id is ', appId);
 
-      console.log(`random seed generating ...`)
-      const randomSeedResponse = await muonCall(configs.url, {
-        app: 'deployment',
-        method: `random-seed`,
-        params: {
-          appId
-        }
-      })
-      expectConfirmed(randomSeedResponse)
-      console.log(`random seed generated`, {randomSeed: randomSeedResponse.result.signatures[0].signature})
+      if(appStatus === "DEPLOYED")
+        throw `App already deployed`;
 
-      console.log('deploying ...')
-      const deployResponse = await muonCall(configs.url, {
-        app: 'deployment',
-        method: `deploy`,
-        params: {
-          appId,
-          reqId: randomSeedResponse.result.reqId,
-          nonce: randomSeedResponse.result.data.init.nonceAddress,
-          seed: randomSeedResponse.result.signatures[0].signature
-        }
-      })
-      expectConfirmed(deployResponse)
-      console.log(`deployment done.`)
+      if(appStatus === 'NEW') {
+        console.log(`random seed generating ...`)
+        const randomSeedResponse = await muonCall(configs.url, {
+          app: 'deployment',
+          method: `random-seed`,
+          params: {
+            appId
+          }
+        })
+        expectConfirmed(randomSeedResponse)
+        console.log(`random seed generated`, {randomSeed: randomSeedResponse.result.signatures[0].signature})
+
+        console.log('deploying ...')
+        const deployResponse = await muonCall(configs.url, {
+          app: 'deployment',
+          method: `deploy`,
+          params: {
+            appId,
+            reqId: randomSeedResponse.result.reqId,
+            nonce: randomSeedResponse.result.data.init.nonceAddress,
+            seed: randomSeedResponse.result.signatures[0].signature
+          }
+        })
+        expectConfirmed(deployResponse)
+        console.log(`deployment done.`)
+      }
 
       console.log('generating app tss key ...')
       const tssResponse = await muonCall(configs.url, {
