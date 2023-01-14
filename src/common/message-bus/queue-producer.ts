@@ -68,11 +68,9 @@ export default class QueueProducer<MessageType> extends BaseMessageQueue {
       }
       else {
         logError(
-          `${this.ConstructorName}[${this.busName}] result contains error %O`,
-          {
-            message: content.message,
-            rawResponse
-          },
+          `${this.ConstructorName}[${this.busName}] result contains message %O rawResponse %O`,
+          content.message,
+          rawResponse
         );
         content.promise.reject({...error, onRemoteSide: true})
       }
