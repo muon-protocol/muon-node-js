@@ -104,7 +104,8 @@ class System extends CallablePlugin {
       return await this.remoteCall(
         generatorInfo.peerId,
         RemoteMethods.GenerateAppTss,
-        {appId}
+        {appId},
+        {timeout: 65e3}
       )
     }
   }
