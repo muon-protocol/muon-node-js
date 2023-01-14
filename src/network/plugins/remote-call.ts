@@ -106,7 +106,7 @@ class RemoteCall extends BaseNetworkPlugin {
     }
   }
 
-  async handler ({ connection, stream , ...otherOptions}) {
+  async handler1 ({ connection, stream , ...otherOptions}) {
     try {
       let response;
       await pipe(
@@ -133,6 +133,28 @@ class RemoteCall extends BaseNetworkPlugin {
     // }
   }
 
+  async handler ({ connection, stream , ...otherOptions}) {
+    const remoteCallInstance = this;
+    try {
+      let response;
+      await pipe(
+        stream,
+        (source) => {
+          return (async function *() {
+            for await (const message of source) {
+              response = await remoteCallInstance.handleIncomingMessage(uint8ArrayToString(message.subarray()), stream, connection.remotePeer)
+              yield remoteCallInstance.prepareSendData(response);
+            }
+          })();
+        },
+        stream.sink
+      )
+      // stream.close();
+    } catch (err) {
+      console.error("network.RemoteCall.handler", err)
+    }
+  }
+
   prepareSendData(data) {
     let strData = JSON.stringify(data)
     // return Buffer.from(strData);
@@ -146,10 +168,11 @@ class RemoteCall extends BaseNetworkPlugin {
         stream,
         async (source) => {
           for await (const message of source) {
-            await this.handleSendResponse(uint8ArrayToString(message.subarray()), peer.id)
+            this.handleSendResponse(uint8ArrayToString(message.subarray()), peer.id)
           }
         }
       )
+      //stream.close();
     } catch (err) {
       console.log('=============================');
       console.log(peer)
@@ -206,8 +229,12 @@ class RemoteCall extends BaseNetworkPlugin {
     return this.network.libp2p.dialProtocol(peer.id, [PROTOCOL])
   }
 
+  private getCallExactMethod(method: string, callParams: {method: string}): string {
+    return method===this.IpcHandler.RemoteCallExecEndPoint ? callParams.method : method;
+  }
+
   call(peer, method: string, params: any, options: RemoteCallOptions={}){
-    log(`calling peer %s : %s`, peerId2Str(peer.id), method===this.IpcHandler.RemoteCallExecEndPoint ? params.method : method)
+    log(`calling peer %s : %s`, peerId2Str(peer.id), this.getCallExactMethod(method, params))
     // TODO: need more check
     if(!peer){
       return Promise.reject({message: `network.RemoteCall.call: peer is null for method ${method}`})
@@ -221,7 +248,8 @@ class RemoteCall extends BaseNetworkPlugin {
       })
       .catch(e => {
         if(!options?.silent) {
-          console.error(`network.RemoteCall.call(peer, '${method}', params)`, `peer: ${peerId2Str(peer.id)}`, e)
+          let exactMethod = this.getCallExactMethod(method, params);
+          console.error(`network.RemoteCall.call(peer, '${exactMethod}', params)`, `peer: ${peerId2Str(peer.id)}`, e)
         }
         // @ts-ignore
         if(this.listenerCount('error') > 0) {
