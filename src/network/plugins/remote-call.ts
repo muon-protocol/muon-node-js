@@ -151,7 +151,7 @@ class RemoteCall extends BaseNetworkPlugin {
       )
       // stream.close();
     } catch (err) {
-      console.error("network.RemoteCall.handler", err)
+      console.error("network.RemoteCall.handler", err);
     }
   }
 
