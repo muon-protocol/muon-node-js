@@ -288,6 +288,7 @@ async function start() {
     tss,
   };
   const network = new Network(configs);
+  // TODO: check this two line swap
   await network._initializeLibp2p();
   await network._initializePlugin();
   await network.start();

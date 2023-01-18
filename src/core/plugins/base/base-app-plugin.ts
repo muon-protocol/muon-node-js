@@ -262,15 +262,17 @@ class BaseAppPlugin extends CallablePlugin {
     if(this.getNSign)
       nSign = this.getNSign()
 
-    if(this.isBuiltInApp) {
+    if(this.APP_ID === '1') {
       if (!this.tssPlugin.isReady)
         throw {message: "Tss not initialized"}
     }
     else{
       if(!this.appManager.appIsDeployed(this.APP_ID))
         throw `App not deployed`;
-      if(!this.appManager.appHasTssKey(this.APP_ID))
+      if(!this.appManager.appHasTssKey(this.APP_ID)) {
+        this.tssPlugin.checkAppTssKeyRecovery(this.APP_ID);
         throw `App tss not initialized`
+      }
     }
 
     if(this.METHOD_PARAMS_SCHEMA){
