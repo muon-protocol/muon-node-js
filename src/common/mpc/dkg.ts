@@ -79,7 +79,7 @@ export class DistKey {
    * @param idx {string | BN} - index of participant
    * @returns PublicKey
    */
-  getPublicKey(idx: BN | string): PublicKey{
+  getPublicKey(idx: number | string): PublicKey{
     return TssModule.calcPolyPoint(idx, this.curve.Fx)
   }
 
