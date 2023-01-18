@@ -42,7 +42,7 @@ function calcPoly(x, polynomial) {
   // return result;
 }
 
-function calcPolyPoint(x, polynomial): PublicKey {
+function calcPolyPointOld(x, polynomial): PublicKey {
   if (!BN.isBN(x))
     x = toBN(x);
   let result: PublicKey | null = null;
@@ -50,6 +50,12 @@ function calcPolyPoint(x, polynomial): PublicKey {
     result = pointAdd(result!, polynomial[i].mul(x.pow(toBN(i))));
   }
   return result!;
+}
+
+function calcPolyPoint(x: string|number, polynomial: PublicKey[]): PublicKey {
+  const bnx = toBN(x);
+  const coeffs = polynomial.map((_,i) => bnx.pow(toBN(i)).umod(curve.n!))
+  return curve.curve._endoWnafMulAdd(polynomial, coeffs, false);
 }
 
 function random() {
