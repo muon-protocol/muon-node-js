@@ -562,6 +562,8 @@ class TssPlugin extends CallablePlugin {
 
   private appTssKeyRecoveryCheckTime = 0;
   async checkAppTssKeyRecovery(appId: string) {
+    // disabled because of bug
+    return ;
     if(this.appTssKeyRecoveryCheckTime + 5*60e3 < Date.now()){
       log(`checking to recover app[${appId}] tss key`)
       this.appTssKeyRecoveryCheckTime = Date.now();
