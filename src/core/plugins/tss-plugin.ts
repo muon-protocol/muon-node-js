@@ -531,7 +531,7 @@ class TssPlugin extends CallablePlugin {
       )
     )
 
-    let shares = partners
+    let shares = noncePartners
       .map((p, j) => {
           if (!keyResults[j])
             return null
@@ -562,8 +562,6 @@ class TssPlugin extends CallablePlugin {
 
   private appTssKeyRecoveryCheckTime = 0;
   async checkAppTssKeyRecovery(appId: string) {
-    // disabled because of bug
-    return ;
     if(this.appTssKeyRecoveryCheckTime + 5*60e3 < Date.now()){
       log(`checking to recover app[${appId}] tss key`)
       this.appTssKeyRecoveryCheckTime = Date.now();
@@ -573,7 +571,7 @@ class TssPlugin extends CallablePlugin {
           log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
           let key = await this.recoverAppTssKey(appId, readyPartners!);
           if(key) {
-            console.log(`app tss key recovered`, key.toSerializable())
+            log(`app tss key recovered`)
             const context = this.appManager.getAppContext(appId);
             await this.appManager.saveAppTssConfig({
               version: context.version,
@@ -842,7 +840,7 @@ class TssPlugin extends CallablePlugin {
     let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
     return {
       id: appTssKey!.id,
-      recoveryShare: `0x${keyPart.toString(16)}`,
+      recoveryShare: `0x${keyPart.toString(16, 64)}`,
       // distributedKey public
       publicKey: `${appTssKey!.publicKey!.encode('hex', true)}`,
       // distributed key address

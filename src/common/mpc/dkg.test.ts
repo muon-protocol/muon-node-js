@@ -4,7 +4,7 @@
  * Sign message
  * Verify signature
  */
-import {DistributedKeyGeneration} from "./dkg.js";
+import {DistKeyJson, DistributedKeyGeneration} from "./dkg.js";
 import FakeNetwork from './fake-network.js';
 import {bn2str} from './utils.js'
 import Web3 from 'web3'
@@ -21,10 +21,16 @@ const ellipticCurve = new elliptic.ec('secp256k1');
  * Needs to at least 3 individual's signature to recover global signature
  */
 const N = TssModule.curve.n
-const threshold = 5;
-const partners = range(threshold).map(i => `${i+1}`)
+const threshold = 3;
+const partners = range(threshold+1).map(i => `${i+1}`)
 const random = () => Math.floor(Math.random()*9999999)
 
+type KeyConstructionData = {
+  id: string,
+  partners: string[],
+  t: number,
+  pk?: string,
+}
 
 function resultOk(realKey: string|null, realPubKey: string|null, resultPubKey: string, reconstructedKey, reconstructedPubKey) {
   if(resultPubKey !== reconstructedPubKey)
@@ -35,6 +41,19 @@ function resultOk(realKey: string|null, realPubKey: string|null, resultPubKey: s
   }
 
   return true
+}
+
+async function keyGen(partners: string[], networks: FakeNetwork[], cData: KeyConstructionData): Promise<DistKeyJson[]> {
+
+  let keyGens = partners.map(p => new DistributedKeyGeneration(cData.id, '1', cData.partners, cData.t, cData.pk))
+
+  let allNodeResults: any[] = await Promise.all(
+    partners.map(
+      (p, i) => keyGens[i].runByNetwork(networks[i], 20000)
+    )
+  );
+
+  return allNodeResults.map(r => r.toJson())
 }
 
 async function run() {
@@ -70,38 +89,28 @@ async function run() {
     const realPrivateKey = specialPrivateKeys[i];
     const realPubKey = realPrivateKey ? TssModule.keyFromPrivate(realPrivateKey).getPublic().encode("hex", true) : null;
 
-    /** DistributedKeyGen construction data */
-    const cData = {
+    let keyShares = await keyGen(partners, fakeNets, {
       id: `dkg-${Date.now()}${random()}`,
       partners,
       t: threshold,
       pk: realPrivateKey,
-    }
+    });
 
-    let keyGens = partners.map(p => new DistributedKeyGeneration(cData.id, '1', cData.partners, cData.t, cData.pk))
-
-    let allNodeResults: any[] = await Promise.all(
-      partners.map(
-        (p, i) => keyGens[i].runByNetwork(fakeNets[i], 20000)
-      )
-    );
-
-    allNodeResults = allNodeResults.map(r => r.toJson())
-
-    const shares = allNodeResults.map(r => ({i: r.index, key: TssModule.keyFromPrivate(r.share)}))
+    /** check total key reconstruction */
+    const shares = keyShares.map(r => ({i: r.index, key: TssModule.keyFromPrivate(r.share)}))
     const reconstructedKey = bn2str(TssModule.reconstructKey(shares, threshold, 0))
     const reconstructedPubKey = TssModule.keyFromPrivate(reconstructedKey).getPublic().encode('hex', true)
 
-    const pubKeyList = allNodeResults.map(key => key.publicKey)
-    if(uniq(pubKeyList).length===1 && resultOk(realPrivateKey, realPubKey, allNodeResults[0].publicKey, reconstructedKey, reconstructedPubKey))
-      console.log(`i: ${i}, match: OK, key party: ${allNodeResults[0].partners} time: ${Date.now() - startTime} ms`)
+    const pubKeyList = keyShares.map(key => key.publicKey)
+    if(uniq(pubKeyList).length===1 && resultOk(realPrivateKey, realPubKey, keyShares[0].publicKey, reconstructedKey, reconstructedPubKey))
+      console.log(`i: ${i}, match: OK, key party: ${keyShares[0].partners} time: ${Date.now() - startTime} ms`)
     else {
       console.log(`i: ${i}, match: false`)
       console.log({
         partnersPubKeys: pubKeyList,
         realPrivateKey,
         realPubKey,
-        resultPubKey: allNodeResults[0].publicKey,
+        resultPubKey: keyShares[0].publicKey,
         reconstructedKey,
         reconstructedPubKey,
       })
