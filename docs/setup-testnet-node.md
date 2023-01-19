@@ -6,7 +6,7 @@
 ### Clone the repository
 
 ```
-git clone git@github.com:muon-protocol/muon-node-js.git --recurse-submodules --branch testnet
+git clone https://github.com/muon-protocol/muon-node-js.git --recurse-submodules --branch testnet
 ```
 
 ### Build and run docker
