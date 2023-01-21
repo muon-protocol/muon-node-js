@@ -1,4 +1,4 @@
-import BaseNetworkPlugin from './base/base-network-plugin.js'
+import CallablePlugin from './base/callable-plugin.js'
 import TimeoutPromise from '../../common/timeout-promise.js'
 import * as eth from '../../utils/eth.js'
 import {stackTrace, timeout} from '../../utils/helpers.js'
@@ -9,10 +9,25 @@ import chalk from 'chalk'
 import Log from '../../common/muon-log.js'
 import { createRequire } from "module";
 import {peerId2Str} from "../utils.js";
+import {broadcastHandler, remoteApp} from "./base/app-decorators.js";
+import NodeCache from 'node-cache';
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
 const log = Log('muon:network:plugins:collateral')
+
+const HEARTBEAT_EXPIRE = 5*60*1000; // Keep heartbeet in memory for 5 minutes
+
+const heartbeatCache = new NodeCache({
+  stdTTL: HEARTBEAT_EXPIRE/1000,
+  // /**
+  //  * (default: 600)
+  //  * The period in seconds, as a number, used for the automatic delete check interval.
+  //  * 0 = no periodic check.
+  //  */
+  checkperiod: 60,
+  useClones: false,
+});
 
 export type GroupInfo = {
   isValid: boolean,
@@ -34,11 +49,11 @@ export type NetworkInfo = {
   maxGroupSize: number
 }
 
-export default class CollateralInfoPlugin extends BaseNetworkPlugin{
+@remoteApp
+export default class CollateralInfoPlugin extends CallablePlugin{
 
   groupInfo: GroupInfo;
   networkInfo: NetworkInfo | null = null;
-  private _onlinePeers: {[index: string]: object} = {}
 
   private lastNodesUpdateTime: number;
   private _nodesList: MuonNodeInfo[];
@@ -54,19 +69,73 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     await this._loadCollateralInfo();
 
     // @ts-ignore
-    this.network.on('peer:discovery', this.onPeerDiscovery.bind(this));
-    // @ts-ignore
     this.network.on('peer:connect', this.onPeerConnect.bind(this));
-    // @ts-ignore
-    this.network.on('peer:disconnect', this.onPeerDisconnect.bind(this));
+  }
+
+  async onStart() {
+    await super.onStart()
+
+    this.__broadcastHeartbeat()
+    heartbeatCache.on("del", this.onHeartbeatExpired.bind(this));
+  }
+
+  private async __broadcastHeartbeat() {
+    let delay = 5000;
+    while(true) {
+      try {
+        log('broadcasting heartbeat')
+        this.broadcast("HB")
+      }catch (e) {
+        log(`error when broadcasting hurt beat`)
+      }
+
+      /** increase delay */
+      if(delay * 2 < HEARTBEAT_EXPIRE)
+        delay += 10000;
+
+      /** delay between each broadcast */
+      await timeout(delay + Math.random() * 2000)
+    }
+  }
+
+  @broadcastHandler
+  async __broadcastHandler(data, callerInfo: MuonNodeInfo) {
+    if(data === 'HB') {
+      log(`Heartbeat arrived from ${callerInfo.id}`)
+      this.onPeerOnline(callerInfo.peerId);
+    }
+  }
+
+  onHeartbeatExpired(key, value){
+    log(`heartbeat expired for node ${key}`)
+    this.onPeerOffline(key);
+  }
+
+  private onPeerOnline(peerId: string) {
+    heartbeatCache.set(peerId, Date.now())
+    this.updateNodeInfo(peerId, {isOnline: true})
+    log(`peer[${peerId}] is online now`)
+    CoreIpc.fireEvent({
+      type: "peer:online",
+      data: peerId,
+    });
+  }
+
+  private onPeerOffline(peerId: string) {
+    this.updateNodeInfo(peerId, {isOnline: false})
+    log(`peer[${peerId}] is offline now`)
+    CoreIpc.fireEvent({
+      type: "peer:offline",
+      data: peerId,
+    });
   }
 
   get onlinePeers(): string[] {
-    return Object.keys(this._onlinePeers)
+    return heartbeatCache.keys()
   }
 
   get onlinePeersInfo(): MuonNodeInfo[] {
-    return Object.keys(this._onlinePeers)
+    return this.onlinePeers
       .map(peerId => this.getNodeInfo(peerId)!)
       .filter(info => !!info)
   }
@@ -76,38 +145,19 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     return `[${id}]:${peerId2Str(peerId)}`
   }
 
-  async onPeerDiscovery(peerId) {
-    await this.waitToLoad();
-
-    const peerInfo: MuonNodeInfo|undefined = this.getNodeInfo(peerId2Str(peerId));
-    if(!peerInfo){
-      log(`unknown peer discovered ${peerId2Str(peerId)}`)
-      return;
-    }
-    log(chalk.green(`peer discovered ${peerInfo.id}`))
-    // console.log("peer available", peerId)
-
-    await timeout(5000);
-
-    this._onlinePeers[peerId2Str(peerId)] = await this.findPeer(peerId)
-    this.updateNodeInfo(peerId2Str(peerId), {isOnline: true})
-  }
-
   async onPeerConnect(peerId) {
     log(chalk.green(`peer connected ${this.getNodeId(peerId)}`))
     await this.waitToLoad();
 
+    const peerInfo: MuonNodeInfo|undefined = this.getNodeInfo(peerId2Str(peerId));
+    if(!peerInfo){
+      log(`unknown peer connect ${peerId2Str(peerId)}`)
+      return;
+    }
+
     await timeout(5000);
 
-    this._onlinePeers[peerId2Str(peerId)] = await this.findPeer(peerId);
-    this.updateNodeInfo(peerId2Str(peerId), {isOnline: true})
-  }
-
-  onPeerDisconnect(peerId) {
-    log(chalk.red(`peer disconnected ${this.getNodeId(peerId)}`))
-    // console.log("peer not available", peerId)
-    delete this._onlinePeers[peerId2Str(peerId)];
-    this.updateNodeInfo(peerId2Str(peerId), {isOnline: false})
+    this.onPeerOnline(peerInfo.peerId)
   }
 
   private updateNodeInfo(index: string, dataToMerge: object) {
@@ -185,7 +235,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
           wallet: item.nodeAddress,
           peerId: item.peerId,
           isDeployer: item.isDeployer,
-          isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || !!this._onlinePeers[item.peerId]
+          isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || heartbeatCache.has(item.peerId)
         }))
     }
   }
@@ -256,8 +306,8 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
         CoreIpc.fireEvent({
           type: "collateral:node:edit",
           data: {
-            nodeInfo: {...n, isOnline: !!this._onlinePeers[n.peerId]},
-            oldNodeInfo: {...oldNode, isOnline: !!this._onlinePeers[oldNode.peerId]},
+            nodeInfo: {...n, isOnline: heartbeatCache.has(n.peerId)},
+            oldNodeInfo: {...oldNode, isOnline: heartbeatCache.has(oldNode.peerId)},
           }
         })
         return;
@@ -319,7 +369,7 @@ export default class CollateralInfoPlugin extends BaseNetworkPlugin{
     /**
      * onlinePartners not include current node
      */
-    return Object.keys(this._onlinePeers)
+    return this.onlinePeers
       .map(peerId => this.getNodeInfo(peerId))
       .filter(info => !!info).length + 1 >= this.TssThreshold
   }
