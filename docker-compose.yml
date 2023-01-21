@@ -3,24 +3,26 @@ services:
   muon_api:
     container_name: muon-node
     restart: always
+    network_mode: host
     volumes:
       - ~/.ssh/id_rsa:/root/.ssh/id_rsa:ro
       - ~/.ssh/id_rsa.pub:/root/.ssh/id_rsa.pub:ro
     build:
       context: .
-    ports:
-      - '8000:8000'
-      - '4000:4000'
-    external_links:
-      - muon_mongo
-      - muon_redis
+    #ports:
+    #  - '8000:8000'
+    #  - '4000:4000'
+#    external_links:
+#      - muon_mongo
+#      - muon_redis
     depends_on:
       - muon_mongo
       - muon_redis
     environment:
-      - MONGO_HOST=muon_mongo
-      - REDIS_HOST=muon_redis
+      - MONGO_HOST=localhost
+      - REDIS_HOST=localhost
   muon_mongo:
+    network_mode: host
     container_name: mongo
     image: mongo
 #    command: --replSet rs01
@@ -29,6 +31,7 @@ services:
 #    ports:
 #      - '27017:27017'
   muon_redis:
+    network_mode: host
     container_name: redis
     image: redis:6
 #   ports:
