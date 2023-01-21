@@ -262,6 +262,9 @@ export class MultiPartyComputation {
 
         /** update qualified list based on current round outputs */
         qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[currentRound!], qualifiedPartners);
+
+        if(qualifiedPartners.length < this.t)
+          throw `Insufficient partners to continue process of ${this.ConstructorName}`
       }
 
       // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
