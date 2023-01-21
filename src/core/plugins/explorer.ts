@@ -54,15 +54,15 @@ class Explorer extends CallablePlugin {
     let result = {
       [process.env.SIGN_WALLET_ADDRESS]: {
         status: "CURRENT",
-        ... await this.healthPlugin.getNodeStatus().catch(e => null)
+        ... await this.healthPlugin.getNodeStatus().catch(e => e.message)
       }
     }
     let responses = await Promise.all(partners.map(node => {
-      return this.healthPlugin.getNodeStatus(node).catch(e => null)
+      return this.healthPlugin.getNodeStatus(node).catch(e => e.message)
     }))
 
     for(let i=0 ; i<responses.length ; i++){
-      if(responses[i] !== null)
+      // if(responses[i] === null)
         result[partners[i].wallet] = responses[i];
     }
 
