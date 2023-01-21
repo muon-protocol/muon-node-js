@@ -126,6 +126,8 @@ export class MultiPartyComputation {
       }, {});
 
     /** remove nodes that not connected with starter node */
+    if(!Array.isArray(connectionGraph[this.starter]))
+      connectionGraph = {}
     Object.keys(connectionGraph).forEach(node => {
       if(!connectionGraph[this.starter].includes(node)) {
         delete connectionGraph[node];
