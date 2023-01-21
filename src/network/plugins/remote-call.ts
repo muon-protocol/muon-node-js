@@ -49,7 +49,14 @@ class RemoteCall extends BaseNetworkPlugin {
   private shieldNodeAllowedMethods = {}
 
   async onStart() {
-    this.network.libp2p.handle(PROTOCOL, this.handler.bind(this))
+    this.network.libp2p.handle(
+      PROTOCOL,
+      this.handler.bind(this),
+      {
+        maxInboundStreams: 16384,
+        maxOutboundStreams: 16384
+      }
+    )
   }
 
   private get IpcHandler(): NetworkIpcHandler {
