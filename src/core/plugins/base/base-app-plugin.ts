@@ -657,7 +657,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async broadcastNewRequest(request) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce: DistributedKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
+    let nonce: DistributedKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`, 15000)
     let party = this.appParty;
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
@@ -724,7 +724,7 @@ class BaseAppPlugin extends CallablePlugin {
     // let signature = crypto.sign(resultHash)
 
     let {reqId} = request;
-    let nonce = await this.tssPlugin.getSharedKey(`nonce-${reqId}`)
+    let nonce = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
     if(!nonce)
       throw `nonce not found for request ${reqId}`
 

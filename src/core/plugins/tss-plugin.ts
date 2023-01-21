@@ -752,8 +752,8 @@ class TssPlugin extends CallablePlugin {
     return key;
   }
 
-  async getSharedKey(id: string): Promise<DistributedKey> {
-    let key = await SharedMemory.waitAndGet(id, 5000)
+  async getSharedKey(id: string, timeout:number=5000): Promise<DistributedKey> {
+    let key = await SharedMemory.waitAndGet(id, timeout)
     let party = this.getParty(key.party);
     if(!party)
       throw `party [${key.party}] not found`
@@ -907,7 +907,7 @@ class TssPlugin extends CallablePlugin {
     const appTssKey = this.getAppTssKey(appId)
 
     if(!appTssKey)
-      throw `Missing app tss key`
+      throw `Missing app[${appId}] tss key `
 
     return {
       isReady: !!appTssKey,
