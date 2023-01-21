@@ -66,6 +66,7 @@ export type AppRequestSignature = {
 const RemoteMethods = {
   WantSign: 'wantSign',
   InformRequestConfirmation: 'InformReqConfirmation',
+  HB: "HB",
 }
 
 @remoteApp
@@ -312,6 +313,24 @@ class BaseAppPlugin extends CallablePlugin {
     }
     /** sign mode */
     else{
+      /** make sure current node is connected to the app party */
+      let appParty = this.appParty!, numConnected=0;
+      for(let t=3 ; t>0 ; t--) {
+        // @ts-ignore
+        let responses = await Promise.all(
+          appParty.partners
+            .map(id => this.collateralPlugin.getNodeInfo(id))
+            .filter(p => !!p)
+            .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB).catch(e => false))
+        )
+        let success = responses.filter(r => r===true)
+        numConnected = success.length
+        if(numConnected >= appParty.t)
+          break;
+      }
+      if(numConnected < appParty.t)
+        throw "Insufficient partner to sign the request"
+
       if(this.validateRequest){
         await this.validateRequest(clone(newRequest))
       }
@@ -948,6 +967,11 @@ class BaseAppPlugin extends CallablePlugin {
     await this.onConfirm(request, result, request.signatures);
 
     return `OK`;
+  }
+
+  @remoteMethod(RemoteMethods.HB)
+  async __HB(data, callerInfo) {
+    return true;
   }
 }
 
