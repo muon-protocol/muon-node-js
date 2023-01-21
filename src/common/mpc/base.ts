@@ -92,7 +92,9 @@ export class MultiPartyComputation {
 
     /** remove Unidirectional edges */
     Object.keys(graph).forEach(node => {
-      graph[node] = graph[node].filter(connection => graph[connection]?.includes(node))
+      graph[node] = graph[node].filter(connection => {
+        return Array.isArray(graph[connection]) && graph[connection].includes(node)
+      })
     })
 
     /**
@@ -124,6 +126,8 @@ export class MultiPartyComputation {
       }, {});
 
     /** remove nodes that not connected with starter node */
+    if(!Array.isArray(connectionGraph[this.starter]))
+      connectionGraph = {}
     Object.keys(connectionGraph).forEach(node => {
       if(!connectionGraph[this.starter].includes(node)) {
         delete connectionGraph[node];
