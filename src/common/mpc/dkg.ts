@@ -392,7 +392,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     const r2Msgs = this.getRoundReceives('round2')
 
     if(qualified.length < this.t) {
-      throw `Insufficient partner to create the Key.`
+      throw `Insufficient partner to create the Key. ${qualified}`
     }
 
     /** share calculation */
