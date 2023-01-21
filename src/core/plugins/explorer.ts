@@ -62,7 +62,8 @@ class Explorer extends CallablePlugin {
     }))
 
     for(let i=0 ; i<responses.length ; i++){
-      result[partners[i].wallet] = responses[i];
+      if(responses[i] !== null)
+        result[partners[i].wallet] = responses[i];
     }
 
     return result;
