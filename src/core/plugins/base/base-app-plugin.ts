@@ -66,6 +66,7 @@ export type AppRequestSignature = {
 const RemoteMethods = {
   WantSign: 'wantSign',
   InformRequestConfirmation: 'InformReqConfirmation',
+  HB: "HB",
 }
 
 @remoteApp
@@ -312,6 +313,31 @@ class BaseAppPlugin extends CallablePlugin {
     }
     /** sign mode */
     else{
+      /** make sure current node is connected to the app party */
+      let appParty = this.appParty!, availables: string[]=[];
+      for(let t=3 ; t>0 ; t--) {
+        let onlinePartners = this.collateralPlugin.filterNodes({
+            list: appParty.partners,
+            isOnline: true,
+            excludeSelf: true
+          });
+        // @ts-ignore
+        let responses = await Promise.all(
+          onlinePartners
+            .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB).catch(e => false))
+        )
+        // @ts-ignore
+        availables = responses
+          .map((r, i) => r===true ? onlinePartners[i].id : null)
+          .filter(id => !!id)
+        availables = [this.currentNodeInfo!.id, ...availables];
+        if(availables.length >= appParty.t * 1.2)
+          break;
+      }
+      this.log(`partners:[${availables}] are available to sign the request`)
+      if(availables.length < appParty.t)
+        throw "Insufficient partner to sign the request"
+
       if(this.validateRequest){
         await this.validateRequest(clone(newRequest))
       }
@@ -657,7 +683,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async broadcastNewRequest(request) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce: DistributedKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
+    let nonce: DistributedKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`, 15000)
     let party = this.appParty;
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
@@ -724,7 +750,7 @@ class BaseAppPlugin extends CallablePlugin {
     // let signature = crypto.sign(resultHash)
 
     let {reqId} = request;
-    let nonce = await this.tssPlugin.getSharedKey(`nonce-${reqId}`)
+    let nonce = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
     if(!nonce)
       throw `nonce not found for request ${reqId}`
 
@@ -948,6 +974,11 @@ class BaseAppPlugin extends CallablePlugin {
     await this.onConfirm(request, result, request.signatures);
 
     return `OK`;
+  }
+
+  @remoteMethod(RemoteMethods.HB)
+  async __HB(data, callerInfo) {
+    return true;
   }
 }
 
