@@ -327,7 +327,7 @@ class BaseAppPlugin extends CallablePlugin {
         )
         let success = responses.filter(r => r===true)
         numConnected = 1 + success.length
-        if(numConnected >= appParty.t)
+        if(numConnected >= appParty.t * 1.2)
           break;
       }
       if(numConnected < appParty.t)
