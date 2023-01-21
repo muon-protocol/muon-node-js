@@ -314,23 +314,28 @@ class BaseAppPlugin extends CallablePlugin {
     /** sign mode */
     else{
       /** make sure current node is connected to the app party */
-      let appParty = this.appParty!, numConnected=0;
+      let appParty = this.appParty!, availables: string[]=[];
       for(let t=3 ; t>0 ; t--) {
-        // @ts-ignore
-        let responses = await Promise.all(
-          this.collateralPlugin.filterNodes({
+        let onlinePartners = this.collateralPlugin.filterNodes({
             list: appParty.partners,
             isOnline: true,
             excludeSelf: true
-          })
+          });
+        // @ts-ignore
+        let responses = await Promise.all(
+          onlinePartners
             .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB).catch(e => false))
         )
-        let success = responses.filter(r => r===true)
-        numConnected = 1 + success.length
-        if(numConnected >= appParty.t * 1.2)
+        // @ts-ignore
+        availables = responses
+          .map((r, i) => r===true ? onlinePartners[i].id : null)
+          .filter(id => !!id)
+        availables = [this.currentNodeInfo!.id, ...availables];
+        if(availables.length >= appParty.t * 1.2)
           break;
       }
-      if(numConnected < appParty.t)
+      this.log(`partners:[${availables}] are available to sign the request`)
+      if(availables.length < appParty.t)
         throw "Insufficient partner to sign the request"
 
       if(this.validateRequest){
