@@ -314,7 +314,7 @@ class BaseAppPlugin extends CallablePlugin {
     /** sign mode */
     else{
       /** make sure current node is connected to the app party */
-      let appParty = this.appParty!, availables: string[]=[];
+      let appParty = this.appParty!, availablePartners: string[]=[];
       for(let t=3 ; t>0 ; t--) {
         let onlinePartners = this.collateralPlugin.filterNodes({
             list: appParty.partners,
@@ -327,15 +327,15 @@ class BaseAppPlugin extends CallablePlugin {
             .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB).catch(e => false))
         )
         // @ts-ignore
-        availables = responses
+        availablePartners = responses
           .map((r, i) => r===true ? onlinePartners[i].id : null)
           .filter(id => !!id)
-        availables = [this.currentNodeInfo!.id, ...availables];
-        if(availables.length >= appParty.t * 1.2)
+        availablePartners = [this.currentNodeInfo!.id, ...availablePartners];
+        if(availablePartners.length >= appParty.t * 1.2)
           break;
       }
-      this.log(`partners:[${availables}] are available to sign the request`)
-      if(availables.length < appParty.t)
+      this.log(`partners:[${availablePartners}] are available to sign the request`)
+      if(availablePartners.length < appParty.t)
         throw "Insufficient partner to sign the request"
 
       if(this.validateRequest){
@@ -374,7 +374,7 @@ class BaseAppPlugin extends CallablePlugin {
 
         newRequest.data.init = {
           ... newRequest.data.init,
-          ... await this.onFirstNodeRequestSucceed(clone(newRequest))
+          ... await this.onFirstNodeRequestSucceed(clone(newRequest), availablePartners)
         };
 
         let memWrite = this.getMemWrite(newRequest, result)
@@ -494,7 +494,7 @@ class BaseAppPlugin extends CallablePlugin {
     ]);
   }
 
-  async onFirstNodeRequestSucceed(request) {
+  async onFirstNodeRequestSucceed(request, availablePartners: string[]) {
     let tssPlugin = this.muon.getPlugin(`tss-plugin`)
     if(!tssPlugin.isReady){
       throw {message: 'Tss not initialized'};
@@ -507,6 +507,7 @@ class BaseAppPlugin extends CallablePlugin {
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     let nonce = await tssPlugin.keyGen(party, {
       id: `nonce-${request.reqId}`,
+      partners: availablePartners,
       maxPartners: nonceParticipantsCount
     })
 
