@@ -318,13 +318,15 @@ class BaseAppPlugin extends CallablePlugin {
       for(let t=3 ; t>0 ; t--) {
         // @ts-ignore
         let responses = await Promise.all(
-          appParty.partners
-            .map(id => this.collateralPlugin.getNodeInfo(id))
-            .filter(p => !!p)
+          this.collateralPlugin.filterNodes({
+            list: appParty.partners,
+            isOnline: true,
+            excludeSelf: true
+          })
             .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB).catch(e => false))
         )
         let success = responses.filter(r => r===true)
-        numConnected = success.length
+        numConnected = 1 + success.length
         if(numConnected >= appParty.t)
           break;
       }
