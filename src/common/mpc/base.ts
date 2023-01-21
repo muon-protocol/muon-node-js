@@ -92,7 +92,9 @@ export class MultiPartyComputation {
 
     /** remove Unidirectional edges */
     Object.keys(graph).forEach(node => {
-      graph[node] = graph[node].filter(connection => graph[connection]?.includes(node))
+      graph[node] = graph[node].filter(connection => {
+        return Array.isArray(graph[connection]) && graph[connection].includes(node)
+      })
     })
 
     /**
