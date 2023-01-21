@@ -689,7 +689,7 @@ class TssPlugin extends CallablePlugin {
    */
   async keyGen(party, options: KeyGenOptions={}): Promise<DistributedKey> {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
-    let {id, partners: oPartners, maxPartners, timeout=30000, value} = options;
+    let {id, partners: oPartners, maxPartners, timeout=60000, value} = options;
 
     let candidatePartners = party.partners;
     if(oPartners)
