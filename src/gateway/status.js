@@ -24,7 +24,10 @@ router.use('/', async (req, res, next) => {
     },
     addedToNetwork: !!nodeInfo,
     network: {
-      nodeInfo,
+      nodeInfo: {
+        ...nodeInfo,
+        isOnline: !!nodeInfo,
+      },
     }
   })
 })
