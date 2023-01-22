@@ -2,6 +2,9 @@ import BasePlugin from './base/base-plugin.js'
 import { QueueConsumer } from '../../common/message-bus/index.js'
 import { promisify } from "util"
 import Redis from 'redis'
+import { logger } from '@libp2p/logger'
+
+const log = logger('muon:core:plugins:gateway-interface')
 
 const GATEWAY_CALL_REQUEST  = `/muon/gateway/${process.env.GATEWAY_PORT}/call/request`
 const GATEWAY_CALL_RESPONSE = `/muon/gateway/${process.env.GATEWAY_PORT}/call/response`
@@ -16,13 +19,13 @@ const callRedis = Redis.createClient(redisConfig)
 const responseRedis = Redis.createClient(redisConfig)
 const blpopAsync = promisify(redis.blpop).bind(redis);
 redis.on("error", function(error) {
-  console.error(error);
+  log.error("%o", error);
 });
 callRedis.on("error", function(error) {
-  console.error(error);
+  log.error("%o", error);
 });
 responseRedis.on('error', function(error) {
-  console.error(error);
+  log.error("%o", error);
 })
 
 let gatewayRequests;
@@ -99,10 +102,8 @@ export default class GatewayInterface extends BasePlugin{
     catch (e) {
       if(typeof e === 'string')
         e = {message: e};
-      if(process.env.VERBOSE) {
-        console.error('gateway-interface error')
-        console.dir(e, {depth: null})
-      }
+      log.error('gateway-interface error %O')
+
       let {message, data: errorData, ...otherProps} = e;
       throw {
         message: message || "GatewayInterface: Unknown error occurred",

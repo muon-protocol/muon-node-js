@@ -1,6 +1,9 @@
 import BaseMessageQueue from './base-message-queue.js'
 import { IpcCallConfig } from './types'
 import { promisify } from "util"
+import { logger } from '@libp2p/logger'
+
+const log = logger('muon:common:msg-bus:q-consumer')
 
 export default class QueueConsumer<MessageType> extends BaseMessageQueue {
 
@@ -31,7 +34,7 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
         let [queue, dataStr] = await sendCommand("BLPOP", [`${this.channelName}@${process.pid}`, this.channelName, '0'])
         this.onMessageReceived(queue, dataStr);
       } catch (e) {
-        console.error(e)
+        log.error("%o", e)
       }
     }
   }
@@ -43,7 +46,7 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
       // @ts-ignore
       response = await this.emit("message", data, {pid, uid})
     } catch (e) {
-      console.log(`QueueConsumer.onMessageReceived`, e);
+      log.error(`QueueConsumer.onMessageReceived %o`, e);
       if(typeof e === "string")
         e = {message: e};
       error = {
