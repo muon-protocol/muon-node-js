@@ -10,6 +10,7 @@ class ContentApp extends CallablePlugin {
   APP_NAME = 'content'
 
   async onGatewayConfirmed(response){
+    return; //REZA: TODO: fix this
     console.log("onGatewayConfirmed");
     let content = await createContent(response)
     await content.save();
