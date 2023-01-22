@@ -45,12 +45,14 @@ export default class CollateralInfoPlugin extends BasePlugin{
 
   private onPeerOnline(peerId: string) {
     this.updateNodeInfo(peerId, {isOnline: true});
-    log(`peer[${peerId}] is online now`)
+    let nodeInfo = this.getNodeInfo(peerId)!;
+    log(`peer[${peerId}] id[${nodeInfo.id}] is online now`)
   }
 
   private onPeerOffline(peerId: string) {
     this.updateNodeInfo(peerId, {isOnline: false});
-    log(`peer[${peerId}] is offline now`)
+    let nodeInfo = this.getNodeInfo(peerId)!;
+    log(`peer[${peerId}] id[${nodeInfo.id}] is offline now`)
   }
 
   get availablePeerIds(): string[] {
