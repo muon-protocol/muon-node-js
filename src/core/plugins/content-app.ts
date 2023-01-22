@@ -10,6 +10,7 @@ class ContentApp extends CallablePlugin {
   APP_NAME = 'content'
 
   async onGatewayConfirmed(response){
+    console.log("onGatewayConfirmed");
     let content = await createContent(response)
     await content.save();
     response['cid'] = content.cid;
