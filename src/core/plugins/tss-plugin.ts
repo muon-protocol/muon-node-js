@@ -906,8 +906,9 @@ class TssPlugin extends CallablePlugin {
 
     const appTssKey = this.getAppTssKey(appId)
 
-    if(!appTssKey)
-      throw `Missing app[${appId}] tss key `
+    if(!appTssKey) {
+      return {isReady: false}
+    }
 
     return {
       isReady: !!appTssKey,
