@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
 const log = Log('muon:network:plugins:collateral')
 
-const HEARTBEAT_EXPIRE = 5*60*1000; // Keep heartbeet in memory for 5 minutes
+const HEARTBEAT_EXPIRE = parseInt(process.env.HEARTBEAT_EXPIRE!) || 20*60*1000; // Keep heartbeet in memory for 5 minutes
 
 const heartbeatCache = new NodeCache({
   stdTTL: HEARTBEAT_EXPIRE/1000,
@@ -80,7 +80,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   }
 
   private async __broadcastHeartbeat() {
-    let delay = 5000;
     while(true) {
       try {
         log('broadcasting heartbeat')
@@ -89,12 +88,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         log(`error when broadcasting hurt beat`)
       }
 
-      /** increase delay */
-      if(delay * 2 < HEARTBEAT_EXPIRE)
-        delay += 10000;
-
       /** delay between each broadcast */
-      await timeout(delay + Math.random() * 2000)
+      await timeout(HEARTBEAT_EXPIRE/2 + Math.random() * 60e3)
     }
   }
 
