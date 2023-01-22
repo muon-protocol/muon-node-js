@@ -96,7 +96,9 @@ export default class GatewayInterface extends BasePlugin{
         // @ts-ignore
         response = await this.emit(`call/muon/${method}`, callingArgs)
       }
+      console.log("GatewayInterface.__onGatewayCall: calling __handleCallResponse")
       await this.__handleCallResponse(callingArgs, response);
+      console.log("GatewayInterface.__onGatewayCall: __handleCallResponse called")
       return response
     }
     catch (e) {
