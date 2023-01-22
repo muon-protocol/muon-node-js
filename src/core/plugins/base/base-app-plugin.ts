@@ -421,6 +421,8 @@ class BaseAppPlugin extends CallablePlugin {
         signatures: confirmed ? signatures : []
       }
 
+      console.log("requestData", requestData)
+
       if(confirmed && gwSign){
         let cryptoSign = crypto.sign(resultHash);
         requestData.gwSignature = cryptoSign;
@@ -434,12 +436,13 @@ class BaseAppPlugin extends CallablePlugin {
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
 
-        // console.log('broadcast signed request');
+        console.log('broadcasting signed request');
         this.broadcast({
           type: 'request_signed',
           peerId: process.env.PEER_ID,
           requestData
         })
+        console.log('broadcasted');
       }
 
       return requestData
