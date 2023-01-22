@@ -23,7 +23,7 @@ const DEFAULT_OPTS = {
   connectionEncryption: [
     noise(),
   ],connectionManager: {
-    //autoDial: true
+    autoDial: true
   },
   streamMuxers: [
     mplex()
