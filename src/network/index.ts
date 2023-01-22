@@ -51,7 +51,7 @@ class Network extends Events {
       //   interval: 60e3
       // }),
       pubsubPeerDiscovery({
-        interval: 5*60e3
+        interval: 10*60e3
       })
     ]
     if(configs.bootstrap.length>0) {
