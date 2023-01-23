@@ -437,11 +437,11 @@ class BaseAppPlugin extends CallablePlugin {
         this.muon.getPlugin('memory').writeAppMem(requestData)
 
         console.log('broadcasting signed request');
-        this.broadcast({
-          type: 'request_signed',
-          peerId: process.env.PEER_ID,
-          requestData
-        })
+        // this.broadcast({
+        //   type: 'request_signed',
+        //   peerId: process.env.PEER_ID,
+        //   requestData
+        // })
         console.log('broadcasted');
       }
 
