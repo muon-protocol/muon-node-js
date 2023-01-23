@@ -85,7 +85,7 @@ class BaseAppPlugin extends CallablePlugin {
   METHOD_PARAMS_SCHEMA: object = {};
   /**=================================*/
   APP_NAME: string | null = null
-  REMOTE_CALL_TIMEOUT = 15000
+  REMOTE_CALL_TIMEOUT = 60000
   requestManager = new AppRequestManager();
   /** initialize when loading */
   isBuiltInApp: boolean
@@ -318,7 +318,7 @@ class BaseAppPlugin extends CallablePlugin {
       for(let t=3 ; t>0 ; t--) {
         let onlinePartners = this.collateralPlugin.filterNodes({
             list: appParty.partners,
-            isOnline: true,
+            // isOnline: true,
             excludeSelf: true
           });
         // @ts-ignore
@@ -421,7 +421,7 @@ class BaseAppPlugin extends CallablePlugin {
         signatures: confirmed ? signatures : []
       }
 
-      console.log("requestData", requestData)
+      // console.log("requestData", requestData)
 
       if(confirmed && gwSign){
         let cryptoSign = crypto.sign(resultHash);
@@ -459,9 +459,9 @@ class BaseAppPlugin extends CallablePlugin {
       ...this.collateralPlugin
         .filterNodes({
           list: this.appParty!.partners,
-          isOnline: true
+          // isOnline: true,
+          excludeSelf: true
         })
-        .filter(n => n.id !== this.currentNodeInfo!.id),
     ]
 
     const responses: string[] = await Promise.all(partners.map(async node => {

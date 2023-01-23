@@ -321,7 +321,7 @@ class TssPlugin extends CallablePlugin {
     let onlinePartners: MuonNodeInfo[] = this.collateralPlugin
       .filterNodes({
         list: appParty.partners,
-        isOnline: true,
+        // isOnline: true,
         excludeSelf: true
       });
 
@@ -400,7 +400,7 @@ class TssPlugin extends CallablePlugin {
   async isNeedToCreateKey(){
     let onlineDeployers = this.collateralPlugin.filterNodes({
       list: this.tssParty!.partners,
-      isOnline: true,
+      // isOnline: true,
       isDeployer: true,
       excludeSelf: true
     })
@@ -654,7 +654,7 @@ class TssPlugin extends CallablePlugin {
     // @ts-ignore
     const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
       list: partners,
-      isOnline: true
+      // isOnline: true
     })
 
     let callResult = await Promise.all(
@@ -697,7 +697,7 @@ class TssPlugin extends CallablePlugin {
 
     let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
       list: candidatePartners,
-      isOnline: true
+      // isOnline: true
     })
 
     if(maxPartners && maxPartners > 0) {

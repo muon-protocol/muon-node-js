@@ -75,8 +75,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   async onStart() {
     await super.onStart()
 
-    this.__broadcastHeartbeat()
-    heartbeatCache.on("del", this.onHeartbeatExpired.bind(this));
+    // this.__broadcastHeartbeat()
+    // heartbeatCache.on("del", this.onHeartbeatExpired.bind(this));
   }
 
   private async __broadcastHeartbeat() {
@@ -107,22 +107,22 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   }
 
   private onPeerOnline(peerId: string) {
-    heartbeatCache.set(peerId, Date.now())
-    this.updateNodeInfo(peerId, {isOnline: true})
-    log(`peer[${peerId}] is online now`)
-    CoreIpc.fireEvent({
-      type: "peer:online",
-      data: peerId,
-    });
+    // heartbeatCache.set(peerId, Date.now())
+    // this.updateNodeInfo(peerId, {isOnline: true})
+    // log(`peer[${peerId}] is online now`)
+    // CoreIpc.fireEvent({
+    //   type: "peer:online",
+    //   data: peerId,
+    // });
   }
 
   private onPeerOffline(peerId: string) {
-    this.updateNodeInfo(peerId, {isOnline: false})
-    log(`peer[${peerId}] is offline now`)
-    CoreIpc.fireEvent({
-      type: "peer:offline",
-      data: peerId,
-    });
+    // this.updateNodeInfo(peerId, {isOnline: false})
+    // log(`peer[${peerId}] is offline now`)
+    // CoreIpc.fireEvent({
+    //   type: "peer:offline",
+    //   data: peerId,
+    // });
   }
 
   get onlinePeers(): string[] {

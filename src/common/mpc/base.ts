@@ -3,10 +3,12 @@ import Ajv from 'ajv';
 import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive, PartyConnectivityGraph} from "./types";
 import lodash from 'lodash'
 import {timeout} from "../../utils/helpers.js";
+import { logger } from '@libp2p/logger'
 
 const {countBy} = lodash;
 
 const random = () => Math.floor(Math.random()*9999999)
+const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const ajv = new Ajv()
 // for(let round of this.rounds) {
 //   if(this.InputSchema[round])
@@ -162,7 +164,7 @@ export class MultiPartyComputation {
     }
   }
 
-  async runByNetwork(network: IMpcNetwork, timeout: number=10000): Promise<any> {
+  async runByNetwork(network: IMpcNetwork, timeout: number=35000): Promise<any> {
     /** n for rounds, 1 fore result */
     this.roundsPromise = new LevelPromise(this.rounds.length+1, timeout);
     /** assign MPC task to this process */
@@ -214,13 +216,16 @@ export class MultiPartyComputation {
   }
 
   private async process(network: IMpcNetwork, timeout: number) {
+    const log = logger(`muon:common:mpc:${this.ConstructorName}`);
     try {
       /** Some partners may be excluded during the MPC process. */
-      let qualifiedPartners = this.partners;
+      let qualifiedPartners = clone(this.partners);
+      log(`${this.ConstructorName}[${this.id}] start with partners %o`, qualifiedPartners)
 
       for (let r = 0; r < this.rounds.length; r++) {
+        Object.freeze(qualifiedPartners);
         const currentRound = this.rounds[r], previousRound = r>0 ? this.rounds[r-1] : null;
-        // console.log(`processing round mpc[${this.id}].${currentRound} ...`)
+        log(`processing round mpc[${this.id}].${currentRound} ...`)
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
@@ -235,24 +240,26 @@ export class MultiPartyComputation {
           }, {})
         }
         /** execute MPC round */
-        //console.log(`MPC[${this.id}][${currentRound}] with qualified list: `, qualifiedPartners);
+        log(`MPC[${this.id}][${currentRound}] with qualified list: %o`, qualifiedPartners);
         this.roundsOutput[currentRound] = await this.processRound(r, inputs, broadcasts, network.id, qualifiedPartners);
-        // console.log(`round executed [${network.id}].mpc[${this.id}].${currentRound} ...`, {currentRound, store, send, broadcast})
+        log(`round executed [${network.id}].mpc[${this.id}].${currentRound}`)
         this.roundsPromise.resolve(r, true);
 
         /** Gather other partners data */
         const dataToSend = {
           constructData: r===0 ? this.constructData : undefined,
         }
+        log(`[${network.id}].mpc[${this.id}].${currentRound} collecting round data`)
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
           qualifiedPartners.map(partner => {
             return this.tryToGetRoundDate(network, partner, r, dataToSend)
               .catch(e => {
-                console.log(`${this.ConstructorName}[${this.id}][${currentRound}] error at level ${r}`, e)
+                log.error(`[${this.id}][${currentRound}] error at level ${r} %o`, e)
                 return null
               })
           })
         )
+        log(`[${network.id}].mpc[${this.id}].${currentRound} ${allPartiesResult.filter(i => !!i).length} response received`)
         /** store partners output for current round */
         this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {
           if(curr !== null)
@@ -263,17 +270,18 @@ export class MultiPartyComputation {
         /** update qualified list based on current round outputs */
         qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[currentRound!], qualifiedPartners);
 
-        if(qualifiedPartners.length < this.t)
-          throw `Insufficient partners to continue process of ${this.ConstructorName}`
+        if(qualifiedPartners.length < this.t) {
+          throw `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified`
+        }
       }
 
-      // console.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
+      log(`${this.ConstructorName}[${network.id}] all rounds done.`)
       const result = this.onComplete(this.roundsArrivedMessages, network.id, qualifiedPartners);
       this.roundsPromise.resolve(this.rounds.length, result);
     }
     catch (e) {
       this.roundsPromise.reject(e);
-      // console.log('error when processing MPC', e)
+      log.error('error when processing MPC', e)
     }
   }
 
