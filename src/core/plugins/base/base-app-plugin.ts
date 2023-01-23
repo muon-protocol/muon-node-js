@@ -324,7 +324,7 @@ class BaseAppPlugin extends CallablePlugin {
         // @ts-ignore
         let responses = await Promise.all(
           onlinePartners
-            .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB).catch(e => false))
+            .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB, null, {timeout: 5000}).catch(e => false))
         )
         // @ts-ignore
         availablePartners = responses
