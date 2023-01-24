@@ -72,7 +72,7 @@ class Network extends Events {
           // `/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`,
           // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
         ],
-        // announceFilter,
+        announceFilter,
       },
       peerDiscovery,
       // config: {
