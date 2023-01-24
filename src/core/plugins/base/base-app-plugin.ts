@@ -25,6 +25,7 @@ import chalk from 'chalk'
 import Ajv from "ajv"
 import Log from '../../../common/muon-log.js'
 import {bn2hex} from "../../../utils/tss/utils.js";
+import * as NetworkIpc from "../../../network/ipc.js";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
@@ -313,30 +314,12 @@ class BaseAppPlugin extends CallablePlugin {
     }
     /** sign mode */
     else{
-      /** make sure current node is connected to the app party */
-      let appParty = this.appParty!, availablePartners: string[]=[];
-      for(let t=3 ; t>0 ; t--) {
-        let onlinePartners = this.collateralPlugin.filterNodes({
-            list: appParty.partners,
-            // isOnline: true,
-            excludeSelf: true
-          });
-        // @ts-ignore
-        let responses = await Promise.all(
-          onlinePartners
-            .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB, null, {timeout: 5000}).catch(e => false))
-        )
-        // @ts-ignore
-        availablePartners = responses
-          .map((r, i) => r===true ? onlinePartners[i].id : null)
-          .filter(id => !!id)
-        availablePartners = [this.currentNodeInfo!.id, ...availablePartners];
-        if(availablePartners.length >= appParty.t * 1.2)
-          break;
-      }
-      this.log(`partners:[${availablePartners}] are available to sign the request`)
+      let appParty = this.appParty!;
+      /** find available partners to sign the request */
+      const availablePartners: string[] = await NetworkIpc.findNOnlinePeer(appParty.partners, Math.ceil(appParty.t*1.2))
+      this.log(`partners:[%o] are available to sign the request`, availablePartners)
       if(availablePartners.length < appParty.t)
-        throw "Insufficient partner to sign the request"
+        throw `Insufficient partner to sign the request, only ${availablePartners.length} are available`
 
       if(this.validateRequest){
         await this.validateRequest(clone(newRequest))

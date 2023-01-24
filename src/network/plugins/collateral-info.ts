@@ -6,15 +6,15 @@ import {MuonNodeInfo} from "../../common/types";
 import * as CoreIpc from '../../core/ipc.js'
 import _ from 'lodash'
 import chalk from 'chalk'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
 import {peerId2Str} from "../utils.js";
-import {broadcastHandler, remoteApp} from "./base/app-decorators.js";
+import {broadcastHandler, remoteApp, remoteMethod} from "./base/app-decorators.js";
 import NodeCache from 'node-cache';
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
-const log = Log('muon:network:plugins:collateral')
+const log = logger('muon:network:plugins:collateral')
 
 const HEARTBEAT_EXPIRE = parseInt(process.env.HEARTBEAT_EXPIRE!) || 20*60*1000; // Keep heartbeet in memory for 5 minutes
 
@@ -47,6 +47,10 @@ export type NetworkInfo = {
   tssThreshold: number,
   minGroupSize: number,
   maxGroupSize: number
+}
+
+const RemoteMethods = {
+  CheckOnline: 'CKON',
 }
 
 @remoteApp
@@ -369,6 +373,10 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       .filter(info => !!info).length + 1 >= this.TssThreshold
   }
 
+  get currentNodeInfo(): MuonNodeInfo | undefined {
+    return this.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
+  }
+
   get MinGroupSize(){
     return this.networkInfo?.minGroupSize;
   }
@@ -412,5 +420,65 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     if(options.excludeSelf)
       result = result.filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
     return result
+  }
+
+  findNOnline(searchList: string[], count: number, options?:{timeout?: number, return?: string}): Promise<MuonNodeInfo[]> {
+    options = {
+      timeout: 15000,
+      return: 'id',
+      ...options
+    }
+    let peers = this.filterNodes({list: searchList})
+    log(`finding ${count} of ${searchList.length} online peer ...`)
+    const selfIndex = peers.findIndex(p => p.peerId === process.env.PEER_ID!)
+
+    let responseList: string[] = []
+    let n = count;
+    if(selfIndex >= 0) {
+      peers = peers.filter((_, i) => (i!==selfIndex))
+      responseList.push(this.currentNodeInfo![options!.return!]);
+      n--;
+    }
+
+    let resultPromise = new TimeoutPromise(
+      options.timeout,
+      `Finding ${count} from ${searchList.length} peer timed out`,
+      {
+        resolveOnTimeout: true,
+        onTimeoutResult: () => {
+          return responseList;
+        }
+      }
+    );
+
+    for(let i=0 ; i<peers.length ; i++) {
+      timeout(Math.random()*1000)
+        .then(() => this.findPeer(peers[i].peerId))
+        .then(peer => {
+          if(!peer)
+            throw `peer ${peers[i].peerId} not found to check online status.`
+          return this.remoteCall(peer, RemoteMethods.CheckOnline, {}, {timeout: options!.timeout})
+        })
+        .then(result => {
+          if(result === "OK") {
+            responseList.push(peers[i][options!.return!])
+            if (--n <= 0)
+              resultPromise.resolve(responseList);
+          }
+          else {
+            throw `check online unknown response: ${result}`
+          }
+        })
+        .catch(e => {
+          log.error("%O", e)
+        })
+    }
+
+    return resultPromise.promise;
+  }
+
+  @remoteMethod(RemoteMethods.CheckOnline)
+  async __checkOnline(): Promise<string> {
+    return "OK";
   }
 }
