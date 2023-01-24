@@ -452,8 +452,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     );
 
     for(let i=0 ; i<peers.length ; i++) {
-      timeout(Math.random()*1000)
-        .then(() => this.findPeer(peers[i].peerId))
+      this.findPeer(peers[i].peerId)
         .then(peer => {
           if(!peer)
             throw `peer ${peers[i].peerId} not found to check online status.`
