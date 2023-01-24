@@ -316,7 +316,7 @@ class BaseAppPlugin extends CallablePlugin {
     else{
       let appParty = this.appParty!;
       /** find available partners to sign the request */
-      const availablePartners: string[] = await NetworkIpc.findNOnlinePeer(appParty.partners, Math.ceil(appParty.t*1.2))
+      const availablePartners: string[] = await NetworkIpc.findNOnlinePeer(appParty.partners, Math.ceil(appParty.t*1.1))
       this.log(`partners:[%o] are available to sign the request`, availablePartners)
       if(availablePartners.length < appParty.t)
         throw `Insufficient partner to sign the request, only ${availablePartners.length} are available`
