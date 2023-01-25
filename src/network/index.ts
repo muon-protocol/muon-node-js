@@ -51,7 +51,7 @@ class Network extends Events {
       //   interval: 60e3
       // }),
       pubsubPeerDiscovery({
-        interval: 60e3
+        interval: 5*60e3
       })
     ]
     if(configs.bootstrap.length>0) {
@@ -68,7 +68,7 @@ class Network extends Events {
       addresses: {
         listen: [
           `/ip4/${configs.host}/tcp/${configs.port}`,
-          `/ip4/${configs.host}/tcp/${parseInt(configs.port)+10000}/ws`,
+          // `/ip4/${configs.host}/tcp/${parseInt(configs.port)+10000}/ws`,
           // `/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`,
           // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
         ],

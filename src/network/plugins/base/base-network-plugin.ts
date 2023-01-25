@@ -50,6 +50,7 @@ export default class BaseNetworkPlugin extends Events {
     catch (e) {
       // TODO: what to do?
       // this.defaultLogger("%o", e)
+      console.log('MUON_PEER_NOT_FOUND', peerId)
       return null;
     }
   }
