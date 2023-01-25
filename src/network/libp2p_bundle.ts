@@ -22,8 +22,9 @@ const DEFAULT_OPTS = {
   ],
   connectionEncryption: [
     noise(),
-  ],connectionManager: {
-    autoDial: true,
+  ],
+  connectionManager: {
+    // autoDial: true,
     maxConnections: 3000,
   },
   streamMuxers: [
