@@ -50,9 +50,9 @@ class Network extends Events {
       // mdns({
       //   interval: 60e3
       // }),
-      pubsubPeerDiscovery({
-        interval: (10+Math.floor(Math.random() * 10))*60e3
-      })
+      // pubsubPeerDiscovery({
+      //   interval: (10+Math.floor(Math.random() * 10))*60e3
+      // })
     ]
     if(configs.bootstrap.length>0) {
       peerDiscovery.push(
