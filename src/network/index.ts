@@ -88,7 +88,8 @@ class Network extends Events {
     });
     libp2p.connectionManager.addEventListener("peer:connect", this.onPeerConnect.bind(this));
     libp2p.connectionManager.addEventListener("peer:disconnect", this.onPeerDisconnect.bind(this));
-    libp2p.addEventListener("peer:discovery", this.onPeerDiscovery.bind(this));
+    
+    // libp2p.addEventListener("peer:discovery", this.onPeerDiscovery.bind(this));
 
     this.peerId = peerId;
     this.libp2p = libp2p;
