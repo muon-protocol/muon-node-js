@@ -51,8 +51,6 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
 
   async askRoundData(fromPartner: string, mpcId: string, round:number, data: any): Promise<PartnerRoundReceive> {
     let nodeInfo = this.collateralPlugin.getNodeInfo(fromPartner)!
-    if(!nodeInfo.isOnline)
-      throw `node [${nodeInfo.wallet}] is not online`
     if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS) {
       return this.__askRoundN({mpcId, round, data}, this.collateralPlugin.currentNodeInfo)
     }
@@ -61,7 +59,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
         nodeInfo.peerId,
         RemoteMethods.AskRoundN,
         {mpcId, round, data},
-        {taskId: mpcId}
+        {taskId: mpcId, timeout: 30000}
       )
     }
   }

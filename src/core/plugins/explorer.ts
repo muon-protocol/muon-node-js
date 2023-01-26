@@ -51,8 +51,10 @@ class Explorer extends CallablePlugin {
       excludeSelf: true
     })
 
+    let currentNode = this.collateralPlugin.currentNodeInfo!;
+
     let result = {
-      [process.env.SIGN_WALLET_ADDRESS]: {
+      [currentNode?.id || 'current']: {
         status: "CURRENT",
         ... await this.healthPlugin.getNodeStatus().catch(e => e.message)
       }
@@ -62,8 +64,8 @@ class Explorer extends CallablePlugin {
     }))
 
     for(let i=0 ; i<responses.length ; i++){
-      // if(responses[i] === null)
-        result[partners[i].wallet] = responses[i];
+      if(responses[i] !== null)
+        result[partners[i].id] = responses[i];
     }
 
     return result;

@@ -25,6 +25,7 @@ import chalk from 'chalk'
 import Ajv from "ajv"
 import Log from '../../../common/muon-log.js'
 import {bn2hex} from "../../../utils/tss/utils.js";
+import * as NetworkIpc from "../../../network/ipc.js";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
@@ -85,7 +86,7 @@ class BaseAppPlugin extends CallablePlugin {
   METHOD_PARAMS_SCHEMA: object = {};
   /**=================================*/
   APP_NAME: string | null = null
-  REMOTE_CALL_TIMEOUT = 15000
+  REMOTE_CALL_TIMEOUT = 60000
   requestManager = new AppRequestManager();
   /** initialize when loading */
   isBuiltInApp: boolean
@@ -313,30 +314,14 @@ class BaseAppPlugin extends CallablePlugin {
     }
     /** sign mode */
     else{
-      /** make sure current node is connected to the app party */
-      let appParty = this.appParty!, availablePartners: string[]=[];
-      for(let t=3 ; t>0 ; t--) {
-        let onlinePartners = this.collateralPlugin.filterNodes({
-            list: appParty.partners,
-            isOnline: true,
-            excludeSelf: true
-          });
-        // @ts-ignore
-        let responses = await Promise.all(
-          onlinePartners
-            .map(p => this.remoteCall(p!.peerId, RemoteMethods.HB).catch(e => false))
-        )
-        // @ts-ignore
-        availablePartners = responses
-          .map((r, i) => r===true ? onlinePartners[i].id : null)
-          .filter(id => !!id)
-        availablePartners = [this.currentNodeInfo!.id, ...availablePartners];
-        if(availablePartners.length >= appParty.t * 1.2)
-          break;
-      }
-      this.log(`partners:[${availablePartners}] are available to sign the request`)
+      let t0 = Date.now(), t1, t2, t3, t4, t5, t6;;
+      let appParty = this.appParty!;
+      /** find available partners to sign the request */
+      const availablePartners: string[] = await NetworkIpc.findNOnlinePeer(appParty.partners, Math.ceil(appParty.t*1.2))
+      t1 = Date.now();
+      this.log(`partners:[%o] are available to sign the request`, availablePartners)
       if(availablePartners.length < appParty.t)
-        throw "Insufficient partner to sign the request"
+        throw `Insufficient partner to sign the request, only ${availablePartners.length} are available`
 
       if(this.validateRequest){
         await this.validateRequest(clone(newRequest))
@@ -344,11 +329,9 @@ class BaseAppPlugin extends CallablePlugin {
       if(this.onArrive){
         newRequest.data.init = await this.onArrive(clone(newRequest))
       }
-      let t2 = Date.now()
 
       let result = await this.onRequest(clone(newRequest))
       newRequest.data.result = result
-      let t3 = Date.now()
 
       let resultHash;
 
@@ -372,10 +355,12 @@ class BaseAppPlugin extends CallablePlugin {
       else {
         this.requestManager.addRequest(newRequest, {requestTimeout: this.requestTimeout});
 
+        t2 = Date.now()
         newRequest.data.init = {
           ... newRequest.data.init,
           ... await this.onFirstNodeRequestSucceed(clone(newRequest), availablePartners)
         };
+        t3 = Date.now();
 
         let memWrite = this.getMemWrite(newRequest, result)
         if (!!memWrite) {
@@ -392,20 +377,21 @@ class BaseAppPlugin extends CallablePlugin {
         // new Signature(sign).save()
 
         await this.broadcastNewRequest(newRequest)
-        let t4 = Date.now()
+        t4 = Date.now()
       }
 
       let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
-      let t5 = Date.now()
+      t5 = Date.now()
 
-      // console.log('base-app-plugin.__onRequestArrived',{
-      //   t1: t1-t0,
-      //   t2: t2-t1,
-      //   t3: t3-t2,
-      //   t4: t4-t3,
-      //   t5: t5-t4,
-      //   '*': t5-t0
-      // })
+      let nonce = await this.tssPlugin.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
+      this.log(`request signed with %o`, nonce.partners);
+      this.log('request time parts %O',{
+        "find online nodes": t1-t0,
+        "req exec time": t2-t1,
+        "dkg time": t3-t2,
+        "req broadcast": t4-t3,
+        "confirm waiting": t5-t4,
+      })
 
       if (confirmed) {
         newRequest['confirmedAt'] = getTimestamp()
@@ -421,6 +407,8 @@ class BaseAppPlugin extends CallablePlugin {
         signatures: confirmed ? signatures : []
       }
 
+      // console.log("requestData", requestData)
+
       if(confirmed && gwSign){
         let cryptoSign = crypto.sign(resultHash);
         requestData.gwSignature = cryptoSign;
@@ -429,17 +417,21 @@ class BaseAppPlugin extends CallablePlugin {
 
       if (confirmed && !isDuplicateRequest) {
         if(!!this.onConfirm) {
-          await this.informRequestConfirmation(requestData);
+          this.informRequestConfirmation(requestData)
+            .catch(e => {
+              this.log.error("error when informing request confirmation %O", e)
+            })
         }
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
 
-        // console.log('broadcast signed request');
-        this.broadcast({
-          type: 'request_signed',
-          peerId: process.env.PEER_ID,
-          requestData
-        })
+        console.log('broadcasting signed request');
+        // this.broadcast({
+        //   type: 'request_signed',
+        //   peerId: process.env.PEER_ID,
+        //   requestData
+        // })
+        console.log('broadcasted');
       }
 
       return requestData
@@ -456,9 +448,9 @@ class BaseAppPlugin extends CallablePlugin {
       ...this.collateralPlugin
         .filterNodes({
           list: this.appParty!.partners,
-          isOnline: true
+          // isOnline: true,
+          excludeSelf: true
         })
-        .filter(n => n.id !== this.currentNodeInfo!.id),
     ]
 
     const responses: string[] = await Promise.all(partners.map(async node => {

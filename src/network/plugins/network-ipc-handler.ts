@@ -46,6 +46,7 @@ export const IpcMethods = {
   AllowRemoteCallByShieldNode: "allow-remote-call-by-shield-node",
   IsCurrentNodeInNetwork: "is-current-node-in-network",
   GetUptime: "get-uptime",
+  FindNOnlinePeer: "FNOP"
 } as const;
 
 export const RemoteMethods = {
@@ -287,6 +288,12 @@ class NetworkIpcHandler extends CallablePlugin {
     // @ts-ignore
     if (seconds < 10) {seconds = "0"+seconds;}
     return hours+':'+minutes+':'+seconds;
+  }
+
+  @ipcMethod(IpcMethods.FindNOnlinePeer)
+  async __findNOnlinePeer(data: {peerIds: string[], count: number, options?: any}) {
+    let {peerIds, count, options} = data;
+    return await this.collateralPlugin.findNOnline(peerIds, count, options)
   }
 
   /** ==================== remote methods ===========================*/

@@ -6,17 +6,17 @@ import {MuonNodeInfo} from "../../common/types";
 import * as CoreIpc from '../../core/ipc.js'
 import _ from 'lodash'
 import chalk from 'chalk'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
 import {peerId2Str} from "../utils.js";
-import {broadcastHandler, remoteApp} from "./base/app-decorators.js";
+import {broadcastHandler, remoteApp, remoteMethod} from "./base/app-decorators.js";
 import NodeCache from 'node-cache';
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
-const log = Log('muon:network:plugins:collateral')
+const log = logger('muon:network:plugins:collateral')
 
-const HEARTBEAT_EXPIRE = 5*60*1000; // Keep heartbeet in memory for 5 minutes
+const HEARTBEAT_EXPIRE = parseInt(process.env.HEARTBEAT_EXPIRE!) || 20*60*1000; // Keep heartbeet in memory for 5 minutes
 
 const heartbeatCache = new NodeCache({
   stdTTL: HEARTBEAT_EXPIRE/1000,
@@ -49,6 +49,10 @@ export type NetworkInfo = {
   maxGroupSize: number
 }
 
+const RemoteMethods = {
+  CheckOnline: 'CKON',
+}
+
 @remoteApp
 export default class CollateralInfoPlugin extends CallablePlugin{
 
@@ -75,12 +79,11 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   async onStart() {
     await super.onStart()
 
-    this.__broadcastHeartbeat()
-    heartbeatCache.on("del", this.onHeartbeatExpired.bind(this));
+    // this.__broadcastHeartbeat()
+    // heartbeatCache.on("del", this.onHeartbeatExpired.bind(this));
   }
 
   private async __broadcastHeartbeat() {
-    let delay = 5000;
     while(true) {
       try {
         log('broadcasting heartbeat')
@@ -89,12 +92,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         log(`error when broadcasting hurt beat`)
       }
 
-      /** increase delay */
-      if(delay * 2 < HEARTBEAT_EXPIRE)
-        delay += 10000;
-
       /** delay between each broadcast */
-      await timeout(delay + Math.random() * 2000)
+      await timeout(HEARTBEAT_EXPIRE/2 + Math.random() * 60e3)
     }
   }
 
@@ -112,22 +111,22 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   }
 
   private onPeerOnline(peerId: string) {
-    heartbeatCache.set(peerId, Date.now())
-    this.updateNodeInfo(peerId, {isOnline: true})
-    log(`peer[${peerId}] is online now`)
-    CoreIpc.fireEvent({
-      type: "peer:online",
-      data: peerId,
-    });
+    // heartbeatCache.set(peerId, Date.now())
+    // this.updateNodeInfo(peerId, {isOnline: true})
+    // log(`peer[${peerId}] is online now`)
+    // CoreIpc.fireEvent({
+    //   type: "peer:online",
+    //   data: peerId,
+    // });
   }
 
   private onPeerOffline(peerId: string) {
-    this.updateNodeInfo(peerId, {isOnline: false})
-    log(`peer[${peerId}] is offline now`)
-    CoreIpc.fireEvent({
-      type: "peer:offline",
-      data: peerId,
-    });
+    // this.updateNodeInfo(peerId, {isOnline: false})
+    // log(`peer[${peerId}] is offline now`)
+    // CoreIpc.fireEvent({
+    //   type: "peer:offline",
+    //   data: peerId,
+    // });
   }
 
   get onlinePeers(): string[] {
@@ -374,6 +373,10 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       .filter(info => !!info).length + 1 >= this.TssThreshold
   }
 
+  get currentNodeInfo(): MuonNodeInfo | undefined {
+    return this.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
+  }
+
   get MinGroupSize(){
     return this.networkInfo?.minGroupSize;
   }
@@ -417,5 +420,64 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     if(options.excludeSelf)
       result = result.filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
     return result
+  }
+
+  findNOnline(searchList: string[], count: number, options?:{timeout?: number, return?: string}): Promise<MuonNodeInfo[]> {
+    options = {
+      timeout: 15000,
+      return: 'id',
+      ...options
+    }
+    let peers = this.filterNodes({list: searchList})
+    log(`finding ${count} of ${searchList.length} online peer ...`)
+    const selfIndex = peers.findIndex(p => p.peerId === process.env.PEER_ID!)
+
+    let responseList: string[] = []
+    let n = count;
+    if(selfIndex >= 0) {
+      peers = peers.filter((_, i) => (i!==selfIndex))
+      responseList.push(this.currentNodeInfo![options!.return!]);
+      n--;
+    }
+
+    let resultPromise = new TimeoutPromise(
+      options.timeout,
+      `Finding ${count} from ${searchList.length} peer timed out`,
+      {
+        resolveOnTimeout: true,
+        onTimeoutResult: () => {
+          return responseList;
+        }
+      }
+    );
+
+    for(let i=0 ; i<peers.length ; i++) {
+      this.findPeer(peers[i].peerId)
+        .then(peer => {
+          if(!peer)
+            throw `peer ${peers[i].peerId} not found to check online status.`
+          return this.remoteCall(peer, RemoteMethods.CheckOnline, {}, {timeout: options!.timeout})
+        })
+        .then(result => {
+          if(result === "OK") {
+            responseList.push(peers[i][options!.return!])
+            if (--n <= 0)
+              resultPromise.resolve(responseList);
+          }
+          else {
+            throw `check online unknown response: ${result}`
+          }
+        })
+        .catch(e => {
+          log.error("%O", e)
+        })
+    }
+
+    return resultPromise.promise;
+  }
+
+  @remoteMethod(RemoteMethods.CheckOnline)
+  async __checkOnline(): Promise<string> {
+    return "OK";
   }
 }

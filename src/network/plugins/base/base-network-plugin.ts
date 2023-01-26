@@ -4,6 +4,7 @@ import NetworkBroadcastPlugin from "../network-broadcast.js";
 import Events from 'events-async'
 import {isPeerId, PeerId} from '../../types.js';
 import {peerIdFromString} from '@libp2p/peer-id'
+import {logger, Logger} from '@libp2p/logger'
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string';
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
 import {peerId2Str} from "../../utils.js";
@@ -11,6 +12,7 @@ import {peerId2Str} from "../../utils.js";
 export default class BaseNetworkPlugin extends Events {
   network: Network;
   configs = {}
+  protected defaultLogger: Logger;
 
   constructor(network: Network, configs){
     super()
@@ -23,6 +25,7 @@ export default class BaseNetworkPlugin extends Events {
    * @returns {Promise<void>}
    */
   async onInit(){
+    this.defaultLogger = logger(`muon:network:plugin:${this.ConstructorName}`)
   }
 
   /**
@@ -46,8 +49,8 @@ export default class BaseNetworkPlugin extends Events {
     }
     catch (e) {
       // TODO: what to do?
-      // if(process.env.VERBOSE)
-        console.error("BaseNetworkPlugin.findPeer", peerId2Str(peerId), e.stack)
+      // this.defaultLogger("%o", e)
+      console.log('MUON_PEER_NOT_FOUND', peerId)
       return null;
     }
   }
@@ -82,7 +85,7 @@ export default class BaseNetworkPlugin extends Events {
   broadcast(data){
     let broadcastChannel = this.BROADCAST_CHANNEL
     if (!broadcastChannel) {
-      console.log(`Broadcast not available for plugin ${this.ConstructorName}`)
+      // this.defaultLogger.error(`Broadcast not available for plugin ${this.ConstructorName}`)
       return;
     }
     this.__broadcastPlugin.rawBroadcast(this.BROADCAST_CHANNEL, data)
@@ -100,7 +103,7 @@ export default class BaseNetworkPlugin extends Events {
       await broadcastHandler(data, callerInfo);
     }
     catch (e) {
-      console.log(`${this.ConstructorName}.__onPluginBroadcastReceived`, e)
+      // this.defaultLogger.error("%o", e)
       throw e;
     }
   }

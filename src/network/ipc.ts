@@ -89,6 +89,10 @@ function getUptime() {
   return call(IpcMethods.GetUptime)
 }
 
+function findNOnlinePeer(peerIds: string[], count: number, options?: {timeout?: number, return?: string}) {
+  return call(IpcMethods.FindNOnlinePeer, {peerIds, count, options})
+}
+
 export {
   call,
   getCollateralInfo,
@@ -107,6 +111,7 @@ export {
   isCurrentNodeInNetwork,
   subscribeToBroadcastChannel,
   getUptime,
+  findNOnlinePeer,
   putDHT,
   getDHT
 }

@@ -46,18 +46,19 @@ class Network extends Events {
       multiaddrs.filter((m) => !isPrivate(m));
     if (process.env.DISABLE_ANNOUNCE_FILTER) announceFilter = (mas) => mas;
 
+    const pubsubPeerDiscoveryInterval = parseInt(process.env.PUBSUB_PEER_DISCOVERY_INTERVAL || "10")
     const peerDiscovery: any[] = [
       // mdns({
       //   interval: 60e3
       // }),
       pubsubPeerDiscovery({
-        interval: 60e3
+        interval: (pubsubPeerDiscoveryInterval+Math.floor(Math.random() * pubsubPeerDiscoveryInterval))*60e3
       })
     ]
     if(configs.bootstrap.length>0) {
       peerDiscovery.push(
         bootstrap({
-          timeout: 2e3,
+          timeout: 5e3,
           list: configs.bootstrap,
         })
       )
@@ -68,11 +69,11 @@ class Network extends Events {
       addresses: {
         listen: [
           `/ip4/${configs.host}/tcp/${configs.port}`,
-          `/ip4/${configs.host}/tcp/${parseInt(configs.port)+10000}/ws`,
+          // `/ip4/${configs.host}/tcp/${parseInt(configs.port)+10000}/ws`,
           // `/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`,
           // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
         ],
-        // announceFilter,
+        announceFilter,
       },
       peerDiscovery,
       // config: {
@@ -87,7 +88,8 @@ class Network extends Events {
     });
     libp2p.connectionManager.addEventListener("peer:connect", this.onPeerConnect.bind(this));
     libp2p.connectionManager.addEventListener("peer:disconnect", this.onPeerDisconnect.bind(this));
-    libp2p.addEventListener("peer:discovery", this.onPeerDiscovery.bind(this));
+    
+    // libp2p.addEventListener("peer:discovery", this.onPeerDiscovery.bind(this));
 
     this.peerId = peerId;
     this.libp2p = libp2p;

@@ -18,13 +18,14 @@ const DEFAULT_OPTS = {
       inboundSocketInactivityTimeout: 0,
       outboundSocketInactivityTimeout: 0,
     }),
-    webSockets()
+    // webSockets()
   ],
   connectionEncryption: [
     noise(),
-  ]
-  ,connectionManager: {
-    autoDial: true
+  ],
+  connectionManager: {
+    // autoDial: true,
+    maxConnections: 3000,
   },
   streamMuxers: [
     mplex()
@@ -47,16 +48,6 @@ const DEFAULT_OPTS = {
       },
     },
   }),
-  // config: {
-  //   peerDiscovery: {
-  //   },
-  //   dht: {
-  //     enabled: true
-  //   },
-  //   // pubsub: {
-  //   //   emitSelf: false
-  //   // }
-  // }
 };
 
 function create(opts) {
