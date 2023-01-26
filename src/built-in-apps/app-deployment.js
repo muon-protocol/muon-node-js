@@ -104,8 +104,18 @@ module.exports = {
                     seed,
                     tssThreshold,
                     maxGroupSize,
-                    selectedNodes: this.callPlugin("system", "selectRandomNodes", seed, tssThreshold, maxGroupSize)
-                        .map(node => node.id)
+                    selectedNodes: [
+                            "9",
+                            "2",
+                            "6",
+                            "8",
+                            "5",
+                            "7",
+                            "1",
+                            "3"
+                        ]
+                        //this.callPlugin("system", "selectRandomNodes", seed, tssThreshold, maxGroupSize)
+                        //.map(node => node.id)
                 };
             }
             case Methods.TssKeyGen: {
