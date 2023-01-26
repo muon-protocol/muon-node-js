@@ -89,7 +89,7 @@ function getUptime() {
   return call(IpcMethods.GetUptime)
 }
 
-function findNOnlinePeer(peerIds: string[], count: number, options?: {timeout?: number, return?: string}) {
+function findNOnlinePeer(peerIds: string[], count: number, options?: {timeout?: number, return?: string}): Promise<string[]> {
   return call(IpcMethods.FindNOnlinePeer, {peerIds, count, options})
 }
 

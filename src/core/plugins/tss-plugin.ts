@@ -261,19 +261,22 @@ class TssPlugin extends CallablePlugin {
         return;
 
       log('waiting for the threshold number of deployers to get online ...')
+      let onlineDeployers: string[];
       while (true) {
-        let onlineDeployers = this.collateralPlugin.filterNodes({
-          list: this.tssParty!.partners,
-          isDeployer: true,
-          isOnline: true
-        })
+        const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId)
+        onlineDeployers = await NetworkIpc.findNOnlinePeer(
+          deployers,
+          Math.ceil(this.tssParty.t*1.3),
+          {timeout: 5000}
+        );
+
         if(onlineDeployers.length >= this.collateralPlugin.TssThreshold) {
           log(`${onlineDeployers.length} number of deployers are now online.`)
           break;
         }
 
         /** wait 5 seconds and retry again */
-        log("online deployers %o", onlineDeployers.map(n => n.id))
+        log("online deployers %o", onlineDeployers)
         log(`waiting: only ${onlineDeployers.length} number of deployers are online.`)
         await timeout(5000);
       }
@@ -398,16 +401,18 @@ class TssPlugin extends CallablePlugin {
   }
 
   async isNeedToCreateKey(){
-    let onlineDeployers = this.collateralPlugin.filterNodes({
-      list: this.tssParty!.partners,
-      // isOnline: true,
-      isDeployer: true,
-      excludeSelf: true
-    })
+    const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId)
+    const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
+      deployers,
+      Math.ceil(this.tssParty!.t*1.2),
+      {timeout: 10000, return: 'peerId'}
+    )
+    if(onlineDeployers.length < this.tssParty!.t)
+      return false;
 
-    let statuses = await Promise.all(onlineDeployers.map(p => {
+    let statuses = await Promise.all(onlineDeployers.map(peerId => {
       return this.remoteCall(
-        p!.peerId,
+        peerId,
         RemoteMethods.checkTssStatus,
         {appId: '1'}
       ).catch(e => 'error')
@@ -592,17 +597,27 @@ class TssPlugin extends CallablePlugin {
   }
 
   async tryToCreateTssKey(): Promise<DistributedKey> {
+    const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId)
     while (!this.isReady) {
       await timeout(5000);
       try {
-        let key: DistributedKey = await this.keyGen(this.tssParty, {lowerThanHalfN: true})
+        const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
+          deployers,
+          Math.ceil(this.tssParty!.t*1.2),
+          {timeout: 10000}
+        )
+        if(onlineDeployers.length < this.tssParty!.t) {
+          log(`Its need ${this.tssParty!.t} deployer to create global tss but only ${onlineDeployers.length} are available`)
+          continue;
+        }
+        log(`Deployers %o are available to create global tss`, onlineDeployers)
+        let key: DistributedKey = await this.keyGen(this.tssParty, {
+          partners: onlineDeployers,
+          lowerThanHalfN: true
+        })
 
-        let keyPartners = this.collateralPlugin.filterNodes({list: key.partners})
+        let keyPartners = this.collateralPlugin.filterNodes({list: key.partners, excludeSelf: true})
         let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
-          if (wallet === process.env.SIGN_WALLET_ADDRESS)
-            return Promise.resolve(true);
-          ;
-
           return this.remoteCall(
             peerId,
             RemoteMethods.storeTssKey,
@@ -610,11 +625,15 @@ class TssPlugin extends CallablePlugin {
               party: this.tssParty!.id,
               key: key.id,
             },
+            {timeout: 120e3}
             // {taskId: `keygen-${key.id}`}
-          ).catch(()=>false);
+          ).catch(e=>{
+            console.log("RC.storeTssKey", e);
+            return false
+          });
         }))
-        // console.log(`key save broadcast count: ${key.partners.length}`, callResult);
-        if (callResult.filter(r => r === true).length < this.TSS_THRESHOLD)
+        // console.log(`key save broadcast threshold: ${this.TSS_THRESHOLD} count: ${key.partners.length}`, callResult);
+        if (callResult.filter(r => r === true).length+1 < this.TSS_THRESHOLD)
           throw `Tss creation failed.`
         this.saveTssConfig(this.tssParty, key)
 
