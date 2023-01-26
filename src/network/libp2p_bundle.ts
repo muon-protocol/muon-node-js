@@ -48,16 +48,6 @@ const DEFAULT_OPTS = {
       },
     },
   }),
-  // config: {
-  //   peerDiscovery: {
-  //   },
-  //   dht: {
-  //     enabled: true
-  //   },
-  //   // pubsub: {
-  //   //   emitSelf: false
-  //   // }
-  // }
 };
 
 function create(opts) {
