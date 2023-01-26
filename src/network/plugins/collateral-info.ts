@@ -422,7 +422,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     return result
   }
 
-  findNOnline(searchList: string[], count: number, options?:{timeout?: number, return?: string}): Promise<MuonNodeInfo[]> {
+  findNOnline(searchList: string[], count: number, options?:{timeout?: number, return?: string}): Promise<string[]> {
     options = {
       timeout: 15000,
       return: 'id',
