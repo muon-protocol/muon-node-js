@@ -433,7 +433,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     const selfIndex = peers.findIndex(p => p.peerId === process.env.PEER_ID!)
 
     let responseList: string[] = []
-    let n = count;
+    // REZA: fixme
+    let n = count - 1;
     if(selfIndex >= 0) {
       peers = peers.filter((_, i) => (i!==selfIndex))
       responseList.push(this.currentNodeInfo![options!.return!]);
