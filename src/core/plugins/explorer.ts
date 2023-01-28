@@ -11,7 +11,7 @@ import {GlobalBroadcastChannels} from "../../common/contantes.js";
 import CollateralInfoPlugin from "./collateral-info.js";
 import {timeout} from '../../utils/helpers.js'
 
-type GetNodeInfo = Override<GatewayCallData, {params: {peerId: string}}>
+type GetNodeInfo = Override<GatewayCallData, {params: {id: string}}>
 
 type GetTransactionData = Override<GatewayCallData, {params: { reqId: string }}>
 
@@ -75,11 +75,11 @@ class Explorer extends CallablePlugin {
 
   @gatewayMethod("node")
   async __nodeInfo(data: GetNodeInfo) {
-    let {peerId} = data?.params || {}
-    if(!peerId) {
-      throw `peerId is undefined`
+    let {id} = data?.params || {}
+    if(!id) {
+      throw `id is undefined`
     }
-    let peerInfo = this.collateralPlugin.getNodeInfo(peerId)!
+    let peerInfo = this.collateralPlugin.getNodeInfo(id)!
     if(!peerInfo) {
       throw `unknown peer`
     }
