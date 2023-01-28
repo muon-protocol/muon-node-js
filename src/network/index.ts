@@ -53,13 +53,13 @@ class Network extends Events {
       //   interval: 60e3
       // }),
       pubsubPeerDiscovery({
-        interval: (pubsubPeerDiscoveryInterval+Math.floor(Math.random() * pubsubPeerDiscoveryInterval))*60e3
+        // interval: (pubsubPeerDiscoveryInterval+Math.floor(Math.random() * pubsubPeerDiscoveryInterval))*60e3
       })
     ]
     if(configs.bootstrap.length>0) {
       peerDiscovery.push(
         bootstrap({
-          timeout: 5e3,
+          // timeout: 5e3,
           list: configs.bootstrap,
         })
       )
