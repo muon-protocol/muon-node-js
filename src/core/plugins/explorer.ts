@@ -11,6 +11,8 @@ import {GlobalBroadcastChannels} from "../../common/contantes.js";
 import CollateralInfoPlugin from "./collateral-info.js";
 import {timeout} from '../../utils/helpers.js'
 
+type GetNodeInfo = Override<GatewayCallData, {params: {peerId: string}}>
+
 type GetTransactionData = Override<GatewayCallData, {params: { reqId: string }}>
 
 type LastTransactionData = Override<GatewayCallData, {params: { count?: number }}>
@@ -69,6 +71,19 @@ class Explorer extends CallablePlugin {
     }
 
     return result;
+  }
+
+  @gatewayMethod("node")
+  async __nodeInfo(data: GetNodeInfo) {
+    let {peerId} = data?.params || {}
+    if(!peerId) {
+      throw `peerId is undefined`
+    }
+    let peerInfo = this.collateralPlugin.getNodeInfo(peerId)!
+    if(!peerInfo) {
+      throw `unknown peer`
+    }
+    return await this.healthPlugin.getNodeStatus(peerInfo)
   }
 
   @gatewayMethod("tx")
