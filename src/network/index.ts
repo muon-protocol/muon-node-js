@@ -70,8 +70,11 @@ class Network extends Events {
     log('finding public ip ...')
     try{
       let myIp = await findMyIp()
-      if(!!myIp)
-        announce.push(`/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`)
+      if(!!myIp) {
+        log(`public ip: %s`, myIp)
+        announce.push(`/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`)
+        log(`announce public address: %s`, announce[0])
+      }
     }catch (e) {
       log.error(`error when loading public ip %s`, e.message)
     }

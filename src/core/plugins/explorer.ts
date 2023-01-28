@@ -85,7 +85,7 @@ class Explorer extends CallablePlugin {
     }
     return {
       peerInfo: await NetworkIpc.getPeerInfo(nodeInfo.peerId),
-      nodeInfo: await this.healthPlugin.getNodeStatus(nodeInfo)
+      nodeInfo: await this.healthPlugin.getNodeStatus(nodeInfo).catch(e => e.message)
     }
   }
 
