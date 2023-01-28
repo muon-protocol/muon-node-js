@@ -26,7 +26,7 @@ const DEFAULT_OPTS = {
   connectionManager: {
     autoDial: true,
     maxConnections: 3000,
-    minConnections: 1
+    minConnections: 2
   },
   streamMuxers: [
     mplex()
