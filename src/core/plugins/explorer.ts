@@ -79,11 +79,14 @@ class Explorer extends CallablePlugin {
     if(!id) {
       throw `id is undefined`
     }
-    let peerInfo = this.collateralPlugin.getNodeInfo(id)!
-    if(!peerInfo) {
+    let nodeInfo = this.collateralPlugin.getNodeInfo(id)!
+    if(!nodeInfo) {
       throw `unknown peer`
     }
-    return await this.healthPlugin.getNodeStatus(peerInfo)
+    return {
+      peerInfo: await NetworkIpc.getPeerInfo(nodeInfo.peerId),
+      nodeInfo: await this.healthPlugin.getNodeStatus(nodeInfo)
+    }
   }
 
   @gatewayMethod("tx")

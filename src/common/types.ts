@@ -1,5 +1,11 @@
 import {GlobalBroadcastChannels} from "./contantes";
 
+export type JsonPeerInfo = {
+    id: string;
+    multiaddrs: string[];
+    protocols: string[];
+}
+
 export type RemoteCallOptions = {
 }
 

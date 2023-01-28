@@ -1,7 +1,7 @@
 import {NetworkIpcMethod, IpcMethods} from "./plugins/network-ipc-handler.js";
 import { QueueProducer } from '../common/message-bus/index.js'
 import { IPC_CHANNEL } from './plugins/network-ipc-plugin.js'
-import {IpcCallOptions, MuonNodeInfo} from "../common/types";
+import {IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../common/types";
 import {NodeFilterOptions} from "./plugins/collateral-info";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
@@ -43,6 +43,11 @@ function getDHT(key) {
 
 function forwardRemoteCall(peer, method, params, options) {
   return call(IpcMethods.RemoteCall, {peer, method, params, options})
+}
+
+function getPeerInfo(peerId: string): JsonPeerInfo|null {
+  // @ts-ignore
+  return call(IpcMethods.GetPeerInfo, {peerId})
 }
 
 function reportClusterStatus(pid, status) {
@@ -100,6 +105,7 @@ export {
   getOnlinePeers,
   broadcastToChannel,
   forwardRemoteCall,
+  getPeerInfo,
   reportClusterStatus,
   assignTask,
   askClusterPermission,

@@ -2,7 +2,7 @@ import CollateralInfoPlugin from "../collateral-info.js";
 import {Network} from "../../index.js";
 import NetworkBroadcastPlugin from "../network-broadcast.js";
 import Events from 'events-async'
-import {isPeerId, PeerId} from '../../types.js';
+import {isPeerId, Libp2pPeerInfo, PeerId} from '../../types.js';
 import {peerIdFromString} from '@libp2p/peer-id'
 import {logger, Logger} from '@libp2p/logger'
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string';
@@ -36,7 +36,7 @@ export default class BaseNetworkPlugin extends Events {
     this.registerBroadcastHandler()
   }
 
-  async findPeer(peerId){
+  async findPeer(peerId): Promise<Libp2pPeerInfo|null>{
     if(!isPeerId(peerId)) {
       try {
         peerId = peerIdFromString(peerId)

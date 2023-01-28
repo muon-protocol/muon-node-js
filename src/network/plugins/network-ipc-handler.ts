@@ -1,6 +1,7 @@
 import CallablePlugin from './base/callable-plugin.js'
+import {PeerInfo} from "@libp2p/interface-peer-info";
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
-import {IpcCallOptions, MuonNodeInfo} from "../../common/types";
+import {IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
 import CollateralInfoPlugin, {NodeFilterOptions} from "./collateral-info.js";
 import QueueProducer from "../../common/message-bus/queue-producer.js";
 import _ from 'lodash';
@@ -39,6 +40,7 @@ export const IpcMethods = {
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
   RemoteCall: "remote-call",
+  GetPeerInfo: "GPI",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
   ForwardGatewayRequest: "forward-gateway-request",
@@ -230,6 +232,18 @@ class NetworkIpcHandler extends CallablePlugin {
       throw `peer not found peerId: ${data?.peer}`
     }
     return await this.remoteCall(peer, "exec-ipc-remote-call", data, data?.options);
+  }
+
+  @ipcMethod(IpcMethods.GetPeerInfo)
+  async __getPeerInfo(data): Promise<JsonPeerInfo|null> {
+    let peerInfo:PeerInfo|null = await this.findPeer(data?.peerId);
+    if(!peerInfo)
+      return null
+    return {
+      id: peerInfo.id.toString(),
+      multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
+      protocols: peerInfo.protocols
+    }
   }
 
   @ipcMethod(IpcMethods.ContentRoutingProvide)
