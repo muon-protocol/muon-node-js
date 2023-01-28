@@ -1,6 +1,7 @@
 import BigNumber from 'bignumber.js'
 BigNumber.set({DECIMAL_PLACES: 26})
 import Web3 from 'web3'
+import axios from 'axios';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import {PublicKey} from "./tss/types.js";
@@ -92,4 +93,9 @@ export function pub2json(pubkey: PublicKey, minimal: boolean=false): {address?: 
     x: '0x' + pubkey.getX().toBuffer('be', 32).toString('hex'),
     yParity: pubkey.getY().mod(toBN(2)).toString(),
   }
+}
+
+export async function findMyIp(): Promise<string> {
+  let response = await axios.get('https://ifconfig.me/all.json')
+  return response?.data?.ip_addr;
 }

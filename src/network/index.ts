@@ -18,9 +18,10 @@ import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
 import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
 import NetworkDHTPlugin from "./plugins/network-dht.js";
-import Log from "../common/muon-log.js"
+import {logger} from "@libp2p/logger"
+import {findMyIp} from "../utils/helpers.js";
 
-const log = Log("muon:network");
+const log = logger("muon:network");
 
 class Network extends Events {
   configs;
@@ -64,6 +65,17 @@ class Network extends Events {
       )
     }
 
+    const announce: string[] = []
+
+    log('finding public ip ...')
+    try{
+      let myIp = await findMyIp()
+      if(!!myIp)
+        announce.push(`/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`)
+    }catch (e) {
+      log.error(`error when loading public ip %s`, e.message)
+    }
+
     const libp2p = await create({
       peerId,
       addresses: {
@@ -74,6 +86,7 @@ class Network extends Events {
           // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
         ],
         announceFilter,
+        announce
       },
       peerDiscovery,
       // config: {
@@ -88,7 +101,7 @@ class Network extends Events {
     });
     libp2p.connectionManager.addEventListener("peer:connect", this.onPeerConnect.bind(this));
     libp2p.connectionManager.addEventListener("peer:disconnect", this.onPeerDisconnect.bind(this));
-    
+
     // libp2p.addEventListener("peer:discovery", this.onPeerDiscovery.bind(this));
 
     this.peerId = peerId;
