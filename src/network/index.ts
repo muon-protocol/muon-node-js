@@ -47,7 +47,7 @@ class Network extends Events {
       multiaddrs.filter((m) => !isPrivate(m));
     if (process.env.DISABLE_ANNOUNCE_FILTER) announceFilter = (mas) => mas;
 
-    const pubsubPeerDiscoveryInterval = parseInt(process.env.PUBSUB_PEER_DISCOVERY_INTERVAL || "10")
+    const pubsubPeerDiscoveryInterval = parseInt(process.env.PUBSUB_PEER_DISCOVERY_INTERVAL || "2")
     const peerDiscovery: any[] = [
       // mdns({
       //   interval: 60e3
