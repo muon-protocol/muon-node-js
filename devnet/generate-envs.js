@@ -1,13 +1,15 @@
-const dotenv = require('dotenv')
-const path = require('path')
+import dotenv from 'dotenv'
+import path from 'path'
 dotenv.config()
-const PeerId = require('peer-id')
-const emoji = require('node-emoji')
-const fs = require('fs')
-const Web3 = require('web3')
-const parseArgv = require('../src/utils/parseArgv')
-const devNodesList = require('./nodes-list')
+import PeerId from 'peer-id'
+import emoji from 'node-emoji'
+import fs from 'fs'
+import Web3 from 'web3'
+import parseArgv from '../src/utils/parseArgv.js'
+import devNodesList from './nodes-list.js'
+import {filePathInfo} from "../src/utils/helpers.js";
 
+const {__dirname} = filePathInfo(import.meta)
 const BASE_PATH = path.join(__dirname, '..');
 
 /**
