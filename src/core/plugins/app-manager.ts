@@ -7,6 +7,7 @@ import BaseAppPlugin from "./base/base-app-plugin.js";
 import CollateralInfoPlugin from "./collateral-info.js";
 import * as CoreIpc from "../ipc.js";
 import * as TssModule from '../../utils/tss/index.js'
+import * as NetworkIpc from '../../network/ipc.js'
 import AppContext, {hash as hashAppContext} from "../../common/db-models/AppContext.js"
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
 import _ from 'lodash'
@@ -274,15 +275,22 @@ export default class AppManager extends CallablePlugin {
   async queryAndLoadAppContext(appId) {
     /** cache for 5 minutes */
     if(this.appQueryResult[appId]){
-      if(Date.now() - this.appQueryResult[appId].time < 5*60*1000)
+      if(Date.now() - this.appQueryResult[appId].time < 60e3)
         return this.appQueryResult[appId].result;
     }
     /** refresh result */
-    const remoteNodes: MuonNodeInfo[] = this.collateralPlugin.filterNodes({isDeployer: true, isOnline: true})
-    log(`calling nodes %o to get app status`, remoteNodes.map(n => n.id))
-    let callResult = await Promise.all(remoteNodes.map(node => {
-      if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
-        return this.getAppStatus(appId)
+    const deployerNodes: string[] = this.collateralPlugin
+      .filterNodes({
+        isDeployer: true,
+        excludeSelf: true
+      })
+      .map(p => p.peerId)
+    let t0 = Date.now()
+    const candidateNodeIds: string[] = await NetworkIpc.findNOnlinePeer(deployerNodes, 5, {timeout: 10000});
+    log(`nodes %o found online in ${Date.now() - t0} ms`, candidateNodeIds)
+    log(`calling nodes %o to get app status`, candidateNodeIds)
+    const candidateNodes = this.collateralPlugin.filterNodes({list: candidateNodeIds})
+    let callResult = await Promise.all(candidateNodes.map(node => {
       return this.remoteCall(
         node.peerId,
         RemoteMethods.AppStatus,
@@ -294,31 +302,8 @@ export default class AppManager extends CallablePlugin {
           return "error"
         })
     }));
-    const threshold = this.tssPlugin.TSS_THRESHOLD;
     const trueCallResult = callResult.filter(r => r?.deployed)
-    if(trueCallResult.length < threshold) {
-      this.appQueryResult[appId] = {
-        time: Date.now(),
-        result: null
-      }
-      return null;
-    }
-
-    const hashCounts = {}
-    trueCallResult.forEach(({contextHash: hash}) => {
-      if(hashCounts[hash] === undefined)
-        hashCounts[hash] = 1
-      else
-        hashCounts[hash] ++;
-    })
-    let maxHash = ''
-    Object.keys(hashCounts).forEach(hash => {
-      if(!maxHash)
-        maxHash = hash
-      else if(hashCounts[hash] > hashCounts[maxHash])
-        maxHash = hash
-    })
-    if(hashCounts[maxHash] < threshold){
+    if(trueCallResult.length < 1) {
       this.appQueryResult[appId] = {
         time: Date.now(),
         result: null
@@ -329,15 +314,15 @@ export default class AppManager extends CallablePlugin {
     /**
      * the nodes, who has the app context data.
      */
-    // @ts-ignore
+      // @ts-ignore
     let holders: MuonNodeInfo[] = callResult
-      .map((r, i) => {
-        if(r.deployed && r.contextHash===maxHash)
-          return remoteNodes[i]
-        else
-          return null;
-      })
-      .filter(h => !!h)
+        .map((r, i) => {
+          if(r.deployed)
+            return candidateNodes[i]
+          else
+            return null;
+        })
+        .filter(h => !!h)
     const context = await this.loadAppContextFromNetwork(holders, appId)
     this.appQueryResult[appId] = {
       time: Date.now(),
@@ -352,19 +337,23 @@ export default class AppManager extends CallablePlugin {
       return null;
     /** cache for 5 minutes */
     if(this.tssKeyQueryResult[appId]){
-      if(Date.now() - this.tssKeyQueryResult[appId].time < 5*60*1000)
+      if(Date.now() - this.tssKeyQueryResult[appId].time < 60e3)
         return this.tssKeyQueryResult[appId].result;
     }
     let appContext = this.appContexts[appId];
 
     /** refresh result */
-    const remoteNodes: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
-      list: appContext.party.partners,
-      isOnline: true,
-      excludeSelf: true,
-    })
+    const deployerNodes: string[] = this.collateralPlugin
+      .filterNodes({
+        isDeployer: true,
+        excludeSelf: true
+      })
+      .map(p => p.peerId)
+    const candidateNodeIds: string[] = await NetworkIpc.findNOnlinePeer(deployerNodes, 5, {timeout: 10});
+    log(`calling nodes %o to get app status`, candidateNodeIds)
+    const candidateNodes = this.collateralPlugin.filterNodes({list: candidateNodeIds})
 
-    let callResult = await Promise.all(remoteNodes.map(node => {
+    let callResult = await Promise.all(candidateNodes.map(node => {
       return this.remoteCall(
         node.peerId,
         RemoteMethods.GetAppTss,
@@ -377,9 +366,9 @@ export default class AppManager extends CallablePlugin {
           return "error"
         })
     }));
-    const threshold = this.tssPlugin.TSS_THRESHOLD;
+
     const trueCallResult = callResult.filter(r => !!r)
-    if(trueCallResult.length < threshold) {
+    if(trueCallResult.length < 1) {
       this.tssKeyQueryResult[appId] = {
         time: Date.now(),
         result: null
@@ -387,37 +376,14 @@ export default class AppManager extends CallablePlugin {
       return null;
     }
 
-    const hashCounts = {}
-    trueCallResult.forEach(r => {
-      let hash = `${r.version}.${r.publicKey}`
-      if(hashCounts[hash] === undefined)
-        hashCounts[hash] = 1
-      else
-        hashCounts[hash] ++;
-    })
-    let maxHash = ''
-    Object.keys(hashCounts).forEach(hash => {
-      if(!maxHash)
-        maxHash = hash
-      else if(hashCounts[hash] > hashCounts[maxHash])
-        maxHash = hash
-    })
-    if(hashCounts[maxHash] < threshold){
-      this.tssKeyQueryResult[appId] = {
-        time: Date.now(),
-        result: null
-      }
-      return null;
-    }
-
-    let [version, publicKeyEncoded] = maxHash.split('.');
-
-    const publicKey = TssModule.keyFromPublic(publicKeyEncoded.replace("0x", ""))
+    let selectedResult = trueCallResult[0]
+    const publicKey = TssModule.keyFromPublic(selectedResult.publicKey.replace("0x", ""))
     const result = {
       appId,
-      version: parseInt(version),
+      version: parseInt(selectedResult.version),
       publicKey: pub2json(publicKey)
     }
+
     this.tssKeyQueryResult[appId] = {
       time: Date.now(),
       result: result

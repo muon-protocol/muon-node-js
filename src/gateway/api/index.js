@@ -77,11 +77,14 @@ async function callProperNode(requestData) {
     const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
     if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
       log(`current node is not deployer`)
-      let deployers = await NetworkIpc.filterNodes({isOnline: true, isDeployer: true});
-      const randomIndex = Math.floor(Math.random() * deployers.length);
-      log(`forwarding request to id:%s`, deployers[randomIndex].id)
+      let deployers = await NetworkIpc.filterNodes({isDeployer: true}).map(p => p.peerId);
+      let onlineDeployers = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 5000})
+      if(!onlineDeployers.length > 0)
+        throw `cannot find any online deployer to forward request`;
+      const randomIndex = Math.floor(Math.random() * onlineDeployers.length);
+      log(`forwarding request to id:%s`, onlineDeployers[randomIndex].id)
       const timeout = await getAppTimeout(requestData.app);
-      return await NetworkIpc.forwardRequest(deployers[randomIndex].id, requestData, timeout);
+      return await NetworkIpc.forwardRequest(onlineDeployers[randomIndex].id, requestData, timeout);
     }
   }
 
