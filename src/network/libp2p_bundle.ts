@@ -12,7 +12,7 @@ import { LevelDatastore } from "datastore-level";
 
 const DEFAULT_OPTS = {
   // TODO: move path to env
-  // datastore: new LevelDatastore(`./muon-data/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
+  datastore: new LevelDatastore(`./muon-data/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
   transports: [
     tcp({
       // outboundSocketInactivityTimeout: 0,
@@ -26,7 +26,7 @@ const DEFAULT_OPTS = {
   connectionManager: {
     autoDial: true,
     maxConnections: 3000,
-    minConnections: 2
+    minConnections: 10
   },
   streamMuxers: [
     mplex()
