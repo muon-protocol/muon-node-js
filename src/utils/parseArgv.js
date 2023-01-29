@@ -8,4 +8,4 @@ const parseArgv = () => {
   })
   return result
 }
-module.exports = parseArgv
+export default parseArgv

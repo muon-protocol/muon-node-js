@@ -1,11 +1,13 @@
-const dotenv = require('dotenv')
+import dotenv from 'dotenv'
 dotenv.config()
-const fs = require('fs')
-const path = require('path')
-const emoji = require('node-emoji')
-const {spawn} = require('child_process')
-const parseArgv = require('../src/utils/parseArgv')
+import fs from 'fs'
+import path from 'path'
+import emoji from 'node-emoji'
+import {spawn} from 'child_process'
+import parseArgv from '../src/utils/parseArgv.js'
+import {filePathInfo} from "../src/utils/helpers.js";
 
+const {__dirname} = filePathInfo(import.meta)
 const BASE_PATH = path.join(__dirname, '..');
 
 function runNodes(node_n) {

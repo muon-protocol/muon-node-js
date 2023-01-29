@@ -1,4 +1,4 @@
-module.exports = [
+export default [
   {
     "account": {
       "address": "0xD8A03762CCb7d5b22034b555D13371d2A15F7854",
