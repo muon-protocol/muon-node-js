@@ -22,9 +22,10 @@ let clusterCount = 1;
 if(parseBool(process.env.CLUSTER_MODE)) {
   if(process.env.CLUSTER_COUNT) {
     clusterCount = parseInt(process.env.CLUSTER_COUNT);
+    clusterCount = Math.max(clusterCount, os.cpus().length)
   }
   else{
-    clusterCount = os.cpus().length;
+    clusterCount = Math.min(os.cpus().length, 2);
   }
 }
 
