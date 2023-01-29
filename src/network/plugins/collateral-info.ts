@@ -233,7 +233,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
           id: BigInt(item.id).toString(),
           wallet: item.nodeAddress,
           peerId: item.peerId,
-          isDeployer: item.id === '3' ? false : item.isDeployer,
+          isDeployer: item.isDeployer,
           isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || heartbeatCache.has(item.peerId)
         }))
     }
