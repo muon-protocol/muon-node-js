@@ -26,7 +26,7 @@ const DEFAULT_OPTS = {
   connectionManager: {
     autoDial: true,
     maxConnections: 3000,
-    minConnections: 3,
+    minConnections: 10,
     maxIncomingPendingConnections: 20
   },
   streamMuxers: [
