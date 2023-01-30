@@ -79,6 +79,7 @@
     "pure-ipfs-only-hash": "^4.0.2",
     "redis": "^3.1.2",
     "socks-proxy-agent": "^7.0.0",
+    "stream-to-it": "^0.2.2",
     "tronweb": "^4.1.0",
     "uint8arrays": "^3.0.0",
     "util": "^0.12.3",
