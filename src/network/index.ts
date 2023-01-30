@@ -65,7 +65,7 @@ class Network extends Events {
       )
     }
 
-    const announce: string[] = []
+    const announce: string[] = [];
 
     log('finding public ip ...')
     try{
