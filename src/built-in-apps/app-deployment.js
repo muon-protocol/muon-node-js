@@ -65,6 +65,15 @@ module.exports = {
             data: { params }
         } = request
         switch (method) {
+            case Methods.Deploy: {
+                const { tssThreshold, maxGroupSize } = await this.callPlugin("system", "getNetworkInfo");
+                let {seed, t=tssThreshold, n=maxGroupSize} = params
+                t = Math.max(t, tssThreshold);
+                return {
+                    selectedNodes: this.callPlugin("system", "selectRandomNodes", seed, t, n)
+                      .map(node => node.id)
+                }
+            }
             case Methods.TssKeyGen: {
                 const { appId } = params
                 // await this.callPlugin('system', "newAppTss", appId)
@@ -97,15 +106,16 @@ module.exports = {
                 return {previous, appId}
             }
             case Methods.Deploy: {
-                const {seed, appId} = params
                 const { tssThreshold, maxGroupSize } = await this.callPlugin("system", "getNetworkInfo");
+                const {selectedNodes} = init
+                let {seed, t=tssThreshold, n=maxGroupSize} = params
+                t = Math.max(t, tssThreshold);
                 return {
                     timestamp: request.data.timestamp,
                     seed,
-                    tssThreshold,
-                    maxGroupSize,
-                    selectedNodes: this.callPlugin("system", "selectRandomNodes", seed, tssThreshold, maxGroupSize)
-                        .map(node => node.id)
+                    tssThreshold: t,
+                    maxGroupSize: n,
+                    selectedNodes,
                 };
             }
             case Methods.TssKeyGen: {

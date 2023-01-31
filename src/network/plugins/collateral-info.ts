@@ -39,6 +39,7 @@ export type GroupInfo = {
 export type NodeFilterOptions = {
   list?: string[],
   isOnline?: boolean,
+  isConnected?: boolean
   isDeployer?: boolean,
   excludeSelf?: boolean
 }
@@ -405,6 +406,16 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     return this.loading.isFulfilled;
   }
 
+  getConnectedPeerIds(): string[] {
+    let list = this.network.libp2p.connectionManager.getConnections()
+      .filter(cnn => cnn.stat.status === 'OPEN')
+    let uniqueList = {}
+    list.forEach(cnn => {
+      uniqueList[cnn.remotePeer.toString()] = true
+    })
+    return Object.keys(uniqueList);
+  }
+
   filterNodes(options: NodeFilterOptions): MuonNodeInfo[] {
     let result: MuonNodeInfo[]
     if(options.list) {
@@ -413,6 +424,10 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     }
     else {
       result = this._nodesList
+    }
+    if(options.isConnected) {
+      let connectedList = this.getConnectedPeerIds()
+      result = result.filter(n => connectedList.includes(n.peerId))
     }
     if(options.isDeployer)
       result = result.filter(n => n.isDeployer)
@@ -452,6 +467,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       }
     );
 
+    let pendingRequests = peers.length
     for(let i=0 ; i<peers.length ; i++) {
       this.findPeer(peers[i].peerId)
         .then(peer => {
@@ -471,6 +487,10 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         })
         .catch(e => {
           log.error("check status error %O", e)
+        })
+        .finally(() => {
+          if(--pendingRequests <= 0)
+            resultPromise.resolve(responseList);
         })
     }
 

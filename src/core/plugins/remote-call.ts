@@ -1,8 +1,8 @@
 import BasePlugin from'./base/base-plugin.js'
 import * as NetworkIpc from '../../network/ipc.js'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 
-const errorLog = Log('muon:core:plugins:remote-call:error')
+const log = logger('muon:core:plugins:remote-call')
 
 export default class RemoteCall extends BasePlugin {
   async handleCall(callId, method, params, callerInfo, responseStream){
@@ -10,7 +10,7 @@ export default class RemoteCall extends BasePlugin {
       // @ts-ignore
       return await this.emit(`${method}`, params, callerInfo)
     }catch (e) {
-      errorLog("error happened %o %o", {method, params, callerInfo}, e)
+      log.error("error happened %o %o", {method, params, callerInfo}, e)
       throw e
     }
   }
@@ -34,7 +34,7 @@ export default class RemoteCall extends BasePlugin {
     // console.log(`core.RemoteCall registering call handler`, {method, options})
     if(options.allowShieldNode) {
       NetworkIpc.allowRemoteCallByShieldNode(method, options).catch(e => {
-        console.log(`network.RemoteCall.on: IPC call failed`, e)
+        log.error(`network.RemoteCall.on: IPC call failed`, e)
       })
     }
     // @ts-ignore

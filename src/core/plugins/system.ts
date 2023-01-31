@@ -36,8 +36,8 @@ class System extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
-  getAvailableNodes(): MuonNodeInfo[] {
-    const onlineNodes = this.collateralPlugin.filterNodes({isOnline: true, excludeSelf: true})
+  private getAvailableNodes(): MuonNodeInfo[] {
+    const onlineNodes = this.collateralPlugin.filterNodes({isConnected: true, excludeSelf: true})
     const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.PEER_ID!)
     return [
       currentNodeInfo!,
@@ -278,7 +278,7 @@ class System extends CallablePlugin {
 
     await this.tssPlugin.createParty({
       id: partyId,
-      t: this.tssPlugin.TSS_THRESHOLD,
+      t: context.party.t,
       partners: context.party.partners,//.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
     let party = this.tssPlugin.parties[partyId];

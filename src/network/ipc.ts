@@ -98,6 +98,10 @@ function findNOnlinePeer(peerIds: string[], count: number, options?: {timeout?: 
   return call(IpcMethods.FindNOnlinePeer, {peerIds, count, options})
 }
 
+function getConnectedPeerIds(): Promise<string[]> {
+  return call(IpcMethods.GetConnectedPeerIds)
+}
+
 export {
   call,
   getCollateralInfo,
@@ -118,6 +122,7 @@ export {
   subscribeToBroadcastChannel,
   getUptime,
   findNOnlinePeer,
+  getConnectedPeerIds,
   putDHT,
   getDHT
 }

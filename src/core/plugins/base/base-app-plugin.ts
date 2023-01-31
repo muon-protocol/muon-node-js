@@ -193,12 +193,6 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  getNSign () {
-    if(!this.tssPlugin.isReady)
-      throw {message: 'Tss not initialized'};
-    return this.tssPlugin.tssParty!.t;
-  }
-
   get tssWalletAddress(){
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     return tss.pub2addr(tssPlugin.tssKey.publicKey)
@@ -250,19 +244,10 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @gatewayMethod("request")
-  async __onRequestArrived({method, params, nSign, mode, callId: gatewayCallId, gwSign}) {
+  async __onRequestArrived({method, params, mode, callId: gatewayCallId, gwSign}) {
     this.log(`request arrived %O`, {method, params})
     let t0 = Date.now()
     let startedAt = getTimestamp()
-    if(!nSign && !process.env.NUM_SIGN_TO_CONFIRM) {
-      throw 'nSign and NUM_SIGN_TO_CONFIRM is undefined';
-    }
-    nSign = !!nSign
-      ? parseInt(nSign)
-      : parseInt(process.env.NUM_SIGN_TO_CONFIRM || "0");
-
-    if(this.getNSign)
-      nSign = this.getNSign()
 
     if(this.APP_ID === '1') {
       if (!this.tssPlugin.isReady)
@@ -276,6 +261,8 @@ class BaseAppPlugin extends CallablePlugin {
         throw `App tss not initialized`
       }
     }
+
+    const nSign = this.appParty!.t;
 
     if(this.METHOD_PARAMS_SCHEMA){
       if(this.METHOD_PARAMS_SCHEMA[method]){
@@ -331,6 +318,7 @@ class BaseAppPlugin extends CallablePlugin {
       }
 
       let result = await this.onRequest(clone(newRequest))
+      this.log(`app result: %O`, result)
       newRequest.data.result = result
 
       let resultHash;
@@ -376,11 +364,13 @@ class BaseAppPlugin extends CallablePlugin {
         this.requestManager.addSignature(newRequest.reqId, sign.owner, sign);
         // new Signature(sign).save()
 
+        this.log('broadcasting request ...');
         await this.broadcastNewRequest(newRequest)
         t4 = Date.now()
       }
 
       let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
+      this.log(`confirmation done with %s`, confirmed)
       t5 = Date.now()
 
       let nonce = await this.tssPlugin.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
@@ -497,11 +487,13 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: 'App party not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
+    this.log(`generating nonce with ${nonceParticipantsCount} partners.`)
     let nonce = await tssPlugin.keyGen(party, {
       id: `nonce-${request.reqId}`,
       partners: availablePartners,
       maxPartners: nonceParticipantsCount
     })
+    this.log(`nonce generation has ben completed with address %s.`, tss.pub2addr(nonce.publicKey))
 
     // let sign = tssPlugin.sign(null, party);
     return {
@@ -692,7 +684,7 @@ class BaseAppPlugin extends CallablePlugin {
       return this.remoteCall(peerId, RemoteMethods.WantSign, request, {timeout: this.REMOTE_CALL_TIMEOUT, taskId: `keygen-${nonce.id}`})
         .then(this.__onRemoteSignTheRequest.bind(this))
         .catch(e => {
-          // console.log('base-tss-app-plugin: on broadcast request error', e)
+          this.log.error('asking signature for request failed %O', e)
           return this.__onRemoteSignTheRequest(null, {
             request: request.reqId,
             peerId,
@@ -777,6 +769,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async __onRemoteSignTheRequest(data: {sign: AppRequestSignature} | null, error) {
     // console.log('BaseAppPlugin.__onRemoteSignTheRequest', data)
+    this.log(`remote ${data?.sign?.owner} signed the request.`)
     if(error){
       let collateralPlugin:CollateralInfoPlugin = this.muon.getPlugin('collateral');
       let {peerId, request: reqId, ...otherParts} = error;

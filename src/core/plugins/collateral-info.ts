@@ -4,6 +4,7 @@ import * as NetworkIpc from '../../network/ipc.js'
 import {GroupInfo, NetworkInfo, NodeFilterOptions} from '../../network/plugins/collateral-info.js'
 import {MuonNodeInfo} from "../../common/types";
 import Log from '../../common/muon-log.js'
+import {MapOf} from "../../common/mpc/types";
 
 const log = Log('muon:core:plugins:collateral')
 
@@ -13,6 +14,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
   networkInfo: NetworkInfo;
   private allowedWallets: string[] = []
 
+  private connectedNodes: MapOf<boolean> = {}
   private _nodesList: MuonNodeInfo[];
   private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
   /**
@@ -23,8 +25,8 @@ export default class CollateralInfoPlugin extends BasePlugin{
   async onStart(){
     super.onStart();
 
-    this.muon.on('peer:online', this.onPeerOnline.bind(this));
-    this.muon.on('peer:offline', this.onPeerOffline.bind(this));
+    this.muon.on("peer:connect", this.onPeerConnect.bind(this))
+    this.muon.on("peer:disconnect", this.onPeerDisconnect.bind(this))
 
     this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
     this.muon.on("collateral:node:edit", this.onNodeEdit.bind(this));
@@ -43,16 +45,14 @@ export default class CollateralInfoPlugin extends BasePlugin{
     // })
   }
 
-  private onPeerOnline(peerId: string) {
-    // this.updateNodeInfo(peerId, {isOnline: true});
-    // let nodeInfo = this.getNodeInfo(peerId)!;
-    // log(`peer[${peerId}] id[${nodeInfo.id}] is online now`)
+  private onPeerConnect(peerId) {
+    log(`peer connect %o`, peerId)
+    this.connectedNodes[peerId] = true
   }
 
-  private onPeerOffline(peerId: string) {
-    // this.updateNodeInfo(peerId, {isOnline: false});
-    // let nodeInfo = this.getNodeInfo(peerId)!;
-    // log(`peer[${peerId}] id[${nodeInfo.id}] is offline now`)
+  private onPeerDisconnect(peerId) {
+    log(`peer disconnect %o`, peerId)
+    delete this.connectedNodes[peerId]
   }
 
   get availablePeerIds(): string[] {
@@ -159,6 +159,11 @@ export default class CollateralInfoPlugin extends BasePlugin{
       this.allowedWallets.push(n.wallet);
     })
 
+    let connectedList = await NetworkIpc.getConnectedPeerIds()
+    connectedList.forEach(peerId => {
+      this.connectedNodes[peerId] = true
+    })
+
     log('Collateral info loaded.');
     // @ts-ignore
     this.emit('loaded');
@@ -219,6 +224,9 @@ export default class CollateralInfoPlugin extends BasePlugin{
     }
     else {
       result = this._nodesList
+    }
+    if(options.isConnected){
+      result = result.filter(n => this.connectedNodes[n.peerId])
     }
     if(options.isDeployer)
       result = result.filter(n => n.isDeployer)

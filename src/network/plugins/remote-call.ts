@@ -8,10 +8,10 @@ import CollateralInfoPlugin from "./collateral-info.js";
 import {RemoteMethodOptions} from "../../common/types"
 import NodeCache from 'node-cache'
 import {peerId2Str} from "../utils.js";
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import NetworkIpcHandler from "./network-ipc-handler";
 
-const log = Log("muon:network:remote-call")
+const log = logger("muon:network:plugins:remote-call")
 
 const callCache = new NodeCache({
   stdTTL: 6*60, // Keep call in memory for 6 minutes
@@ -181,10 +181,7 @@ class RemoteCall extends BaseNetworkPlugin {
       )
       //stream.close();
     } catch (err) {
-      console.log('=============================');
-      console.log(peer)
-      console.log('=============================');
-      console.error("RemoteCall.send", err)
+      log.error("send failed peer: %s error: %O", peer.id, err)
     }
     // finally {
     //   // Replies are done on new streams, so let's close this stream so we don't leak it
@@ -228,7 +225,7 @@ class RemoteCall extends BaseNetworkPlugin {
         // TODO: what to do? it may timed out.
       }
     }catch (e) {
-      console.error("RemoteCall.handleSendResponse", e);
+      log.error("handling send response failed %O", e);
     }
   }
 
@@ -244,26 +241,26 @@ class RemoteCall extends BaseNetworkPlugin {
     log(`calling peer %s : %s`, peerId2Str(peer.id), this.getCallExactMethod(method, params))
     // TODO: need more check
     if(!peer){
+      log.error(`missing peer %s : %s`, peerId2Str(peer.id), this.getCallExactMethod(method, params))
       return Promise.reject({message: `network.RemoteCall.call: peer is null for method ${method}`})
     }
     return this.getPeerStream(peer)
       .then(stream => {
         if(!stream) {
-          console.log('network.RemoteCall.call: no stream call ... ')
+          log.error('network.RemoteCall.call: no stream call ... ')
         }
         return this.callConnection(stream, peer, method, params, options)
       })
       .catch(e => {
-        if(!options?.silent) {
-          let exactMethod = this.getCallExactMethod(method, params);
-          console.error(`network.RemoteCall.call(peer, '${exactMethod}', params)`, `peer: ${peerId2Str(peer.id)}`, e)
-        }
+        let exactMethod = this.getCallExactMethod(method, params);
+        log.error(`network.RemoteCall.call(peer, '${exactMethod}', params) peer: ${peerId2Str(peer.id)} %O`, e)
+
         // @ts-ignore
         if(this.listenerCount('error') > 0) {
           // @ts-ignore
           this.emit({catch: true}, 'error', {peerId: peer.id, method, onRemoteSide: e.onRemoteSide})
             .catch(e => {
-              console.log("network.RemoteCall.call: error handler failed", e);
+              log.error("network.RemoteCall.call: error handler failed %O", e);
             })
         }
         throw e;
