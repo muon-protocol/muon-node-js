@@ -229,8 +229,9 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       lastUpdateTime: parseInt(rawResult._lastUpdateTime),
       allNodes: rawResult._nodes
         .filter(item => item.active)
-        .map(item => ({
+        .map((item): MuonNodeInfo => ({
           id: BigInt(item.id).toString(),
+          staker: item.stakerAddress,
           wallet: item.nodeAddress,
           peerId: item.peerId,
           isDeployer: item.isDeployer,

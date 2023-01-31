@@ -104,7 +104,7 @@ class NetworkIpcHandler extends CallablePlugin {
   @ipcMethod(IpcMethods.FilterNodes)
   async __filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
     return this.collateralPlugin.filterNodes(filter)
-      .map(({id, wallet, peerId, isOnline, isDeployer}) => ({id, wallet, peerId, isOnline, isDeployer}));
+      .map(({id, staker, wallet, peerId, isOnline, isDeployer}) => ({id, staker, wallet, peerId, isOnline, isDeployer}));
   }
 
   /**
