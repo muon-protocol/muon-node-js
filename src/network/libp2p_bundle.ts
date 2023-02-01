@@ -15,8 +15,10 @@ const DEFAULT_OPTS = {
   datastore: new LevelDatastore(`./muon-data/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
   transports: [
     tcp({
-      // outboundSocketInactivityTimeout: 0,
-      // inboundSocketInactivityTimeout: 0
+      // default timeout is 5 mins and nodes disconnect
+      // once per 5 mins. It could increase load of dht
+      outboundSocketInactivityTimeout: 30 * 60e3,
+      inboundSocketInactivityTimeout: 30 * 60e3
     }),
     // webSockets()
   ],
