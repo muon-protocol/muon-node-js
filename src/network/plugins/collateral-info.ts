@@ -430,14 +430,14 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     /** make result unique */
     result = lodash.uniqBy(result, 'id')
 
-    if(options.isConnected) {
+    if(options.isConnected !== undefined) {
       let connectedList = this.getConnectedPeerIds()
-      result = result.filter(n => connectedList.includes(n.peerId))
+      result = result.filter(n => connectedList.includes(n.peerId)===options.isConnected)
     }
-    if(options.isDeployer)
-      result = result.filter(n => n.isDeployer)
-    if(options.isOnline)
-      result = result.filter(n => n.isOnline)
+    if(options.isDeployer != undefined)
+      result = result.filter(n => n.isDeployer === options.isDeployer)
+    if(options.isOnline != undefined)
+      result = result.filter(n => n.isOnline === options.isOnline)
     if(options.excludeSelf)
       result = result.filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
     return result
