@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin.js'
-import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators.js'
+import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
@@ -22,6 +22,7 @@ const RemoteMethods = {
   InformAppDeployed: "informAppDeployed",
   GenerateAppTss: "generateAppTss",
   Undeploy: "undeploy",
+  EnsureAppPartyExist: "ensure-app-party-exist"
 }
 
 @remoteApp
@@ -47,6 +48,18 @@ class System extends CallablePlugin {
       currentNodeInfo!,
       ...onlineNodes
     ]
+  }
+
+  @broadcastHandler
+  async __broadcastHandler(data, callerInfo: MuonNodeInfo) {
+    const {type, details} = data||{};
+    switch (type) {
+      case 'undeploy': {
+        const {appId} = details || {}
+        this.__undeployApp(appId, callerInfo).catch(e => {})
+        break;
+      }
+    }
   }
 
   @appApiMethod()
@@ -99,6 +112,23 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId);
     if(!context)
       throw `App deployment info not found.`
+
+    /** inform non deployer nodes about app party */
+    let nonDeployerPartners = this.collateralPlugin.filterNodes({
+      list: context.party.partners,
+      isDeployer: false,
+      excludeSelf: true
+    })
+    if(nonDeployerPartners.length > 0) {
+      await Promise.all(nonDeployerPartners.map(p => {
+        return this.remoteCall(
+          p.peerId,
+          RemoteMethods.EnsureAppPartyExist,
+          appId
+        )
+      }))
+    }
+
     const generatorInfo = this.collateralPlugin.getNodeInfo(context.party.partners[0])!
     if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
       return await this.__generateAppTss({appId}, null);
@@ -253,6 +283,8 @@ class System extends CallablePlugin {
           });
       }
     }))
+
+    this.broadcast({type: "undeploy", details: {appId}})
   }
 
   @appApiMethod({})
@@ -343,6 +375,19 @@ class System extends CallablePlugin {
     await AppTssConfig.deleteMany({appId});
     log(`deleting app from memory of all cluster %s`, appId)
     CoreIpc.fireEvent({type: 'app-context:delete', data: appId})
+  }
+
+  @remoteMethod(RemoteMethods.EnsureAppPartyExist)
+  async __ensureAppPartyExist(appId, callerInfo) {
+    if(!callerInfo.isDeployer)
+      throw `only deployers can call this method`
+
+    const context = await AppContext.findOne({appId}).exec();
+    if(!!context)
+      return true;
+
+    let ctx = await this.appManager.queryAndLoadAppContext(appId)
+    return !!ctx;
   }
 }
 
