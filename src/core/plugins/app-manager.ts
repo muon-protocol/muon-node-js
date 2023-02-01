@@ -11,10 +11,10 @@ import * as NetworkIpc from '../../network/ipc.js'
 import AppContext, {hash as hashAppContext} from "../../common/db-models/AppContext.js"
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
 import _ from 'lodash'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import {pub2json} from "../../utils/helpers.js";
 
-const log = Log('muon:core:plugins:app-manager')
+const log = logger('muon:core:plugins:app-manager')
 
 const RemoteMethods = {
   AppStatus: "app-status",
@@ -35,6 +35,7 @@ export default class AppManager extends CallablePlugin {
 
     this.muon.on('app-context:add', this.onAppContextAdd.bind(this))
     this.muon.on('app-context:update', this.onAppContextUpdate.bind(this))
+    this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
     this.muon.on('app-tss-key:add', this.onAppTssConfigAdd.bind(this))
 
     this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
@@ -180,18 +181,19 @@ export default class AppManager extends CallablePlugin {
     this.contextIdToAppIdMap[doc._id] = doc.appId
   }
 
-  private async onAppContextDelete(_id: string) {
-    // console.log("====== AppContext:change ======", JSON.stringify(change))
+  private async onAppContextDelete(appId: string) {
+    log(`pid[${process.pid}] app[${appId}] context deleting...`)
     try {
-      const contextId = Object.keys(this.appContexts).find(contextId => (this.appContexts[contextId]._id.toString() === _id))
-      if(!contextId) {
-        console.error(`AppContext deleted but contextId not found`, {_id})
+      if(!this.appContexts[appId]) {
+        log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
         return
       }
-      delete this.appContexts[contextId]
+      delete this.appContexts[appId]
+      delete this.appTssConfigs[appId]
+      log(`app[${appId}] context deleted.`)
     }
     catch (e) {
-      console.log(`AppManager.onAppContextChange`, e);
+      log(`error when deleting app context %O`, e);
     }
   }
 

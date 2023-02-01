@@ -18,6 +18,20 @@ module.exports = {
     APP_ID: 1,
     owners,
 
+    readOnlyMethods: ['undeploy'],
+
+    undeploy: async function (params) {
+        const {
+            params: {app}
+        } = params
+
+        await this.callPlugin("system", "undeployApp", app);
+
+        return {
+            success: true,
+        }
+    },
+
     validateRequest: async function(request) {
         let {
             method,

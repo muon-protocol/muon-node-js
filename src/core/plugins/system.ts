@@ -10,14 +10,18 @@ import AppTssConfig from "../../common/db-models/AppTssConfig.js"
 import * as NetworkIpc from '../../network/ipc.js'
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import AppManager from "./app-manager.js";
+import * as CoreIpc from '../ipc.js'
 import useDistributedKey from "../../utils/tss/use-distributed-key.js";
+import {logger} from '@libp2p/logger'
 import {pub2json, timeout} from '../../utils/helpers.js'
-import { promisify } from "util"
 import {bn2hex} from "../../utils/tss/utils.js";
+
+const log = logger("muon:core:plugins:system");
 
 const RemoteMethods = {
   InformAppDeployed: "informAppDeployed",
   GenerateAppTss: "generateAppTss",
+  Undeploy: "undeploy",
 }
 
 @remoteApp
@@ -218,6 +222,40 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
+  async undeployApp(appNameOrId) {
+    let app = this.muon.getAppById(appNameOrId) || this.muon.getAppByName(appNameOrId);
+    if(!app)
+      throw `App not found by identifier: ${appNameOrId}`
+    const appId = app.APP_ID
+    const party = this.tssPlugin.getAppParty(appId)!;
+    if(!party)
+      throw `App not deployed`;
+    let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
+    const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: [...deployers, ...party.partners]})
+    log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
+    await Promise.all(partnersToCall.map(node => {
+      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
+        return this.__undeployApp(appId, this.collateralPlugin.currentNodeInfo)
+          .catch(e => {
+            log.error(`error when undeploy at current node: %O`, e)
+            return e?.message || "unknown error occurred"
+          });
+      }
+      else{
+        return this.remoteCall(
+          node.peerId,
+          RemoteMethods.Undeploy,
+          appId
+        )
+          .catch(e => {
+            log.error(`error when undeploy at ${node.peerId}: %O`, e)
+            return e?.message || "unknown error occurred"
+          });
+      }
+    }))
+  }
+
+  @appApiMethod({})
   async getAppContext(appId) {
     let contexts = await AppContext.find({
       appId
@@ -291,6 +329,20 @@ class System extends CallablePlugin {
       id: key.id,
       publicKey: pub2json(key.publicKey!)
     }
+  }
+
+  @remoteMethod(RemoteMethods.Undeploy)
+  async __undeployApp(appId, callerInfo) {
+    if(!callerInfo.isDeployer)
+      throw `Only deployer can call this method`
+    const app = this.appManager.getAppContext(appId)
+    if(!app)
+      throw `App not found`
+    log(`deleting app from persistent db %s`, appId)
+    await AppContext.deleteMany({appId});
+    await AppTssConfig.deleteMany({appId});
+    log(`deleting app from memory of all cluster %s`, appId)
+    CoreIpc.fireEvent({type: 'app-context:delete', data: appId})
   }
 }
 
