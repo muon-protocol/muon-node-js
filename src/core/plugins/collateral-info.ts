@@ -5,6 +5,7 @@ import {GroupInfo, NetworkInfo, NodeFilterOptions} from '../../network/plugins/c
 import {MuonNodeInfo} from "../../common/types";
 import Log from '../../common/muon-log.js'
 import {MapOf} from "../../common/mpc/types";
+import lodash from 'lodash'
 
 const log = Log('muon:core:plugins:collateral')
 
@@ -225,6 +226,10 @@ export default class CollateralInfoPlugin extends BasePlugin{
     else {
       result = this._nodesList
     }
+
+    /** make result unique */
+    result = lodash.uniqBy(result, 'id')
+
     if(options.isConnected){
       result = result.filter(n => this.connectedNodes[n.peerId])
     }

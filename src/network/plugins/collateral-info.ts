@@ -11,6 +11,7 @@ import { createRequire } from "module";
 import {peerId2Str} from "../utils.js";
 import {broadcastHandler, remoteApp, remoteMethod} from "./base/app-decorators.js";
 import NodeCache from 'node-cache';
+import lodash from "lodash";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
@@ -425,6 +426,10 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     else {
       result = this._nodesList
     }
+
+    /** make result unique */
+    result = lodash.uniqBy(result, 'id')
+
     if(options.isConnected) {
       let connectedList = this.getConnectedPeerIds()
       result = result.filter(n => connectedList.includes(n.peerId))
