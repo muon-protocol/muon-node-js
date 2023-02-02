@@ -8,7 +8,7 @@ const web3 = new Web3();
 const createEnv = async () => {
   if(fs.existsSync('./.env')) {
     console.log('.env file already exists.');
-    process.exit(1);
+    process.exit(0);
   }
 
   let wallet = web3.eth.accounts.create();
