@@ -22,7 +22,6 @@ const RemoteMethods = {
   InformAppDeployed: "informAppDeployed",
   GenerateAppTss: "generateAppTss",
   Undeploy: "undeploy",
-  EnsureAppPartyExist: "ensure-app-party-exist"
 }
 
 @remoteApp
@@ -112,22 +111,6 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId);
     if(!context)
       throw `App deployment info not found.`
-
-    /** inform non deployer nodes about app party */
-    let nonDeployerPartners = this.collateralPlugin.filterNodes({
-      list: context.party.partners,
-      isDeployer: false,
-      excludeSelf: true
-    })
-    if(nonDeployerPartners.length > 0) {
-      await Promise.all(nonDeployerPartners.map(p => {
-        return this.remoteCall(
-          p.peerId,
-          RemoteMethods.EnsureAppPartyExist,
-          appId
-        )
-      }))
-    }
 
     const generatorInfo = this.collateralPlugin.getNodeInfo(context.party.partners[0])!
     if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
@@ -375,19 +358,6 @@ class System extends CallablePlugin {
     await AppTssConfig.deleteMany({appId});
     log(`deleting app from memory of all cluster %s`, appId)
     CoreIpc.fireEvent({type: 'app-context:delete', data: appId})
-  }
-
-  @remoteMethod(RemoteMethods.EnsureAppPartyExist)
-  async __ensureAppPartyExist(appId, callerInfo) {
-    if(!callerInfo.isDeployer)
-      throw `only deployers can call this method`
-
-    const context = await AppContext.findOne({appId}).exec();
-    if(!!context)
-      return true;
-
-    let ctx = await this.appManager.queryAndLoadAppContext(appId)
-    return !!ctx;
   }
 }
 
