@@ -431,10 +431,10 @@ class BaseAppPlugin extends CallablePlugin {
 
       if (confirmed && !isDuplicateRequest) {
         if(!!this.onConfirm) {
-          this.informRequestConfirmation(requestData)
-            .catch(e => {
-              this.log.error("error when informing request confirmation %O", e)
-            })
+          await this.informRequestConfirmation(requestData)
+            // .catch(e => {
+            //   this.log.error("error when informing request confirmation %O", e)
+            // })
         }
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
@@ -493,8 +493,8 @@ class BaseAppPlugin extends CallablePlugin {
           })
       }
     }))
-    const successResponses = responses.filter(r => (r === 'OK'))
-    if(successResponses.length < this.tssPlugin.TSS_THRESHOLD)
+    const successResponses = responses.filter(r => (r !== 'error'))
+    if(successResponses.length < this.appParty!.t)
       throw `Error when informing request confirmation.`
   }
 
