@@ -16,6 +16,7 @@ router.use('/', async (req, res, next) => {
     staker: nodeInfo ? nodeInfo.staker : undefined,
     address: NodeAddress,
     peerId: PeerID,
+    networkingPort: process.env.PEER_PORT,
     managerContract: {
       network: collateralInfo?.contract?.network,
       address: collateralInfo?.contract?.address,
@@ -26,10 +27,7 @@ router.use('/', async (req, res, next) => {
     },
     addedToNetwork: !!nodeInfo,
     network: {
-      nodeInfo: {
-        ...lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker']),
-        isOnline: !!nodeInfo,
-      },
+      nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker']) : undefined
     }
   })
 })
