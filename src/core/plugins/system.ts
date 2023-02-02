@@ -51,14 +51,14 @@ class System extends CallablePlugin {
 
   @broadcastHandler
   async __broadcastHandler(data, callerInfo: MuonNodeInfo) {
-    const {type, details} = data||{};
-    switch (type) {
-      case 'undeploy': {
-        const {appId} = details || {}
-        this.__undeployApp(appId, callerInfo).catch(e => {})
-        break;
-      }
-    }
+    // const {type, details} = data||{};
+    // switch (type) {
+    //   case 'undeploy': {
+    //     const {appId} = details || {}
+    //     this.__undeployApp(appId, callerInfo).catch(e => {})
+    //     break;
+    //   }
+    // }
   }
 
   @appApiMethod()
