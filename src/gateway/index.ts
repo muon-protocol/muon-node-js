@@ -23,7 +23,7 @@ async function start(options) {
   )
   app.use(bodyParser.json())
 
-  await mongoose.connect(process.env.MONGODB_CS, {
+  await mongoose.connect(process.env.MONGODB_CS!, {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })

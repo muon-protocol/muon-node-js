@@ -692,9 +692,9 @@ class TssPlugin extends CallablePlugin {
           })
         })
     )
-    const failed = partners.filter((p, i) => callResult[i]==='error')
-    if(failed.length > 0)
-      throw `${failed.length} partner failed when creating party.`
+    const succeeded = partners.filter((p, i) => callResult[i] !== 'error')
+    if(succeeded.length < newParty.t)
+      throw `Only ${succeeded} partners succeeded when creating the party.`
     return newParty.id;
   }
 

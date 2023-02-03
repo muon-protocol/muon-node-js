@@ -58,6 +58,12 @@ const nameToChainIdMap = {
   optimismTestnet: 420, // Optimism Testnet
 }
 
+function getNetworkId(network) {
+  if(!!_networksWeb3[network])
+    return network
+  return nameToChainIdMap[network]
+}
+
 function getWeb3(network) {
   if (_networksWeb3[network]) return Promise.resolve(_networksWeb3[network])
   else if (_networksWeb3[nameToChainIdMap[network]])
@@ -242,6 +248,7 @@ class Subscribe extends EventEmbitter {
 
 export {
   getWeb3,
+  getNetworkId,
   getBlock,
   getBlockNumber,
   getPastEvents,

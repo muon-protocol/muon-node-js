@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin.js'
-import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators.js'
+import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
@@ -47,6 +47,18 @@ class System extends CallablePlugin {
       currentNodeInfo!,
       ...onlineNodes
     ]
+  }
+
+  @broadcastHandler
+  async __broadcastHandler(data, callerInfo: MuonNodeInfo) {
+    // const {type, details} = data||{};
+    // switch (type) {
+    //   case 'undeploy': {
+    //     const {appId} = details || {}
+    //     this.__undeployApp(appId, callerInfo).catch(e => {})
+    //     break;
+    //   }
+    // }
   }
 
   @appApiMethod()
@@ -99,6 +111,7 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId);
     if(!context)
       throw `App deployment info not found.`
+
     const generatorInfo = this.collateralPlugin.getNodeInfo(context.party.partners[0])!
     if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
       return await this.__generateAppTss({appId}, null);
@@ -253,6 +266,8 @@ class System extends CallablePlugin {
           });
       }
     }))
+
+    this.broadcast({type: "undeploy", details: {appId}})
   }
 
   @appApiMethod({})

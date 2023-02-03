@@ -13,7 +13,8 @@ import { createRequire } from "module";
 const log = Log('muon:boot')
 
 process.on('unhandledRejection', function(reason, _promise) {
-  console.log("Unhandled promise rejection", reason, _promise);
+  // console.log("Unhandled promise rejection", _promise);
+  console.dir(reason, {depth: 5})
   throw `Unhandled promise rejection reason: ${reason}`
 });
 

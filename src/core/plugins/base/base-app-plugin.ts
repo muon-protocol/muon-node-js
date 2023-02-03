@@ -23,9 +23,10 @@ import {MuonNodeInfo} from "../../../common/types";
 import useDistributedKey from "../../../utils/tss/use-distributed-key.js";
 import chalk from 'chalk'
 import Ajv from "ajv"
-import Log from '../../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import {bn2hex} from "../../../utils/tss/utils.js";
 import * as NetworkIpc from "../../../network/ipc.js";
+import {PublicKey} from "../../../utils/tss/types";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
@@ -67,6 +68,7 @@ export type AppRequestSignature = {
 const RemoteMethods = {
   WantSign: 'wantSign',
   InformRequestConfirmation: 'InformReqConfirmation',
+  GetTssPublicKey: "get-tss-pub",
   HB: "HB",
 }
 
@@ -82,6 +84,7 @@ class BaseAppPlugin extends CallablePlugin {
   onRequest: (request: any) => any;
   signParams: (request: object, result: any) => any[];
   onMemWrite: (request: object, result: any) => object;
+  getConfirmAnnounceList: (request: object) => Promise<string[]>;
   onConfirm: (request: object, result: any, signatures: any[]) => void;
   METHOD_PARAMS_SCHEMA: object = {};
   /**=================================*/
@@ -103,7 +106,7 @@ class BaseAppPlugin extends CallablePlugin {
       });
     }
 
-    this.log = Log("muon:apps:base")
+    this.log = logger("muon:apps:base")
 
     // console.log(this.APP_NAME);
     /**
@@ -143,7 +146,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onInit() {
-    this.log = Log(`muon:apps:${this.APP_NAME}`);
+    this.log = logger(`muon:apps:${this.APP_NAME}`);
 
     this.warnArrowFunctions([
       "onArrive",
@@ -231,6 +234,27 @@ class BaseAppPlugin extends CallablePlugin {
 
   private get appTss(): DistributedKey | null {
     return this.tssPlugin.getAppTssKey(this.APP_ID)
+  }
+
+  /** useful when current node is not in the app party */
+  private async findTssPublicKey(): Promise<PublicKey | null> {
+    /** if key exist in current node */
+    let publicKey = this.appTss?.publicKey
+    if(publicKey)
+      return publicKey
+
+    /** ask deployers for app tss public key */
+    const deployersPeerId: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId);
+    let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployersPeerId, 3, {timeout: 5000, return: 'peerId'})
+    // @ts-ignore
+    const publicKeyStr: string = await Promise.any(onlineDeployers.map(peerId => {
+      return this.remoteCall(
+        peerId,
+        RemoteMethods.GetTssPublicKey,
+      )
+    }))
+
+    return DistributedKey.loadPubKey(publicKeyStr);
   }
 
   /**
@@ -407,10 +431,10 @@ class BaseAppPlugin extends CallablePlugin {
 
       if (confirmed && !isDuplicateRequest) {
         if(!!this.onConfirm) {
-          this.informRequestConfirmation(requestData)
-            .catch(e => {
-              this.log.error("error when informing request confirmation %O", e)
-            })
+          await this.informRequestConfirmation(requestData)
+            // .catch(e => {
+            //   this.log.error("error when informing request confirmation %O", e)
+            // })
         }
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
@@ -431,17 +455,26 @@ class BaseAppPlugin extends CallablePlugin {
   async informRequestConfirmation(request) {
     // await this.onConfirm(request)
     let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
-    const partners: MuonNodeInfo[] = [
-      /** self */
-      this.currentNodeInfo!,
-      /** all other online partners */
-      ...this.collateralPlugin
-        .filterNodes({
-          list: this.appParty!.partners,
-          // isOnline: true,
-          excludeSelf: true
-        })
+
+    let announceList = [
+      process.env.SIGN_WALLET_ADDRESS!,
+      ... this.appParty!.partners
     ]
+    if(!!this.getConfirmAnnounceList) {
+      let moreAnnounceList = await this.getConfirmAnnounceList(request);
+      this.log(`custom announce list: %o`, moreAnnounceList)
+      if(Array.isArray(moreAnnounceList)) {
+        if(moreAnnounceList.findIndex(n => typeof n !== "string") < 0) {
+          announceList = [
+            ... announceList,
+            ... moreAnnounceList
+          ]
+        }
+      }
+    }
+
+    const partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: announceList})
+    this.log(`nodes selected to announce confirmation: %o`, partners.map(p => p.id))
 
     const responses: string[] = await Promise.all(partners.map(async node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
@@ -460,8 +493,8 @@ class BaseAppPlugin extends CallablePlugin {
           })
       }
     }))
-    const successResponses = responses.filter(r => (r === 'OK'))
-    if(successResponses.length < this.tssPlugin.TSS_THRESHOLD)
+    const successResponses = responses.filter(r => (r !== 'error'))
+    if(successResponses.length < this.appParty!.t)
       throw `Error when informing request confirmation.`
   }
 
@@ -660,9 +693,8 @@ class BaseAppPlugin extends CallablePlugin {
     return p1 === p2 ? owner : null;
   }
 
-  verify(hash: string, signature: string, nonceAddress: string): boolean {
-    let tssKey = this.appTss;
-    const signingPubKey = tssKey!.publicKey;
+  async verify(hash: string, signature: string, nonceAddress: string): Promise<boolean> {
+    const signingPubKey = await this.findTssPublicKey();
     return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey!);
   }
 
@@ -895,11 +927,11 @@ class BaseAppPlugin extends CallablePlugin {
 
     const [result, hash] = await this.preProcessRemoteRequest(request);
 
-    request.signatures.forEach(sign => {
-      if(!this.verify(hash, sign.signature, request.data.init.nonceAddress)) {
+    for(let i=0 ; i<request.signatures.length ; i++) {
+      if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
         throw `TSS signature not verified`
       }
-    })
+    }
   }
 
   @remoteMethod(RemoteMethods.WantSign)
@@ -951,11 +983,11 @@ class BaseAppPlugin extends CallablePlugin {
 
     const [result, hash] = await this.preProcessRemoteRequest(request);
 
-    request.signatures.forEach(sign => {
-      if(!this.verify(hash, sign.signature, request.data.init.nonceAddress)) {
+    for(let i=0 ; i<request.signatures.length ; i++) {
+      if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
         throw `TSS signature not verified`
       }
-    })
+    }
 
     await this.onConfirm(request, result, request.signatures);
 
@@ -965,6 +997,11 @@ class BaseAppPlugin extends CallablePlugin {
   @remoteMethod(RemoteMethods.HB)
   async __HB(data, callerInfo) {
     return true;
+  }
+
+  @remoteMethod(RemoteMethods.GetTssPublicKey)
+  async __getTssPublicKey(data, callerInfo) {
+    return this.appTss!.publicKey!.encode("hex", true)
   }
 }
 

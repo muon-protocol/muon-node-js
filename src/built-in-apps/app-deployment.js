@@ -56,7 +56,7 @@ module.exports = {
                 const seedResult = await this.onRequest(randomSeedRequest)
                 const seedSignParams = this.signParams(randomSeedRequest, seedResult)
                 const hash = this.hashAppSignParams(randomSeedRequest, seedSignParams)
-                if(!this.verify(hash, seed, nonce))
+                if(!await this.verify(hash, seed, nonce))
                     throw `seed not verified`
                 break;
             }
@@ -90,9 +90,19 @@ module.exports = {
             }
             case Methods.TssKeyGen: {
                 const { appId } = params
-                // await this.callPlugin('system', "newAppTss", appId)
+
+                /** ensure app context to be exist */
+                let context = await this.callPlugin('system', "getAppContext", params.appId)
+                if(!context)
+                    throw `app deployment info not found`
+
                 const {id, publicKey} = await this.callPlugin('system', "genAppTss", appId)
-                return {id, publicKey}
+
+                return {
+                    id,
+                    publicKey,
+                    partners: context.party.partners,
+                }
             }
             case Methods.TssReshare: {
                 const {appId} = params
@@ -133,9 +143,20 @@ module.exports = {
                 };
             }
             case Methods.TssKeyGen: {
+                /** ensure app context to be exist */
+                let context = await this.callPlugin('system', "getAppContext", params.appId)
+                if(!context)
+                    throw `app deployment info not found`
+
+                if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
+                    throw `deployed partners mismatched with key-gen partners`
+                }
+
+                /** ensure a random key already generated */
                 let key = await this.callPlugin('system', "getDistributedKey", init.id)
                 if(!key)
                     throw `App new tss key not found`;
+
                 return {
                     address: key.address,
                     publicKey: "0x" + key.publicKey.encode("hex", true),
@@ -192,6 +213,19 @@ module.exports = {
             }
             default:
                 throw "Unknown method"
+        }
+    },
+
+    getConfirmAnnounceList: async function(request) {
+        switch (request.method) {
+            case Methods.Deploy: {
+                return request.data.init.selectedNodes
+            }
+            case Methods.TssKeyGen: {
+                return request.data.init.partners
+            }
+            default:
+                return []
         }
     },
 
