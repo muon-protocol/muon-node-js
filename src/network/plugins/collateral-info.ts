@@ -12,6 +12,7 @@ import {peerId2Str} from "../utils.js";
 import {broadcastHandler, remoteApp, remoteMethod} from "./base/app-decorators.js";
 import NodeCache from 'node-cache';
 import lodash from "lodash";
+import axios from "axios";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
@@ -220,7 +221,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     let rawResult;
     do {
       try {
-        rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
+        rawResult = await this.getInfo(address, network);
       }catch (e) {
         log('loading network info failed. %o', e)
         await timeout(5000)
@@ -239,6 +240,13 @@ export default class CollateralInfoPlugin extends CallablePlugin{
           isDeployer: item.isDeployer,
           isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || heartbeatCache.has(item.peerId)
         }))
+    }
+  }
+
+  async getInfo(address: string, network: string) {
+    return {
+      _lastUpdateTime: await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network),
+      _nodes: await axios.get('http://192.3.136.81/allNodes').then(({data}) => data)
     }
   }
 
