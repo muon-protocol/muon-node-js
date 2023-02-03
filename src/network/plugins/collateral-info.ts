@@ -16,6 +16,7 @@ import axios from "axios";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
+const MuonNodesPaginationAbi = require('../../data/MuonNodesPagination-ABI.json')
 const log = logger('muon:network:plugins:collateral')
 
 const HEARTBEAT_EXPIRE = parseInt(process.env.HEARTBEAT_EXPIRE!) || 20*60*1000; // Keep heartbeet in memory for 5 minutes
@@ -216,12 +217,21 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   }
 
   async loadNetworkInfo(nodeManagerInfo): Promise<{lastUpdateTime: number, allNodes: MuonNodeInfo[]}>{
-    const {address, network} = nodeManagerInfo;
+    const {address, network, pagination: paginationContractAddress} = nodeManagerInfo;
 
     let rawResult;
     do {
       try {
-        rawResult = await this.getInfo(address, network);
+        if(!!paginationContractAddress) {
+          rawResult = await this.paginateAndGetInfo(
+            paginationContractAddress,
+            address,
+            network
+          )
+        }
+        else {
+          rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
+        }
       }catch (e) {
         log('loading network info failed. %o', e)
         await timeout(5000)
@@ -243,10 +253,35 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     }
   }
 
-  async getInfo(address: string, network: string) {
+  // private async getInfo(address: string, network: string) {
+  //   return {
+  //     _lastUpdateTime: await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network),
+  //     _nodes: await axios.get('http://192.3.136.81/allNodes').then(({data}) => data)
+  //   }
+  // }
+
+  private async paginateAndGetInfo(paginationAddress:string, nodeManagerAddress: string, network: string) {
+    const itemPerPage = 2000;
+    const lastNodeIdStr: string = await eth.call(nodeManagerAddress, 'lastNodeId', [], NodeManagerAbi, network)
+    const lastNodeId = parseInt(lastNodeIdStr)
+
+    const pagesToRequest = new Array(Math.ceil(lastNodeId / itemPerPage)).fill(0).map((_,i) => i)
+
+    const pagesData = await Promise.all(pagesToRequest.map(page => {
+      const startIndex = page*itemPerPage + 1;
+      const endIndex = Math.min(startIndex+itemPerPage-1, lastNodeId)
+      return eth.call(
+        paginationAddress,
+        'getAllNodes',
+        [`0x${startIndex.toString(16)}`,`0x${endIndex.toString(16)}`],
+        MuonNodesPaginationAbi,
+        network
+      )
+    }))
+
     return {
-      _lastUpdateTime: await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network),
-      _nodes: await axios.get('http://192.3.136.81/allNodes').then(({data}) => data)
+      _lastUpdateTime: await eth.call(nodeManagerAddress, 'lastUpdateTime', [], NodeManagerAbi, network),
+      _nodes: [].concat(...pagesData)
     }
   }
 
@@ -261,6 +296,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
    * 6) Edit isDeployer
    */
   async onNodesChange() {
+    log(`nodes list updating ...`)
     let {nodeManager} = this.network.configs.net;
 
     let {lastUpdateTime, allNodes} = await this.loadNetworkInfo(nodeManager);
@@ -326,15 +362,17 @@ export default class CollateralInfoPlugin extends CallablePlugin{
 
     this._nodesList = allNodes;
     this.groupInfo.partners = allNodes.map(n => n.id)
+    log(`nodes list updated.`)
   }
 
   async watchNodesChange(nodeManagerInfo) {
     const {address, network} = nodeManagerInfo;
     while (true) {
       /** every 20 seconds */
-      await timeout(20000);
+      await timeout(60000);
       try {
         let lastUpdateTime;
+        log(`checking for nodes list changes ...`)
         do {
           try {
             lastUpdateTime = await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
@@ -346,9 +384,14 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         lastUpdateTime = parseInt(lastUpdateTime);
 
         if(lastUpdateTime !== this.lastNodesUpdateTime) {
-          log("Muon nodes list changed on-chain.")
+          log(`Muon nodes list changed on-chain %o`, {
+            oldUpdateTime: this.lastNodesUpdateTime,
+            newUpdateTime: lastUpdateTime
+          })
           await this.onNodesChange();
         }
+        else
+          log('no change detected.')
       }
       catch (e) {
         console.log(`Network.CollateralInfoPlugin.watchNodesChange`, e)
