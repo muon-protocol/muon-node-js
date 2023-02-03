@@ -70,6 +70,8 @@ class HealthCheck extends CallablePlugin {
       loadAvg: uptimeStdOut.split('load average')[1].substr(2).trim(),
       memory: `${freeCols[6]}/${freeCols[1]}`,
       uptime: await NetworkIpc.getUptime(),
+      networkingPort: process.env.PEER_PORT,
+      gatewayPort: process.env.GATEWAY_PORT
     }
   }
 
