@@ -12,7 +12,7 @@ import { LevelDatastore } from "datastore-level";
 
 const DEFAULT_OPTS = {
   // TODO: move path to env
-  //datastore: new LevelDatastore(`./muon-data/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
+  datastore: new LevelDatastore(`./muon-data/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
   transports: [
     tcp({
       // default timeout is 5 mins and nodes disconnect
@@ -38,8 +38,8 @@ const DEFAULT_OPTS = {
     allowPublishToZeroPeers: true,
   }),
   dht: kadDHT({
-    kBucketSize: 8,
-    clientMode: process.env.GATEWAY_PORT == "8000" ? true : false,
+    kBucketSize: 20,
+    clientMode: false,
     validators: {
       muon: async (key, data) => {
         //TODO: validate data
