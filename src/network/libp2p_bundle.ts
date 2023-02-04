@@ -38,7 +38,7 @@ const DEFAULT_OPTS = {
     allowPublishToZeroPeers: true,
   }),
   dht: kadDHT({
-    kBucketSize: 50,
+    kBucketSize: 20,
     clientMode: false,
     validators: {
       muon: async (key, data) => {
