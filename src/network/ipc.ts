@@ -50,6 +50,11 @@ function getPeerInfo(peerId: string): JsonPeerInfo|null {
   return call(IpcMethods.GetPeerInfo, {peerId})
 }
 
+function getPeerInfoLight(peerId: string): JsonPeerInfo|null {
+  // @ts-ignore
+  return call(IpcMethods.GetPeerInfoLight, {peerId})
+}
+
 function reportClusterStatus(pid, status) {
   return call(IpcMethods.ReportClusterStatus, {pid, status});
 }
@@ -110,6 +115,7 @@ export {
   broadcastToChannel,
   forwardRemoteCall,
   getPeerInfo,
+  getPeerInfoLight,
   reportClusterStatus,
   assignTask,
   askClusterPermission,

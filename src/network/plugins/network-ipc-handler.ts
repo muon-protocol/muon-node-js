@@ -41,6 +41,7 @@ export const IpcMethods = {
   AssignTask: "assign-task",
   RemoteCall: "remote-call",
   GetPeerInfo: "GPI",
+  GetPeerInfoLight: "GPILight",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
   ForwardGatewayRequest: "forward-gateway-request",
@@ -238,6 +239,18 @@ class NetworkIpcHandler extends CallablePlugin {
   @ipcMethod(IpcMethods.GetPeerInfo)
   async __getPeerInfo(data): Promise<JsonPeerInfo|null> {
     let peerInfo:PeerInfo|null = await this.findPeer(data?.peerId);
+    if(!peerInfo)
+      return null
+    return {
+      id: peerInfo.id.toString(),
+      multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
+      protocols: peerInfo.protocols
+    }
+  }
+
+  @ipcMethod(IpcMethods.GetPeerInfoLight)
+  async __getPeerInfoLight(data): Promise<JsonPeerInfo|null> {
+    let peerInfo:PeerInfo|null = await this.findPeerLocal(data?.peerId);
     if(!peerInfo)
       return null
     return {

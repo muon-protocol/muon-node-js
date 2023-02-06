@@ -55,6 +55,30 @@ export default class BaseNetworkPlugin extends Events {
     }
   }
 
+  async findPeerLocal(peerId): Promise<Libp2pPeerInfo|null>{
+    if(!isPeerId(peerId)) {
+      try {
+        peerId = peerIdFromString(peerId)
+      }catch (e) {
+        throw `Invalid string PeedID [${peerId}]: ${e.message}`;
+      }
+    }
+    try {
+      let ret = await this.network.libp2p.peerStore.get(peerId)
+      return {
+        id: ret.id,
+        multiaddrs: ret.addresses.map(x => x.multiaddr),
+        protocols: []
+      }
+    }
+    catch (e) {
+      // TODO: what to do?
+      // this.defaultLogger("%o", e)
+      console.log('MUON_PEER_NOT_FOUND', peerId)
+      return null;
+    }
+  }
+
   get peerId(){
     return this.network.peerId;
   }

@@ -89,6 +89,21 @@ class Explorer extends CallablePlugin {
     }
   }
 
+  @gatewayMethod("node-peer")
+  async __nodePeerInfo(data: GetNodeInfo) {
+    let {id} = data?.params || {}
+    if(!id) {
+      throw `id is undefined`
+    }
+    let nodeInfo = this.collateralPlugin.getNodeInfo(id)!
+    if(!nodeInfo) {
+      throw `unknown peer`
+    }
+    return {
+      peerInfo: await NetworkIpc.getPeerInfoLight(nodeInfo.peerId)
+    }
+  }
+
   @gatewayMethod("tx")
   async __onTxInfo(data: GetTransactionData) {
     let content = await Content.findOne({reqId: data?.params?.reqId});
