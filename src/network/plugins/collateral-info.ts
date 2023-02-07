@@ -72,6 +72,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   loading = new TimeoutPromise(0, "collateral loading timed out")
 
   async onInit() {
+    await super.onInit()
+
     let {nodeManager} = this.network.configs.net;
     log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
     await this._loadCollateralInfo();

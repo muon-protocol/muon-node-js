@@ -9,6 +9,7 @@ import axios from 'axios'
 import * as crypto from '../../utils/crypto.js'
 import Log from '../../common/muon-log.js'
 import Ajv from "ajv"
+import {mixGetPost} from "../middlewares.js";
 
 const log = Log('muon:gateway:api')
 const ajv = new Ajv()
@@ -159,12 +160,8 @@ const MUON_REQUEST_SCHEMA = {
 
 let router = Router();
 
-router.use('/', async (req, res, next) => {
-  let mixed = {
-    ...req.query,
-    ...req.body,
-  }
-  let {app, method, params = {}, nSign, mode = "sign", gwSign} = mixed
+router.use('/', mixGetPost, async (req, res, next) => {
+  let {app, method, params = {}, nSign, mode = "sign", gwSign} = req.mixed
 
   if (!["sign", "view"].includes(mode)) {
     return res.json({success: false, error: {message: "Request mode is invalid"}})

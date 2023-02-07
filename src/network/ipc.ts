@@ -55,6 +55,11 @@ function getPeerInfoLight(peerId: string): JsonPeerInfo|null {
   return call(IpcMethods.GetPeerInfoLight, {peerId})
 }
 
+function getClosestPeer(peerId: string, cid: string): JsonPeerInfo|null {
+  // @ts-ignore
+  return call(IpcMethods.GetClosestPeer, {peerId, cid})
+}
+
 function reportClusterStatus(pid, status) {
   return call(IpcMethods.ReportClusterStatus, {pid, status});
 }
@@ -116,6 +121,7 @@ export {
   forwardRemoteCall,
   getPeerInfo,
   getPeerInfoLight,
+  getClosestPeer,
   reportClusterStatus,
   assignTask,
   askClusterPermission,

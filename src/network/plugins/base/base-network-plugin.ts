@@ -2,7 +2,7 @@ import CollateralInfoPlugin from "../collateral-info.js";
 import {Network} from "../../index.js";
 import NetworkBroadcastPlugin from "../network-broadcast.js";
 import Events from 'events-async'
-import {isPeerId, Libp2pPeerInfo, PeerId} from '../../types.js';
+import {isPeerId, Libp2pPeer, Libp2pPeerInfo, PeerId} from '../../types.js';
 import {peerIdFromString} from '@libp2p/peer-id'
 import {logger, Logger} from '@libp2p/logger'
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string';
@@ -45,6 +45,17 @@ export default class BaseNetworkPlugin extends Events {
       }
     }
     try {
+      let peer: Libp2pPeer = await this.network.libp2p.peerStore.get(peerId)
+        .catch(e => null)
+      if(peer) {
+        this.defaultLogger(`peer found local %p`, peerId)
+        return {
+          id: peerId,
+          multiaddrs: peer.addresses.map(addr => addr.multiaddr),
+          protocols: []
+        };
+      }
+      this.defaultLogger(`peer not found local %p`, peerId)
       return await this.network.libp2p.peerRouting.findPeer(peerId)
     }
     catch (e) {

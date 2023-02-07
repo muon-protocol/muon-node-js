@@ -7,5 +7,19 @@
     "network": "bsctest",
     "address": "0x2efB53c11FC935f6114B3fC37AaFa6a76B263a4E",
     "pagination": "0xb9f279712ff864e236ba2009ca3b1b6355f4e476"
-  }
+  },
+  "routing": {
+    "delegate": [
+      "http://104.131.177.195:8080/delegate",
+      "http://3.130.24.220:8080/delegate",
+      "http://194.195.211.27:8080/delegate",
+      "http://209.250.252.247:8080/delegate"
+    ]
+  },
+  "bootstrap": [
+    "/ip4/104.131.177.195/tcp/5000/p2p/Qma3GsJmB47xYuyahPZPSadh1avvxfyYQwk8R3UnFrQ6aP",
+    "/ip4/3.130.24.220/tcp/5000/p2p/Qmcrx17xt1vENkbedPjgeQdZWhRRKCLbtqJr9z8E76nztz",
+    "/ip4/194.195.211.27/tcp/5000/p2p/QmTLpbUrFJap7FNQhUo8RqRCXSDhdKjXmXAyCpNCd8YtMm",
+    "/ip4/209.250.252.247/tcp/5000/p2p/QmbAGW4ddya254cAXKz2FnarpFv1odaJuisgCdPZrYfVxE"
+  ]
 }

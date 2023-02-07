@@ -42,6 +42,7 @@ export const IpcMethods = {
   RemoteCall: "remote-call",
   GetPeerInfo: "GPI",
   GetPeerInfoLight: "GPILight",
+  GetClosestPeer: "GCPeer",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
   ForwardGatewayRequest: "forward-gateway-request",
@@ -258,6 +259,36 @@ class NetworkIpcHandler extends CallablePlugin {
       multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
       protocols: peerInfo.protocols
     }
+  }
+
+  @ipcMethod(IpcMethods.GetClosestPeer)
+  async __getClosestPeer(data:{peerId?: string, cid?: string}): Promise<JsonPeerInfo[]> {
+    let {peerId, cid} = data ?? {}
+    if(!!peerId) {
+      /** return all bootstrap nodes info */
+      let bootstrapList: any[] = this.network.configs.net.bootstrap ?? [];
+      bootstrapList = bootstrapList
+        .map(ma => ({
+          peerId: ma.split('p2p/')[1],
+          multiaddr: ma
+        }))
+        /** exclude self address */
+        // .filter(({peerId}) => !!peerId && peerId !== process.env.PEER_ID)
+
+      let peerInfos = await Promise.all(bootstrapList.map(bs => {
+        return this.findPeerLocal(bs.peerId)
+      }))
+      return peerInfos
+        .filter(p => !!p)
+        .map(peerInfo => ({
+            id: peerInfo!.id.toString(),
+            multiaddrs: peerInfo!.multiaddrs.map(ma => ma.toString()),
+            protocols: peerInfo!.protocols
+          })
+        )
+    }
+    /** cid not supported yet */
+    return []
   }
 
   @ipcMethod(IpcMethods.ContentRoutingProvide)

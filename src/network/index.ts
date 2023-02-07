@@ -20,6 +20,7 @@ import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
 import NetworkDHTPlugin from "./plugins/network-dht.js";
 import {logger} from "@libp2p/logger"
 import {findMyIp} from "../utils/helpers.js";
+import {muonRouting} from "./muon-routing.js";
 
 const log = logger("muon:network");
 
@@ -42,6 +43,7 @@ class Network extends Events {
   async _initializeLibp2p() {
     log(`libp2p initializing ...`);
     const configs = this.configs.libp2p;
+    const netConfig = this.configs.net;
     let peerId = await createFromJSON(configs.peerId);
     let announceFilter = (multiaddrs) =>
       multiaddrs.filter((m) => !isPrivate(m));
@@ -56,12 +58,25 @@ class Network extends Events {
       //   interval: (pubsubPeerDiscoveryInterval+Math.floor(Math.random() * pubsubPeerDiscoveryInterval))*60e3
       // })
     ]
-    if(configs.bootstrap.length>0) {
+    let bootstrapList: string[] = netConfig.bootstrap ?? [];
+    /** exclude self address */
+    bootstrapList = bootstrapList.filter(bs => {
+      let peerId = bs.split('p2p/')[1]
+      return !!peerId && peerId !== process.env.PEER_ID
+    })
+    if(bootstrapList.length>0) {
       peerDiscovery.push(
         bootstrap({
           // timeout: 5e3,
-          list: configs.bootstrap,
+          list: bootstrapList,
         })
+      )
+    }
+
+    const peerRouters: any[] = []
+    if(Array.isArray(netConfig.routing?.delegate) && netConfig.routing.delegate.length > 0) {
+      peerRouters.push(
+        muonRouting({baseUrls: netConfig.routing.delegate})
       )
     }
 
@@ -92,6 +107,7 @@ class Network extends Events {
         announce
       },
       peerDiscovery,
+      peerRouters,
       // config: {
       //   peerDiscovery: {
       //     // [Libp2pBundle.Bootstrap.tag]: {
