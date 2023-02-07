@@ -18,7 +18,7 @@ const DEFAULT_OPTS = {
       // default timeout is 5 mins and nodes disconnect
       // once per 5 mins. It could increase load of dht
       outboundSocketInactivityTimeout: 30 * 60e3,
-      inboundSocketInactivityTimeout: 30 * 60e3
+      inboundSocketInactivityTimeout: 30 * 60e3,
     }),
     // webSockets()
   ],
