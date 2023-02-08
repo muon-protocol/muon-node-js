@@ -15,9 +15,7 @@ router.use('/findpeer', mixGetPost, async (req, res, next) => {
     })
   }
   catch (e) {
-    res.error({
-      message: e.message()
-    })
+    res.status(500).send({ message: e.message() })
   }
 })
 
@@ -31,9 +29,7 @@ router.use('/query', mixGetPost, async (req, res, next) => {
     })
   }
   catch (e) {
-    res.error({
-      message: e.message()
-    })
+    res.status(500).send({ message: e.message() })
   }
 })
 
