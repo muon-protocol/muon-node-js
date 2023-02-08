@@ -74,11 +74,11 @@ class Network extends Events {
     }
 
     const peerRouters: any[] = []
-    if(Array.isArray(netConfig.routing?.delegate) && netConfig.routing.delegate.length > 0) {
-      peerRouters.push(
-        muonRouting({baseUrls: netConfig.routing.delegate})
-      )
-    }
+    // if(Array.isArray(netConfig.routing?.delegate) && netConfig.routing.delegate.length > 0) {
+    //   peerRouters.push(
+    //     muonRouting({baseUrls: netConfig.routing.delegate})
+    //   )
+    // }
 
     const announce: string[] = [];
 
