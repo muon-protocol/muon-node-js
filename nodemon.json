@@ -10,6 +10,7 @@
     "src/cmd/**/*.*",
     "__test__/*",
     "config/",
-    "fixtures/*"
+    "fixtures/*",
+    "package-lock.json"
   ]
 }
