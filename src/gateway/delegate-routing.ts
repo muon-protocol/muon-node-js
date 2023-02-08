@@ -10,7 +10,6 @@ router.use('/findpeer', mixGetPost, async (req, res, next) => {
     return res.error({message: `peer is not defined`})
 
   try {
-    throw "213"
     res.json({
       peerInfo: await NetworkIpc.getPeerInfoLight(peerId)
     })
