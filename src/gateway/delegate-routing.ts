@@ -10,12 +10,15 @@ router.use('/findpeer', mixGetPost, async (req, res, next) => {
     return res.error({message: `peer is not defined`})
 
   try {
+    throw "213"
     res.json({
       peerInfo: await NetworkIpc.getPeerInfoLight(peerId)
     })
   }
   catch (e) {
-    res.status(500).send({ message: e.message() })
+    if(typeof e == "string")
+      e = {message: e}
+    res.status(500).send({ message: e.message })
   }
 })
 
@@ -29,7 +32,9 @@ router.use('/query', mixGetPost, async (req, res, next) => {
     })
   }
   catch (e) {
-    res.status(500).send({ message: e.message() })
+    if(typeof e == "string")
+      e = {message: e}
+    res.status(500).send({ message: e.message })
   }
 })
 
