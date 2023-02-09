@@ -12,15 +12,31 @@ import type { PeerInfo } from '@libp2p/interface-peer-info'
 import type { Startable } from '@libp2p/interfaces/startable'
 import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
 import { multiaddr } from '@multiformats/multiaddr'
+import {parseBool, timeout} from "../utils/helpers.js";
+import * as crypto from '../utils/crypto.js'
+import soliditySha3 from "../utils/soliditySha3.js";
+import {isPrivate} from "./utils.js";
 
 const log = logger('muon:network:routing')
 
-const DEFAULT_TIMEOUT = 30e3 // 30 second default
+const FINDPEER_DEFAULT_TIMEOUT = 30e3 // 30 second default
 const CONCURRENT_HTTP_REQUESTS = 4
 
 export type MuonRoutingInit = {
-  /** list of routing service providers */
+  /**
+   List of routing service providers
+   */
   baseUrls: string[],
+  /**
+   Discovery interval.
+   Default: 300000 (every 5 minutes)
+   */
+  discoveryInterval?: number,
+  /**
+   IF true, we will not send our discovery data
+   Default: false
+   */
+  listenOnly?: boolean
 }
 
 export interface HTTPClientExtraOptions {
@@ -36,9 +52,14 @@ export class MuonRouting implements PeerRouting, Startable {
   private readonly httpQueue: PQueue
   private started: boolean
   private abortController: AbortController
+  private discoveryInterval: number
+  private listenOnly: boolean
 
   constructor(init: MuonRoutingInit, components: any) {
+    log('initializing ...')
     this.init = init;
+    this.discoveryInterval = init?.discoveryInterval ?? 5*60000;
+    this.listenOnly = init?.listenOnly ?? false
     this.components = components;
 
     this.started = false
@@ -73,13 +94,23 @@ export class MuonRouting implements PeerRouting, Startable {
     this.started = false
   }
 
+  afterStart() {
+    // Don't broadcast if we are only listening
+    if (this.listenOnly) {
+      return
+    }
+
+    // Broadcast immediately, and then run on interval
+    this._discovery()
+  }
+
   /**
    * Attempts to find the given peer
    */
   async findPeer(id: PeerId, options: HTTPClientExtraOptions & AbortOptions = {}) {
     log('findPeer starts: %p', id)
 
-    options.timeout = options.timeout ?? DEFAULT_TIMEOUT;
+    options.timeout = options.timeout ?? FINDPEER_DEFAULT_TIMEOUT;
     options.signal = anySignal([this.abortController.signal].concat((options.signal != null) ? [options.signal] : []));
 
     const onStart = defer()
@@ -95,7 +126,7 @@ export class MuonRouting implements PeerRouting, Startable {
 
       const randomIndex = Math.floor(Math.random() * this.apis.length)
       log(`requesting to delegate server %o ...`, this.apis[randomIndex].defaults.baseURL)
-      let result = await this.apis[randomIndex].post('/findpeer', {peerId: `${id}`})
+      let result = await this.apis[randomIndex].post('/findpeer', {id: `${id}`})
         .then(({data}) => data)
 
       log(`delegate server response %O`, result)
@@ -125,51 +156,59 @@ export class MuonRouting implements PeerRouting, Startable {
    * Attempt to find the closest peers on the network to the given key
    */
   async * getClosestPeers (key: Uint8Array, options: HTTPClientExtraOptions & AbortOptions = {}) {
-    let cidOrPeerId: CID | PeerId
-    const cid = CID.asCID(key)
+      yield * []
+  }
 
-    if (cid != null) {
-      cidOrPeerId = cid
-    } else {
-      cidOrPeerId = peerIdFromBytes(key)
+  async _discovery () {
+    log(`discovery started.`)
+    const peerId = this.components.peerId
+
+    if (peerId.publicKey == null) {
+      throw new Error('PeerId was missing public key')
     }
 
-    log('getClosestPeers starts: %s', cidOrPeerId)
-    options.timeout = options.timeout ?? DEFAULT_TIMEOUT;
-    options.signal = anySignal([this.abortController.signal].concat((options.signal != null) ? [options.signal] : []))
+    while (true) {
+      log(`sending discovery data ...`);
+      try {
+        let multiAddrs = this.components.addressManager.getAddresses()
+        let allowPrivateIps = parseBool(process.env.DISABLE_ANNOUNCE_FILTER!)
+        if (!allowPrivateIps)
+          multiAddrs = multiAddrs.filter(ma => !isPrivate(ma))
 
-    const onStart = defer()
-    const onFinish = defer()
+        const peerInfo = {
+          id: `${peerId}`,
+          multiaddrs: multiAddrs.map(ma => ma.toString()),
+          protocols: []
+        }
 
-    void this.httpQueue.add(async () => {
-      onStart.resolve()
-      return await onFinish.promise
-    })
 
-    try {
-      await onStart.promise
+        const timestamp = Date.now();
+        const hash = soliditySha3([
+          {type: "uint64", value: timestamp},
+          {type: "string", value: peerInfo.id},
+          ...(
+            peerInfo.multiaddrs.map(value => ({type: "string", value}))
+          )
+        ])
 
-      const randomIndex = Math.floor(Math.random() * this.apis.length)
-      log(`send query to delegate server %o ...`, this.apis[randomIndex].defaults.baseURL)
-      let result = await this.apis[randomIndex].post('/query', cid ? {cid: cidOrPeerId.toString()} : {peerId: cidOrPeerId.toString()})
-        .then(({data}) => data)
+        const discoveryData = {
+          peerInfo,
+          timestamp,
+          signature: crypto.sign(hash)
+        }
 
-      log(`query response %o`, (result?.list ?? []).map(p => p.id))
-      let list = result?.list
-      if(!list)
-        throw `peer list not found`
+        // @ts-ignore
+        await Promise.any(this.apis.map(api => {
+          return api.post('/discovery', discoveryData)
+        }))
 
-      yield * list.map(info => ({
-        id: peerIdFromString(info.id),
-        multiaddrs: info.multiaddrs.map(ma => multiaddr(ma)),
-        protocols: []
-      }));
-    } catch (err) {
-      log.error('getClosestPeers errored:', err)
-      throw err
-    } finally {
-      onFinish.resolve()
-      log('getClosestPeers finished: %b', key)
+        log('discovery sent successfully')
+      }catch (e) {
+        log.error(`discovery error: %O`, e)
+      }
+
+      const deltaTime = (Math.random() - 0.5) * this.discoveryInterval
+      await timeout(this.discoveryInterval + deltaTime)
     }
   }
 }

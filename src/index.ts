@@ -8,7 +8,6 @@ import * as NetworkIpc from './network/ipc.js'
 import * as SharedMemory from './common/shared-memory/index.js'
 import { parseBool, timeout } from './utils/helpers.js'
 import { createRequire } from "module";
-import { exec } from 'node:child_process'
 
 // const require = createRequire(import.meta.url);
 const log = Log('muon:boot')
@@ -51,15 +50,6 @@ async function refreshWorkersList() {
 
 async function boot() {
   if (cluster.isMaster) {
-    console.log('installing dependencies ...')
-    exec('npm i', (err, output) => {
-      if (err) {
-        console.error("could not install dependencies: ", err)
-        return
-      }
-      console.log("dependencies installed Output: \n", output)
-    })
-
     log(`Master cluster start at [${process.pid}]`)
     SharedMemory.startServer();
 

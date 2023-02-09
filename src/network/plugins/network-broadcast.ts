@@ -43,7 +43,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
     const {detail: {data: rawData, from: peerId, topic, ...otherItems}} = evt;
     log("broadcast received %o", {sender: peerId2Str(peerId), topic})
     if(!this.handlerRegistered[topic]) {
-      log(`unknown broadcast topic: ${topic}`)
+      // log(`unknown broadcast topic: ${topic}`)
       return;
     }
     let from = peerId2Str(peerId);
