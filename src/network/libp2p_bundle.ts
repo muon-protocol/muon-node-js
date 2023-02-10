@@ -26,7 +26,7 @@ const DEFAULT_OPTS = {
     noise(),
   ],
   connectionManager: {
-    autoDial: true,
+    autoDial: false,
     maxConnections: 3000,
     minConnections: 10,
     maxIncomingPendingConnections: 10
