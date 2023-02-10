@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as dotenv from "dotenv";
 
 const ROOT = "./";
-const ENV_PATH = path.join(ROOT, ".env.back");
+const ENV_PATH = path.join(ROOT, ".env");
 const ENV_TEMPLATE_PATH = path.join(ROOT, ".env.testnet");
 
 export const command = "keys <action> [value]";
@@ -49,7 +49,7 @@ const restore = (argv) => {
     }
     const backup = fs.readFileSync(fname, "utf8");
     const buf = Buffer.from(backup);
-    const keys = dotenv.parse(buf);
+    keys = dotenv.parse(buf);
   }
   _restore(keys);
 };
