@@ -12,7 +12,7 @@ import { LevelDatastore } from "datastore-level";
 
 const DEFAULT_OPTS = {
   // TODO: move path to env
-  datastore: new LevelDatastore(`./muon-data/v2/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
+  // datastore: new LevelDatastore(`./muon-data/v2/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
   transports: [
     tcp({
       // default timeout is 5 mins and nodes disconnect
@@ -37,23 +37,25 @@ const DEFAULT_OPTS = {
   pubsub: gossipsub({
     allowPublishToZeroPeers: true,
   }),
-  dht: kadDHT({
-    kBucketSize: 20,
-    clientMode: false,
-    validators: {
-      muon: async (key, data) => {
-        //TODO: validate data
-        // throw an err when data is not valid
-        return;
-      },
-    },
-    selectors: {
-      muon: (key, dataList) => {
-        //TODO: select correct record
-        return 0;
-      },
-    },
-  }),
+
+  // dht: kadDHT({
+  //   kBucketSize: 20,
+  //   clientMode: false,
+  //   validators: {
+  //     muon: async (key, data) => {
+  //       //TODO: validate data
+  //       // throw an err when data is not valid
+  //       return;
+  //     },
+  //   },
+  //   selectors: {
+  //     muon: (key, dataList) => {
+  //       //TODO: select correct record
+  //       return 0;
+  //     },
+  //   },
+  // }),
+  
 };
 
 function create(opts) {
