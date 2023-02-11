@@ -47,6 +47,7 @@ check_for_update (){
 
     log `$_NODE  $_NPM install`
 
+    git checkout package.json package-lock.json
     if git pull --recurse-submodules origin "$current_branch" | grep -q 'Already up to date'; then
 #        log "Node: [`which node`]    PM2: [`which pm2`]";
         ``;
