@@ -74,6 +74,7 @@ export class MuonRouting implements PeerRouting, Startable {
     this.apis = init.baseUrls.map(baseUrl => axios.create({
       baseURL: baseUrl,
       responseType: 'json',
+      timeout: 5000,
     }))
 
     log(`enabled via %o`, init.baseUrls)
@@ -126,7 +127,12 @@ export class MuonRouting implements PeerRouting, Startable {
 
       const randomIndex = Math.floor(Math.random() * this.apis.length)
       log(`requesting to delegate server %o ...`, this.apis[randomIndex].defaults.baseURL)
-      let result = await this.apis[randomIndex].post('/findpeer', {id: `${id}`})
+      let result = await this.apis[randomIndex].post(
+        '/findpeer',
+        {id: `${id}`},
+        {
+          timeout: options.timeout
+        })
         .then(({data}) => data)
 
       log(`delegate server response %O`, result)

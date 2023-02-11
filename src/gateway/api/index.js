@@ -1,4 +1,5 @@
 import {Router} from 'express'
+import asyncHandler from 'express-async-handler'
 import RequestLog from '../../common/db-models/RequestLog.js'
 import {QueueProducer} from '../../common/message-bus/index.ts'
 import {parseBool} from '../../utils/helpers.js'
@@ -160,10 +161,12 @@ const MUON_REQUEST_SCHEMA = {
 
 let router = Router();
 
-router.use('/', mixGetPost, async (req, res, next) => {
+router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
+  // @ts-ignore
   let {app, method, params = {}, nSign, mode = "sign", gwSign} = req.mixed
 
   if (!["sign", "view"].includes(mode)) {
+    // @ts-ignore
     return res.json({success: false, error: {message: "Request mode is invalid"}})
   }
 
@@ -172,6 +175,7 @@ router.use('/', mixGetPost, async (req, res, next) => {
   log("request arrived %o", requestData);
 
   if(!ajv.validate(MUON_REQUEST_SCHEMA, requestData)){
+    // @ts-ignore
     return res.json({
       success: false,
       error: {
@@ -186,6 +190,7 @@ router.use('/', mixGetPost, async (req, res, next) => {
     if(!SHIELD_FORWARD_URL) {
       log("Env variable 'SHIELD_FORWARD_URL' not specified.")
       const appId = await CoreIpc.getAppId(app);
+      // @ts-ignore
       return res.json({
         success: false,
         appId,
@@ -196,6 +201,7 @@ router.use('/', mixGetPost, async (req, res, next) => {
     }
     if(!appIsShielded[app]) {
       log("This app is not shielded.")
+      // @ts-ignore
       return res.json({success: false, error: {message: `The '${app}' app is neither shielded nor included in the network.`}});
     }
     log(`forwarding request to ${SHIELD_FORWARD_URL}`, requestData);
@@ -204,6 +210,7 @@ router.use('/', mixGetPost, async (req, res, next) => {
     if(result.success) {
       await shieldConfirmedResult(requestData, result.result)
     }
+    // @ts-ignore
     return res.json(result);
   }
   else {
@@ -227,6 +234,7 @@ router.use('/', mixGetPost, async (req, res, next) => {
           errorMessage: result?.confirmed ? "" : "",
           ...extraLogs(req, result),
         });
+        // @ts-ignore
         res.json({success: true, result})
       })
       .catch(async error => {
@@ -250,6 +258,7 @@ router.use('/', mixGetPost, async (req, res, next) => {
           ...extraLogs(req),
         });
         const {message, ...otherProps} = error;
+        // @ts-ignore
         res.json({
           success: false,
           appId,
@@ -260,6 +269,6 @@ router.use('/', mixGetPost, async (req, res, next) => {
         })
       })
   }
-})
+}))
 
 export default router

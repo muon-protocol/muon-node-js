@@ -38,6 +38,21 @@ async function start(options) {
   app.use('/status', status)
   app.use('/delegate', delegate)
 
+  /**
+   Error handler
+   */
+  app.use((err, req, res, next) => {
+    if(typeof err === 'string') {
+      err = {message: err}
+    }
+    res
+      .status(500)
+      .send({
+        success: false,
+        error: err.message
+      })
+  })
+
   app.listen(port, host, function () {
     log(`Running gateway on port ${port} at ${host}`)
   })
