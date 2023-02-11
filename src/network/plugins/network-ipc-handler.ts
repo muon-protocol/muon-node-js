@@ -9,10 +9,11 @@ import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
 import NetworkDHTPlugin from "./network-dht.js";
 import NetworkContentPlugin from "./content-plugin.js";
-import {timeout} from '../../utils/helpers.js'
+import {parseBool, timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
 import Log from '../../common/muon-log.js'
+import {isPrivate} from "../utils.js";
 
 const log = Log('muon:network:plugins:ipc-handler')
 let requestQueue = new QueueProducer(`gateway-requests`);
@@ -51,7 +52,8 @@ export const IpcMethods = {
   IsCurrentNodeInNetwork: "is-current-node-in-network",
   GetUptime: "get-uptime",
   FindNOnlinePeer: "FNOP",
-  GetConnectedPeerIds: "GCPIDS"
+  GetConnectedPeerIds: "GCPIDS",
+  GetNodeMultiAddress: "GNMA"
 } as const;
 
 export const RemoteMethods = {
@@ -358,6 +360,15 @@ class NetworkIpcHandler extends CallablePlugin {
   @ipcMethod(IpcMethods.GetConnectedPeerIds)
   async __getConnectedPeerIds() {
     return await this.collateralPlugin.getConnectedPeerIds()
+  }
+
+  @ipcMethod(IpcMethods.GetNodeMultiAddress)
+  async __getNodeMultiAddress() {
+    let multiAddrs = this.network.libp2p.components.addressManager.getAddresses()
+    let allowPrivateIps = parseBool(process.env.DISABLE_ANNOUNCE_FILTER!)
+    if (!allowPrivateIps)
+      multiAddrs = multiAddrs.filter(ma => !isPrivate(ma))
+    return multiAddrs.map(ma => ma.toString())
   }
 
   /** ==================== remote methods ===========================*/
