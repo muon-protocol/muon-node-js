@@ -34,7 +34,6 @@ router.use('/findpeer', mixGetPost, asyncHandler(async (req, res, next) => {
 
   const peerInfo = peerInfos[0]
 
-  // @ts-ignore
   res.json({
     peerInfo: onlines[peerInfo.id]?.peerInfo
   })
@@ -46,7 +45,6 @@ router.use('/query', mixGetPost, asyncHandler(async (req, res, next) => {
   if(!peerId && !cid)
     throw `peerId or cid most be defined`
 
-  // @ts-ignore
   res.json({
     list: []
   })
@@ -78,7 +76,6 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   onlines[realPeerInfo[0].id] = {timestamp, peerInfo}
 
   log(`peerInfo arrived from %s`, peerInfo.id)
-  // @ts-ignore
   res.json({
     success: true
   })
@@ -93,7 +90,6 @@ router.use('/onlines', mixGetPost, asyncHandler(async (req, res, next) => {
   let {duration=60} = req.mixed
 
   const time = Date.now() - duration*60000;
-  // @ts-ignore
   res.json(
     Object.values(onlines)
       .filter(p => p.timestamp > time)

@@ -13,7 +13,6 @@ const router = Router();
 router.use('/', asyncHandler(async (req, res, next) => {
   let collateralInfo = await NetworkIpc.getCollateralInfo()
   const nodeInfo = await NetworkIpc.getCurrentNodeInfo()
-  // @ts-ignore
   res.json({
     staker: nodeInfo ? nodeInfo.staker : undefined,
     address: NodeAddress,
