@@ -22,13 +22,13 @@ const onlines:{[index: string]: RoutingData} = {}
 router.use('/findpeer', mixGetPost, async (req, res, next) => {
   let {id} = req.mixed
   if(!id)
-    return res.error({message: `id is not defined`})
+    return res.status(500).send({message: `id is not defined`})
 
   const peerInfos: MuonNodeInfo[] = await NetworkIpc.filterNodes({list: [id]})!;
 
   if(peerInfos.length < 1){
     console.log(`unknown peerId ${id}`);
-    return res.error({message: `unknown peerId ${id}`});
+    return res.status(500).send({message: `unknown peerId ${id}`});
   }
 
   const peerInfo = peerInfos[0]
