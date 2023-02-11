@@ -204,14 +204,16 @@ export class MuonRouting implements PeerRouting, Startable {
         }
 
         // @ts-ignore
-        await Promise.any(this.apis.map(api => {
+        const responses = await Promise.any(this.apis.map(api => {
           return api.post('/discovery', discoveryData, {timeout: 5000})
+            .then(() => "OK")
             .catch(e => {
               log.error(`sent to ${api.defaults.baseURL} error: %O`, e)
+              return e.message || 'unknown error'
             })
         }))
 
-        log('discovery sent successfully')
+        log('discovery sent done. result: %o', responses)
       }catch (e) {
         log.error(`discovery error: %O`, e)
       }
