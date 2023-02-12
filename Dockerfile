@@ -37,5 +37,5 @@ RUN pm2 install pm2-logrotate
 RUN apt-get update && apt-get -y install cron
 RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-testnet'
 
-CMD [ "bash", "-c", "service cron start;pm2-runtime start ecosystem.config.cjs" ]
+CMD [ "bash", "-c", "service cron start;pm2 start ecosystem.config.cjs; sleep infinity" ]
 #
