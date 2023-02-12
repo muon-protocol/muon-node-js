@@ -51,14 +51,15 @@ class System extends CallablePlugin {
 
   @broadcastHandler
   async __broadcastHandler(data, callerInfo: MuonNodeInfo) {
-    // const {type, details} = data||{};
-    // switch (type) {
-    //   case 'undeploy': {
-    //     const {appId} = details || {}
-    //     this.__undeployApp(appId, callerInfo).catch(e => {})
-    //     break;
-    //   }
-    // }
+    const {type, details} = data||{};
+    switch (type) {
+      case 'undeploy': {
+        const {appId, deploymentReqId, tssKeyAddress} = details || {}
+        this.__undeployApp(appId, deploymentReqId, tssKeyAddress, callerInfo)
+          .catch(e => {})
+        break;
+      }
+    }
   }
 
   @appApiMethod()
@@ -240,15 +241,23 @@ class System extends CallablePlugin {
     if(!app)
       throw `App not found by identifier: ${appNameOrId}`
     const appId = app.APP_ID
+
+    /** check app party */
     const party = this.tssPlugin.getAppParty(appId)!;
     if(!party)
       throw `App not deployed`;
+
+    /** check app context */
+    let context = this.appManager.getAppContext(appId);
+    const deploymentReqId = context.deploymentRequest.reqId;
+    const tssKeyAddress = context.publicKey.address
+
     let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
     const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: [...deployers, ...party.partners]})
     log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
     await Promise.all(partnersToCall.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__undeployApp(appId, this.collateralPlugin.currentNodeInfo)
+        return this.__undeployApp(appId, deploymentReqId, tssKeyAddress, this.collateralPlugin.currentNodeInfo)
           .catch(e => {
             log.error(`error when undeploy at current node: %O`, e)
             return e?.message || "unknown error occurred"
@@ -267,7 +276,7 @@ class System extends CallablePlugin {
       }
     }))
 
-    this.broadcast({type: "undeploy", details: {appId}})
+    this.broadcast({type: "undeploy", details: {appId, deploymentReqId, tssKeyAddress}})
   }
 
   @appApiMethod({})
@@ -347,17 +356,17 @@ class System extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.Undeploy)
-  async __undeployApp(appId, callerInfo) {
+  async __undeployApp(appId, deploymentReqId, tssKeyAddress, callerInfo) {
     if(!callerInfo.isDeployer)
       throw `Only deployer can call this method`
-    const app = this.appManager.getAppContext(appId)
-    if(!app)
-      throw `App not found`
-    log(`deleting app from persistent db %s`, appId)
-    await AppContext.deleteMany({appId});
-    await AppTssConfig.deleteMany({appId});
+    const context = this.appManager.getAppContext(appId)
+    if(!context || context.deploymentRequest.reqId != deploymentReqId)
+      throw `App context not found`
+    log(`deleting app from persistent db %s`, appId);
+    await AppContext.deleteMany({appId, "deploymentRequest.reqId": deploymentReqId});
+    await AppTssConfig.deleteMany({appId, "publicKey.address": tssKeyAddress});
     log(`deleting app from memory of all cluster %s`, appId)
-    CoreIpc.fireEvent({type: 'app-context:delete', data: appId})
+    CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, deploymentReqId: context.deploymentRequest.reqId}})
   }
 }
 

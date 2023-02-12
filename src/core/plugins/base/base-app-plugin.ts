@@ -332,7 +332,7 @@ class BaseAppPlugin extends CallablePlugin {
       t1 = Date.now();
       this.log(`partners:[%o] are available to sign the request`, availablePartners)
       if(availablePartners.length < appParty.t)
-        throw `Insufficient partner to sign the request, only ${availablePartners.length} are available`
+        throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
 
       if(this.validateRequest){
         await this.validateRequest(clone(newRequest))

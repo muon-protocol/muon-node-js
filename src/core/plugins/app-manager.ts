@@ -181,10 +181,17 @@ export default class AppManager extends CallablePlugin {
     this.contextIdToAppIdMap[doc._id] = doc.appId
   }
 
-  private async onAppContextDelete(appId: string) {
-    log(`pid[${process.pid}] app[${appId}] context deleting...`)
+  private async onAppContextDelete(data: {appId: string, deploymentReqId: string}) {
     try {
-      if(!this.appContexts[appId]) {
+      const {appId, deploymentReqId} = data
+      if(!appId || !deploymentReqId) {
+        log.error('missing appId/deploymentReqId.');
+        return;
+      }
+
+      log(`pid[${process.pid}] app[${appId}] context deleting...`)
+
+      if(!this.appContexts[appId] || this.appContexts[appId].deploymentRequest.reqId !== deploymentReqId) {
         log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
         return
       }
