@@ -2,6 +2,7 @@ version: '3'
 services:
   muon_api:
     container_name: muon-node
+    image: muonnode/muon-node-js
     restart: always
     network_mode: host
     build:
