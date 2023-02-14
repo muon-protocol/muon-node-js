@@ -12,6 +12,7 @@ const log = logger("muon:gateway:routing")
 
 type RoutingData = {
   timestamp: number,
+  id: string,
   peerInfo: {
     id: string,
     multiaddrs: string[],
@@ -73,7 +74,11 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   if(wallet !== realPeerInfo[0].wallet)
     throw `signature mismatch`
 
-  onlines[realPeerInfo[0].id] = {timestamp, peerInfo}
+  onlines[realPeerInfo[0].id] = {
+    timestamp,
+    id: realPeerInfo[0].id,
+    peerInfo
+  }
 
   log(`peerInfo arrived from %s`, peerInfo.id)
   res.json({

@@ -15,6 +15,7 @@ import useDistributedKey from "../../utils/tss/use-distributed-key.js";
 import {logger} from '@libp2p/logger'
 import {pub2json, timeout} from '../../utils/helpers.js'
 import {bn2hex} from "../../utils/tss/utils.js";
+import axios from 'axios'
 
 const log = logger("muon:core:plugins:system");
 
@@ -40,8 +41,37 @@ class System extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
-  private getAvailableNodes(): MuonNodeInfo[] {
-    const onlineNodes = this.collateralPlugin.filterNodes({isConnected: true, excludeSelf: true})
+  private async getAvailableNodes(): Promise<MuonNodeInfo[]> {
+    const externalOnlineList = this.muon.configs.net.nodes?.onlineList;
+    let availableIds: string[] = [];
+
+    const isDeployer: {[index: string]: string} = this.collateralPlugin
+      .filterNodes({isDeployer: true})
+      .map(node => node.id)
+      .reduce((obj, current) => (obj[current]=true, obj), {});
+
+    if(externalOnlineList){
+      let response = await axios.get(externalOnlineList).then(({data}) => data);
+      let availables = response.result.filter(item => {
+        /** active nodes that has uptime more than 1 hour */
+        return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
+      })
+      availableIds = availables.map(p => p.id)
+    }
+    else {
+      const delegateRoutingUrl = this.muon.configs.net.routing?.delegate;
+      if(!delegateRoutingUrl)
+        throw `delegate routing url not defined to get available list.`
+      let response = await axios.get(`${delegateRoutingUrl}/onlines`).then(({data}) => data);
+      let thresholdTimestamp = Date.now() - 60*60*1000
+      let availables = response.filter(item => {
+        /** active nodes that has uptime more than 1 hour */
+        return isDeployer[item.id] || (item.timestamp > thresholdTimestamp)
+      })
+      availableIds = availables.map(p => p.id)
+    }
+
+    const onlineNodes = this.collateralPlugin.filterNodes({list: availableIds, excludeSelf: true})
     const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.PEER_ID!)
     return [
       currentNodeInfo!,
@@ -71,8 +101,8 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  selectRandomNodes(seed, t, n): MuonNodeInfo[] {
-    const availableNodes = this.getAvailableNodes();
+  async selectRandomNodes(seed, t, n): Promise<MuonNodeInfo[]> {
+    const availableNodes = await this.getAvailableNodes();
     if(availableNodes.length < t)
       throw `No enough nodes to select n subset`
     let nodesHash = availableNodes.map(node => {

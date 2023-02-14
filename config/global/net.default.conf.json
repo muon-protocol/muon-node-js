@@ -16,6 +16,9 @@
       "http://209.250.252.247:8080/delegate"
     ]
   },
+  "nodes": {
+    "onlineList": "http://103.75.196.96/nodes"
+  },
   "bootstrap": [
     "/ip4/104.131.177.195/tcp/5000/p2p/Qma3GsJmB47xYuyahPZPSadh1avvxfyYQwk8R3UnFrQ6aP",
     "/ip4/3.130.24.220/tcp/5000/p2p/Qmcrx17xt1vENkbedPjgeQdZWhRRKCLbtqJr9z8E76nztz",

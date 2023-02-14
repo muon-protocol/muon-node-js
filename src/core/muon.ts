@@ -44,7 +44,14 @@ export type MuonConfigs = {
     nodeManager: {
       network: string,
       address: string
-    }
+    },
+    "routing": {
+      "delegate": string[]
+    },
+    "nodes"?: {
+      "onlineList"?: string,
+    },
+    bootstrap: string[],
   },
 }
 

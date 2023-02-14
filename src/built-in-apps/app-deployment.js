@@ -83,9 +83,9 @@ module.exports = {
                 const { tssThreshold, maxGroupSize } = await this.callPlugin("system", "getNetworkInfo");
                 let {seed, t=tssThreshold, n=maxGroupSize} = params
                 t = Math.max(t, tssThreshold);
+                const selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
                 return {
-                    selectedNodes: this.callPlugin("system", "selectRandomNodes", seed, t, n)
-                      .map(node => node.id)
+                    selectedNodes: selectedNodes.map(node => node.id)
                 }
             }
             case Methods.TssKeyGen: {
