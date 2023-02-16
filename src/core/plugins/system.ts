@@ -58,7 +58,7 @@ class System extends CallablePlugin {
         /** active nodes that has uptime more than 1 hour */
         return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
       })
-      availableIds = availables.map(p => p.id)
+      availableIds = availables.map(p => `${p.id}`)
     }
     else {
       const delegateRoutingUrl = this.muon.configs.net.routing?.delegate;
