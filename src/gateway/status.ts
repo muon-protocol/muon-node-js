@@ -1,6 +1,7 @@
 import {Router} from 'express';
 import * as NetworkIpc from '../network/ipc.js'
 import lodash from 'lodash'
+import asyncHandler from 'express-async-handler'
 
 const NodeAddress = process.env.SIGN_WALLET_ADDRESS || null;
 const PeerID = process.env.PEER_ID || null
@@ -9,9 +10,10 @@ const shieldedApps = (process.env.SHIELDED_APPS || "").split('|').filter(v => !!
 
 const router = Router();
 
-router.use('/', async (req, res, next) => {
+router.use('/', asyncHandler(async (req, res, next) => {
   let collateralInfo = await NetworkIpc.getCollateralInfo()
   const nodeInfo = await NetworkIpc.getCurrentNodeInfo()
+  const address = await NetworkIpc.getNodeMultiAddress()
   res.json({
     staker: nodeInfo ? nodeInfo.staker : undefined,
     address: NodeAddress,
@@ -27,9 +29,10 @@ router.use('/', async (req, res, next) => {
     },
     addedToNetwork: !!nodeInfo,
     network: {
-      nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker']) : undefined
+      nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker']) : undefined,
+      address,
     }
   })
-})
+}))
 
 export default router;

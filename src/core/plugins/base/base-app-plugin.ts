@@ -275,7 +275,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     if(this.APP_ID === '1') {
       if (!this.tssPlugin.isReady)
-        throw {message: "Tss not initialized"}
+        throw {message: "Deployment tss is not initialized"}
     }
     else{
       if(!this.appManager.appIsDeployed(this.APP_ID))
@@ -332,7 +332,7 @@ class BaseAppPlugin extends CallablePlugin {
       t1 = Date.now();
       this.log(`partners:[%o] are available to sign the request`, availablePartners)
       if(availablePartners.length < appParty.t)
-        throw `Insufficient partner to sign the request, only ${availablePartners.length} are available`
+        throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
 
       if(this.validateRequest){
         await this.validateRequest(clone(newRequest))
@@ -511,13 +511,13 @@ class BaseAppPlugin extends CallablePlugin {
 
   async onFirstNodeRequestSucceed(request, availablePartners: string[]) {
     let tssPlugin = this.muon.getPlugin(`tss-plugin`)
-    if(!tssPlugin.isReady){
-      throw {message: 'Tss not initialized'};
+    if(!this.appTss){
+      throw {message: 'App tss is not initialized'};
     }
 
     let party = this.appParty;
     if(!party)
-      throw {message: 'App party not generated'}
+      throw {message: 'App party is not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     this.log(`generating nonce with ${nonceParticipantsCount} partners.`)

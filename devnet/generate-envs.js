@@ -63,6 +63,7 @@ ${bootstrapList}
 # ===========================================
 
 DISABLE_ANNOUNCE_FILTER=1
+DISABLE_PUBLIC_IP_ANNOUNCE=1
 
 INFURA_PROJECT_ID=${data.infuraProjectId}
 
@@ -148,8 +149,16 @@ const createEnv = async () => {
       },
       "nodeManager": {
         "network": "mumbai",
-        "address": "0x8Abd99F5f74777bd275Ed506D909fd2E9D099Ee6"
-      }
+        "address": "0x3112a7D5b3960d2C528cd83217E3170f8d252432"
+      },
+      "routing": {
+        "delegate": [
+          `http://127.0.0.1:${baseGatewayPort}/delegate`
+        ]
+      },
+      "bootstrap": [
+        firstNodeAddress
+      ]
     },
     null,
     2

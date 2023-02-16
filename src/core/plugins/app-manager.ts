@@ -140,24 +140,27 @@ export default class AppManager extends CallablePlugin {
   async deleteAppContext(_id: string) {
   }
 
-  async saveAppTssConfig(appTssConfig: object) {
-    let newConfig = new AppTssConfig(appTssConfig)
-    /**
-     * Do not use this code in any other place
-     * Call this method as the base method for saving AppTssConfig.
-     */
-    newConfig.dangerousAllowToSave = true
-    await newConfig.save()
-    CoreIpc.fireEvent({
-      type: "app-tss-key:add",
-      data: newConfig
-    })
+  async saveAppTssConfig(appTssConfig: any) {
+    // @ts-ignore
+    if(appTssConfig.keyShare) {
+      let newConfig = new AppTssConfig(appTssConfig)
+      /**
+       * Do not use this code in any other place
+       * Call this method as the base method for saving AppTssConfig.
+       */
+      newConfig.dangerousAllowToSave = true
+      await newConfig.save()
+      CoreIpc.fireEvent({
+        type: "app-tss-key:add",
+        data: newConfig
+      })
+    }
 
     // @ts-ignore
-    const {appId, version} = appTssConfig;
+    const {appId, version, publicKey} = appTssConfig;
     const context = await AppContext.findOne({appId, version}).exec();
     // @ts-ignore
-    context.publicKey = appTssConfig.publicKey
+    context.publicKey = publicKey
     context.dangerousAllowToSave = true
     await context.save();
     CoreIpc.fireEvent({
@@ -181,10 +184,17 @@ export default class AppManager extends CallablePlugin {
     this.contextIdToAppIdMap[doc._id] = doc.appId
   }
 
-  private async onAppContextDelete(appId: string) {
-    log(`pid[${process.pid}] app[${appId}] context deleting...`)
+  private async onAppContextDelete(data: {appId: string, deploymentReqId: string}) {
     try {
-      if(!this.appContexts[appId]) {
+      const {appId, deploymentReqId} = data
+      if(!appId || !deploymentReqId) {
+        log.error('missing appId/deploymentReqId.');
+        return;
+      }
+
+      log(`pid[${process.pid}] app[${appId}] context deleting...`)
+
+      if(!this.appContexts[appId] || this.appContexts[appId].deploymentRequest.reqId !== deploymentReqId) {
         log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
         return
       }

@@ -19,7 +19,7 @@ import RemoteCallPlugin from "./plugins/remote-call.js";
 import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
 import NetworkDHTPlugin from "./plugins/network-dht.js";
 import {logger} from "@libp2p/logger"
-import {findMyIp} from "../utils/helpers.js";
+import {findMyIp, parseBool} from "../utils/helpers.js";
 import {muonRouting} from "./muon-routing.js";
 
 const log = logger("muon:network");
@@ -45,9 +45,6 @@ class Network extends Events {
     const configs = this.configs.libp2p;
     const netConfig = this.configs.net;
     let peerId = await createFromJSON(configs.peerId);
-    let announceFilter = (multiaddrs) =>
-      multiaddrs.filter((m) => !isPrivate(m));
-    if (process.env.DISABLE_ANNOUNCE_FILTER) announceFilter = (mas) => mas;
 
     const pubsubPeerDiscoveryInterval = parseInt(process.env.PUBSUB_PEER_DISCOVERY_INTERVAL || "10")
     const peerDiscovery: any[] = [
@@ -86,17 +83,34 @@ class Network extends Events {
 
     const announce: string[] = [];
 
-    log('finding public ip ...')
-    try{
-      let myIp = await findMyIp()
-      if(!!myIp) {
-        log(`public ip: %s`, myIp)
-        announce.push(`/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`)
-        log(`announce public address: %s`, announce[0])
+    /** disable for devnet */
+    let myIp;
+    if(!parseBool(process.env.DISABLE_PUBLIC_IP_ANNOUNCE!)) {
+      log('finding public ip ...')
+      try {
+        myIp = await findMyIp()
+        if (!!myIp) {
+          log(`public ip: %s`, myIp)
+          announce.push(`/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`)
+          log(`announce public address: %s`, announce[0])
+        }
+      } catch (e) {
+        log.error(`error when loading public ip %s`, e.message)
       }
-    }catch (e) {
-      log.error(`error when loading public ip %s`, e.message)
     }
+
+    let announceFilter = (multiaddrs) => {
+      // remove myIp if a public IP is already in the list
+      let filtered = multiaddrs.filter((m) => !isPrivate(m) &&
+        m.nodeAddress()['address'] != myIp
+      );
+      if(filtered.length == 0){
+        return multiaddrs.filter((m) => !isPrivate(m));
+      }
+      return filtered;
+    }
+
+    if (process.env.DISABLE_ANNOUNCE_FILTER) announceFilter = (mas) => mas;
 
     const libp2p = await create({
       peerId,

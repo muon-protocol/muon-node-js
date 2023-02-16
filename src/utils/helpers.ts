@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import {PublicKey} from "./tss/types.js";
 import {pub2addr} from "./tss/utils.js";
+import {JsonPublicKey} from "../common/types";
 const toBN = Web3.utils.toBN;
 
 export const timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,7 +84,7 @@ export function filePathInfo(importMeta) {
   return {__filename, __dirname};
 }
 
-export function pub2json(pubkey: PublicKey, minimal: boolean=false): {address?: string, encoded?: string, x: string, yParity: string} {
+export function pub2json(pubkey: PublicKey, minimal: boolean=false): JsonPublicKey {
   let extra = minimal ? {} : {
     address: pub2addr(pubkey),
     encoded: pubkey.encode('hex', true),

@@ -36,5 +36,4 @@ RUN apt-get update && apt-get -y install cron
 RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-testnet'
 
 CMD [ "bash", "-c", "node testnet-generate-env.js; service cron start; pm2 start ecosystem.config.cjs; sleep infinity" ]
-
 #
