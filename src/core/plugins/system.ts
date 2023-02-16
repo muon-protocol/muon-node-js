@@ -56,7 +56,8 @@ class System extends CallablePlugin {
       let response = await axios.get(externalOnlineList).then(({data}) => data);
       let availables = response.result.filter(item => {
         /** active nodes that has uptime more than 1 hour */
-        return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
+        // return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
+        return item.isDeployer || item.active
       })
       availableIds = availables.map(p => `${p.id}`)
     }
