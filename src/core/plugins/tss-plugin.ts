@@ -732,6 +732,10 @@ class TssPlugin extends CallablePlugin {
       // partners = partners.slice(0, maxPartners);
     }
 
+    const keyId = id || uuid()
+
+    log(`creating key with partners: %o`, partners.map(p => p.id))
+
     let keyGen: DistributedKeyGeneration, dKey: DistKey;
     do {
       keyGen = new DistributedKeyGeneration(
@@ -751,7 +755,7 @@ class TssPlugin extends CallablePlugin {
         /** extra values usable in DKG */
         {
           party: party.id,
-          keyId: id || uuid(),
+          keyId,
           lowerThanHalfN: options.lowerThanHalfN,
         }
       );

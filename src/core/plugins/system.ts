@@ -2,7 +2,7 @@ import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
-import {AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
+import {AppDeploymentStatus, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import soliditySha3 from '../../utils/soliditySha3.js'
 import * as tssModule from '../../utils/tss/index.js'
 import AppContext from "../../common/db-models/AppContext.js"
@@ -16,6 +16,7 @@ import {logger} from '@libp2p/logger'
 import {pub2json, timeout} from '../../utils/helpers.js'
 import {bn2hex} from "../../utils/tss/utils.js";
 import axios from 'axios'
+import {MapOf} from "../../common/mpc/types";
 
 const log = logger("muon:core:plugins:system");
 
@@ -23,6 +24,7 @@ const RemoteMethods = {
   InformAppDeployed: "informAppDeployed",
   GenerateAppTss: "generateAppTss",
   Undeploy: "undeploy",
+  GetAppPublicKey: "getAppPubKey",
 }
 
 @remoteApp
@@ -169,6 +171,56 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
+  async findAndGetAppPublicKey(appId, keyId): Promise<JsonPublicKey> {
+    const context = this.appManager.getAppContext(appId)
+    if(!context)
+      throw `App deployment info not found.`
+    const appPartners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+      list: context.party.partners
+    })
+
+    let responses = await Promise.all(appPartners.map(node => {
+      if(node.id === this.collateralPlugin.currentNodeInfo?.id) {
+        return this.__getAppPublicKey({appId, keyId}, this.collateralPlugin.currentNodeInfo)
+          .catch(e => {
+            log.error(e.message)
+            return 'error'
+          })
+      }
+      else {
+        return this.remoteCall(
+          node.peerId,
+          RemoteMethods.GetAppPublicKey,
+          {appId, keyId}
+        )
+          .catch(e => {
+            log.error(e.message)
+            return 'error'
+          })
+      }
+    }))
+
+    let counts: MapOf<number> = {}, max:string|null=null;
+    for(const str of responses) {
+      if(str === 'error')
+        continue
+      if(!counts[str])
+        counts[str] = 1
+      else
+        counts[str] ++;
+      if(!max || counts[str] > counts[max])
+        max = str;
+    }
+    if(!max || counts[max] < context.party.t) {
+      throw 'public key not found';
+    }
+
+    const publicKey = tssModule.keyFromPublic(max.replace("0x", ""), "hex")
+
+    return pub2json(publicKey)
+  }
+
+  @appApiMethod({})
   async getDistributedKey(keyId) {
     let key = await this.tssPlugin.getSharedKey(keyId)
     if(!key)
@@ -263,6 +315,45 @@ class System extends CallablePlugin {
       publicKey: pub2json(key.publicKey!),
       keyShare: bn2hex(key.share!),
     })
+  }
+
+  @appApiMethod({})
+  async appKeyGenConfirmed(request) {
+    const {data: {params: {appId}, init: {id: keyId}}} = request;
+
+    /** check context exist */
+    const context = await AppContext.findOne({appId}).exec();
+    if(!context) {
+      throw `App deployment info not found to process tss KeyGen confirmation.`
+    }
+
+    const currentNode = this.collateralPlugin.currentNodeInfo!;
+    if(context.party.partners.includes(currentNode.id)) {
+      /** check key not created before */
+      const oldTssKey = await AppTssConfig.findOne({
+        appId: appId,
+        version: context.version,
+      }).exec();
+      if(oldTssKey)
+        throw `App tss key already generated`
+
+      /** store tss key */
+      let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
+      await useDistributedKey(key.publicKey!.encode('hex', true), `app-${appId}-tss`)
+      await this.appManager.saveAppTssConfig({
+        version: context.version,
+        appId: appId,
+        publicKey: pub2json(key.publicKey!),
+        keyShare: bn2hex(key.share!),
+      })
+    }
+    else {
+      await this.appManager.saveAppTssConfig({
+        version: context.version,
+        appId: appId,
+        publicKey: request.data.init.publicKey
+      })
+    }
   }
 
   @appApiMethod({})
@@ -397,6 +488,20 @@ class System extends CallablePlugin {
     await AppTssConfig.deleteMany({appId, "publicKey.address": tssKeyAddress});
     log(`deleting app from memory of all cluster %s`, appId)
     CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, deploymentReqId: context.deploymentRequest.reqId}})
+  }
+
+  @remoteMethod(RemoteMethods.GetAppPublicKey)
+  async __getAppPublicKey(data: {appId: string, keyId: string}, callerInfo) {
+    const {appId, keyId} = data;
+
+    const context = this.appManager.getAppContext(appId)
+    if(!context)
+      throw `App deployment info not found.`
+    let key = await this.tssPlugin.getSharedKey(keyId)
+    if(!key)
+      throw `App tss key not found.`
+
+    return "0x" + key.publicKey!.encode("hex", true)
   }
 }
 

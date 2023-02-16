@@ -6,6 +6,13 @@ export type JsonPeerInfo = {
     protocols: string[];
 }
 
+export type JsonPublicKey = {
+    address?: string,
+    encoded?: string,
+    x: string,
+    yParity: string
+}
+
 export type RemoteCallOptions = {
 }
 

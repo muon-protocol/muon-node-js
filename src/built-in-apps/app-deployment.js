@@ -153,16 +153,11 @@ module.exports = {
                 }
 
                 /** ensure a random key already generated */
-                let key = await this.callPlugin('system', "getDistributedKey", init.id)
-                if(!key)
+                let publicKey = await this.callPlugin('system', "findAndGetAppPublicKey", params.appId, init.id)
+                if(!publicKey)
                     throw `App new tss key not found`;
 
-                return {
-                    address: key.address,
-                    publicKey: "0x" + key.publicKey.encode("hex", true),
-                    x: '0x' + key.publicKey.getX().toString(16).padStart(64, '0'),
-                    yParity: key.publicKey.getY().isEven() ? 0 : 1,
-                }
+                return publicKey
             }
 
             case Methods.TssReshare: {
@@ -247,8 +242,8 @@ module.exports = {
             }
             case Methods.TssKeyGen: {
                 const {appId} = params
-                // await this.callPlugin('system', "storeAppTss", appId)
-                await this.callPlugin('system', "storeAppTss", appId, init.id)
+                // await this.callPlugin('system', "storeAppTss", appId, init.id)
+                await this.callPlugin('system', "appKeyGenConfirmed", request)
             }
         }
     }

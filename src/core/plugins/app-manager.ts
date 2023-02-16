@@ -140,24 +140,27 @@ export default class AppManager extends CallablePlugin {
   async deleteAppContext(_id: string) {
   }
 
-  async saveAppTssConfig(appTssConfig: object) {
-    let newConfig = new AppTssConfig(appTssConfig)
-    /**
-     * Do not use this code in any other place
-     * Call this method as the base method for saving AppTssConfig.
-     */
-    newConfig.dangerousAllowToSave = true
-    await newConfig.save()
-    CoreIpc.fireEvent({
-      type: "app-tss-key:add",
-      data: newConfig
-    })
+  async saveAppTssConfig(appTssConfig: any) {
+    // @ts-ignore
+    if(appTssConfig.keyShare) {
+      let newConfig = new AppTssConfig(appTssConfig)
+      /**
+       * Do not use this code in any other place
+       * Call this method as the base method for saving AppTssConfig.
+       */
+      newConfig.dangerousAllowToSave = true
+      await newConfig.save()
+      CoreIpc.fireEvent({
+        type: "app-tss-key:add",
+        data: newConfig
+      })
+    }
 
     // @ts-ignore
-    const {appId, version} = appTssConfig;
+    const {appId, version, publicKey} = appTssConfig;
     const context = await AppContext.findOne({appId, version}).exec();
     // @ts-ignore
-    context.publicKey = appTssConfig.publicKey
+    context.publicKey = publicKey
     context.dangerousAllowToSave = true
     await context.save();
     CoreIpc.fireEvent({
