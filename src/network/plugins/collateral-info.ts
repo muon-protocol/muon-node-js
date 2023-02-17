@@ -10,6 +10,7 @@ import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
 import {peerId2Str} from "../utils.js";
 import {broadcastHandler, remoteApp, remoteMethod} from "./base/app-decorators.js";
+import { peerIdFromString } from '@libp2p/peer-id'
 import NodeCache from 'node-cache';
 import lodash from "lodash";
 import axios from "axios";
@@ -241,7 +242,17 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     }while(!rawResult)
 
     let allNodes = rawResult._nodes
-      .filter(item => item.active)
+      .filter(item => {
+        if (!item.active)
+          return false;
+        try {
+          peerIdFromString(item.peerId)
+          return true
+        }
+        catch (e) {
+          return false;
+        }
+      })
       .map((item): MuonNodeInfo => ({
         id: BigInt(item.id).toString(),
         staker: item.stakerAddress,
