@@ -88,7 +88,7 @@ class System extends CallablePlugin {
     switch (type) {
       case 'undeploy': {
         const {appId, deploymentReqId, tssKeyAddress} = details || {}
-        this.__undeployApp(appId, deploymentReqId, tssKeyAddress, callerInfo)
+        this.__undeployApp({appId, deploymentReqId, tssKeyAddress}, callerInfo)
           .catch(e => {})
         break;
       }
@@ -372,14 +372,14 @@ class System extends CallablePlugin {
     /** check app context */
     let context = this.appManager.getAppContext(appId);
     const deploymentReqId = context.deploymentRequest.reqId;
-    const tssKeyAddress = context.publicKey.address
+    const tssKeyAddress = context.publicKey?.address || null
 
     let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
     const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: [...deployers, ...party.partners]})
     log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
     await Promise.all(partnersToCall.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__undeployApp(appId, deploymentReqId, tssKeyAddress, this.collateralPlugin.currentNodeInfo)
+        return this.__undeployApp({appId, deploymentReqId, tssKeyAddress}, this.collateralPlugin.currentNodeInfo)
           .catch(e => {
             log.error(`error when undeploy at current node: %O`, e)
             return e?.message || "unknown error occurred"
@@ -389,7 +389,7 @@ class System extends CallablePlugin {
         return this.remoteCall(
           node.peerId,
           RemoteMethods.Undeploy,
-          appId
+          {appId, deploymentReqId, tssKeyAddress}
         )
           .catch(e => {
             log.error(`error when undeploy at ${node.peerId}: %O`, e)
@@ -478,9 +478,10 @@ class System extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.Undeploy)
-  async __undeployApp(appId, deploymentReqId, tssKeyAddress, callerInfo) {
+  async __undeployApp(data: {appId, deploymentReqId, tssKeyAddress}, callerInfo) {
     if(!callerInfo.isDeployer)
       throw `Only deployer can call this method`
+    let {appId, deploymentReqId, tssKeyAddress} = data;
     const context = this.appManager.getAppContext(appId)
     if(!context || context.deploymentRequest.reqId != deploymentReqId)
       throw `App context not found`
