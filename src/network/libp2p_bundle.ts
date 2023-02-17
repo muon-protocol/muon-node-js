@@ -29,7 +29,7 @@ const DEFAULT_OPTS = {
     autoDial: false,
     maxConnections: 300,
     minConnections: 10,
-    maxIncomingPendingConnections: 10
+    maxIncomingPendingConnections: 50
   },
   streamMuxers: [
     mplex()
