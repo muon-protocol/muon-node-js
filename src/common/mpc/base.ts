@@ -189,7 +189,7 @@ export class MultiPartyComputation {
   }
 
   private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any) {
-    const NumReTry = 3;
+    const NumReTry = 1;
     const roundTitle = this.rounds[roundIndex];
     let lastError: any;
     let result: any;
