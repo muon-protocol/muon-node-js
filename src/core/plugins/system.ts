@@ -156,7 +156,7 @@ class System extends CallablePlugin {
         generatorInfo.peerId,
         RemoteMethods.GenerateAppTss,
         {appId},
-        {timeout: 120e3}
+        {timeout: 65e3}
       )
     }
   }
@@ -469,7 +469,7 @@ class System extends CallablePlugin {
     if(!party)
       throw `Party not created`
 
-    let key = await this.tssPlugin.keyGen(party, {timeout: 120e3, lowerThanHalfN: true})
+    let key = await this.tssPlugin.keyGen(party, {timeout: 65e3, lowerThanHalfN: true})
 
     return {
       id: key.id,

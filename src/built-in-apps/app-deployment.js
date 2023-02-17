@@ -14,7 +14,7 @@ const owners = [
 
 module.exports = {
     APP_NAME: "deployment",
-    REMOTE_CALL_TIMEOUT: 150e3,
+    REMOTE_CALL_TIMEOUT: 120e3,
     APP_ID: 1,
     owners,
 
