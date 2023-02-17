@@ -14,9 +14,7 @@ RUN npm install
 ## Bundle app source
 COPY . .
 
-## generate nodes env variables
 ENV DOCKER_MODE=1
-RUN node testnet-generate-env.js
 
 # gateway
 EXPOSE 8000
@@ -37,5 +35,5 @@ RUN pm2 install pm2-logrotate
 RUN apt-get update && apt-get -y install cron
 RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-testnet'
 
-CMD [ "bash", "-c", "service cron start;pm2 start ecosystem.config.cjs; sleep infinity" ]
+CMD [ "bash", "-c", "node testnet-generate-env.js; service cron start; pm2 start ecosystem.config.cjs; sleep infinity" ]
 #
