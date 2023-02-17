@@ -485,7 +485,7 @@ class BaseAppPlugin extends CallablePlugin {
           node.peerId,
           RemoteMethods.InformRequestConfirmation,
           request,
-          {taskId: `keygen-${nonce.id}`}
+          {taskId: `keygen-${nonce.id}`, timeout: 45e3}
         )
           .catch(e => {
             this.log(`informRequestConfirmation error %o`, e)
