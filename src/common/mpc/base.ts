@@ -255,7 +255,7 @@ export class MultiPartyComputation {
           qualifiedPartners.map(partner => {
             return this.tryToGetRoundDate(network, partner, r, dataToSend)
               .catch(e => {
-                this.log.error(`[${this.id}][${currentRound}] error at level ${r} %o`, e)
+                this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
                 return null
               })
           })
