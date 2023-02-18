@@ -868,7 +868,7 @@ class BaseAppPlugin extends CallablePlugin {
     /**
      * Check request timestamp
      */
-    if(getTimestamp() - request.data.timestamp > 40) {
+    if(getTimestamp() - request.data.timestamp > this.REMOTE_CALL_TIMEOUT/1000) {
       throw "Request timestamp expired to sign."
     }
 
