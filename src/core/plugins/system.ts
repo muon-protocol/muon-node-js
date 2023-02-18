@@ -265,9 +265,9 @@ class System extends CallablePlugin {
       list: [...deployers, ...appPartners],
     });
 
-    let requestNonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!
 
     if(request.owner === process.env.SIGN_WALLET_ADDRESS){
+      let requestNonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!
 
       const noneInformedPartners = nodesNeedsToInform.filter(node => !requestNonce.partners.includes(node.id))
 
