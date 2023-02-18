@@ -251,7 +251,7 @@ export class MultiPartyComputation {
         const dataToSend = {
           constructData: r===0 ? this.constructData : undefined,
         }
-        this.log(`[${network.id}].mpc[${this.id}].${currentRound} collecting round data`)
+        this.log(`mpc[${this.id}].${currentRound} collecting round data`)
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
           qualifiedPartners.map(partner => {
             return this.tryToGetRoundDate(network, partner, r, dataToSend)
@@ -261,7 +261,7 @@ export class MultiPartyComputation {
               })
           })
         )
-        this.log(`[${network.id}].mpc[${this.id}].${currentRound} ${allPartiesResult.filter(i => !!i).length} response received`)
+        this.log(`MPC[${this.id}].${currentRound} ${allPartiesResult.filter(i => !!i).length} response received`)
         /** store partners output for current round */
         this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {
           if(curr !== null)
@@ -277,7 +277,7 @@ export class MultiPartyComputation {
         }
       }
 
-      this.log(`${this.ConstructorName}[${network.id}] all rounds done.`)
+      this.log(`MPC[${this.id}] all rounds done.`)
       const result = this.onComplete(this.roundsArrivedMessages, network.id, qualifiedPartners);
       this.roundsPromise.resolve(this.rounds.length, result);
     }
