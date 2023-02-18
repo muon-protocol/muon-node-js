@@ -255,20 +255,21 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async storeAppContext(request, result) {
-    let {appId, seed} = request.data.params
-    const partners = result.selectedNodes
+    /** store app context */
     const context = await this.writeAppContextIntoDb(request, result);
-    const allOnlineNodes = this.collateralPlugin.filterNodes({
-      list: this.tssPlugin.tssParty?.partners,
-      isOnline: true
+
+    /** inform the other nodes */
+    const appPartners: string[] = result.selectedNodes
+    const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(({id}) => id);
+    const nodesNeedsToInform = this.collateralPlugin.filterNodes({
+      list: [...deployers, ...appPartners],
     });
 
     let requestNonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!
 
     if(request.owner === process.env.SIGN_WALLET_ADDRESS){
 
-      const noncePartners = requestNonce.partners
-      const noneInformedPartners = allOnlineNodes.filter(node => (noncePartners.indexOf(node.id) < 0))
+      const noneInformedPartners = nodesNeedsToInform.filter(node => !requestNonce.partners.includes(node.id))
 
       const informResponses = await Promise.all(noneInformedPartners.map(node => {
         if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
@@ -423,6 +424,23 @@ class System extends CallablePlugin {
       calculated: tssModule.pub2addr(key.publicKey!)
     })
     return key.publicKey
+  }
+
+  @appApiMethod({})
+  async generateTssKeyBetweenPartners(t, partners: string[]) {
+    const partyId = soliditySha3(partners.map(v => ({t:'string', v})))
+
+    await this.tssPlugin.createParty({id: partyId, t, partners});
+    let party = this.tssPlugin.parties[partyId];
+    if(!party)
+      throw `Party not created`
+
+    let key = await this.tssPlugin.keyGen(party, {timeout: 65e3, lowerThanHalfN: true})
+
+    return {
+      id: key.id,
+      publicKey: pub2json(key.publicKey!)
+    }
   }
 
   /**
