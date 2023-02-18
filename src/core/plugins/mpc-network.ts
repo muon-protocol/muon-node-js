@@ -59,7 +59,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
         nodeInfo.peerId,
         RemoteMethods.AskRoundN,
         {mpcId, round, data},
-        {taskId: mpcId, timeout: 30000}
+        {taskId: mpcId, timeout: 10e3}
       )
     }
   }
