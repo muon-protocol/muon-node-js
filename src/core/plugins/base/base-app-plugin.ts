@@ -712,16 +712,23 @@ class BaseAppPlugin extends CallablePlugin {
     this.requestManager.setPartnerCount(request.reqId, partners.length + 1);
 
     // TODO: remove async
-    partners.map(async ({peerId, wallet}) => {
-      return this.remoteCall(peerId, RemoteMethods.WantSign, request, {timeout: this.REMOTE_CALL_TIMEOUT, taskId: `keygen-${nonce.id}`})
-        .then(this.__onRemoteSignTheRequest.bind(this))
+    partners.map(async node => {
+      return this.remoteCall(
+          node.peerId,
+          RemoteMethods.WantSign,
+          request,
+          {
+            timeout: this.REMOTE_CALL_TIMEOUT,
+            taskId: `keygen-${nonce.id}`
+          }
+        )
+        .then(data => this.__onRemoteSignTheRequest(data, null, node))
         .catch(e => {
           this.log.error('asking signature for request failed %O', e)
           return this.__onRemoteSignTheRequest(null, {
             request: request.reqId,
-            peerId,
             ...e
-          });
+          }, node);
         })
     })
   }
@@ -799,23 +806,18 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async __onRemoteSignTheRequest(data: {sign: AppRequestSignature} | null, error) {
-    // console.log('BaseAppPlugin.__onRemoteSignTheRequest', data)
-    this.log(`remote ${data?.sign?.owner} signed the request.`)
+  async __onRemoteSignTheRequest(data: {sign: AppRequestSignature} | null, error, remoteNode: MuonNodeInfo) {
     if(error){
-      let collateralPlugin:CollateralInfoPlugin = this.muon.getPlugin('collateral');
-      let {peerId, request: reqId, ...otherParts} = error;
+      this.log.error(`node ${remoteNode.id} unable to sign the request. %O`, error)
+      let {request: reqId, ...otherParts} = error;
       let request = this.requestManager.getRequest(reqId);
       if(request) {
-        const ownerInfo = collateralPlugin.getNodeInfo(peerId);
-        if(ownerInfo) {
-          // TODO: replace with ownerInfo.id
-          this.requestManager.addError(reqId, ownerInfo.wallet, otherParts);
-        }
+        this.requestManager.addError(reqId, remoteNode.wallet, otherParts);
       }
       return;
     }
     try {
+      this.log(`node ${remoteNode.id} signed the request.`)
       let {sign} = data!;
       // let request = await Request.findOne({_id: sign.request})
       let request = this.requestManager.getRequest(sign.request)
@@ -824,7 +826,7 @@ class BaseAppPlugin extends CallablePlugin {
         // let signer = await this.recoverSignature(request, sign)
         // if (signer && signer === sign.owner) {
           // @ts-ignore
-          this.requestManager.addSignature(request.reqId, sign.owner, sign)
+          this.requestManager.addSignature(request.reqId, remoteNode.wallet, sign)
           // // let newSignature = new Signature(sign)
           // // await newSignature.save()
         // } else {
