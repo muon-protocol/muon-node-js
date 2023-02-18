@@ -242,7 +242,6 @@ export class MultiPartyComputation {
           }, {})
         }
         /** execute MPC round */
-        this.log(`MPC[${this.id}][${currentRound}] with qualified list: %o`, qualifiedPartners);
         this.roundsOutput[currentRound] = await this.processRound(r, inputs, broadcasts, network.id, qualifiedPartners);
         this.log(`round executed [${network.id}].mpc[${this.id}].${currentRound}`)
         this.roundsPromise.resolve(r, true);
@@ -261,7 +260,7 @@ export class MultiPartyComputation {
               })
           })
         )
-        this.log(`MPC[${this.id}].${currentRound} ${allPartiesResult.filter(i => !!i).length} response received`)
+        this.log(`MPC[${this.id}].${currentRound} ${allPartiesResult.filter(i => !!i).length} nodes response received`)
         /** store partners output for current round */
         this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {
           if(curr !== null)
@@ -271,6 +270,7 @@ export class MultiPartyComputation {
 
         /** update qualified list based on current round outputs */
         qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[currentRound!], qualifiedPartners);
+        this.log(`MPC[${this.id}][${currentRound}] complete with qualified list: %o`, qualifiedPartners);
 
         if(qualifiedPartners.length < this.t) {
           throw `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified`
