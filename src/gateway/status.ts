@@ -19,6 +19,9 @@ router.use('/', asyncHandler(async (req, res, next) => {
     address: NodeAddress,
     peerId: PeerID,
     networkingPort: process.env.PEER_PORT,
+    node: {
+      uptime: await NetworkIpc.getUptime(),
+    },
     managerContract: {
       network: collateralInfo?.contract?.network,
       address: collateralInfo?.contract?.address,
