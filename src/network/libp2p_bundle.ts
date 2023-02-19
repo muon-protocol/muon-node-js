@@ -27,7 +27,7 @@ const DEFAULT_OPTS = {
   ],
   connectionManager: {
     autoDial: false,
-    maxConnections: 300,
+    maxConnections: 1000,
     minConnections: 10,
     maxIncomingPendingConnections: 50
   },
