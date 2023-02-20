@@ -588,11 +588,13 @@ class TssPlugin extends CallablePlugin {
         }
         else {
           log(`app[${appId}] tss is not ready yet`)
+          throw `app[${appId}] tss is not ready yet`;
+          
         }
       }
-      catch (e) {
-        log(`recovering app[${appId}] tss key failed %O`, e);
-      }
+      // catch (e) {
+      //   log(`recovering app[${appId}] tss key failed %O`, e);
+      // }
     }
   }
 
