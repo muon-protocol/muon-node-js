@@ -281,7 +281,7 @@ class BaseAppPlugin extends CallablePlugin {
       if(!this.appManager.appIsDeployed(this.APP_ID))
         throw `App not deployed`;
       if(!this.appManager.appHasTssKey(this.APP_ID)) {
-        this.tssPlugin.checkAppTssKeyRecovery(this.APP_ID);
+        await this.tssPlugin.checkAppTssKeyRecovery(this.APP_ID);
         throw `App tss not initialized`
       }
     }
