@@ -592,9 +592,10 @@ class TssPlugin extends CallablePlugin {
           
         }
       }
-      // catch (e) {
-      //   log(`recovering app[${appId}] tss key failed %O`, e);
-      // }
+      catch (e) {
+        log(`recovering app[${appId}] tss key failed %O`, e);
+        throw e;
+      }
     }
   }
 
