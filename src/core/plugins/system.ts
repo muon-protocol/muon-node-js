@@ -58,7 +58,7 @@ class System extends CallablePlugin {
         /** active nodes that has uptime more than 1 hour */
         // return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
         return item.isDeployer || (item.active && item.tests.networking 
-          && item.tests.status && item.tests.peerInfo)
+          && item.tests.status && item.tests.peerInfo && item.uptime >= 5*60 && item.tests.wasOfflineIn24==0)
       })
       availableIds = availables.map(p => `${p.id}`)
     }
