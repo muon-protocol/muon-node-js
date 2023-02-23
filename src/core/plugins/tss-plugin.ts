@@ -110,7 +110,7 @@ class TssPlugin extends CallablePlugin {
   async onNodeAdd(nodeInfo: MuonNodeInfo) {
     log(`node add %o`, nodeInfo)
 
-    await timeout(5000);
+    //await timeout(5000);
 
     const selfInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
     if(!selfInfo) {
