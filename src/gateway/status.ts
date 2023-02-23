@@ -2,6 +2,7 @@ import {Router} from 'express';
 import * as NetworkIpc from '../network/ipc.js'
 import lodash from 'lodash'
 import asyncHandler from 'express-async-handler'
+import {getCommitId} from "../utils/helpers.js";
 
 const NodeAddress = process.env.SIGN_WALLET_ADDRESS || null;
 const PeerID = process.env.PEER_ID || null
@@ -20,7 +21,13 @@ router.use('/', asyncHandler(async (req, res, next) => {
     peerId: PeerID,
     networkingPort: process.env.PEER_PORT,
     node: {
+      addedToNetwork: !!nodeInfo,
+      staker: nodeInfo ? nodeInfo.staker : undefined,
+      address: NodeAddress,
+      peerId: PeerID,
+      networkingPort: process.env.PEER_PORT,
       uptime: await NetworkIpc.getUptime(),
+      commitId: await getCommitId(),
     },
     managerContract: {
       network: collateralInfo?.contract?.network,

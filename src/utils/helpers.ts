@@ -7,7 +7,10 @@ import { dirname } from 'path';
 import {PublicKey} from "./tss/types.js";
 import {pub2addr} from "./tss/utils.js";
 import {JsonPublicKey} from "../common/types";
+import {promisify} from 'util'
+import childProcess from 'node:child_process'
 const toBN = Web3.utils.toBN;
+const exec = promisify(childProcess.exec);
 
 export const timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export const getTimestamp = () => Math.floor(Date.now() / 1000);
@@ -99,4 +102,11 @@ export function pub2json(pubkey: PublicKey, minimal: boolean=false): JsonPublicK
 export async function findMyIp(): Promise<string> {
   let response = await axios.get('https://ifconfig.me/all.json')
   return response?.data?.ip_addr;
+}
+
+export async function getCommitId(): Promise<string> {
+  const {stdout, stderr} = await exec('git rev-parse HEAD');
+  if(stderr)
+    throw stderr;
+  return stdout.trim();
 }
