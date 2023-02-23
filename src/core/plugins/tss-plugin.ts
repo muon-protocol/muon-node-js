@@ -137,6 +137,7 @@ class TssPlugin extends CallablePlugin {
     /**
      * if the current node is edited, its needs some time to tssParty be updated
      */
+    log("onNodeEdit timeout(5000)")
     await timeout(5000);
 
     if(nodeInfo.isDeployer !== oldNodeInfo.isDeployer) {
@@ -288,12 +289,13 @@ class TssPlugin extends CallablePlugin {
         log(`TSS key generated with ${key.partners.length} partners`);
       }
       else{
-        log(`trying to recover global tss key...`)
+        log(`trying to recover global tss key... timeout(6000)`)
         await timeout(6000);
 
         // this.tryToFindOthers();
 
         while (!this.isReady) {
+          log("waiting for tss, timeout(5000)");
           await timeout(5000);
           const {isReady, readyPartners} = await this.queryTssIsReady('1')
 
@@ -434,6 +436,7 @@ class TssPlugin extends CallablePlugin {
           peerId: process.env.PEER_ID,
         }
       })
+      log("tryToFindOthers timeout(5000)")
       await timeout(5000)
     }
   }
@@ -602,6 +605,7 @@ class TssPlugin extends CallablePlugin {
   async tryToCreateTssKey(): Promise<DistributedKey> {
     const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId)
     while (!this.isReady) {
+      log('tryToCreateTssKey:: tss is not ready. timeout(5000)')
       await timeout(5000);
       try {
         const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
