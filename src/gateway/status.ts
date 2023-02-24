@@ -13,8 +13,14 @@ const router = Router();
 
 router.use('/', asyncHandler(async (req, res, next) => {
   const [collateralInfo, nodeInfo, multiAddress, uptime, commitId] = await Promise.all([
-    NetworkIpc.getCollateralInfo().catch(e => null),
-    NetworkIpc.getCurrentNodeInfo().catch(e => null),
+    NetworkIpc.getCollateralInfo({
+      timeout: 5000,
+      timeoutMessage: "Getting collateral info timed out"
+    }).catch(e => null),
+    NetworkIpc.getCurrentNodeInfo({
+      timeout: 5000,
+      timeoutMessage: "Getting current node info timed out"
+    }).catch(e => null),
     NetworkIpc.getNodeMultiAddress().catch(e => null),
     NetworkIpc.getUptime().catch(e => null),
     getCommitId().catch(e => null)
