@@ -84,8 +84,16 @@ function forwardRequest(id, requestData, appTimeout?:number) {
   return call(IpcMethods.ForwardGatewayRequest, {id, requestData, appTimeout});
 }
 
-function getCurrentNodeInfo(): Promise<MuonNodeInfo|undefined> {
-  return call(IpcMethods.GetCurrentNodeInfo);
+function getCurrentNodeInfo(options?: IpcCallOptions): Promise<MuonNodeInfo|undefined> {
+  return call(
+    IpcMethods.GetCurrentNodeInfo,
+    null,
+    {
+      timeout: 5000,
+      timeoutMessage: "Getting current node info timed out",
+      ...options
+    }
+  );
 }
 
 function allowRemoteCallByShieldNode(method, options) {
