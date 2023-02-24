@@ -196,7 +196,7 @@ export class MultiPartyComputation {
     for(let i=1 ; i<=NumReTry ; i++) {
       lastError = undefined;
       try {
-        result = await network.askRoundData(from, this.id, roundIndex, dataToSend);
+        result = network.askRoundData(from, this.id, roundIndex, dataToSend);
         return result;
         break;
       }catch (e) {
