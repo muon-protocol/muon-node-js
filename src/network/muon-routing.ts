@@ -178,6 +178,7 @@ export class MuonRouting implements PeerRouting, Startable {
       try {
         let multiAddrs = this.components.addressManager.getAddresses()
         let allowPrivateIps = parseBool(process.env.DISABLE_ANNOUNCE_FILTER!)
+        let gatewayPort: number = parseInt(process.env.GATEWAY_PORT!)
         if (!allowPrivateIps)
           multiAddrs = multiAddrs.filter(ma => !isPrivate(ma))
 
@@ -190,6 +191,7 @@ export class MuonRouting implements PeerRouting, Startable {
 
         const timestamp = Date.now();
         const hash = soliditySha3([
+          {type: "uint16", value: gatewayPort},
           {type: "uint64", value: timestamp},
           {type: "string", value: peerInfo.id},
           ...(
@@ -198,6 +200,7 @@ export class MuonRouting implements PeerRouting, Startable {
         ])
 
         const discoveryData = {
+          gatewayPort,
           peerInfo,
           timestamp,
           signature: crypto.sign(hash)

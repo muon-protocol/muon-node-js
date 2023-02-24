@@ -11,14 +11,7 @@ function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions) {
 }
 
 function getCollateralInfo(options?: IpcCallOptions) {
-  return call(
-    IpcMethods.GetCollateralInfo,
-    {},
-    {
-      timeout: 5000,
-      timeoutMessage: "Getting collateral info timed out",
-      ...options
-    })
+  return call(IpcMethods.GetCollateralInfo, {}, options)
 }
 
 function filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
@@ -84,8 +77,8 @@ function forwardRequest(id, requestData, appTimeout?:number) {
   return call(IpcMethods.ForwardGatewayRequest, {id, requestData, appTimeout});
 }
 
-function getCurrentNodeInfo(): Promise<MuonNodeInfo|undefined> {
-  return call(IpcMethods.GetCurrentNodeInfo);
+function getCurrentNodeInfo(options?: IpcCallOptions): Promise<MuonNodeInfo|undefined> {
+  return call(IpcMethods.GetCurrentNodeInfo, null, options);
 }
 
 function allowRemoteCallByShieldNode(method, options) {

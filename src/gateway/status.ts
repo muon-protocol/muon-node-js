@@ -12,9 +12,20 @@ const shieldedApps = (process.env.SHIELDED_APPS || "").split('|').filter(v => !!
 const router = Router();
 
 router.use('/', asyncHandler(async (req, res, next) => {
-  let collateralInfo = await NetworkIpc.getCollateralInfo()
-  const nodeInfo = await NetworkIpc.getCurrentNodeInfo()
-  const address = await NetworkIpc.getNodeMultiAddress()
+  const [collateralInfo, nodeInfo, multiAddress, uptime, commitId] = await Promise.all([
+    NetworkIpc.getCollateralInfo({
+      timeout: 5000,
+      timeoutMessage: "Getting collateral info timed out"
+    }).catch(e => null),
+    NetworkIpc.getCurrentNodeInfo({
+      timeout: 5000,
+      timeoutMessage: "Getting current node info timed out"
+    }).catch(e => null),
+    NetworkIpc.getNodeMultiAddress().catch(e => null),
+    NetworkIpc.getUptime().catch(e => null),
+    getCommitId().catch(e => null)
+  ]);
+
   res.json({
     staker: nodeInfo ? nodeInfo.staker : undefined,
     address: NodeAddress,
@@ -26,8 +37,8 @@ router.use('/', asyncHandler(async (req, res, next) => {
       address: NodeAddress,
       peerId: PeerID,
       networkingPort: process.env.PEER_PORT,
-      uptime: await NetworkIpc.getUptime(),
-      commitId: await getCommitId(),
+      uptime,
+      commitId,
     },
     managerContract: {
       network: collateralInfo?.contract?.network,
@@ -40,7 +51,7 @@ router.use('/', asyncHandler(async (req, res, next) => {
     addedToNetwork: !!nodeInfo,
     network: {
       nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker']) : undefined,
-      address,
+      address: multiAddress,
     }
   })
 }))
