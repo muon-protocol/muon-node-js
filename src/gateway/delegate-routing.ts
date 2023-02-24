@@ -13,6 +13,7 @@ const log = logger("muon:gateway:routing")
 type RoutingData = {
   timestamp: number,
   id: string,
+  gatewayPort: number,
   peerInfo: {
     id: string,
     multiaddrs: string[],
@@ -53,9 +54,9 @@ router.use('/query', mixGetPost, asyncHandler(async (req, res, next) => {
 
 router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   // @ts-ignore
-  const {timestamp, peerInfo, signature} = req.mixed;
+  const {timestamp, gatewayPort, peerInfo, signature} = req.mixed;
 
-  if(!timestamp || !peerInfo || !signature)
+  if(!gatewayPort || !timestamp || !peerInfo || !signature)
     throw `missing data`
 
   let realPeerInfo: MuonNodeInfo[] = await NetworkIpc.filterNodes({list: [peerInfo.id]});
@@ -63,6 +64,7 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
     throw `unknown peerId`;
 
   let hash = soliditySha3([
+    {type: "uint16", value: gatewayPort},
     {type: "uint64", value: timestamp},
     {type: "string", value: peerInfo.id},
     ...(
@@ -77,6 +79,7 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   onlines[realPeerInfo[0].id] = {
     timestamp,
     id: realPeerInfo[0].id,
+    gatewayPort,
     peerInfo
   }
 
