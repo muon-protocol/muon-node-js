@@ -197,6 +197,7 @@ export class MultiPartyComputation {
       lastError = undefined;
       try {
         result = await network.askRoundData(from, this.id, roundIndex, dataToSend);
+        return result;
         break;
       }catch (e) {
         lastError = e;
