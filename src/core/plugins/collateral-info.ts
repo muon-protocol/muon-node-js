@@ -85,7 +85,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
     }
   }
 
-  onNodeAdd(nodeInfo: MuonNodeInfo) {
+  async onNodeAdd(nodeInfo: MuonNodeInfo) {
     log(`Core.CollateralInfo.onNodeAdd %o`, nodeInfo)
     this.groupInfo.partners.push(nodeInfo.id);
     this._nodesList.push(nodeInfo)
