@@ -47,18 +47,22 @@ export default class AppManager extends CallablePlugin {
   onNodeAdd(nodeInfo: MuonNodeInfo) {
     if(!this.isLoaded())
       return;
-    let deploymentContext = this.appContexts['1'];
-    deploymentContext.party.partners = [
-      ...deploymentContext.party.partners,
-      nodeInfo.id
-    ]
+    if(nodeInfo.isDeployer) {
+      let deploymentContext = this.appContexts['1'];
+      deploymentContext.party.partners = [
+        ...deploymentContext.party.partners,
+        nodeInfo.id
+      ]
+    }
   }
 
   onNodeDelete(nodeInfo: MuonNodeInfo) {
     if(!this.isLoaded())
       return;
-    let deploymentContext = this.appContexts['1'];
-    deploymentContext.party.partners = deploymentContext.party.partners.filter(id => id != nodeInfo.id)
+    if(nodeInfo.isDeployer) {
+      let deploymentContext = this.appContexts['1'];
+      deploymentContext.party.partners = deploymentContext.party.partners.filter(id => id != nodeInfo.id)
+    }
   }
 
   get tssPlugin(): TssPlugin {

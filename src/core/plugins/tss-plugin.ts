@@ -123,7 +123,7 @@ class TssPlugin extends CallablePlugin {
       this.loadTssInfo()
     }
     else {
-      if(selfInfo.isDeployer) {
+      if(nodeInfo.isDeployer) {
         log(`adding the new node [%s] into the tss party.`, nodeInfo.id);
         this.tssParty!.addPartner(nodeInfo.id)
       }
@@ -150,7 +150,7 @@ class TssPlugin extends CallablePlugin {
           await this.loadTssInfo()
         }
         else {
-          if(selfInfo.isDeployer)
+          if(nodeInfo.isDeployer)
             this.tssParty!.addPartner(nodeInfo.id)
         }
       }
@@ -592,7 +592,6 @@ class TssPlugin extends CallablePlugin {
         else {
           log(`app[${appId}] tss is not ready yet`)
           throw `app[${appId}] tss is not ready yet`;
-          
         }
       }
       catch (e) {
