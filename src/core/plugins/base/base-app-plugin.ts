@@ -267,7 +267,7 @@ class BaseAppPlugin extends CallablePlugin {
     return this.REMOTE_CALL_TIMEOUT * 2 + 5000;
   }
 
-  @gatewayMethod("request")
+  @gatewayMethod("default")
   async __onRequestArrived({method, params, mode, callId: gatewayCallId, gwSign}) {
     this.log(`request arrived %O`, {method, params})
     let t0 = Date.now()

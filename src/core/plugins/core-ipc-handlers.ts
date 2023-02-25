@@ -106,7 +106,7 @@ class CoreIpcHandlers extends CallablePlugin {
   @ipcMethod(IpcMethods.IsDeploymentExcerpt)
   async __isDeploymentExcerpt(data: {appName: string, method: string}) {
     const gp: GatewayInterface = this.muon.getPlugin('gateway-interface')
-    return gp.getActualHandlerMethod(data.appName, data.method) !== 'request'
+    return gp.getActualHandlerMethod(data.appName, data.method) !== 'default'
   }
 
   @ipcMethod(IpcMethods.ShieldConfirmedRequest)

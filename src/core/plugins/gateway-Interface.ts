@@ -60,8 +60,8 @@ export default class GatewayInterface extends BasePlugin{
         return method
       }
       // @ts-ignore
-      else if(this.listenerCount(`call/${app}/request`) > 0){
-        return 'request'
+      else if(this.listenerCount(`call/${app}/default`) > 0){
+        return 'default'
       }
       /** return undefined */
     }
@@ -84,9 +84,9 @@ export default class GatewayInterface extends BasePlugin{
           response = await this.emit(`call/${app}/${method}`, callingArgs)
         }
         // @ts-ignore
-        else if(this.listenerCount(`call/${app}/request`) > 0){
+        else if(this.listenerCount(`call/${app}/default`) > 0){
           // @ts-ignore
-          response = await this.emit(`call/${app}/request`, callingArgs)
+          response = await this.emit(`call/${app}/default`, callingArgs)
         }
         else{
           throw {message: `app:[${app}] method:[${method}] handler not defined`}
