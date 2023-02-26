@@ -12,11 +12,8 @@ const shieldedApps = (process.env.SHIELDED_APPS || "").split('|').filter(v => !!
 const router = Router();
 
 router.use('/', asyncHandler(async (req, res, next) => {
-  const [collateralInfo, nodeInfo, multiAddress, uptime, commitId] = await Promise.all([
-    NetworkIpc.getCollateralInfo({
-      timeout: 5000,
-      timeoutMessage: "Getting collateral info timed out"
-    }).catch(e => null),
+  const [netConfig, nodeInfo, multiAddress, uptime, commitId] = await Promise.all([
+    NetworkIpc.getNetworkConfig().catch(e => null),
     NetworkIpc.getCurrentNodeInfo({
       timeout: 5000,
       timeoutMessage: "Getting current node info timed out"
@@ -41,8 +38,8 @@ router.use('/', asyncHandler(async (req, res, next) => {
       commitId,
     },
     managerContract: {
-      network: collateralInfo?.contract?.network,
-      address: collateralInfo?.contract?.address,
+      network: netConfig?.nodeManager?.network,
+      address: netConfig?.nodeManager?.address,
     },
     shield:{
       enable: !!shieldForwardUrl,

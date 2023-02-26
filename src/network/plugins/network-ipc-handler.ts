@@ -32,6 +32,7 @@ const tasksCache = new NodeCache({
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetOnlinePeers: "get-online-peers",
+  GetNetworkConfig: "get-net-conf",
   GetCollateralInfo: "get-collateral-info",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
   BroadcastToChannel: "broadcast-to-channel",
@@ -119,6 +120,11 @@ class NetworkIpcHandler extends CallablePlugin {
   @ipcMethod(IpcMethods.GetOnlinePeers)
   async __onGetOnlinePeers(): Promise<string[]> {
     return this.collateralPlugin.onlinePeers;
+  }
+
+  @ipcMethod(IpcMethods.GetNetworkConfig)
+  async __getNetworkConfig() {
+    return this.network.configs.net
   }
 
   @ipcMethod(IpcMethods.GetCollateralInfo)

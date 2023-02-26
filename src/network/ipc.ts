@@ -10,6 +10,10 @@ function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions) {
   return callQueue.send({method, params}, options);
 }
 
+function getNetworkConfig() {
+  return call(IpcMethods.GetNetworkConfig);
+}
+
 function getCollateralInfo(options?: IpcCallOptions) {
   return call(IpcMethods.GetCollateralInfo, {}, options)
 }
@@ -111,6 +115,7 @@ function getNodeMultiAddress(): Promise<string[]> {
 
 export {
   call,
+  getNetworkConfig,
   getCollateralInfo,
   filterNodes,
   getOnlinePeers,
