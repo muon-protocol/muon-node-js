@@ -63,6 +63,9 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   if(realPeerInfo.length < 1)
     throw `unknown peerId`;
 
+  if(!peerInfo?.multiaddrs || !Array.isArray(peerInfo.multiaddrs) || peerInfo.multiaddrs.length === 0)
+    throw `empty multiaddrs list`
+
   let hash = soliditySha3([
     {type: "uint16", value: gatewayPort},
     {type: "uint64", value: timestamp},
