@@ -395,7 +395,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     const {address, network} = nodeManagerInfo;
     while (true) {
       /** every 20 seconds */
-      await timeout(5*60000);
+      await timeout(30*60000);
       try {
         let lastUpdateTime;
         log(`checking for nodes list changes ...`)
