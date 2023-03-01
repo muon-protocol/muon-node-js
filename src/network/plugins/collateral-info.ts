@@ -271,7 +271,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   // }
 
   private async paginateAndGetInfo(paginationAddress:string, nodeManagerAddress: string, network: string) {
-    const itemPerPage = 2000;
+    const itemPerPage = 1500;
     const lastNodeIdStr: string = await eth.call(nodeManagerAddress, 'lastNodeId', [], NodeManagerAbi, network)
     const lastNodeId = parseInt(lastNodeIdStr)
 
