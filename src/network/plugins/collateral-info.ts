@@ -33,13 +33,6 @@ const heartbeatCache = new NodeCache({
   useClones: false,
 });
 
-export type GroupInfo = {
-  isValid: boolean,
-  group: string,
-  sharedKey: string | null,
-  partners: string[]
-}
-
 export type NodeFilterOptions = {
   list?: string[],
   isOnline?: boolean,
@@ -60,8 +53,6 @@ const RemoteMethods = {
 
 @remoteApp
 export default class CollateralInfoPlugin extends CallablePlugin{
-
-  groupInfo: GroupInfo;
   networkInfo: NetworkInfo | null = null;
 
   private lastNodesUpdateTime: number;
@@ -205,13 +196,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         .set(n.peerId, n)
     })
 
-    this.groupInfo = {
-      isValid: true,
-      group: "1",
-      sharedKey: null,
-      partners: allNodes.map(n => n.id)
-    }
-
     log('Collateral info loaded.');
 
     // @ts-ignore
@@ -292,6 +276,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     const lastNodeId = parseInt(lastNodeIdStr)
 
     const pagesToRequest = new Array(Math.ceil(lastNodeId / itemPerPage)).fill(0).map((_,i) => i)
+    log(`loading nodes info: size: ${itemPerPage}, pages: [${pagesToRequest.join(',')}]`)
 
     const pagesData = await Promise.all(pagesToRequest.map(page => {
       const startIndex = page*itemPerPage + 1;
@@ -311,6 +296,71 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     }
   }
 
+  async paginateAndGetEditedNodes(paginationAddress:string, nodeManagerAddress: string, network: string, timestamp: number) {
+    const itemPerPage = 2000;
+    const lastNodeId: number = parseInt(await eth.call(nodeManagerAddress, 'lastNodeId', [], NodeManagerAbi, network))
+
+    const pagesToRequest = new Array(Math.ceil(lastNodeId / itemPerPage)).fill(0).map((_,i) => i)
+    log(`loading node changes: size: ${itemPerPage}, pages: [${pagesToRequest.join(',')}]`)
+
+    const pagesData = await Promise.all(pagesToRequest.map(page => {
+      const startIndex = page*itemPerPage + 1;
+      const endIndex = Math.min(startIndex+itemPerPage-1, lastNodeId)
+      return eth.call(
+        paginationAddress,
+        'getEditedNodes',
+        [
+          `0x${timestamp.toString(16)}`,
+          `0x${startIndex.toString(16)}`,
+          `0x${endIndex.toString(16)}`
+        ],
+        MuonNodesPaginationAbi,
+        network
+      )
+    }))
+
+    // @ts-ignore
+    const _nodes = [].concat(...pagesData).filter(node => parseInt(node.id)>0)
+
+    return {
+      // @ts-ignore
+      _lastUpdateTime: _nodes.reduce((max, node) => Math.max(max, parseInt(node.lastEditTime)), 0),
+      _nodes
+    }
+  }
+
+  async loadNetworkChanges(nodeManagerInfo) {
+    const {address, network, pagination: paginationContractAddress} = nodeManagerInfo;
+    const fromTimestamp = this.lastNodesUpdateTime;
+
+    let rawResult;
+    do {
+      try {
+        if(!!paginationContractAddress) {
+          rawResult = await this.paginateAndGetEditedNodes(
+            paginationContractAddress,
+            address,
+            network,
+            fromTimestamp
+          )
+        }
+        else {
+          rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
+          rawResult._nodes = rawResult._nodes
+            .filter(item => item.lastEditTime > fromTimestamp)
+        }
+      }catch (e) {
+        log('loading network info failed. %o', e)
+        await timeout(5000)
+      }
+    }while(!rawResult)
+
+    return {
+      lastUpdateTime: parseInt(rawResult._lastUpdateTime),
+      allNodes: rawResult._nodes
+    };
+  }
+
   /**
    * All events that changes the lastUpdateTime:
    *
@@ -325,32 +375,32 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     log(`nodes list updating ...`)
     let {nodeManager} = this.network.configs.net;
 
-    let {lastUpdateTime, allNodes} = await this.loadNetworkInfo(nodeManager);
+    let {lastUpdateTime, allNodes: changes} = await this.loadNetworkChanges(nodeManager);
     this.lastNodesUpdateTime = lastUpdateTime;
+    log(`contract data changed: ${changes.length} nodes`)
 
+    const addedNodes: any[] = []
+    const deletedNodes = {}
+    changes.forEach(n => {
+      /**
+       * 2) Remove node by Admin
+       * 3) Deactivate node by collateral address
+       */
+      if(!n.active) {
+        this._nodesMap.delete(n.id)
+        this._nodesMap.delete(n.wallet)
+        this._nodesMap.delete(n.peerId)
+        log(`Node info deleted from chain %o`, n)
+        // @ts-ignore
+        this.emit("collateral:node:delete", n)
+        CoreIpc.fireEvent({type: "collateral:node:delete", data: _.omit(n, ['peer'])})
+        deletedNodes[n.id] = true;
+        return;
+      }
 
-    /**
-     * 2) Remove node by Admin
-     * 3) Deactivate node by collateral address
-     */
-    const newIdList = allNodes.map(n => n.id);
-    const nodesToRemove = this._nodesList
-      .map(n => n.id)
-      .filter(id => !newIdList.includes(id));
-    nodesToRemove.forEach(id => {
-      let oldNode = this._nodesMap.get(id)!;
-      this._nodesMap.delete(oldNode.id)
-      this._nodesMap.delete(oldNode.wallet)
-      this._nodesMap.delete(oldNode.peerId)
-      log(`Node info deleted from chain %o`, oldNode)
-      // @ts-ignore
-      this.emit("collateral:node:delete", oldNode)
-      CoreIpc.fireEvent({type: "collateral:node:delete", data: _.omit(oldNode, ['peer'])})
-    })
-
-    allNodes.forEach(n => {
-      let oldNode = this._nodesMap.get(n.id);
       /** 1) Add new node. */
+
+      let oldNode = this._nodesMap.get(n.id)!;
       if(!oldNode){
         this._nodesMap
           .set(n.id, n)
@@ -360,6 +410,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         // @ts-ignore
         this.emit("collateral:node:add", n)
         CoreIpc.fireEvent({type: "collateral:node:add", data: n})
+        addedNodes.push(n);
         return;
       }
       /**
@@ -386,16 +437,20 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       }
     })
 
-    this._nodesList = allNodes;
-    this.groupInfo.partners = allNodes.map(n => n.id)
-    log(`nodes list updated.`)
+    this._nodesList = [
+      /** filter deleted nodes */
+      ...this._nodesList.filter(n => !deletedNodes[n.id]),
+      /** add new nodes */
+      ...addedNodes
+    ]
+    log(`nodes list updated.`);
   }
 
   async watchNodesChange(nodeManagerInfo) {
     const {address, network} = nodeManagerInfo;
     while (true) {
       /** every 20 seconds */
-      await timeout(30*60000);
+      await timeout(5*60000);
       try {
         let lastUpdateTime;
         log(`checking for nodes list changes ...`)

@@ -133,10 +133,9 @@ class NetworkIpcHandler extends CallablePlugin {
     const collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
     // await collateralPlugin.waitToLoad();
 
-    let {groupInfo, networkInfo} = collateralPlugin;
+    let {networkInfo} = collateralPlugin;
     return {
       contract: this.network.configs.net.nodeManager,
-      groupInfo,
       networkInfo,
       nodesList: await collateralPlugin.getNodesList(),
       // nodesList: (await collateralPlugin.getNodesList()).map(item => _.omit(item, ['peer']))

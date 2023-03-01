@@ -6,7 +6,7 @@
   "nodeManager": {
     "network": "bsctest",
     "address": "0x2efB53c11FC935f6114B3fC37AaFa6a76B263a4E",
-    "pagination": "0xb9f279712ff864e236ba2009ca3b1b6355f4e476"
+    "pagination": "0x35fccb153e862b0af8f66192c43a4b0dea132691"
   },
   "routing": {
     "delegate": [

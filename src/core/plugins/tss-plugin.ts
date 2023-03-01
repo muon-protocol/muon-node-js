@@ -208,10 +208,10 @@ class TssPlugin extends CallablePlugin {
   }
 
   async loadTssInfo() {
-    if(!this.collateralPlugin.groupInfo || !this.collateralPlugin.networkInfo){
+    if(!this.collateralPlugin.networkInfo){
       throw {message: `TssPlugin.loadTssInfo: collateral plugin not loaded the network info.`}
     }
-    let {groupInfo: {isValid, group, sharedKey, partners}, networkInfo} = this.collateralPlugin;
+    let {networkInfo} = this.collateralPlugin;
 
     const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
 

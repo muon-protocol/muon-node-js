@@ -1,7 +1,7 @@
 import BasePlugin from './base/base-plugin.js'
 import TimeoutPromise from '../../common/timeout-promise.js'
 import * as NetworkIpc from '../../network/ipc.js'
-import {GroupInfo, NetworkInfo, NodeFilterOptions} from '../../network/plugins/collateral-info.js'
+import {NetworkInfo, NodeFilterOptions} from '../../network/plugins/collateral-info.js'
 import {MuonNodeInfo} from "../../common/types";
 import Log from '../../common/muon-log.js'
 import {MapOf} from "../../common/mpc/types";
@@ -10,8 +10,6 @@ import lodash from 'lodash'
 const log = Log('muon:core:plugins:collateral')
 
 export default class CollateralInfoPlugin extends BasePlugin{
-
-  groupInfo: GroupInfo;
   networkInfo: NetworkInfo;
   private allowedWallets: string[] = []
 
@@ -87,7 +85,6 @@ export default class CollateralInfoPlugin extends BasePlugin{
 
   async onNodeAdd(nodeInfo: MuonNodeInfo) {
     log(`Core.CollateralInfo.onNodeAdd %o`, nodeInfo)
-    this.groupInfo.partners.push(nodeInfo.id);
     this._nodesList.push(nodeInfo)
 
     this._nodesMap
@@ -119,10 +116,6 @@ export default class CollateralInfoPlugin extends BasePlugin{
   onNodeDelete(nodeInfo: MuonNodeInfo) {
     log(`Core.CollateralInfo.onNodeDelete %o`, nodeInfo)
 
-    /** remove from groupInfo*/
-    let pIndex = this.groupInfo.partners.indexOf(nodeInfo.id)
-    this.groupInfo.partners.splice(pIndex, 1);
-
     /** remove from nodesList */
     const idx1 = this._nodesList.findIndex(item => item.id === nodeInfo.id)
     this._nodesList.splice(idx1, 1);
@@ -146,9 +139,8 @@ export default class CollateralInfoPlugin extends BasePlugin{
         log(`process[${process.pid}] collateral info loading failed %o`, e);
       }
     }
-    const { groupInfo, networkInfo, nodesList } = info
+    const { networkInfo, nodesList } = info
 
-    this.groupInfo = groupInfo;
     this.networkInfo = networkInfo;
 
     this._nodesList = nodesList;
