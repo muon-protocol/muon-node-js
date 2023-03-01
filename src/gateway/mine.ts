@@ -8,7 +8,6 @@ const mine = function(seed, difficulty = 5) {
   // @ts-ignore
   difficulty = parseInt(difficulty)
   const prefix = '0x' + new Array(difficulty).fill('0').join('')
-  console.log({difficulty, prefix})
   while (true) {
     const h = sha3(seed + nonce);
     if (!!h && h.startsWith(prefix)) {
