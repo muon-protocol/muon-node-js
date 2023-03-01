@@ -211,7 +211,8 @@ export class MuonRouting implements PeerRouting, Startable {
             return api.post('/discovery', discoveryData, {timeout: 5000})
               .then(({data}) => data)
               .catch(e => {
-                log.error(`sent to ${api.defaults.baseURL} error: %O`, e.message || "unknown error")
+                const errorMessage = e.response.data.error || e.message || "unknown error"
+                log.error(`sent to ${api.defaults.baseURL} error: %O`, errorMessage)
                 return e.message || 'unknown error'
               })
           }))
