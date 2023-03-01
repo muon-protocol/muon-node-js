@@ -4,6 +4,7 @@ import bodyParser from 'body-parser'
 import mongoose from 'mongoose'
 import api from './api/index.js'
 import status from './status.js'
+import mine from './mine.js'
 import delegate from './delegate-routing.js'
 import Log from '../common/muon-log.js'
 
@@ -37,6 +38,7 @@ async function start(options) {
   app.use('/v1/', api)
   app.use('/status', status)
   app.use('/delegate', delegate)
+  app.use('/mine', mine)
 
   /**
    Error handler
