@@ -79,6 +79,7 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   if(wallet !== realPeerInfo[0].wallet) {
     console.log('delegate signature mismatch')
     console.dir({
+      wallet,
       // @ts-ignore
       req: req.mixed,
       realPeerInfo
