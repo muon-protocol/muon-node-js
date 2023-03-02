@@ -76,7 +76,7 @@ class Network extends Events {
       peerRouters.push(
         muonRouting({
           baseUrls: netConfig.routing.delegate,
-          discoveryInterval: 5*60*1000,
+          discoveryInterval: 3*60*1000,
         })
       )
     }
