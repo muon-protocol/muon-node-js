@@ -77,11 +77,12 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   // @ts-ignore
   const wallet = crypto.recover(hash, signature)
   if(wallet !== realPeerInfo[0].wallet) {
-    console.log('delegate signature mismatch', {
+    console.log('delegate signature mismatch')
+    console.dir({
       // @ts-ignore
       req: req.mixed,
       realPeerInfo
-    })
+    }, {depth: 5})
     throw `signature mismatch`
   }
 
