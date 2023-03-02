@@ -86,6 +86,7 @@ export async function handler(argv) {
 }
 
 function store(argv) {
+  //./node_modules/.bin/ts-node ./src/cmd keys store DISCORD_VERIFICATION=def
   let value = argv.value;
   value = value.split("=");
   let key = value[0];
