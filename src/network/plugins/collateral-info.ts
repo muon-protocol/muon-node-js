@@ -239,6 +239,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       })
       .map((item): MuonNodeInfo => ({
         id: BigInt(item.id).toString(),
+        active: true,
         staker: item.stakerAddress,
         wallet: item.nodeAddress,
         peerId: item.peerId,
@@ -329,7 +330,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     }
   }
 
-  async loadNetworkChanges(nodeManagerInfo) {
+  async loadNetworkChanges(nodeManagerInfo): Promise<{lastUpdateTime: number, allNodes: MuonNodeInfo[]}> {
     const {address, network, pagination: paginationContractAddress} = nodeManagerInfo;
     const fromTimestamp = this.lastNodesUpdateTime;
 
@@ -355,9 +356,20 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       }
     }while(!rawResult)
 
+    const allNodes = rawResult._nodes
+      .map((item): MuonNodeInfo => ({
+        id: BigInt(item.id).toString(),
+        active: item.active,
+        staker: item.stakerAddress,
+        wallet: item.nodeAddress,
+        peerId: item.peerId,
+        isDeployer: item.isDeployer,
+        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || heartbeatCache.has(item.peerId)
+      }))
+
     return {
       lastUpdateTime: parseInt(rawResult._lastUpdateTime),
-      allNodes: rawResult._nodes
+      allNodes
     };
   }
 
