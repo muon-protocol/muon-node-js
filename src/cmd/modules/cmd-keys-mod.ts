@@ -37,7 +37,7 @@ const _restore = (keys) => {
 };
 
 const restore = (argv) => {
-  const { value } = argv;
+  const {value} = argv;
   let keys;
   try {
     keys = JSON.parse(value);
@@ -78,5 +78,23 @@ export async function handler(argv) {
       restore(argv);
       break;
     }
+    case "store": {
+      store(argv);
+      break;
+    }
   }
+}
+
+function store(argv) {
+  let value = argv.value;
+  value = value.split("=");
+  let key = value[0];
+  value = value[1];
+  let env = fs.readFileSync(ENV_TEMPLATE_PATH, "utf8");
+  const regex = new RegExp(`/^${key}.*/`, 'gi');
+  env = env.replace(regex, '');
+  env += `\n${key}=${value}`;
+  fs.writeFileSync(ENV_PATH, env);
+  process.env[key] = value;
+  console.log(`${key}=${value} Successfully added to env`);
 }
