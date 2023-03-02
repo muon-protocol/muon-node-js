@@ -13,7 +13,7 @@ export const describe = "Backup/Restore keys";
 export const builder = {
   action: {
     describe: "Backup/Restore keys",
-    choices: ["backup", "restore"],
+    choices: ["backup", "restore", "store"],
     type: "string",
   },
   value: {

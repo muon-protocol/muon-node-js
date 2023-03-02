@@ -23,7 +23,10 @@ router.use('/', asyncHandler(async (req, res, next) => {
     getCommitId().catch(e => null)
   ]);
 
+  let discordVerification=process.env.DISCORD_VERIFICATION;
+
   res.json({
+    discordVerification,
     staker: nodeInfo ? nodeInfo.staker : undefined,
     address: NodeAddress,
     peerId: PeerID,
