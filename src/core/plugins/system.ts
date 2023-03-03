@@ -468,7 +468,8 @@ class System extends CallablePlugin {
 
     return {
       id: key.id,
-      publicKey: pub2json(key.publicKey!)
+      publicKey: pub2json(key.publicKey!),
+      generators: key.partners
     }
   }
 

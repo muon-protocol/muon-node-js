@@ -96,12 +96,13 @@ module.exports = {
                 if(!context)
                     throw `app deployment info not found`
 
-                const {id, publicKey} = await this.callPlugin('system', "genAppTss", appId)
+                const {id, publicKey, generators} = await this.callPlugin('system', "genAppTss", appId)
 
                 return {
                     id,
                     publicKey,
                     partners: context.party.partners,
+                    keyGenerators: generators
                 }
             }
             case Methods.TssReshare: {
@@ -217,7 +218,7 @@ module.exports = {
                 return request.data.init.selectedNodes
             }
             case Methods.TssKeyGen: {
-                return request.data.init.partners
+                return request.data.init.keyGenerators
             }
             default:
                 return []
