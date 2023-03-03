@@ -394,6 +394,14 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     const addedNodes: any[] = []
     const deletedNodes = {}
     changes.forEach(n => {
+      /** A violent node may use another node's peerId. */
+      if(!!this._nodesMap[n.peerId]?.id && n.id !== this._nodesMap[n.peerId]?.id) {
+        console.log(`same peerId used by two nodes`, {
+          peerId: n.peerId,
+          nodes: [n.id, this._nodesMap[n.peerId]?.id]
+        })
+        return;
+      }
       /**
        * 2) Remove node by Admin
        * 3) Deactivate node by collateral address
