@@ -94,14 +94,19 @@ export default class AppManager extends CallablePlugin {
         ...await AppContext.find({})
       ]
 
+      const tssKeyContext = {}
       allAppContexts.forEach(ac => {
+        if(ac.publicKey?.encoded) {
+          tssKeyContext[ac.publicKey?.encoded] = ac;
+        }
         this.appContexts[ac.appId] = ac;
       })
       log('apps contexts loaded.')
 
       const allTssKeys = await AppTssConfig.find({});
       allTssKeys.forEach(key => {
-        this.appTssConfigs[key.appId] = key;
+        if(tssKeyContext[key.publicKey.encoded])
+          this.appTssConfigs[key.appId] = key;
       })
       log('apps tss keys loaded.')
 
@@ -162,7 +167,7 @@ export default class AppManager extends CallablePlugin {
 
     // @ts-ignore
     const {appId, version, publicKey} = appTssConfig;
-    const context = await AppContext.findOne({appId, version}).exec();
+    const context = await AppContext.findOne({_id: appTssConfig.context}).exec();
     // @ts-ignore
     context.publicKey = publicKey
     context.dangerousAllowToSave = true
@@ -188,17 +193,17 @@ export default class AppManager extends CallablePlugin {
     this.contextIdToAppIdMap[doc._id] = doc.appId
   }
 
-  private async onAppContextDelete(data: {appId: string, deploymentReqId: string}) {
+  private async onAppContextDelete(data: {appId: string, deploymentReqIds: string[]}) {
     try {
-      const {appId, deploymentReqId} = data
-      if(!appId || !deploymentReqId) {
-        log.error('missing appId/deploymentReqId.');
+      const {appId, deploymentReqIds} = data
+      if(!appId || !Array.isArray(deploymentReqIds)) {
+        log.error('missing appId/deploymentReqIds.');
         return;
       }
 
       log(`pid[${process.pid}] app[${appId}] context deleting...`)
 
-      if(!this.appContexts[appId] || this.appContexts[appId].deploymentRequest.reqId !== deploymentReqId) {
+      if(!this.appContexts[appId] || !deploymentReqIds.includes(this.appContexts[appId].deploymentRequest.reqId)) {
         log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
         return
       }
