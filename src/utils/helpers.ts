@@ -103,7 +103,6 @@ export function pub2json(pubkey: PublicKey, minimal: boolean=false): JsonPublicK
 
 export async function findMyIp(): Promise<string> {
   const checkValidIp = str => {
-    console.log({str})
     if(!isIP(str))
       throw `input is not ip`
     if(isIpPrivate(str))
