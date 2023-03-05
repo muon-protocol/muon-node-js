@@ -48,10 +48,14 @@ export type MuonNodeInfo = {
     isOnline?: boolean
 }
 
-export type AppDeploymentStatus = {
+export type AppDeploymentStatus = "NEW" | "TSS_GROUP_SELECTED" | "DEPLOYED";
+
+export type AppDeploymentInfo = {
     appId: string,
     /** Is app deployed? */
     deployed: boolean,
+    /** deployment status*/
+    status: AppDeploymentStatus,
     /** reqId of confirmed deployment request signed by global tss group */
     reqId?: string,
     /** context version */

@@ -2,7 +2,7 @@ import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
-import {AppDeploymentStatus, JsonPublicKey, MuonNodeInfo} from "../../common/types";
+import {AppDeploymentInfo, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import soliditySha3 from '../../utils/soliditySha3.js'
 import * as tssModule from '../../utils/tss/index.js'
 import AppContext from "../../common/db-models/AppContext.js"
@@ -129,18 +129,8 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async getAppStatus(appId: string): Promise<AppDeploymentStatus> {
-    if(!this.appManager.appIsDeployed(appId))
-      return {appId, deployed: false}
-    if(!this.appManager.appHasTssKey(appId))
-      return {appId, deployed: true, version: -1}
-    const context = this.appManager.getAppContext(appId)
-    return {
-      appId,
-      deployed: true,
-      version: context.version,
-      reqId: context.deploymentRequest.reqId,
-    }
+  getAppDeploymentInfo(appId: string): AppDeploymentInfo {
+    return this.appManager.getAppDeploymentInfo(appId);
   }
 
   @appApiMethod({})

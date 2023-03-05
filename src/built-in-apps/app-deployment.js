@@ -40,7 +40,7 @@ module.exports = {
         switch (method) {
             case Methods.RandomSeed: {
                 const {appId} = params
-                const {deployed} = await this.callPlugin('system', "getAppStatus", appId)
+                const {deployed} = this.callPlugin('system', "getAppDeploymentInfo", appId)
                 if(deployed)
                     throw `App already deployed`
                 break;
@@ -121,7 +121,7 @@ module.exports = {
         switch (method) {
             case Methods.Check: {
                 const {appId} = params
-                const status = await this.callPlugin('system', "getAppStatus", appId)
+                const status = this.callPlugin('system', "getAppDeploymentInfo", appId)
                 return status;
             }
             case Methods.RandomSeed: {

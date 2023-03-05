@@ -328,12 +328,16 @@ class BaseAppPlugin extends CallablePlugin {
       let t0 = Date.now(), t1, t2, t3, t4, t5, t6;;
       let appParty = this.appParty!;
       /** find available partners to sign the request */
-      const availablePartners: string[] = await NetworkIpc.findNOnlinePeer(appParty.partners, 
+      const availablePartners: string[] = await this.appManager.findNAvailablePartners(
+        this.APP_ID,
+        appParty.partners,
         Math.min(
           Math.ceil(appParty.t*1.2),
-          appParty.partners.length - 1
-        )
-      )
+          appParty.partners.length,
+        ),
+        {timeout: 5000}
+      );
+
       t1 = Date.now();
       this.log(`partners:[%o] are available to sign the request`, availablePartners)
       if(availablePartners.length < appParty.t)

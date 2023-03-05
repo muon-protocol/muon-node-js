@@ -17,6 +17,7 @@ export const IpcMethods = {
   IsDeploymentExcerpt: 'is-deployment-excerpt',
   ShieldConfirmedRequest: 'shield-confirmed-request',
   EnsureAppTssKeyExist: 'ensure-app-tss-key-exist',
+  FindNAvailablePartners: 'find-n-available-partner',
 } as const;
 type IpcKeys = keyof typeof IpcMethods;
 export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
@@ -124,6 +125,11 @@ class CoreIpcHandlers extends CallablePlugin {
       return true;
     const tssKey = this.appManager.queryAndLoadAppTssKey(appId);
     return !!tssKey;
+  }
+
+  @ipcMethod(IpcMethods.FindNAvailablePartners)
+  async __findNAvailablePartners(data: {appId: string, searchList: string[], count: number}): Promise<string[]> {
+    return await this.appManager.findNAvailablePartners(data.appId, data.searchList, data.count)
   }
 }
 

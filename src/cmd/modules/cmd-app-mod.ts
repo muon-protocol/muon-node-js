@@ -92,7 +92,7 @@ export async function handler(argv) {
         }
       })
       expectConfirmed(tssResponse)
-      console.log(`tss key generating done.`, tssResponse.result.data.result)
+      console.log(`tss key generating done with this generators: [${tssResponse.result.data.init.keyGenerators}].`, tssResponse.result.data.result)
     }
   }
 }
