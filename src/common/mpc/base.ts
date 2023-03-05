@@ -2,11 +2,11 @@ import LevelPromise from "./level-promise.js";
 import Ajv from 'ajv';
 import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive, PartyConnectivityGraph} from "./types";
 import lodash from 'lodash'
+import * as PromiseLibs from '../promise-libs.js'
 import {timeout} from "../../utils/helpers.js";
 import { logger, Logger } from '@libp2p/logger'
 
 const {countBy} = lodash;
-
 const random = () => Math.floor(Math.random()*9999999)
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const ajv = new Ajv()
@@ -189,32 +189,14 @@ export class MultiPartyComputation {
   }
 
   private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any) {
-    const NumReTry = 1;
     const roundTitle = this.rounds[roundIndex];
-    let lastError: any;
-    let result: any;
-    for(let i=1 ; i<=NumReTry ; i++) {
-      lastError = undefined;
-      try {
-        result = network.askRoundData(from, this.id, roundIndex, dataToSend);
-        return result;
-        break;
-      }catch (e) {
-        lastError = e;
-        if(i != NumReTry)
-          await timeout(i*1000)
-      }
-    }
-    if(lastError)
-      throw lastError;
-
+    let result: any = await network.askRoundData(from, this.id, roundIndex, dataToSend);
     if(this.InputSchema[roundTitle] && !ajv.validate(this.InputSchema[roundTitle], result)){
       // console.dir({r,currentRound, result}, {depth: null})
       this.log.error("round data validation error schema: %O, data: %o",this.InputSchema[roundTitle], result)
       // @ts-ignore
       throw ajv.errors.map(e => e.message).join("\n");
     }
-
     return result;
   }
 
@@ -252,15 +234,31 @@ export class MultiPartyComputation {
           constructData: r===0 ? this.constructData : undefined,
         }
         this.log(`mpc[${this.id}].${currentRound} collecting round data`)
-        let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
-          qualifiedPartners.map(partner => {
-            return this.tryToGetRoundDate(network, partner, r, dataToSend)
-              .catch(e => {
-                this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
-                return null
-              })
-          })
-        )
+        let allPartiesResult: (PartnerRoundReceive|null)[] =
+          r == 0 ?
+            /** for round 0 */
+            (
+              await PromiseLibs.count(
+                Math.ceil(this.t * 1.1),
+                qualifiedPartners.map(partner => this.tryToGetRoundDate(network, partner, r, dataToSend)),
+                {
+                  timeout: 15e3,
+                  resolveOnTimeout: true,
+                  defaultResult: null
+                }
+              )
+            /** for rounds grater than 0 */
+            ) : (
+              await Promise.all(
+                qualifiedPartners.map(partner => {
+                  return this.tryToGetRoundDate(network, partner, r, dataToSend)
+                    .catch(e => {
+                      this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
+                      return null
+                    })
+                })
+              )
+          );
         this.log(`MPC[${this.id}].${currentRound} ${allPartiesResult.filter(i => !!i).length} nodes response received`)
         /** store partners output for current round */
         this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {

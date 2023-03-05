@@ -325,14 +325,14 @@ class BaseAppPlugin extends CallablePlugin {
     }
     /** sign mode */
     else{
-      let t0 = Date.now(), t1, t2, t3, t4, t5, t6;;
+      let t0 = Date.now(), t1, t2, t3, t4, t5, t6;
       let appParty = this.appParty!;
       /** find available partners to sign the request */
       const availablePartners: string[] = await this.appManager.findNAvailablePartners(
         this.APP_ID,
         appParty.partners,
         Math.min(
-          Math.ceil(appParty.t*1.2),
+          Math.ceil(appParty.t*1.4),
           appParty.partners.length,
         ),
         {timeout: 5000}
