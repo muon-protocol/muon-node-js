@@ -238,6 +238,7 @@ export class MultiPartyComputation {
           r == 0 ?
             /** for round 0 */
             (
+              console.log('ROUND-0', this.t * 1.4, qualifiedPartners.length)
               await PromiseLibs.count(
                 Math.ceil(this.t * 1.4),
                 qualifiedPartners.map(partner => this.tryToGetRoundDate(network, partner, r, dataToSend)),
