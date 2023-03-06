@@ -329,20 +329,20 @@ class BaseAppPlugin extends CallablePlugin {
       let t0 = Date.now(), t1, t2, t3, t4, t5, t6;
       let appParty = this.appParty!;
       /** find available partners to sign the request */
-      // const availablePartners: string[] = await this.appManager.findNAvailablePartners(
-      //   this.APP_ID,
-      //   appParty.partners,
-      //   Math.min(
-      //     Math.ceil(appParty.t*1.5),
-      //     appParty.partners.length,
-      //   ),
-      //   {timeout: 5000}
-      // );
-      let count = Math.min(
-        Math.ceil(appParty.t*1.5),
-        appParty.partners.length,
+      const availablePartners: string[] = await this.appManager.findNAvailablePartners(
+        this.APP_ID,
+        appParty.partners,
+        Math.min(
+          Math.ceil(appParty.t*1.5),
+          appParty.partners.length,
+        ),
+        {timeout: 5000}
       );
-      const availablePartners = shuffle(appParty.partners).slice(0, count-1);
+      // let count = Math.min(
+      //   Math.ceil(appParty.t*1.5),
+      //   appParty.partners.length,
+      // );
+      // const availablePartners = shuffle(appParty.partners).slice(0, count-1);
 
       t1 = Date.now();
       this.log(`partners:[%o] are available to sign the request`, availablePartners)
