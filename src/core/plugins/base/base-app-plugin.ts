@@ -332,7 +332,7 @@ class BaseAppPlugin extends CallablePlugin {
         this.APP_ID,
         appParty.partners,
         Math.min(
-          Math.ceil(appParty.t*1.4),
+          Math.ceil(appParty.t*1.5),
           appParty.partners.length,
         ),
         {timeout: 5000}
