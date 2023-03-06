@@ -245,7 +245,7 @@ export class MultiPartyComputation {
                 ),
                 qualifiedPartners.map(partner => this.tryToGetRoundDate(network, partner, r, dataToSend)),
                 {
-                  timeout: 5e3,
+                  timeout: 15e3,
                   resolveOnTimeout: true,
                   defaultResult: null
                 }
