@@ -62,7 +62,7 @@ class System extends CallablePlugin {
           item.tests.peerInfo &&
           item.uptime >= 5*60 &&
           item.tests.healthy &&
-          item.tests.responseTimeRank >= 4
+          item.tests.responseTimeRank <= 2
         )
       })
       availableIds = availables.map(p => `${p.id}`)
