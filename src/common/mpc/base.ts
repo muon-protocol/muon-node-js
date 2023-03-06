@@ -235,7 +235,7 @@ export class MultiPartyComputation {
         }
         this.log(`mpc[${this.id}].${currentRound} collecting round data`)
         let allPartiesResult: (PartnerRoundReceive|null)[] =
-          r == 0 && false ?
+          r == 0  ?
             /** for round 0 */
             (
               await PromiseLibs.count(
