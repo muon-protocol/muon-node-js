@@ -242,7 +242,7 @@ export class MultiPartyComputation {
                 Math.ceil(this.t * 1.2),
                 qualifiedPartners.map(partner => this.tryToGetRoundDate(network, partner, r, dataToSend)),
                 {
-                  timeout: 5e3,
+                  timeout: 15e3,
                   resolveOnTimeout: true,
                   defaultResult: null
                 }
