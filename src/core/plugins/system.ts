@@ -57,8 +57,13 @@ class System extends CallablePlugin {
       let availables = response.result.filter(item => {
         /** active nodes that has uptime more than 1 hour */
         // return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
-        return item.isDeployer || (item.active &&
-          item.tests.peerInfo && item.uptime >= 5*60 && item.tests.healthy)
+        return item.isDeployer || (
+          item.active &&
+          item.tests.peerInfo &&
+          item.uptime >= 5*60 &&
+          item.tests.healthy &&
+          item.tests.responseTimeRank >= 4
+        )
       })
       availableIds = availables.map(p => `${p.id}`)
     }
