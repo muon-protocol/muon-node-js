@@ -239,7 +239,7 @@ export class MultiPartyComputation {
             /** for round 0 */
             (
               await PromiseLibs.count(
-                Math.ceil(this.t * 1.2),
+                Math.ceil(this.t * 1.3),
                 qualifiedPartners.map(partner => this.tryToGetRoundDate(network, partner, r, dataToSend)),
                 {
                   timeout: 15e3,
