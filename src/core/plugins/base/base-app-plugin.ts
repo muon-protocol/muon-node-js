@@ -27,6 +27,7 @@ import * as NetworkIpc from "../../../network/ipc.js";
 import {PublicKey} from "../../../utils/tss/types";
 import {RedisCache} from "../../../common/redis-cache.js";
 
+const {shuffle} = lodash;
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
 const ajv = new Ajv()
@@ -332,11 +333,16 @@ class BaseAppPlugin extends CallablePlugin {
         this.APP_ID,
         appParty.partners,
         Math.min(
-          Math.ceil(appParty.t*1.4),
+          Math.ceil(appParty.t*1.5),
           appParty.partners.length,
         ),
         {timeout: 5000}
       );
+      // let count = Math.min(
+      //   Math.ceil(appParty.t*1.5),
+      //   appParty.partners.length,
+      // );
+      // const availablePartners = shuffle(appParty.partners).slice(0, count-1);
 
       t1 = Date.now();
       this.log(`partners:[%o] are available to sign the request`, availablePartners)

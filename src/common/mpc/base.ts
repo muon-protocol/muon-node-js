@@ -235,11 +235,14 @@ export class MultiPartyComputation {
         }
         this.log(`mpc[${this.id}].${currentRound} collecting round data`)
         let allPartiesResult: (PartnerRoundReceive|null)[] =
-          r == 0 ?
+          r == 0  ?
             /** for round 0 */
             (
               await PromiseLibs.count(
-                Math.ceil(this.t * 1.2),
+                Math.min(
+                  Math.ceil(this.t * 1.4),
+                  qualifiedPartners.length
+                ),
                 qualifiedPartners.map(partner => this.tryToGetRoundDate(network, partner, r, dataToSend)),
                 {
                   timeout: 15e3,
