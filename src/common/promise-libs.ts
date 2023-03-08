@@ -43,6 +43,7 @@ export function count(n: number, list: Promise<any>[], options:Options={}): Prom
     for(let i=0 ; i<list.length ; i++) {
       list[i]
         .then(result => {
+          execTimes[i] = Date.now() - startTime
           responseList[i] = result;
           successCount++;
         })
@@ -50,9 +51,7 @@ export function count(n: number, list: Promise<any>[], options:Options={}): Prom
           // console.log("===========================", e.message)
         })
         .finally(() => {
-          execTimes[i] = Date.now() - startTime
           --remaining;
-
           if(successCount >= n) {
             finalized = true;
             log("count exec times %o", execTimes)

@@ -529,6 +529,9 @@ export default class AppManager extends CallablePlugin {
     );
 
     let pendingRequests = peers.length
+    const execTimes = new Array(peers.length).fill(-1)
+    const startTime = Date.now()
+    let finalized = false;
     for(let i=0 ; i<peers.length ; i++) {
       this.remoteCall(
         peers[i].peerId,
@@ -537,18 +540,28 @@ export default class AppManager extends CallablePlugin {
         {timeout: options!.timeout},
       )
         .then(({status}) => {
+          execTimes[i] = Date.now() - startTime
           if(status === "DEPLOYED") {
             responseList.push(peers[i][options!.return!])
-            if (--n <= 0)
-              resultPromise.resolve(responseList);
+            n--;
           }
         })
         .catch(e => {
           log.error("get deployment status has been failed %O", e)
         })
         .finally(() => {
-          if(--pendingRequests <= 0)
+          if (n <= 0) {
+            if(!finalized)
+              log("find availability exec times %o, nodes: %o", execTimes, peers.map(p => p.id))
+            finalized = true
             resultPromise.resolve(responseList);
+          }
+          if(--pendingRequests <= 0) {
+            if(!finalized)
+              log("find availability exec times %o, nodes: %o", execTimes, peers.map(p => p.id))
+            finalized = true
+            resultPromise.resolve(responseList);
+          }
         })
     }
 
