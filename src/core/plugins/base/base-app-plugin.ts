@@ -1,8 +1,6 @@
 import CallablePlugin from './callable-plugin.js'
 import { createClient, RedisClient } from 'redis'
 import Request from '../../../common/db-models/Request.js'
-import AppContext from "../../../common/db-models/AppContext.js"
-import AppTssConfig from "../../../common/db-models/AppTssConfig.js"
 import {makeAppDependency} from './app-dependencies/index.js'
 import {getTimestamp, pub2json, timeout} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
@@ -27,12 +25,14 @@ import {logger} from '@libp2p/logger'
 import {bn2hex} from "../../../utils/tss/utils.js";
 import * as NetworkIpc from "../../../network/ipc.js";
 import {PublicKey} from "../../../utils/tss/types";
+import {RedisCache} from "../../../common/redis-cache.js";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
 const ajv = new Ajv()
 const web3 = new Web3();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
+const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
 
 export type AppRequestSignature = {
   /**
@@ -440,10 +440,10 @@ class BaseAppPlugin extends CallablePlugin {
 
       if (confirmed && !isDuplicateRequest) {
         if(!!this.onConfirm) {
-          await this.informRequestConfirmation(requestData)
-            // .catch(e => {
-            //   this.log.error("error when informing request confirmation %O", e)
-            // })
+          this.informRequestConfirmation(requestData)
+            .catch(e => {
+              this.log.error("error when informing request confirmation %O", e)
+            })
         }
         newRequest.save()
         this.muon.getPlugin('memory').writeAppMem(requestData)
@@ -872,12 +872,12 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async preProcessRemoteRequest(request) {
+  async preProcessRemoteRequest(request, checkTimestamp:boolean=true) {
     const {method, data: {params={}}} = request
     /**
      * Check request timestamp
      */
-    if(getTimestamp() - request.data.timestamp > this.REMOTE_CALL_TIMEOUT/1000) {
+    if(checkTimestamp && getTimestamp() - request.data.timestamp > this.REMOTE_CALL_TIMEOUT/1000) {
       throw "Request timestamp expired to sign."
     }
 
@@ -979,6 +979,19 @@ class BaseAppPlugin extends CallablePlugin {
     return { sign }
   }
 
+  async validateCompletedRequest(request, checkTimestamp:boolean=true): Promise<boolean> {
+
+    const [result, hash] = await this.preProcessRemoteRequest(request, checkTimestamp);
+
+    for(let i=0 ; i<request.signatures.length ; i++) {
+      if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
+        return false
+      }
+    }
+
+    return true;
+  }
+
   @remoteMethod(RemoteMethods.InformRequestConfirmation)
   async __onRequestConfirmation(request, callerInfo) {
     if(!this.onConfirm)
@@ -992,15 +1005,14 @@ class BaseAppPlugin extends CallablePlugin {
       throw "Only request owner can inform confirmation."
     }
 
-    const [result, hash] = await this.preProcessRemoteRequest(request);
-
-    for(let i=0 ; i<request.signatures.length ; i++) {
-      if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
-        throw `TSS signature not verified`
-      }
+    const isValid = await this.validateCompletedRequest(request);
+    if(!isValid) {
+      throw `TSS signature not verified`
     }
 
-    await this.onConfirm(request, result, request.signatures);
+    await this.onConfirm(request, request.data.result, request.signatures)
+
+    await requestConfirmationCache.set(request.reqId, '1');
 
     return `OK`;
   }

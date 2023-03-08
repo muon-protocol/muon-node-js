@@ -24,7 +24,6 @@ const modelSchema = mongoose.Schema({
   party: {type: TssPartyInfo},
   deploymentRequest: {type: Object, required: true},
   publicKey: {type: TssPublicKeyInfo},
-  keyShare: {type: String},
   deployTime: {type: Date, required: true},
   reShareTime: {type: Date},
 }, {timestamps: true});
