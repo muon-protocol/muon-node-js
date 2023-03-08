@@ -92,9 +92,7 @@ function store(argv) {
   let key = value[0];
   value = value[1];
   let env = fs.readFileSync(ENV_PATH, "utf8");
-  console.log(key);
   const regex = new RegExp(`${key}.*`, 'gi');
-  console.log(regex);
   env = env.replace(regex, '');
   env += `\n${key}=${value}`;
   fs.writeFileSync(ENV_PATH, env);
