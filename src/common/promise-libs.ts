@@ -1,4 +1,7 @@
 import TimeoutPromise, {TimeoutPromiseOptions} from "./timeout-promise.js";
+import {logger} from '@libp2p/logger'
+
+const log = logger("muon:promise-libs")
 
 type Options = {
   timeout?: number,
@@ -34,22 +37,40 @@ export function count(n: number, list: Promise<any>[], options:Options={}): Prom
       }
     )
     let successCount=0, remaining = n;
+    const execTimes = new Array(list.length).fill(-1)
+    const startTime = Date.now()
+    let finalized = false;
     for(let i=0 ; i<list.length ; i++) {
       list[i]
         .then(result => {
           responseList[i] = result;
-          if(++successCount >= n)
-            resultPromise.resolve(responseList)
+          successCount++;
         })
-        .catch(e => {})
+        .catch(e => {
+          // console.log("===========================", e.message)
+        })
         .finally(() => {
-          if(--remaining < n-successCount) {
-            if(!options.resolveOnTimeout)
-              resultPromise.reject(`no enough promise to resolve`)
+          execTimes[i] = Date.now() - startTime
+          --remaining;
+
+          if(successCount >= n) {
+            finalized = true;
+            log("count exec times %o", execTimes)
+            resultPromise.resolve(responseList)
           }
-          if(remaining === 0) {
-            if(options.resolveOnTimeout)
+
+          if(remaining < n-successCount) {
+            if(!options.resolveOnTimeout) {
+              finalized = true;
+              resultPromise.reject(`no enough promise to resolve`)
+            }
+          }
+
+          if(!finalized && remaining === 0) {
+            if(options.resolveOnTimeout) {
+              log("count exec times %o", execTimes)
               resultPromise.resolve(responseList)
+            }
             else
               resultPromise.reject(`no enough promise to resolve`)
           }
