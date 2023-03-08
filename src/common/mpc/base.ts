@@ -209,6 +209,8 @@ export class MultiPartyComputation {
 
       for (let r = 0; r < this.rounds.length; r++) {
         Object.freeze(qualifiedPartners);
+        const roundStartTime = Date.now();
+
         const currentRound = this.rounds[r], previousRound = r>0 ? this.rounds[r-1] : null;
         this.log(`processing round mpc[${this.id}].${currentRound} ...`)
         /** prepare round handler inputs */
@@ -272,7 +274,11 @@ export class MultiPartyComputation {
 
         /** update qualified list based on current round outputs */
         qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[currentRound!], qualifiedPartners);
-        this.log(`MPC[${this.id}][${currentRound}] complete with qualified list: %o`, qualifiedPartners);
+        this.log(
+          `MPC[${this.id}][${currentRound}] complete in %d ms with qualified list: %o`,
+          Date.now() - roundStartTime,
+          qualifiedPartners
+        );
 
         if(qualifiedPartners.length < this.t) {
           throw `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified`
