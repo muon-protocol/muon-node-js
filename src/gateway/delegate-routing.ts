@@ -2,7 +2,7 @@ import {Router} from 'express';
 import * as NetworkIpc from '../network/ipc.js'
 import {mixGetPost} from './middlewares.js'
 import {logger} from '@libp2p/logger'
-import soliditySha3 from "../utils/soliditySha3.js";
+import {muonSha3} from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
 import {MuonNodeInfo} from "../common/types";
 import asyncHandler from 'express-async-handler'
@@ -66,14 +66,14 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   if(!peerInfo?.multiaddrs || !Array.isArray(peerInfo.multiaddrs) || peerInfo.multiaddrs.length === 0)
     throw `empty multiaddrs list`
 
-  let hash = soliditySha3([
+  let hash = muonSha3(
     {type: "uint16", value: gatewayPort},
     {type: "uint64", value: timestamp},
     {type: "string", value: peerInfo.id},
     ...(
       peerInfo.multiaddrs.map(value => ({type: "string", value}))
     )
-  ])
+  )
   // @ts-ignore
   const wallet = crypto.recover(hash, signature)
   if(wallet !== realPeerInfo[0].wallet) {

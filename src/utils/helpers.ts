@@ -137,7 +137,3 @@ export async function getCommitId(): Promise<string> {
     throw stderr;
   return stdout.trim();
 }
-
-export function nodeSha3(msg): string {
-  return '0x' + createHash('sha3-256').update(msg).digest('hex')
-}

@@ -3,7 +3,7 @@ import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/ap
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
 import {AppDeploymentInfo, JsonPublicKey, MuonNodeInfo} from "../../common/types";
-import soliditySha3 from '../../utils/soliditySha3.js'
+import {soliditySha3} from '../../utils/sha3.js'
 import * as tssModule from '../../utils/tss/index.js'
 import AppContext from "../../common/db-models/AppContext.js"
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
@@ -122,7 +122,7 @@ class System extends CallablePlugin {
         hash: soliditySha3([
           {t: 'uint256', v: seed},
           {t: 'uint64', v: node.id},
-        ])
+        ])!
       }
     });
     nodesHash.sort((a, b) => (a.hash > b.hash ? 1 : -1))
@@ -400,7 +400,7 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async generateTssKeyBetweenPartners(t, partners: string[]) {
-    const partyId = soliditySha3(partners.map(v => ({t:'string', v})))
+    const partyId = soliditySha3(partners.map(v => ({t:'string', v})))!
 
     await this.tssPlugin.createParty({id: partyId, t, partners});
     let party = this.tssPlugin.parties[partyId];

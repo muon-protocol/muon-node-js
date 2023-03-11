@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 import {MODEL_APP_CONTEXT} from './constants.js'
-import soliditySha3 from '../../utils/soliditySha3.js'
+import {soliditySha3} from '../../utils/sha3.js'
 
 const TssPartyInfo = mongoose.Schema({
   t: {type: Number, required: true},

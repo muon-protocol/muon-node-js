@@ -22,7 +22,7 @@ import {
   getNftInfo as ethGetNftInfo,
   hashCallOutput as ethHashCallOutput
 } from '../utils/eth.js'
-import soliditySha3 from '../utils/soliditySha3.js'
+import {soliditySha3} from '../utils/sha3.js'
 import { multiCall } from '../utils/multicall.js'
 import { BNSqrt } from'../utils/bn-sqrt.js'
 
