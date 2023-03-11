@@ -1,21 +1,15 @@
 import Web3 from 'web3'
-import {createHash, Encoding} from "node:crypto";
+import jsSha3 from 'js-sha3'
 const web3Instance = new Web3()
 
 export function soliditySha3(params) {
     return web3Instance.utils.soliditySha3(...params)
 }
 
-export function nodeSha3(input: string|Buffer, inputType?: Encoding) {
-    if(typeof input === 'string' && !!inputType)
-        return '0x' + createHash('sha3-256').update(input, inputType).digest('hex')
-    else
-        return '0x' + createHash('sha3-256').update(input).digest('hex')
-}
-
 export function muonSha3(...args): string {
     const packed:string = web3Instance.utils.encodePacked(...args)!;
     if(!packed)
         throw `muonSha3 error: unknown input data`
-    return nodeSha3(packed, 'hex')
+  let buff = Buffer.from(packed.substring(2), 'hex');
+  return '0x' + jsSha3.keccak_256(buff)
 }
