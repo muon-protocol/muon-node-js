@@ -1,5 +1,6 @@
 #!/bin/bash
 . ~/.bashrc
+GIT_MERGE_AUTOEDIT=no
 
 . "`dirname "$0"`/pre-run.sh"
 
