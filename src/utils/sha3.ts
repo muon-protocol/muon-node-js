@@ -1,5 +1,5 @@
 import Web3 from 'web3'
-import {createHash, Encoding} from "crypto";
+import {createHash, Encoding} from "node:crypto";
 const web3Instance = new Web3()
 
 export function soliditySha3(params) {

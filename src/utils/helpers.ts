@@ -11,7 +11,6 @@ import {promisify} from 'util'
 import childProcess from 'node:child_process'
 import {isIP} from 'net'
 import isIpPrivate from 'private-ip'
-import {createHash} from "crypto";
 const toBN = Web3.utils.toBN;
 const exec = promisify(childProcess.exec);
 
