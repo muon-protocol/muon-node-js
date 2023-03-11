@@ -11,6 +11,7 @@ import {promisify} from 'util'
 import childProcess from 'node:child_process'
 import {isIP} from 'net'
 import isIpPrivate from 'private-ip'
+import {createHash} from "crypto";
 const toBN = Web3.utils.toBN;
 const exec = promisify(childProcess.exec);
 
@@ -135,4 +136,8 @@ export async function getCommitId(): Promise<string> {
   if(stderr)
     throw stderr;
   return stdout.trim();
+}
+
+export function nodeSha3(msg): string {
+  return '0x' + createHash('sha3-256').update(msg).digest('hex')
 }

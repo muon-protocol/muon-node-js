@@ -1,7 +1,6 @@
 import {Router} from 'express';
-import Web3 from 'web3'
 import {mixGetPost} from "./middlewares.js";
-const {utils: {sha3}} = Web3;
+import {nodeSha3} from "../utils/helpers.js";
 
 const mine = function(seed, difficulty = 5) {
   let nonce = 0;
@@ -9,7 +8,7 @@ const mine = function(seed, difficulty = 5) {
   difficulty = parseInt(difficulty)
   const prefix = '0x' + new Array(difficulty).fill('0').join('')
   while (true) {
-    const h = sha3(seed + nonce);
+    const h = nodeSha3(seed + nonce);
     if (!!h && h.startsWith(prefix)) {
       return nonce;
     }
