@@ -134,16 +134,20 @@ class Explorer extends CallablePlugin {
     if(!isValid)
       throw `request validation failed.`
 
-    const hasAnnouncement = !!app.onConfirm;
-    let announceList = hasAnnouncement ? appParty.partners : [];
-    if(hasAnnouncement && !!app.getConfirmAnnounceList) {
-      announceList = [
-        ...announceList,
-        ...await app.getConfirmAnnounceList(request)
-      ]
+    const announceList = {}, hasAnnouncement = !!app.onConfirm;
+    if(hasAnnouncement){
+      announceList['primary'] = appParty.partners
+      if(!!app.getConfirmAnnounceList) {
+        announceList['secondary'] = await app.getConfirmAnnounceList(request)
+      }
     }
 
-    const nodesToAnnounceConfirmation = this.collateralPlugin.filterNodes({list: announceList});
+    const nodesToAnnounceConfirmation = this.collateralPlugin.filterNodes({
+      list: [
+        ...announceList['primary'],
+        ...(announceList['secondary']||[]),
+        ]
+    });
     const announced: boolean[] = await Promise.all(nodesToAnnounceConfirmation.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
         return this.__isReqConfirmationAnnounced(reqId, this.collateralPlugin.currentNodeInfo);
@@ -165,10 +169,12 @@ class Explorer extends CallablePlugin {
         n: appParty.max
       },
       hasAnnouncement,
+      announceList,
       announced: announced.reduce((obj, check, index) => {
-        obj[nodesToAnnounceConfirmation[index].id] = check
+        let group = index < announceList['primary'].length ? 'primary' : 'secondary'
+        obj[group][nodesToAnnounceConfirmation[index].id] = check
         return obj
-      }, {})
+      }, {primary: {}, secondary: {}})
     }
   }
 

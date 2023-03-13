@@ -878,19 +878,19 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async preProcessRemoteRequest(request, checkTimestamp:boolean=true) {
+  async preProcessRemoteRequest(request, validation:boolean=true) {
     const {method, data: {params={}}} = request
     /**
      * Check request timestamp
      */
-    if(checkTimestamp && getTimestamp() - request.data.timestamp > this.REMOTE_CALL_TIMEOUT/1000) {
+    if(validation && getTimestamp() - request.data.timestamp > this.REMOTE_CALL_TIMEOUT/1000) {
       throw "Request timestamp expired to sign."
     }
 
     /**
      * validate params schema
      */
-    if(this.METHOD_PARAMS_SCHEMA){
+    if(validation && this.METHOD_PARAMS_SCHEMA){
       if(this.METHOD_PARAMS_SCHEMA[method]){
         if(!ajv.validate(this.METHOD_PARAMS_SCHEMA[method], params)){
           // @ts-ignore
@@ -902,7 +902,7 @@ class BaseAppPlugin extends CallablePlugin {
     /**
      * validate request
      */
-    if(this.validateRequest){
+    if(validation && this.validateRequest){
       await this.validateRequest(request)
     }
     /**
@@ -985,9 +985,9 @@ class BaseAppPlugin extends CallablePlugin {
     return { sign }
   }
 
-  async validateCompletedRequest(request, checkTimestamp:boolean=true): Promise<boolean> {
+  async validateCompletedRequest(request, validation:boolean=true): Promise<boolean> {
 
-    const [result, hash] = await this.preProcessRemoteRequest(request, checkTimestamp);
+    const [result, hash] = await this.preProcessRemoteRequest(request, validation);
 
     for(let i=0 ; i<request.signatures.length ; i++) {
       if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
