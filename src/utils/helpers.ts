@@ -1,3 +1,5 @@
+import fs from 'fs'
+import readline from 'readline'
 import BigNumber from 'bignumber.js'
 BigNumber.set({DECIMAL_PLACES: 26})
 import Web3 from 'web3'
@@ -80,6 +82,24 @@ export const deepFreeze = function deepFreeze (object) {
 export const stackTrace = function() {
   let err = new Error();
   return err.stack;
+}
+
+export async function readFileTail(path: string, n: number): Promise<string> {
+  const fileStream = fs.createReadStream(path);
+
+  const rl = readline.createInterface({
+    input: fileStream,
+    crlfDelay: 1
+  });
+
+  const lines: string[] = []
+  for await (const line of rl) {
+    lines.push(line)
+    if(lines.length > n)
+      lines.splice(0, 1)
+  }
+
+  return lines.join('\n');
 }
 
 export function filePathInfo(importMeta) {
