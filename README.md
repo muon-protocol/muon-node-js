@@ -26,6 +26,7 @@ By enabling auto update any commit to the repository will trigger the update and
     EOF
 
 #### Local devnet
+
 You can run local devnet on port 8080
 
     docker-compose build --build-arg INFURA_PROJECT_ID=< your infura project id >
