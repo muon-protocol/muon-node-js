@@ -48,15 +48,14 @@ check_for_update (){
     fi
 
     git checkout package.json package-lock.json
-    #update_check = `git pull --recurse-submodules origin "$current_branch"`
-    #if echo $update_check | grep -q 'Already up to date'; then
-    if git pull --recurse-submodules origin "$current_branch" | grep -q 'Already up to date'; then
+    update_check=`git pull --recurse-submodules origin "$current_branch"`
+    if echo $update_check | grep -q 'Already up to date'; then
         echo "No new updates";
     else
         log "========== updating detected ===========";
-#        log "============ update reason =============";
-#        log "$update_check"
-#        log "========================================";
+        log "============ update reason =============";
+        log "$update_check"
+        log "========================================";
         log "Installing dependencies: $_NODE  $_NPM install";
         log `pwd`;
         log `$_NODE  $_NPM install`
