@@ -48,7 +48,7 @@ check_for_update (){
     fi
 
     git checkout package.json package-lock.json
-    update_check=`git pull --recurse-submodules origin "$current_branch"`
+    update_check=`git pull --recurse-submodules origin "$current_branch" 2>&1`
     if echo $update_check | grep -q 'Already up to date'; then
         echo "No new updates";
     else
