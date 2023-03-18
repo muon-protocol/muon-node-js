@@ -57,7 +57,7 @@ check_for_update (){
         exit;
     fi
 
-    update_check=`git pull --recurse-submodules origin "$current_branch" 2>&1`
+    update_check=`git pull --recurse-submodules origin "$remote_commit" 2>&1`
     
     if [ $? -ne 0 ]; then
         log "Git pull error.";
