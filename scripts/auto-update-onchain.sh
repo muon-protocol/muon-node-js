@@ -48,7 +48,16 @@ check_for_update (){
     fi
 
     git checkout package.json package-lock.json
-    update_check=`git pull --recurse-submodules origin "$current_branch" 2>&1`
+
+    current_commit=`git rev-parse HEAD`
+    remote_commit=`node $project_dir/scripts/onchain_commit.cjs`
+    
+    if [[ "$current_commit" == "$remote_commit" ]]; then
+        log "No new commits"
+        exit;
+    fi
+
+    update_check=`git pull --recurse-submodules origin "$remote_commit" 2>&1`
     
     if [ $? -ne 0 ]; then
         log "Git pull error.";

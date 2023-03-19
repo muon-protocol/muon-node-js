@@ -2,7 +2,7 @@ import {Router} from 'express';
 import * as NetworkIpc from '../network/ipc.js'
 import lodash from 'lodash'
 import asyncHandler from 'express-async-handler'
-import {getCommitId} from "../utils/helpers.js";
+import {getCommitId, readFileTail} from "../utils/helpers.js";
 
 const NodeAddress = process.env.SIGN_WALLET_ADDRESS || null;
 const PeerID = process.env.PEER_ID || null
@@ -23,6 +23,13 @@ router.use('/', asyncHandler(async (req, res, next) => {
     getCommitId().catch(e => null)
   ]);
 
+  let autoUpdateLogs: string|undefined = undefined;
+  if(req.query.au !== undefined) {
+    // @ts-ignore
+    const n = parseInt(req.query.au) || 100;
+    autoUpdateLogs = await readFileTail("auto-update.log", n);
+  }
+
   let discordVerification=process.env.DISCORD_VERIFICATION;
 
   res.json({
@@ -39,6 +46,7 @@ router.use('/', asyncHandler(async (req, res, next) => {
       networkingPort: process.env.PEER_PORT,
       uptime,
       commitId,
+      autoUpdateLogs,
     },
     managerContract: {
       network: netConfig?.nodeManager?.network,

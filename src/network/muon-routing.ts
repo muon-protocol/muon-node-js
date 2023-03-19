@@ -14,7 +14,7 @@ import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
 import { multiaddr } from '@multiformats/multiaddr'
 import {parseBool, timeout} from "../utils/helpers.js";
 import * as crypto from '../utils/crypto.js'
-import soliditySha3 from "../utils/soliditySha3.js";
+import {muonSha3} from "../utils/sha3.js";
 import {isPrivate} from "./utils.js";
 
 const log = logger('muon:network:routing')
@@ -190,14 +190,14 @@ export class MuonRouting implements PeerRouting, Startable {
           }
 
           const timestamp = Date.now();
-          const hash = soliditySha3([
+          const hash = muonSha3(
             {type: "uint16", value: gatewayPort},
             {type: "uint64", value: timestamp},
             {type: "string", value: peerInfo.id},
             ...(
               peerInfo.multiaddrs.map(value => ({type: "string", value}))
             )
-          ])
+          )
 
           const discoveryData = {
             gatewayPort,

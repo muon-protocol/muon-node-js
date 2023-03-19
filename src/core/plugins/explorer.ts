@@ -10,14 +10,24 @@ import * as NetworkIpc from '../../network/ipc.js'
 import {GlobalBroadcastChannels} from "../../common/contantes.js";
 import CollateralInfoPlugin from "./collateral-info.js";
 import {timeout} from '../../utils/helpers.js'
+import {RedisCache} from "../../common/redis-cache.js";
+import BaseAppPlugin from "./base/base-app-plugin";
+
+const requestConfirmCache: RedisCache = new RedisCache('req-confirm')
 
 type GetNodeInfo = Override<GatewayCallData, {params: {id: string}}>
 
 type GetTransactionData = Override<GatewayCallData, {params: { reqId: string }}>
 
+type CheckReqData = Override<GatewayCallData, {params: {request: object}}>
+
 type LastTransactionData = Override<GatewayCallData, {params: { count?: number }}>
 
 type GetAppData = Override<GatewayCallData, {params: { appName?: string, appId?: string }}>
+
+const RemoteMethods = {
+  IsReqConfirmationAnnounced: "is-req-conf-ann",
+}
 
 @remoteApp
 class Explorer extends CallablePlugin {
@@ -104,6 +114,70 @@ class Explorer extends CallablePlugin {
     }
   }
 
+  /**
+   * For all nodes in announce list of app, this function confirms that app.onConfirm has been called on this node.
+   */
+  @gatewayMethod('req-check')
+  async __checkRequest(data: CheckReqData) {
+    const {request} = data?.params || {};
+    if(!request)
+      throw `request undefined`
+    // @ts-ignore
+    const appParty = this.tssPlugin.getAppParty(request.appId)
+    if(!appParty)
+      throw `App party not found`;
+
+    // @ts-ignore
+    const {appId, reqId} = request;
+    const app: BaseAppPlugin = this.muon.getAppById(appId)
+    let isValid = await app.validateCompletedRequest(request, false)
+    if(!isValid)
+      throw `request validation failed.`
+
+    const announceList = {}, hasAnnouncement = !!app.onConfirm;
+    if(hasAnnouncement){
+      announceList['primary'] = appParty.partners
+      if(!!app.getConfirmAnnounceList) {
+        announceList['secondary'] = await app.getConfirmAnnounceList(request)
+      }
+    }
+
+    const nodesToAnnounceConfirmation = this.collateralPlugin.filterNodes({
+      list: [
+        ...announceList['primary'],
+        ...(announceList['secondary']||[]),
+        ]
+    });
+    const announced: boolean[] = await Promise.all(nodesToAnnounceConfirmation.map(node => {
+      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
+        return this.__isReqConfirmationAnnounced(reqId, this.collateralPlugin.currentNodeInfo);
+      }
+      else {
+        return this.remoteCall(
+          node.peerId,
+          RemoteMethods.IsReqConfirmationAnnounced,
+          reqId
+        )
+          .catch(e => false)
+      }
+    }))
+
+    return {
+      isValid,
+      tss: {
+        t: appParty.t,
+        n: appParty.max
+      },
+      hasAnnouncement,
+      announceList,
+      announced: announced.reduce((obj, check, index) => {
+        let group = index < announceList['primary'].length ? 'primary' : 'secondary'
+        obj[group][nodesToAnnounceConfirmation[index].id] = check
+        return obj
+      }, {primary: {}, secondary: {}})
+    }
+  }
+
   @gatewayMethod("tx")
   async __onTxInfo(data: GetTransactionData) {
     let content = await Content.findOne({reqId: data?.params?.reqId});
@@ -164,6 +238,12 @@ class Explorer extends CallablePlugin {
         publicKey: context.publicKey || null
       }
     }
+  }
+
+  @remoteMethod(RemoteMethods.IsReqConfirmationAnnounced)
+  async __isReqConfirmationAnnounced(reqId: string, callerInfo) {
+    let confirmed: string = await requestConfirmCache.get(reqId)
+    return confirmed === '1'
   }
 }
 

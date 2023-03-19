@@ -584,6 +584,7 @@ class TssPlugin extends CallablePlugin {
             await this.appManager.saveAppTssConfig({
               version: context.version,
               appId: appId,
+              context: context._id,
               publicKey: pub2json(key.publicKey!),
               keyShare: bn2hex(key.share!),
             })

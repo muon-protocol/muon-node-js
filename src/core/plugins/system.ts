@@ -2,8 +2,8 @@ import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
-import {AppDeploymentStatus, JsonPublicKey, MuonNodeInfo} from "../../common/types";
-import soliditySha3 from '../../utils/soliditySha3.js'
+import {AppDeploymentInfo, JsonPublicKey, MuonNodeInfo} from "../../common/types";
+import {soliditySha3} from '../../utils/sha3.js'
 import * as tssModule from '../../utils/tss/index.js'
 import AppContext from "../../common/db-models/AppContext.js"
 import AppTssConfig from "../../common/db-models/AppTssConfig.js"
@@ -57,8 +57,13 @@ class System extends CallablePlugin {
       let availables = response.result.filter(item => {
         /** active nodes that has uptime more than 1 hour */
         // return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
-        return item.isDeployer || (item.active && 
-          item.tests.peerInfo && item.uptime >= 5*60 && item.tests.healthy)
+        return item.isDeployer || (
+          item.active &&
+          item.tests.peerInfo &&
+          item.uptime >= 5*60 &&
+          item.tests.healthy &&
+          item.tests.responseTimeRank <= 2
+        )
       })
       availableIds = availables.map(p => `${p.id}`)
     }
@@ -88,8 +93,10 @@ class System extends CallablePlugin {
     const {type, details} = data||{};
     switch (type) {
       case 'undeploy': {
-        const {appId, deploymentReqId, tssKeyAddress} = details || {}
-        this.__undeployApp({appId, deploymentReqId, tssKeyAddress}, callerInfo)
+        if(!callerInfo.isDeployer)
+          return;
+        const {appId, deploymentTimestamp} = details || {}
+        this.__undeployApp({appId, deploymentTimestamp}, callerInfo)
           .catch(e => {})
         break;
       }
@@ -115,7 +122,7 @@ class System extends CallablePlugin {
         hash: soliditySha3([
           {t: 'uint256', v: seed},
           {t: 'uint64', v: node.id},
-        ])
+        ])!
       }
     });
     nodesHash.sort((a, b) => (a.hash > b.hash ? 1 : -1))
@@ -127,18 +134,8 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async getAppStatus(appId: string): Promise<AppDeploymentStatus> {
-    if(!this.appManager.appIsDeployed(appId))
-      return {appId, deployed: false}
-    if(!this.appManager.appHasTssKey(appId))
-      return {appId, deployed: true, version: -1}
-    const context = this.appManager.getAppContext(appId)
-    return {
-      appId,
-      deployed: true,
-      version: context.version,
-      reqId: context.deploymentRequest.reqId,
-    }
+  getAppDeploymentInfo(appId: string): AppDeploymentInfo {
+    return this.appManager.getAppDeploymentInfo(appId);
   }
 
   @appApiMethod({})
@@ -293,34 +290,6 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async storeAppTss(appId, keyId) {
-    // console.log(`System.storeAppTss`, {appId})
-
-    /** check context exist */
-    const context = await AppContext.findOne({appId}).exec();
-    if(!context)
-      throw `App deployment info not found.`
-
-    /** check key not created before */
-    const oldTssKey = await AppTssConfig.findOne({
-      appId: appId,
-      version: context.version,
-    }).exec();
-    if(oldTssKey)
-      throw `App tss key already generated`
-
-    /** store tss key */
-    let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
-    await useDistributedKey(key.publicKey!.encode('hex', true), `app-${appId}-tss`)
-    await this.appManager.saveAppTssConfig({
-      version: context.version,
-      appId: appId,
-      publicKey: pub2json(key.publicKey!),
-      keyShare: bn2hex(key.share!),
-    })
-  }
-
-  @appApiMethod({})
   async appKeyGenConfirmed(request) {
     const {data: {params: {appId}, init: {id: keyId}}} = request;
 
@@ -333,12 +302,9 @@ class System extends CallablePlugin {
     const currentNode = this.collateralPlugin.currentNodeInfo!;
     if(context.party.partners.includes(currentNode.id)) {
       /** check key not created before */
-      const oldTssKey = await AppTssConfig.findOne({
-        appId: appId,
-        version: context.version,
-      }).exec();
-      if(oldTssKey)
-        throw `App tss key already generated`
+      if(context.publicKey?.encoded) {
+        throw `App context already has key`
+      }
 
       /** store tss key */
       let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
@@ -346,6 +312,7 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         version: context.version,
         appId: appId,
+        context: context._id,
         publicKey: pub2json(key.publicKey!),
         keyShare: bn2hex(key.share!),
       })
@@ -354,6 +321,7 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         version: context.version,
         appId: appId,
+        context: context._id,
         publicKey: request.data.init.publicKey
       })
     }
@@ -373,7 +341,7 @@ class System extends CallablePlugin {
 
     /** check app context */
     let context = this.appManager.getAppContext(appId);
-    const deploymentReqId = context.deploymentRequest.reqId;
+    const deploymentTimestamp = context.deploymentRequest.data.timestamp;
     const tssKeyAddress = context.publicKey?.address || null
 
     let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
@@ -381,7 +349,7 @@ class System extends CallablePlugin {
     log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
     await Promise.all(partnersToCall.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__undeployApp({appId, deploymentReqId, tssKeyAddress}, this.collateralPlugin.currentNodeInfo)
+        return this.__undeployApp({appId, deploymentTimestamp}, this.collateralPlugin.currentNodeInfo)
           .catch(e => {
             log.error(`error when undeploy at current node: %O`, e)
             return e?.message || "unknown error occurred"
@@ -391,7 +359,7 @@ class System extends CallablePlugin {
         return this.remoteCall(
           node.peerId,
           RemoteMethods.Undeploy,
-          {appId, deploymentReqId, tssKeyAddress}
+          {appId, deploymentTimestamp}
         )
           .catch(e => {
             log.error(`error when undeploy at ${node.peerId}: %O`, e)
@@ -400,7 +368,10 @@ class System extends CallablePlugin {
       }
     }))
 
-    this.broadcast({type: "undeploy", details: {appId, deploymentReqId, tssKeyAddress}})
+    this.broadcast({type: "undeploy", details: {
+        appId,
+        deploymentTimestamp
+    }})
   }
 
   @appApiMethod({})
@@ -429,7 +400,7 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async generateTssKeyBetweenPartners(t, partners: string[]) {
-    const partyId = soliditySha3(partners.map(v => ({t:'string', v})))
+    const partyId = soliditySha3(partners.map(v => ({t:'string', v})))!
 
     await this.tssPlugin.createParty({id: partyId, t, partners});
     let party = this.tssPlugin.parties[partyId];
@@ -471,12 +442,12 @@ class System extends CallablePlugin {
     const context = await AppContext.findOne({appId}).exec();
     if(!context)
       throw `App deployment info not found.`
-    const oldTssKey = await AppTssConfig.findOne({
-      appId: context.appId,
-      version: context.version
-    }).exec();
-    if(oldTssKey)
-      throw `App tss key already generated`
+
+    /** check key not created before */
+    if(context.publicKey?.encoded) {
+      throw `App context already has key`
+    }
+
     const partyId = this.tssPlugin.getAppPartyId(context.appId, context.version)
 
     await this.tssPlugin.createParty({
@@ -492,23 +463,42 @@ class System extends CallablePlugin {
 
     return {
       id: key.id,
-      publicKey: pub2json(key.publicKey!)
+      publicKey: pub2json(key.publicKey!),
+      generators: key.partners
     }
   }
 
   @remoteMethod(RemoteMethods.Undeploy)
-  async __undeployApp(data: {appId, deploymentReqId, tssKeyAddress}, callerInfo) {
+  async __undeployApp(data: {appId, deploymentTimestamp}, callerInfo) {
     if(!callerInfo.isDeployer)
       throw `Only deployer can call this method`
-    let {appId, deploymentReqId, tssKeyAddress} = data;
-    const context = this.appManager.getAppContext(appId)
-    if(!context || context.deploymentRequest.reqId != deploymentReqId)
-      throw `App context not found`
+    let {appId, deploymentTimestamp} = data;
+
     log(`deleting app from persistent db %s`, appId);
-    await AppContext.deleteMany({appId, "deploymentRequest.reqId": deploymentReqId});
-    await AppTssConfig.deleteMany({appId, "publicKey.address": tssKeyAddress});
+    /** get list of old contexts */
+    const allContexts = await AppContext.find({appId})
+    const deleteContextList: any[] = []
+    const deleteKeyList: any[] = [];
+
+    for(let context of allContexts) {
+      /** select context to be deleted */
+      if(context.deploymentRequest.data.timestamp <= deploymentTimestamp) {
+        deleteContextList.push(context.deploymentRequest.reqId)
+        /** add context key into delete list */
+        if(context.publicKey?.encoded)
+          deleteKeyList.push(context.publicKey?.encoded)
+      }
+    }
+    await AppContext.deleteMany({
+      "deploymentRequest.reqId": {$in: deleteContextList}
+    });
+
+    await AppTssConfig.deleteMany({
+      appId,
+      "publicKey.encoded": {$in: deleteKeyList},
+    });
     log(`deleting app from memory of all cluster %s`, appId)
-    CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, deploymentReqId: context.deploymentRequest.reqId}})
+    CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, deploymentReqIds: deleteContextList}})
   }
 
   @remoteMethod(RemoteMethods.GetAppPublicKey)

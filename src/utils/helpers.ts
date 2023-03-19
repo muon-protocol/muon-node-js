@@ -1,3 +1,5 @@
+import fs from 'fs'
+import readline from 'readline'
 import BigNumber from 'bignumber.js'
 BigNumber.set({DECIMAL_PLACES: 26})
 import Web3 from 'web3'
@@ -9,6 +11,8 @@ import {pub2addr} from "./tss/utils.js";
 import {JsonPublicKey} from "../common/types";
 import {promisify} from 'util'
 import childProcess from 'node:child_process'
+import {isIP} from 'net'
+import isIpPrivate from 'private-ip'
 const toBN = Web3.utils.toBN;
 const exec = promisify(childProcess.exec);
 
@@ -80,6 +84,24 @@ export const stackTrace = function() {
   return err.stack;
 }
 
+export async function readFileTail(path: string, n: number): Promise<string> {
+  const fileStream = fs.createReadStream(path);
+
+  const rl = readline.createInterface({
+    input: fileStream,
+    crlfDelay: 1
+  });
+
+  const lines: string[] = []
+  for await (const line of rl) {
+    lines.push(line)
+    if(lines.length > n)
+      lines.splice(0, 1)
+  }
+
+  return lines.join('\n');
+}
+
 export function filePathInfo(importMeta) {
   const __filename = fileURLToPath(importMeta.url);
   const __dirname = dirname(__filename);
@@ -100,8 +122,32 @@ export function pub2json(pubkey: PublicKey, minimal: boolean=false): JsonPublicK
 }
 
 export async function findMyIp(): Promise<string> {
-  let response = await axios.get('https://ifconfig.me/all.json')
-  return response?.data?.ip_addr;
+  const checkValidIp = str => {
+    if(!isIP(str))
+      throw `input is not ip`
+    if(isIpPrivate(str))
+      throw `input is private ip`
+    return str
+  }
+  // @ts-ignore
+  let ip = await Promise.any([
+    axios.get('https://ifconfig.me/all.json')
+      .then(({data}) => data.ip_addr)
+      .then(checkValidIp),
+    axios.get('https://ipinfo.io/ip', {responseType: "text"})
+      .then(({data}) => data)
+      .then(checkValidIp),
+    axios.get('http://api.ipify.org/', {responseType: "text"})
+      .then(({data}) => data)
+      .then(checkValidIp),
+    axios.get('https://ident.me/', {responseType: "text"})
+      .then(({data}) => data)
+      .then(checkValidIp),
+    axios.get('https://ipecho.net/plain', {responseType: "text"})
+      .then(({data}) => data)
+      .then(checkValidIp),
+  ])
+  return ip;
 }
 
 export async function getCommitId(): Promise<string> {

@@ -94,6 +94,10 @@ async function ensureAppTssKeyExist(appId) {
   return await call(IpcMethods.EnsureAppTssKeyExist, appId);
 }
 
+async function findNAvailablePartners(appId: string, searchList: string[], count: number) {
+  return await call(IpcMethods.FindNAvailablePartners, {appId, searchList, count})
+}
+
 export {
   call,
   broadcast,
@@ -107,6 +111,7 @@ export {
   queryAppContext,
   isDeploymentExcerpt,
   shieldConfirmedRequest,
+  findNAvailablePartners,
   ensureAppTssKeyExist,
   GLOBAL_EVENT_CHANNEL,
 }

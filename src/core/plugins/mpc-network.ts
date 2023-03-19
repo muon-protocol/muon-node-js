@@ -9,6 +9,18 @@ import * as NetworkIpc from '../../network/ipc.js'
 import TssPlugin from "./tss-plugin.js";
 import * as SharedMemory from "../../common/shared-memory/index.js";
 import {bn2hex} from "../../utils/tss/utils.js";
+import NodeCache from 'node-cache'
+
+const mpcCache = new NodeCache({
+  stdTTL: 10 * 60, // Keep MPCs in memory for 10 minutes
+  // /**
+  //  * (default: 600)
+  //  * The period in seconds, as a number, used for the automatic delete check interval.
+  //  * 0 = no periodic check.
+  //  */
+  checkperiod: 5*60,
+  useClones: false,
+});
 
 const RemoteMethods = {
   AskRoundN: 'ask-round-n'
@@ -19,7 +31,6 @@ const random = () => Math.floor(Math.random()*9999999)
 @remoteApp
 class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
   APP_NAME="mpcnet"
-  private mpcMap: Map<string, MultiPartyComputation> = new Map<string, MultiPartyComputation>()
   // public readonly id: string;
 
   constructor(muon, configs) {
@@ -39,9 +50,9 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
   }
 
   async registerMcp(mpc: MultiPartyComputation) {
-    if(this.mpcMap.has(mpc.id))
+    if(mpcCache.has(mpc.id))
       throw `MPC[${mpc.id}] already registered to MPCNetwork`
-    this.mpcMap.set(mpc.id, mpc);
+    mpcCache.set(mpc.id, mpc);
 
     // console.log({mpcId: mpc.id, pid: process.pid})
     let assignResponse = await NetworkIpc.assignTask(mpc.id);
@@ -59,13 +70,13 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
         nodeInfo.peerId,
         RemoteMethods.AskRoundN,
         {mpcId, round, data},
-        {taskId: mpcId, timeout: 5e3}
+        {taskId: mpcId, timeout: 15e3}
       )
     }
   }
 
   waitToMpcFulFill(mpcId): Promise<any> {
-    const mpc: MultiPartyComputation = this.mpcMap.get(mpcId)!
+    const mpc: MultiPartyComputation = mpcCache.get(mpcId)!
     if(!mpc)
       return Promise.reject(`MultiPartyComputation [${mpcId}] not found`)
     return mpc.waitToFulfill()
@@ -75,7 +86,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
   async __askRoundN(message, callerInfo): Promise<PartnerRoundReceive> {
     const {mpcId, round, data} = message;
     if(round === 0) {
-      if(!this.mpcMap.has(mpcId)) {
+      if(!mpcCache.has(mpcId)) {
         // @ts-ignore
         let mpc = new DistributedKeyGeneration(...data.constructData)
 
@@ -105,7 +116,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
           })
       }
     }
-    const mpc = this.mpcMap.get(mpcId);
+    const mpc: MultiPartyComputation = mpcCache.get(mpcId)!;
     if(!mpc)
       throw `pid: [${process.pid}] MPC [${mpcId}] not registered in MPCNetwork`
     return await mpc.getPartnerRoundData(round, callerInfo.id);

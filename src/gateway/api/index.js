@@ -3,7 +3,7 @@ import asyncHandler from 'express-async-handler'
 import RequestLog from '../../common/db-models/RequestLog.js'
 import {QueueProducer} from '../../common/message-bus/index.ts'
 import {parseBool} from '../../utils/helpers.js'
-import soliditySha3 from '../../utils/soliditySha3.js'
+import {soliditySha3} from '../../utils/sha3.js'
 import * as CoreIpc from '../../core/ipc.ts'
 import * as NetworkIpc from '../../network/ipc.ts'
 import axios from 'axios'
@@ -79,14 +79,14 @@ async function callProperNode(requestData) {
     const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
     if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
       log(`current node is not deployer`)
-      let deployers = await NetworkIpc.filterNodes({isDeployer: true}).map(p => p.peerId);
+      let deployers = (await NetworkIpc.filterNodes({isDeployer: true})).map(p => p.peerId);
       let onlineDeployers = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 5000})
       if(!onlineDeployers.length > 0)
         throw `cannot find any online deployer to forward request`;
       const randomIndex = Math.floor(Math.random() * onlineDeployers.length);
-      log(`forwarding request to id:%s`, onlineDeployers[randomIndex].id)
+      log(`forwarding request to id:%s`, onlineDeployers[randomIndex])
       const timeout = await getAppTimeout(requestData.app);
-      return await NetworkIpc.forwardRequest(onlineDeployers[randomIndex].id, requestData, timeout);
+      return await NetworkIpc.forwardRequest(onlineDeployers[randomIndex], requestData, timeout);
     }
   }
 

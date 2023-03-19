@@ -40,7 +40,7 @@ module.exports = {
         switch (method) {
             case Methods.RandomSeed: {
                 const {appId} = params
-                const {deployed} = await this.callPlugin('system', "getAppStatus", appId)
+                const {deployed} = this.callPlugin('system', "getAppDeploymentInfo", appId)
                 if(deployed)
                     throw `App already deployed`
                 break;
@@ -96,12 +96,13 @@ module.exports = {
                 if(!context)
                     throw `app deployment info not found`
 
-                const {id, publicKey} = await this.callPlugin('system', "genAppTss", appId)
+                const {id, publicKey, generators} = await this.callPlugin('system', "genAppTss", appId)
 
                 return {
                     id,
                     publicKey,
                     partners: context.party.partners,
+                    keyGenerators: generators
                 }
             }
             case Methods.TssReshare: {
@@ -120,7 +121,7 @@ module.exports = {
         switch (method) {
             case Methods.Check: {
                 const {appId} = params
-                const status = await this.callPlugin('system', "getAppStatus", appId)
+                const status = this.callPlugin('system', "getAppDeploymentInfo", appId)
                 return status;
             }
             case Methods.RandomSeed: {
@@ -217,7 +218,7 @@ module.exports = {
                 return request.data.init.selectedNodes
             }
             case Methods.TssKeyGen: {
-                return request.data.init.partners
+                return request.data.init.keyGenerators
             }
             default:
                 return []

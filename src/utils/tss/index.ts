@@ -158,6 +158,8 @@ function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
 }
 
 function schnorrVerify(pubKey, msg, sig) {
+  if(!sig.s.lt(curve.n))
+    throw "signature must be reduced modulo N"
   let r_v = pointAdd(curve.g.mul(sig.s), pubKey.mul(sig.e))
   let e_v = schnorrHash(r_v, msg)
   return toBN(e_v).eq(sig.e);
@@ -193,7 +195,7 @@ function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPub
   return nonceAddress === addr;
 }
 
-function schnorrAggregateSigs(t, sigs, indices){
+function schnorrAggregateSigs(t, sigs, indices): {s: BN, e: BN}{
   assert(sigs.length >= t);
   let ts = toBN(0)
   range(0, t).map(j => {
