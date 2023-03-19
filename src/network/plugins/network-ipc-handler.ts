@@ -1,9 +1,9 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {PeerInfo} from "@libp2p/interface-peer-info";
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
-import {IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
+import {AppRequest, IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
 import CollateralInfoPlugin, {NodeFilterOptions} from "./collateral-info.js";
-import QueueProducer from "../../common/message-bus/queue-producer.js";
+import {QueueProducer, MessagePublisher} from "../../common/message-bus/index.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
@@ -14,6 +14,15 @@ import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
 import Log from '../../common/muon-log.js'
 import {isPrivate} from "../utils.js";
+
+class AggregatorBus extends MessagePublisher {
+  async send(message:any){
+    this.sendRedis.publish(this.busName, JSON.stringify(message));
+  }
+}
+
+const REQ_AGGREGATOR_CHANNEL = process.env.REQ_AGGREGATOR_CHANNEL;
+const reqAggregatorBus = !!REQ_AGGREGATOR_CHANNEL ? new AggregatorBus(REQ_AGGREGATOR_CHANNEL) : null;
 
 const log = Log('muon:network:plugins:ipc-handler')
 let requestQueue = new QueueProducer(`gateway-requests`);
@@ -54,12 +63,14 @@ export const IpcMethods = {
   GetUptime: "get-uptime",
   FindNOnlinePeer: "FNOP",
   GetConnectedPeerIds: "GCPIDS",
-  GetNodeMultiAddress: "GNMA"
+  GetNodeMultiAddress: "GNMA",
+  SendToAggregatorNode: "send-to-aggregator-node",
 } as const;
 
 export const RemoteMethods = {
   ExecIpcRemoteCall: "exec-ipc-remote-call",
   ExecGateWayRequest: 'exec-gateway-request',
+  AggregateData: "aggregate-data",
 }
 
 type IpcKeys = keyof typeof IpcMethods;
@@ -376,6 +387,42 @@ class NetworkIpcHandler extends CallablePlugin {
     return multiAddrs.map(ma => ma.toString())
   }
 
+  /**
+   *
+   * @param type {string} - type of data.
+   * @param data - data to be stored on node.
+   * @returns {Promise<string[]>} - The ID of the nodes that received the data.
+   */
+  @ipcMethod(IpcMethods.SendToAggregatorNode)
+  async __sendToAggregatorNode(data: {type: string, data: any}): Promise<string[]> {
+    let aggregators = this.network.configs.net.nodes?.aggregators || []
+    if(aggregators.length > 0) {
+      const aggregatorsInfo = this.collateralPlugin.filterNodes({list: aggregators});
+      let responses: (MuonNodeInfo|null)[] = await Promise.all(
+        aggregatorsInfo.map(n => {
+          if(n.wallet === process.env.SIGN_WALLET_ADDRESS) {
+            return this.__aggregateData(data, this.collateralPlugin.currentNodeInfo!)
+              .then(() => n)
+              .catch(e => null)
+          }
+          else {
+            return this.findPeer(n.peerId)
+              .then(peer => this.remoteCall(
+                peer,
+                RemoteMethods.AggregateData,
+                data
+                )
+              )
+              .then(() => n)
+              .catch(e => null)
+          }
+        })
+      );
+      return responses.filter(n => !!n).map(n => n!.id)
+    }
+    return []
+  }
+
   /** ==================== remote methods ===========================*/
 
 
@@ -414,6 +461,28 @@ class NetworkIpcHandler extends CallablePlugin {
   async __execGatewayRequest(data, callerInfo) {
     // console.log(`NetworkIpcHandler.__execGatewayRequest`, data)
     return await requestQueue.send(data)
+  }
+
+  @remoteMethod(RemoteMethods.AggregateData)
+  async __aggregateData(data: {type: string, data: AppRequest}, callerInfo: MuonNodeInfo) {
+    /** validating data */
+    switch (data.type) {
+      case "AppRequest": {
+        let appName = data?.data?.app;
+        if(!appName)
+          throw 'invalid request'
+        /** forward request into core to be verified and then be stored */
+        const verified = await CoreIpc.verifyRequestSignature(data.data)
+        if(!verified)
+          throw 'request not verified';
+        if(reqAggregatorBus) {
+          await reqAggregatorBus.send(data.data);
+        }
+        break;
+      }
+      default:
+        throw 'invalid type'
+    }
   }
 }
 

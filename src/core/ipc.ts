@@ -1,4 +1,4 @@
-import {IpcCallOptions, MuonNodeInfo} from "../common/types";
+import {AppRequest, IpcCallOptions, MuonNodeInfo} from "../common/types";
 import { QueueProducer, MessagePublisher } from '../common/message-bus/index.js'
 import { BROADCAST_CHANNEL } from './plugins/broadcast.js'
 import { IPC_CHANNEL } from './plugins/core-ipc-plugin.js'
@@ -98,6 +98,10 @@ async function findNAvailablePartners(appId: string, searchList: string[], count
   return await call(IpcMethods.FindNAvailablePartners, {appId, searchList, count})
 }
 
+async function verifyRequestSignature(request: AppRequest) {
+  return call(IpcMethods.VerifyRequestSignature, request);
+}
+
 export {
   call,
   broadcast,
@@ -113,5 +117,6 @@ export {
   shieldConfirmedRequest,
   findNAvailablePartners,
   ensureAppTssKeyExist,
+  verifyRequestSignature,
   GLOBAL_EVENT_CHANNEL,
 }

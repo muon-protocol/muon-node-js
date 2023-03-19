@@ -130,7 +130,7 @@ class Explorer extends CallablePlugin {
     // @ts-ignore
     const {appId, reqId} = request;
     const app: BaseAppPlugin = this.muon.getAppById(appId)
-    let isValid = await app.validateCompletedRequest(request, false)
+    let isValid = await app.verifyCompletedRequest(request, false)
     if(!isValid)
       throw `request validation failed.`
 

@@ -17,7 +17,7 @@ import TssPlugin from "../tss-plugin.js";
 import AppManager from "../app-manager.js";
 import TssParty from "../../../utils/tss/party.js";
 import CollateralInfoPlugin from "../collateral-info.js";
-import {MuonNodeInfo} from "../../../common/types";
+import {AppRequest, MuonNodeInfo} from "../../../common/types";
 import useDistributedKey from "../../../utils/tss/use-distributed-key.js";
 import chalk from 'chalk'
 import Ajv from "ajv"
@@ -451,7 +451,20 @@ class BaseAppPlugin extends CallablePlugin {
               this.log.error("error when informing request confirmation %O", e)
             })
         }
+
+        /** send request data to aggregator nodes */
+        this.log('sending request to aggregator nodes ...')
+        NetworkIpc.sendToAggregatorNode("AppRequest", requestData)
+          .then(aggregatorNodeIdList => {
+            this.log(`request sent to nodes: %o`, aggregatorNodeIdList)
+          })
+          .catch(e => {
+            this.log(`error when sending request to aggregator nodes %o`, e)
+          })
+
+        /** store data locally */
         newRequest.save()
+
         this.muon.getPlugin('memory').writeAppMem(requestData)
 
         console.log('broadcasting signed request');
@@ -471,10 +484,7 @@ class BaseAppPlugin extends CallablePlugin {
     // await this.onConfirm(request)
     let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
 
-    let announceList = [
-      process.env.SIGN_WALLET_ADDRESS!,
-      ... this.appParty!.partners
-    ]
+    let announceList = this.appParty!.partners;
     if(!!this.getConfirmAnnounceList) {
       let moreAnnounceList = await this.getConfirmAnnounceList(request);
       this.log(`custom announce list: %o`, moreAnnounceList)
@@ -938,17 +948,51 @@ class BaseAppPlugin extends CallablePlugin {
     return [result, hash1]
   }
 
-  async verifyRequestSignature(_request) {
+  /**
+   * check signature to be matched with request result
+   * @param _request
+   */
+  async verifyRequestSignature(_request: AppRequest): Promise<boolean> {
     const request = clone(_request)
     deepFreeze(request);
 
-    const [result, hash] = await this.preProcessRemoteRequest(request);
+    // const [result, hash] = await this.preProcessRemoteRequest(request);
+    const {result, signParams} = _request.data
+    let hash;
+
+    if(this.isV3()) {
+      hash = this.hashAppSignParams(request, signParams, false)
+    }
+    else {
+      hash = await this.hashRequestResult(request, result)
+    }
 
     for(let i=0 ; i<request.signatures.length ; i++) {
       if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
         throw `TSS signature not verified`
       }
     }
+
+    return true;
+  }
+
+  /**
+   * App will be run again and the result will be checked to be correct.
+   * All signatures will be checked to be matched with the result.
+   * @param request {AppRequest} - confirmed app request
+   * @param validation {boolean} - if false, request validation will not be checked.
+   */
+  async verifyCompletedRequest(request, validation:boolean=true): Promise<boolean> {
+
+    const [result, hash] = await this.preProcessRemoteRequest(request, validation);
+
+    for(let i=0 ; i<request.signatures.length ; i++) {
+      if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
+        return false
+      }
+    }
+
+    return true;
   }
 
   @remoteMethod(RemoteMethods.WantSign)
@@ -985,19 +1029,6 @@ class BaseAppPlugin extends CallablePlugin {
     return { sign }
   }
 
-  async validateCompletedRequest(request, validation:boolean=true): Promise<boolean> {
-
-    const [result, hash] = await this.preProcessRemoteRequest(request, validation);
-
-    for(let i=0 ; i<request.signatures.length ; i++) {
-      if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
-        return false
-      }
-    }
-
-    return true;
-  }
-
   @remoteMethod(RemoteMethods.InformRequestConfirmation)
   async __onRequestConfirmation(request, callerInfo) {
     if(!this.onConfirm)
@@ -1011,7 +1042,7 @@ class BaseAppPlugin extends CallablePlugin {
       throw "Only request owner can inform confirmation."
     }
 
-    const isValid = await this.validateCompletedRequest(request);
+    const isValid = await this.verifyCompletedRequest(request);
     if(!isValid) {
       throw `TSS signature not verified`
     }

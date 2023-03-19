@@ -5,6 +5,7 @@ import AppManager from "./app-manager.js";
 import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import {timeout} from '../../utils/helpers.js'
+import {AppRequest} from "../../common/types";
 
 export const IpcMethods = {
   ForwardRemoteCall: 'forward-remote-call',
@@ -18,6 +19,7 @@ export const IpcMethods = {
   ShieldConfirmedRequest: 'shield-confirmed-request',
   EnsureAppTssKeyExist: 'ensure-app-tss-key-exist',
   FindNAvailablePartners: 'find-n-available-partner',
+  VerifyRequestSignature: 'verify-req-sign',
 } as const;
 type IpcKeys = keyof typeof IpcMethods;
 export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
@@ -130,6 +132,15 @@ class CoreIpcHandlers extends CallablePlugin {
   @ipcMethod(IpcMethods.FindNAvailablePartners)
   async __findNAvailablePartners(data: {appId: string, searchList: string[], count: number}): Promise<string[]> {
     return await this.appManager.findNAvailablePartners(data.appId, data.searchList, data.count)
+  }
+
+  @ipcMethod(IpcMethods.VerifyRequestSignature)
+  async __verifyRequestSignature(request: AppRequest): Promise<boolean> {
+    const {appId} = request
+    const app: BaseAppPlugin = this.muon.getAppById(appId)
+    if(!app)
+      throw `app not found`
+    return app.verifyRequestSignature(request);
   }
 }
 

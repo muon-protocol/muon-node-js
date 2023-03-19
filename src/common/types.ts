@@ -1,4 +1,5 @@
 import {GlobalBroadcastChannels} from "./contantes";
+import BN from 'bn.js'
 
 export type JsonPeerInfo = {
     id: string;
@@ -68,3 +69,43 @@ type GlobalBroadcastChannelsKeys = keyof typeof GlobalBroadcastChannels;
 export type GlobalBroadcastChannel = typeof GlobalBroadcastChannels[GlobalBroadcastChannelsKeys];
 
 export type Override<T1, T2> = Omit<T1, keyof T2> & T2;
+
+export type TypedValue =
+  | string
+  | number
+  | BN
+  | { type: string; value: string; }
+  | { t: string; v: string | BN | number; }
+  | boolean;
+
+export type MuonSignature = {
+    owner: string,
+    ownerPublicKey: {
+        x: string,
+        yParity: '0' | '1',
+        timestamp: number,
+        signature: string,
+    }
+}
+
+export type AppRequest = {
+    confirmed: boolean,
+    reqId: string,
+    app: string,
+    appId: string,
+    method: string,
+    gwAddress: string,
+    data: {
+        uid: string,
+        params: any,
+        timestamp: number,
+        result: any,
+        signParams: TypedValue[],
+        init: {
+            nonceAddress: string
+        }
+    }
+    startedAt: number,
+    confirmedAt: number,
+    signatures: MuonSignature[]
+}
