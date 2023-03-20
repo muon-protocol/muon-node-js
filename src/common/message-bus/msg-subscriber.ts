@@ -1,9 +1,10 @@
 import BaseMessageBus from './base-message-bus.js'
+import {MessageBusConfigs} from "./types";
 
 export default class MessageSubscriber extends BaseMessageBus {
 
-  constructor(busName: string) {
-    super(busName);
+  constructor(busName: string, configs?:MessageBusConfigs) {
+    super(busName, configs);
 
     this.receiveRedis.subscribe(this.channelName);
     this.receiveRedis.on("message", this.onMessageReceived.bind(this));
