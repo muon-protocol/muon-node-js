@@ -2,8 +2,10 @@ import { createClient, RedisClient } from 'redis'
 import redisConfig from '../redis-config.js'
 import Events from 'events-async'
 import {uuid} from '../../utils/helpers.js'
+import {MessageBusConfigs} from "./types";
 
 export default class BaseMessageBus extends Events{
+  readonly configs: MessageBusConfigs;
   /**
    * @type {String} - Bus name for transferring message between processes
    */
@@ -17,9 +19,14 @@ export default class BaseMessageBus extends Events{
    */
   receiveRedis: RedisClient;
 
-  constructor(busName: string) {
+  constructor(busName: string, configs:MessageBusConfigs={}) {
     super();
     this.busName = busName
+
+    this.configs = {
+      ...redisConfig,
+      ...configs
+    }
 
     const sendRedis = this.createRedisClient();
     const receiveRedis = this.createRedisClient();

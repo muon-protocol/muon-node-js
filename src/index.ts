@@ -12,6 +12,8 @@ import { createRequire } from "module";
 // const require = createRequire(import.meta.url);
 const log = Log('muon:boot')
 
+type ClusterType = 'gateway' | 'networking' | "core"
+
 process.on('unhandledRejection', function(reason, _promise) {
   // console.log("Unhandled promise rejection", _promise);
   console.dir(reason, {depth: 5})
@@ -30,17 +32,21 @@ if(parseBool(process.env.CLUSTER_MODE)) {
   }
 }
 
-type ApplicationDictionary = {[index: number]: Worker}
+type ClusterInfo = {type: ClusterType, worker: Worker}
+type ApplicationDictionary = {[index: number]: ClusterInfo}
 
 const applicationWorkers:ApplicationDictionary = {};
 
-function runNewApplicationCluster(): Worker | null {
-  const child:Worker = cluster.fork();//{MASTER_PROCESS_ID: process.pid}
+function runNewApplicationCluster(type: ClusterType): Worker | null {
+  const child:Worker = cluster.fork({MUON_CLUSTER_TYPE: type});//{MASTER_PROCESS_ID: process.pid}
   if(!child?.process?.pid){
     log(`application cluster does not start correctly.`)
     return null;
   }
-  applicationWorkers[child.process.pid] = child
+  applicationWorkers[child.process.pid] = {
+    type,
+    worker: child
+  }
   return child;
 }
 
@@ -53,15 +59,10 @@ async function boot() {
     log(`Master cluster start at [${process.pid}]`)
     SharedMemory.startServer();
 
-    /** Start gateway */
-    Gateway.start({
-      host: process.env.GATEWAY_HOST,
-      port: process.env.GATEWAY_PORT,
-    })
-      .catch(e => {
-        console.log(`Gateway failed to start.`, e)
-      })
+    /** start gateway cluster */
+    runNewApplicationCluster('gateway');
 
+    /** start network cluster */
     try {
       await Network.start()
     }
@@ -69,40 +70,70 @@ async function boot() {
       console.log(`Network failed to start.`, e)
       throw e
     }
-    //
-    cluster.on("exit", async function (worker, code, signal) {
-      log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
-      if(!worker.process.pid) {
-        log(`a worker with an unknown pid stopped working.`)
-        await refreshWorkersList();
-      }
-      else {
-        delete applicationWorkers[worker.process.pid];
-        await NetworkIpc.reportClusterStatus(worker.process.pid, 'exit')
-      }
 
-      await timeout(5000);
-      log("Starting a new worker");
-      let child = runNewApplicationCluster();
-      if(!child){
-        return ;
-      }
-      await NetworkIpc.reportClusterStatus(child.process.pid, 'start')
-    });
-
-    /** Start application clusters */
+    /** Start core clusters */
     for (let i = 0; i < clusterCount; i++) {
-      const child:Worker|null = runNewApplicationCluster();
+      const child:Worker|null = runNewApplicationCluster('core');
       if(child === null){
         i--;
         log(`child process fork failed. trying one more time`);
       }else
         await NetworkIpc.reportClusterStatus(child.process.pid, 'start')
     }
-  } else {
-    log(`application cluster start pid:${process.pid}`)
+
+    /** restart stopped cluster */
+    cluster.on("exit", async function (worker, code, signal) {
+      log(`Worker ${worker.process.pid} died with code: ${code}, and signal: ${signal}`);
+      let clusterInfo:ClusterInfo;
+
+      if(!worker.process.pid) {
+        log(`a worker with an unknown pid stopped working.`)
+        await refreshWorkersList();
+      }
+      else {
+        clusterInfo = applicationWorkers[worker.process.pid];
+        delete applicationWorkers[worker.process.pid];
+        if(clusterInfo.type === 'core') {
+          await NetworkIpc.reportClusterStatus(worker.process.pid, 'exit')
+        }
+
+        await timeout(5000);
+        log(`Starting a new cluster type:${clusterInfo.type}`);
+        let child = runNewApplicationCluster(clusterInfo.type);
+        if(!child){
+          return ;
+        }
+        if(clusterInfo.type === 'core') {
+          await NetworkIpc.reportClusterStatus(child.process.pid, 'start')
+        }
+      }
+    });
+  }
+  else {
+    const clusterType:ClusterType = process.env.MUON_CLUSTER_TYPE! as ClusterType;
+    log(`child cluster start type:${clusterType} pid:${process.pid}`)
     // require('./core').start();
-    Core.start();
+    switch (clusterType) {
+      case 'gateway': {
+        Gateway.start({
+          host: process.env.GATEWAY_HOST,
+          port: process.env.GATEWAY_PORT,
+        })
+          .catch(e => {
+            console.log(`Gateway failed to start.`, e)
+          })
+        break;
+      }
+      case 'core': {
+        Core.start();
+        break;
+      }
+      case 'networking': {
+        throw `Networking cluster should start in master cluster`
+      }
+      default:
+        throw `invalid cluster type: ${clusterType}`;
+    }
   }
 
   // Core.start();

@@ -3,7 +3,7 @@ import {PeerInfo} from "@libp2p/interface-peer-info";
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
 import {AppRequest, IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
 import CollateralInfoPlugin, {NodeFilterOptions} from "./collateral-info.js";
-import {QueueProducer, MessagePublisher} from "../../common/message-bus/index.js";
+import {QueueProducer, MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
@@ -21,8 +21,22 @@ class AggregatorBus extends MessagePublisher {
   }
 }
 
-const REQ_AGGREGATOR_CHANNEL = process.env.REQ_AGGREGATOR_CHANNEL;
-const reqAggregatorBus = !!REQ_AGGREGATOR_CHANNEL ? new AggregatorBus(REQ_AGGREGATOR_CHANNEL) : null;
+const REQUESTS_PUB_SUB_REDIS = process.env.REQUESTS_PUB_SUB_REDIS;
+const REQUESTS_PUB_SUB_CHANNEL = process.env.REQUESTS_PUB_SUB_CHANNEL;
+let reqAggregatorBus;
+/** enable requests PubSub channel to be used in explorer  */
+if(!!REQUESTS_PUB_SUB_CHANNEL) {
+  let configs: MessageBusConfigs = {}
+  /** set to external redis server */
+  if(!!REQUESTS_PUB_SUB_REDIS) {
+    configs = {
+      host: undefined,
+      port: undefined,
+      url: REQUESTS_PUB_SUB_REDIS
+    }
+  }
+  reqAggregatorBus = new AggregatorBus(REQUESTS_PUB_SUB_CHANNEL, configs)
+}
 
 const log = Log('muon:network:plugins:ipc-handler')
 let requestQueue = new QueueProducer(`gateway-requests`);

@@ -1,5 +1,5 @@
 import BaseMessageQueue from './base-message-queue.js'
-import { IpcCallConfig } from './types'
+import {IpcCallConfig, MessageBusConfigs} from './types'
 import { promisify } from "util"
 import { logger } from '@libp2p/logger'
 
@@ -10,8 +10,8 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
   options = {}
   _reading = false;
 
-  constructor(busName: string, options: IpcCallConfig={}) {
-    super(busName);
+  constructor(busName: string, options: IpcCallConfig={}, busConfigs?:MessageBusConfigs) {
+    super(busName, busConfigs);
 
     this.options = options;
   }
