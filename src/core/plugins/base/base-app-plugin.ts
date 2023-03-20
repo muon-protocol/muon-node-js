@@ -96,43 +96,11 @@ class BaseAppPlugin extends CallablePlugin {
   isBuiltInApp: boolean
   private log;
 
-  private broadcastPubSubRedis: RedisClient
-
   constructor(muon, configs) {
     super(muon, configs);
-
-    if(!!process.env.BROADCAST_PUB_SUB_REDIS){
-      this.broadcastPubSubRedis = createClient({
-        url: process.env.BROADCAST_PUB_SUB_REDIS
-      });
-    }
-
     this.log = logger("muon:apps:base")
-
-    // console.log(this.APP_NAME);
-    /**
-     * This is abstract class, so "new BaseAppPlugin()" is not allowed
-     */
-    // if (new.target === BaseAppPlugin) {
-    //   throw new TypeError("Cannot construct abstract BaseAppPlugin instances directly");
-    // }
   }
 
-  @broadcastHandler
-  async onBroadcastReceived(data) {
-    try {
-      if (data && data.type === 'request_signed' &&
-        !!process.env.BROADCAST_PUB_SUB_REDIS) {
-        // console.log("Publishing request_signed");
-        this.broadcastPubSubRedis.publish(
-          process.env.BROADCAST_PUB_SUB_CHANNEL,
-          JSON.stringify(data)
-        );
-      }
-    } catch (e) {
-      console.error(e)
-    }
-  }
 
   isV3(){
     return !!this.signParams;
@@ -466,14 +434,6 @@ class BaseAppPlugin extends CallablePlugin {
         newRequest.save()
 
         this.muon.getPlugin('memory').writeAppMem(requestData)
-
-        console.log('broadcasting signed request');
-        // this.broadcast({
-        //   type: 'request_signed',
-        //   peerId: process.env.PEER_ID,
-        //   requestData
-        // })
-        console.log('broadcasted');
       }
 
       return requestData
