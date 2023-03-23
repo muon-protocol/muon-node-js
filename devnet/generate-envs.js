@@ -60,6 +60,7 @@ PEER_PUBLIC_KEY = "${data.peerIdPublic}"
 PEER_PRIVATE_KEY = "${data.peerIdPrivate}"
 PEER_PORT = ${data.libp2pListenPort}
 ${bootstrapList}
+DISCOVERY_INTERVAL=15000
 # ===========================================
 
 DISABLE_ANNOUNCE_FILTER=1

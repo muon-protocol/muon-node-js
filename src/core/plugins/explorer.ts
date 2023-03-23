@@ -2,7 +2,7 @@ import CallablePlugin from './base/callable-plugin.js'
 import Content from '../../common/db-models/Content.js'
 import {remoteApp, remoteMethod, gatewayMethod, globalBroadcastHandler, broadcastHandler} from './base/app-decorators.js'
 import TssPlugin from "./tss-plugin.js";
-import {MuonNodeInfo, Override} from "../../common/types";
+import {AppDeploymentStatus, MuonNodeInfo, Override} from "../../common/types";
 import HealthCheck from "./health-check.js";
 import {GatewayCallData} from "../../gateway/types";
 import AppManager from "./app-manager.js";
@@ -27,6 +27,8 @@ type GetAppData = Override<GatewayCallData, {params: { appName?: string, appId?:
 
 const RemoteMethods = {
   IsReqConfirmationAnnounced: "is-req-conf-ann",
+  AppDeploymentStatus: "app-deployment-status",
+  LoadAppContextAndKey: "load-app-context",
 }
 
 @remoteApp
@@ -220,10 +222,46 @@ class Explorer extends CallablePlugin {
     if(!!context?.publicKey?.address)
       statusCode ++;
 
+    const statusTitle = ["NEW", "TSS_GROUP_SELECTED", "DEPLOYED"][statusCode];
+
+    let partnersStatus;
+    if(context && statusCode > 0) {
+      const partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+        list: context.party.partners
+      })
+      const responses = await Promise.all(
+        partners.map(n => {
+          if(n.wallet === process.env.SIGN_WALLET_ADDRESS)
+            return this.__getAppDeploymentStatus(appId, this.collateralPlugin.currentNodeInfo!)
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.AppDeploymentStatus,
+            appId,
+            {timeout: 5000}
+          )
+            .catch(e => null)
+        })
+      )
+      partnersStatus = responses.reduce((obj, result, index) => {
+        const node = partners[index]
+        obj[node.id] = result
+
+        /** call remote node to load app context*/
+        this.remoteCall(
+          node.peerId,
+          RemoteMethods.LoadAppContextAndKey,
+          appId
+        )
+          .catch(e => {})
+
+        return obj
+      }, {})
+    }
+
     return {
       appId,
       appName,
-      status: ["NEW","TSS_GROUP_SELECTED", "DEPLOYED"][statusCode],
+      status: statusTitle,
       context: !context ? null : {
         isBuiltIn: context.isBuiltIn,
         version: context.version,
@@ -236,7 +274,8 @@ class Explorer extends CallablePlugin {
           max: context.party.max
         },
         publicKey: context.publicKey || null
-      }
+      },
+      partnersStatus: partnersStatus,
     }
   }
 
@@ -244,6 +283,28 @@ class Explorer extends CallablePlugin {
   async __isReqConfirmationAnnounced(reqId: string, callerInfo) {
     let confirmed: string = await requestConfirmCache.get(reqId)
     return confirmed === '1'
+  }
+
+  @remoteMethod(RemoteMethods.AppDeploymentStatus)
+  async __getAppDeploymentStatus(appId, callerInfo: MuonNodeInfo) {
+    return this.appManager.getAppDeploymentStatus(appId)
+  }
+
+  @remoteMethod(RemoteMethods.LoadAppContextAndKey)
+  async __loadAppContextAndKey(appId, callerInfo: MuonNodeInfo) {
+    if(!callerInfo.isDeployer)
+      return;
+    const status:AppDeploymentStatus = this.appManager.getAppDeploymentStatus(appId)
+    let context;
+    if(status === 'NEW') {
+      context = await this.appManager.queryAndLoadAppContext(appId);
+      if(!context || !context.party.partners.includes(this.collateralPlugin.currentNodeInfo!.id))
+        return;
+    }
+    if(status !== 'DEPLOYED') {
+      await timeout(2000)
+      await this.tssPlugin.checkAppTssKeyRecovery(appId);
+    }
   }
 }
 

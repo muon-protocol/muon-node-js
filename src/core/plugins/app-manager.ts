@@ -397,8 +397,8 @@ export default class AppManager extends CallablePlugin {
         excludeSelf: true
       })
       .map(p => p.peerId)
-    const candidateNodeIds: string[] = await NetworkIpc.findNOnlinePeer(deployerNodes, 5, {timeout: 10});
-    log(`calling nodes %o to get app status`, candidateNodeIds)
+    const candidateNodeIds: string[] = await NetworkIpc.findNOnlinePeer(deployerNodes, 5, {timeout: 10e3});
+    log(`calling nodes %o to get app tss key`, candidateNodeIds)
     const candidateNodes = this.collateralPlugin.filterNodes({list: candidateNodeIds})
 
     let callResult = await Promise.all(candidateNodes.map(node => {

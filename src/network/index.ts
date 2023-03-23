@@ -73,10 +73,15 @@ class Network extends Events {
     const peerRouters: any[] = []
 
     if(Array.isArray(netConfig.routing?.delegate) && netConfig.routing.delegate.length > 0) {
+      let discoveryInterval = 3*60e3
+      if(process.env.DISCOVERY_INTERVAL){
+        if(parseInt(process.env.DISCOVERY_INTERVAL)>=10e3)
+          discoveryInterval = parseInt(process.env.DISCOVERY_INTERVAL)
+      }
       peerRouters.push(
         muonRouting({
           baseUrls: netConfig.routing.delegate,
-          discoveryInterval: 3*60*1000,
+          discoveryInterval,
         })
       )
     }
