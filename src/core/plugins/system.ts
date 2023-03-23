@@ -2,7 +2,7 @@ import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
-import {AppDeploymentInfo, JsonPublicKey, MuonNodeInfo} from "../../common/types";
+import {AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import {soliditySha3} from '../../utils/sha3.js'
 import * as tssModule from '../../utils/tss/index.js'
 import AppContext from "../../common/db-models/AppContext.js"
@@ -17,11 +17,11 @@ import {pub2json, timeout} from '../../utils/helpers.js'
 import {bn2hex} from "../../utils/tss/utils.js";
 import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
+import BaseAppPlugin from "./base/base-app-plugin";
 
 const log = logger("muon:core:plugins:system");
 
 const RemoteMethods = {
-  InformAppDeployed: "informAppDeployed",
   GenerateAppTss: "generateAppTss",
   Undeploy: "undeploy",
   GetAppPublicKey: "getAppPubKey",
@@ -252,38 +252,9 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async storeAppContext(request, result) {
+  async storeAppContext(request: AppRequest, result) {
     /** store app context */
     const context = await this.writeAppContextIntoDb(request, result);
-
-    /** inform the other nodes */
-    const appPartners: string[] = result.selectedNodes
-    const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(({id}) => id);
-    const nodesNeedsToInform = this.collateralPlugin.filterNodes({
-      list: [...deployers, ...appPartners],
-    });
-
-
-    if(request.owner === process.env.SIGN_WALLET_ADDRESS){
-      let requestNonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!
-
-      const noneInformedPartners = nodesNeedsToInform.filter(node => !requestNonce.partners.includes(node.id))
-
-      const informResponses = await Promise.all(noneInformedPartners.map(node => {
-        if(node.wallet === process.env.SIGN_WALLET_ADDRESS)
-          return "OK";
-        // else
-        return this.remoteCall(
-          node.peerId,
-          RemoteMethods.InformAppDeployed,
-          request,
-        )
-          .catch(e => {
-            console.log(`System.storeAppContext`, e)
-            return 'error'
-          })
-      }));
-    }
 
     // console.log(context);
     return true;
@@ -418,22 +389,6 @@ class System extends CallablePlugin {
   /**
    * Remote methods
    */
-
-  @remoteMethod(RemoteMethods.InformAppDeployed)
-  async __informAppDeployed(request, callerInfo) {
-    const {app, method} = request
-    if(app !== 'deployment' || method !== 'deploy') {
-      console.log("==== request ====", request);
-      throw `Invalid deployment request`
-    }
-
-    const developmentApp = this.muon.getAppByName("deployment")
-    await developmentApp.verifyRequestSignature(request);
-
-    await this.writeAppContextIntoDb(request, request.data.result);
-
-    return "OK"
-  }
 
   @remoteMethod(RemoteMethods.GenerateAppTss)
   async __generateAppTss({appId}, callerInfo) {

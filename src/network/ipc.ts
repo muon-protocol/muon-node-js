@@ -113,6 +113,16 @@ function getNodeMultiAddress(): Promise<string[]> {
   return call(IpcMethods.GetNodeMultiAddress)
 }
 
+/**
+ *
+ * @param type {string} - type of data.
+ * @param data - data to be stored on node.
+ * @returns {Promise<string[]>} - The ID of the nodes that received the data.
+ */
+function sendToAggregatorNode(type: string, data: any): Promise<string[]> {
+  return call(IpcMethods.SendToAggregatorNode, {type, data})
+}
+
 export {
   call,
   getNetworkConfig,
@@ -138,6 +148,7 @@ export {
   findNOnlinePeer,
   getConnectedPeerIds,
   getNodeMultiAddress,
+  sendToAggregatorNode,
   putDHT,
   getDHT
 }

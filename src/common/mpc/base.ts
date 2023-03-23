@@ -236,34 +236,15 @@ export class MultiPartyComputation {
           constructData: r===0 ? this.constructData : undefined,
         }
         this.log(`mpc[${this.id}].${currentRound} collecting round data`)
-        let allPartiesResult: (PartnerRoundReceive|null)[] =
-          r == 0  ?
-            /** for round 0 */
-            (
-              await PromiseLibs.count(
-                Math.min(
-                  Math.ceil(this.t * 1.4),
-                  qualifiedPartners.length
-                ),
-                qualifiedPartners.map(partner => this.tryToGetRoundDate(network, partner, r, dataToSend)),
-                {
-                  timeout: 15e3,
-                  resolveOnTimeout: true,
-                  defaultResult: null
-                }
-              )
-            /** for rounds grater than 0 */
-            ) : (
-              await Promise.all(
-                qualifiedPartners.map(partner => {
-                  return this.tryToGetRoundDate(network, partner, r, dataToSend)
-                    .catch(e => {
-                      this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
-                      return null
-                    })
+        let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
+            qualifiedPartners.map(partner => {
+              return this.tryToGetRoundDate(network, partner, r, dataToSend)
+                .catch(e => {
+                  this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
+                  return null
                 })
-              )
-          );
+            })
+          )
         this.log(`MPC[${this.id}].${currentRound} ${allPartiesResult.filter(i => !!i).length} nodes response received`)
         /** store partners output for current round */
         this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {

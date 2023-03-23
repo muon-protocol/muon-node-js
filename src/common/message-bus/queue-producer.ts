@@ -3,6 +3,7 @@ import { IpcCallOptions } from "../types";
 import TimeoutPromise from '../timeout-promise.js'
 import NodeCache from 'node-cache'
 import Log from '../muon-log.js'
+import {MessageBusConfigs} from "./types";
 
 const logError = Log("muon:queue-produces:error")
 
@@ -19,8 +20,8 @@ type CacheContent<T> = {
 
 export default class QueueProducer<MessageType> extends BaseMessageQueue {
 
-  constructor(busName: string){
-    super(busName)
+  constructor(busName: string, busConfigs?:MessageBusConfigs){
+    super(busName, busConfigs)
 
     this.receiveRedis.subscribe(this.getProcessResponseChannel());
     this.receiveRedis.on("message", this.onResponseReceived.bind(this));
