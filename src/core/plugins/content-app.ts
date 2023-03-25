@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin.js'
 import Content, {create as createContent} from '../../common/db-models/Content.js'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
-import {GatewayCallData} from "../../gateway/types";
+import {GatewayCallParams} from "../../gateway/types";
 import * as NetworkIpc from '../../network/ipc.js';
 import ContentVerifyPlugin from "./content-verify-plugin.js";
 
@@ -74,7 +74,7 @@ class ContentApp extends CallablePlugin {
   }
 
   @gatewayMethod('get_content')
-  async responseToGatewayRequestData(data: GatewayCallData){
+  async responseToGatewayRequestData(data: GatewayCallParams){
     let {cid, format='string'} = data.params;
     let content = await this.getContent(cid)
     if(content){

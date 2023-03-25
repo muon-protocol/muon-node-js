@@ -71,12 +71,12 @@ export default class GatewayInterface extends BasePlugin{
   async __onGatewayCall(message, {pid, uid: callId}){
     // console.log("GatewayInterface.__onGatewayCall", message)
     try {
-      let {app, method, params, nSign, mode, gwSign} = message
+      let {app, method, params, nSign, mode, gwSign, fee} = message
       if(!['sign', 'view'].includes(mode)){
         throw {message: `Invalid call mode: ${mode}`}
       }
       let response
-      const callingArgs = {app, method, params, nSign, mode, callId, gwSign}
+      const callingArgs = {app, method, params, nSign, mode, callId, gwSign, fee}
       if(app){
         // @ts-ignore
         if(this.listenerCount(`call/${app}/${method}`) > 0){

@@ -103,6 +103,33 @@ export type AppRequest = {
         signParams: TypedValue[],
         init: {
             nonceAddress: string
+        },
+        fee: {
+            /** returned from Fee server */
+            amount: number,
+            /** comes from client */
+            spender: {
+                address: string,
+                timestamp: number,
+                /**
+                 * signature of hash of (spender, timestamp, appId)
+                 * hash = soliditySha3 (
+                 *      {t: "address", v: spender},
+                 *      {t: "uint64", v: timestamp},
+                 *      {t: "uint256", v: appId},
+                 * )
+                 */
+                signature: string,
+            },
+            /**
+             * returned from fee server
+             * signature of hash of (reqId, spender, timestamp, appId, amount)
+             * hash = soliditySha3 (
+             *      {t: "uint256", v: reqId},
+             *      {t: "uint256", v: amount},
+             * )
+             */
+            signature: string,
         }
     }
     startedAt: number,

@@ -66,6 +66,7 @@ check_for_update (){
         log "Installing dependencies: $_NODE  $_NPM install";
         log `pwd`;
         log `$_NODE  $_NPM install`
+        log `npm install 2>&1`
         log "Restarting PM2: $_NODE $_PM2 restart $_PM2_APP";
         log `$_NODE $_PM2 restart "$_PM2_APP"`
         log "============ updating done =============";

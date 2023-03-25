@@ -1,4 +1,4 @@
-import { JSONPeerId } from 'peer-id'
+// import { JSONPeerId } from 'peer-id'
 import {PeerInfo} from "@libp2p/interface-peer-info";
 export { PeerId, isPeerId } from '@libp2p/interface-peer-id';
 import { Peer } from '@libp2p/interface-peer-store';
@@ -24,7 +24,7 @@ export interface INetworkPlugin {
 }
 
 export type Libp2pConfig = {
-    peerId: JSONPeerId,
+    peerId: any,
     natIp?: string,
     host: string,
     port: string | number,

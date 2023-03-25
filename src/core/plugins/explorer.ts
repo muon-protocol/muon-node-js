@@ -4,7 +4,7 @@ import {remoteApp, remoteMethod, gatewayMethod, globalBroadcastHandler, broadcas
 import TssPlugin from "./tss-plugin.js";
 import {AppDeploymentStatus, MuonNodeInfo, Override} from "../../common/types";
 import HealthCheck from "./health-check.js";
-import {GatewayCallData} from "../../gateway/types";
+import {GatewayCallParams} from "../../gateway/types";
 import AppManager from "./app-manager.js";
 import * as NetworkIpc from '../../network/ipc.js'
 import {GlobalBroadcastChannels} from "../../common/contantes.js";
@@ -15,15 +15,15 @@ import BaseAppPlugin from "./base/base-app-plugin";
 
 const requestConfirmCache: RedisCache = new RedisCache('req-confirm')
 
-type GetNodeInfo = Override<GatewayCallData, {params: {id: string}}>
+type GetNodeInfo = Override<GatewayCallParams, {params: {id: string}}>
 
-type GetTransactionData = Override<GatewayCallData, {params: { reqId: string }}>
+type GetTransactionData = Override<GatewayCallParams, {params: { reqId: string }}>
 
-type CheckReqData = Override<GatewayCallData, {params: {request: object}}>
+type CheckReqData = Override<GatewayCallParams, {params: {request: object}}>
 
-type LastTransactionData = Override<GatewayCallData, {params: { count?: number }}>
+type LastTransactionData = Override<GatewayCallParams, {params: { count?: number }}>
 
-type GetAppData = Override<GatewayCallData, {params: { appName?: string, appId?: string }}>
+type GetAppData = Override<GatewayCallParams, {params: { appName?: string, appId?: string }}>
 
 const RemoteMethods = {
   IsReqConfirmationAnnounced: "is-req-conf-ann",
