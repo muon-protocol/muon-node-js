@@ -26,9 +26,9 @@ const DEFAULT_OPTS = {
     noise(),
   ],
   connectionManager: {
-    autoDial: false,
+    // autoDial: false,
     maxConnections: 1000,
-    minConnections: 10,
+    minConnections: 0,
     maxIncomingPendingConnections: 50
   },
   streamMuxers: [
