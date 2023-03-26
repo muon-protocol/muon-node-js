@@ -1,7 +1,6 @@
 import dotenv from 'dotenv'
 import path from 'path'
 dotenv.config()
-import PeerId from 'peer-id'
 import emoji from 'node-emoji'
 import fs from 'fs'
 import Web3 from 'web3'
