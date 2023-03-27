@@ -157,8 +157,24 @@ function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
   return {s, e}
 }
 
-function schnorrVerify(pubKey, msg, sig) {
-  if(!sig.s.lt(curve.n))
+export function stringifySignature(sign: {s: BN, e: BN}): string {
+  return `0x${sign.e.toString('hex' ,64)}${sign.s.toString('hex',64)}`
+}
+
+export function splitSignature(signature: string): {s: BN, e: BN} {
+  const bytes = signature.replace('0x','');
+  if(bytes.length !== 128)
+    throw `invalid schnorr signature string`;
+  return {
+    e: toBN(`0x${bytes.substr(0, 64)}`),
+    s: toBN(`0x${bytes.substr(64, 64)}`),
+  }
+}
+
+function schnorrVerify(pubKey: PublicKey, msg, sig:{s: BN, e: BN}|string) {
+  if(typeof sig === 'string')
+    sig = splitSignature(sig);
+  if(!sig.s.lt(curve.n!))
     throw "signature must be reduced modulo N"
   let r_v = pointAdd(curve.g.mul(sig.s), pubKey.mul(sig.e))
   let e_v = schnorrHash(r_v, msg)
