@@ -29,7 +29,7 @@
   "fee": {
     "endpoint": "http://70.34.217.65:3000/sign",
     "signers": [
-      "0xDC8DF2877338C89ADB26A8B0A63CF601B2E73184"
+      "0xdc8Df2877338c89Adb26a8b0A63Cf601B2E73184"
     ]
   }
 }
