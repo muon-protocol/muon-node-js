@@ -15,7 +15,7 @@ import {MuonNodeInfo} from "../../common/types";
 import {GatewayCallParams} from "../types";
 
 const log = Log('muon:gateway:api')
-const ajv = new Ajv()
+const ajv = new Ajv({coerceTypes: true})
 let requestQueue = new QueueProducer(`gateway-requests`);
 
 const SHIELD_FORWARD_URL = process.env.SHIELD_FORWARD_URL
