@@ -3,8 +3,8 @@ import mongoose from "mongoose"
 import Events from "events-async"
 import { create } from "./libp2p_bundle.js";
 import { bootstrap } from "@libp2p/bootstrap";
-import {pubsubPeerDiscovery} from "@libp2p/pubsub-peer-discovery";
-import { mdns } from '@libp2p/mdns'
+// import {pubsubPeerDiscovery} from "@libp2p/pubsub-peer-discovery";
+// import { mdns } from '@libp2p/mdns'
 import loadConfigs from "./configurations.js"
 import { createFromJSON } from '@libp2p/peer-id-factory'
 import chalk from "chalk"
@@ -73,10 +73,15 @@ class Network extends Events {
     const peerRouters: any[] = []
 
     if(Array.isArray(netConfig.routing?.delegate) && netConfig.routing.delegate.length > 0) {
+      let discoveryInterval = 3*60e3
+      if(process.env.DISCOVERY_INTERVAL){
+        if(parseInt(process.env.DISCOVERY_INTERVAL)>=10e3)
+          discoveryInterval = parseInt(process.env.DISCOVERY_INTERVAL)
+      }
       peerRouters.push(
         muonRouting({
           baseUrls: netConfig.routing.delegate,
-          discoveryInterval: 3*60*1000,
+          discoveryInterval,
         })
       )
     }
@@ -136,8 +141,8 @@ class Network extends Events {
       //   },
       // },
     });
-    libp2p.connectionManager.addEventListener("peer:connect", this.onPeerConnect.bind(this));
-    libp2p.connectionManager.addEventListener("peer:disconnect", this.onPeerDisconnect.bind(this));
+    libp2p.addEventListener("peer:connect", this.onPeerConnect.bind(this));
+    libp2p.addEventListener("peer:disconnect", this.onPeerDisconnect.bind(this));
 
     // libp2p.addEventListener("peer:discovery", this.onPeerDiscovery.bind(this));
 
@@ -165,9 +170,9 @@ class Network extends Events {
 
     if (this.configs.libp2p.natIp) {
       let { port, natIp } = this.configs.libp2p;
-      this.libp2p.components.addressManager.addObservedAddr(
-        `/ip4/${natIp}/tcp/${port}/p2p/${peerId2Str(this.peerId)}`
-      );
+      // this.libp2p.components.addressManager.addObservedAddr(
+      //   `/ip4/${natIp}/tcp/${port}/p2p/${peerId2Str(this.peerId)}`
+      // );
     }
 
     log(

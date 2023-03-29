@@ -16,7 +16,7 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
     this.options = options;
   }
 
-  on(eventName: string, listener: (arg:MessageType, {pid: number, uid: string}) => Promise<any>) {
+  on(eventName: string, listener: (arg:MessageType, {pid, uid}) => Promise<any>) {
     // @ts-ignore
     super.on(eventName, listener);
     if(!this._reading){

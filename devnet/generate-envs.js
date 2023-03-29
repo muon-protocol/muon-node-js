@@ -1,7 +1,6 @@
 import dotenv from 'dotenv'
 import path from 'path'
 dotenv.config()
-import PeerId from 'peer-id'
 import emoji from 'node-emoji'
 import fs from 'fs'
 import Web3 from 'web3'
@@ -60,6 +59,7 @@ PEER_PUBLIC_KEY = "${data.peerIdPublic}"
 PEER_PRIVATE_KEY = "${data.peerIdPrivate}"
 PEER_PORT = ${data.libp2pListenPort}
 ${bootstrapList}
+DISCOVERY_INTERVAL=15000
 # ===========================================
 
 DISABLE_ANNOUNCE_FILTER=1

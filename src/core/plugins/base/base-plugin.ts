@@ -3,7 +3,6 @@ import {MuonNodeInfo} from "../../../common/types";
 import CollateralInfoPlugin from "../collateral-info";
 import Log from '../../../common/muon-log.js'
 import Events from 'events-async'
-import PeerId from 'peer-id'
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
 import * as SharedMem from '../../../common/shared-memory/index.js'

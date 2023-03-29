@@ -4,7 +4,7 @@ import Request from '../../../common/db-models/Request.js'
 import {makeAppDependency} from './app-dependencies/index.js'
 import {getTimestamp, pub2json, timeout} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
-import {soliditySha3} from '../../../utils/sha3.js'
+import {muonSha3, soliditySha3} from '../../../utils/sha3.js'
 import * as tss from '../../../utils/tss/index.js'
 import Web3 from 'web3'
 import lodash from 'lodash'
@@ -26,6 +26,8 @@ import {bn2hex} from "../../../utils/tss/utils.js";
 import * as NetworkIpc from "../../../network/ipc.js";
 import {PublicKey} from "../../../utils/tss/types";
 import {RedisCache} from "../../../common/redis-cache.js";
+import axios from "axios";
+import {GatewayCallParams} from "../../../gateway/types";
 
 const {shuffle} = lodash;
 const { omit } = lodash;
@@ -237,7 +239,9 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @gatewayMethod("default")
-  async __onRequestArrived({method, params, mode, callId: gatewayCallId, gwSign}) {
+  async __onRequestArrived(callParams: GatewayCallParams) {
+    const {method, params, mode, callId: gatewayCallId, gwSign, fee: feeParams} = callParams;
+
     this.log(`request arrived %O`, {method, params})
     let t0 = Date.now()
     let startedAt = getTimestamp()
@@ -266,6 +270,18 @@ class BaseAppPlugin extends CallablePlugin {
       }
     }
 
+    const feeData = !!feeParams ? {
+      fee: {
+        amount: "",
+        spender: {
+          address: feeParams.spender,
+          timestamp: feeParams.timestamp,
+          signature: feeParams.signature
+        },
+        signature: ""
+      }
+    } : {}
+
     let newRequest = new Request({
       reqId: null,
       app: this.APP_NAME,
@@ -278,6 +294,7 @@ class BaseAppPlugin extends CallablePlugin {
         uid: gatewayCallId,
         params,
         timestamp: startedAt,
+        ...feeData,
       },
       startedAt
     })
@@ -371,6 +388,13 @@ class BaseAppPlugin extends CallablePlugin {
         this.requestManager.addSignature(newRequest.reqId, sign.owner, sign);
         // new Signature(sign).save()
 
+        const fee = await this.spendRequestFee(newRequest);
+
+        if(fee) {
+          newRequest.data.fee.amount = fee.amount
+          newRequest.data.fee.signature = fee.sign
+        }
+
         this.log('broadcasting request ...');
         await this.broadcastNewRequest(newRequest)
         t4 = Date.now()
@@ -438,6 +462,61 @@ class BaseAppPlugin extends CallablePlugin {
 
       return requestData
     }
+  }
+
+  async spendRequestFee(request: AppRequest) {
+    let {fee} = request.data;
+    const feeConfigs = this.muon.configs.net.fee;
+    if(fee && feeConfigs) {
+      this.log(`spending fee %o`, fee)
+      const {spender} = fee;
+      const appId = this.APP_ID;
+
+      /** fee signature is valid for 5 minutes */
+      if(spender.timestamp/1000 < request.data.timestamp-5*60e3)
+        throw `fee spend time has been expired.`
+
+      const hash = muonSha3(
+        {t: "address", v: spender.address},
+        {t: 'uint64', v: spender.timestamp},
+        {t: 'uint256', v: appId},
+      )
+      const signer = crypto.recover(hash, spender.signature);
+      if(signer !== spender.address)
+        throw `fee spender not matched with signer.`
+
+      /** spend fee */
+      const {endpoint, signers: feeSigners} = feeConfigs
+      let feeResponse = await axios.post(
+        endpoint,
+        {
+          request: request.reqId,
+          spender: spender.address,
+          timestamp: spender.timestamp,
+          appId,
+          sign: spender.signature,
+        },
+      )
+        .then(({data}) => data)
+        .catch(e => {
+          return {
+            error: e?.response?.data?.error || e?.message || "unknown error when spending request fee"
+          }
+        })
+      this.log(`fee server response %o`, feeResponse)
+
+      if(feeResponse.error)
+        throw feeResponse.error;
+
+      /** check fee server response */
+      const feeAmount: number = parseInt(feeResponse.amount)
+      if(feeAmount <= 0)
+        throw `unable to spend request fee.`
+
+      return feeResponse;
+    }
+
+    return undefined;
   }
 
   async informRequestConfirmation(request) {
@@ -979,6 +1058,20 @@ class BaseAppPlugin extends CallablePlugin {
       throw `Missing app tss key`
 
     const [result, hash] = await this.preProcessRemoteRequest(request);
+
+    /** fee checking */
+    if(request.data.fee) {
+      const feeConfigs = this.muon.configs.net.fee;
+      let {amount, signature} = request.data.fee;
+      const hash = muonSha3(
+        { type: "uint256", value: request.reqId },
+        { type: "uint256", value: amount }
+      )
+      const signer = crypto.recover(hash, signature)
+      if(feeConfigs && !feeConfigs.signers.includes(signer)) {
+        throw `fee consumption signature mismatched.`
+      }
+    }
 
     let sign = await this.makeSignature(request, result, hash)
     let memWrite = this.getMemWrite(request, result)

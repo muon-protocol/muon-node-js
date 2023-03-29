@@ -1,11 +1,11 @@
 import { createLibp2p } from "libp2p";
 import { tcp } from "@libp2p/tcp";
-import { webSockets } from "@libp2p/websockets";
+// import { webSockets } from "@libp2p/websockets";
 import { mplex } from "@libp2p/mplex";
 import { noise } from "@chainsafe/libp2p-noise";
-import { kadDHT } from "@libp2p/kad-dht";
+// import { kadDHT } from "@libp2p/kad-dht";
 import { bootstrap } from "@libp2p/bootstrap";
-import { pubsubPeerDiscovery } from "@libp2p/pubsub-peer-discovery";
+// import { pubsubPeerDiscovery } from "@libp2p/pubsub-peer-discovery";
 import { gossipsub } from "@chainsafe/libp2p-gossipsub";
 import defaultsDeep from "@nodeutils/defaults-deep";
 import { LevelDatastore } from "datastore-level";
@@ -26,9 +26,9 @@ const DEFAULT_OPTS = {
     noise(),
   ],
   connectionManager: {
-    autoDial: false,
+    // autoDial: false,
     maxConnections: 1000,
-    minConnections: 10,
+    minConnections: 0,
     maxIncomingPendingConnections: 50
   },
   streamMuxers: [

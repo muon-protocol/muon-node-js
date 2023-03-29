@@ -52,6 +52,10 @@ export type MuonConfigs = {
       "onlineList"?: string,
     },
     bootstrap: string[],
+    fee?: {
+      endpoint: string,
+      signers: string[]
+    }
   },
 }
 

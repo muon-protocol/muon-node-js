@@ -1,19 +1,21 @@
 import {Router} from 'express'
 import asyncHandler from 'express-async-handler'
 import RequestLog from '../../common/db-models/RequestLog.js'
-import {QueueProducer} from '../../common/message-bus/index.ts'
+import {QueueProducer} from '../../common/message-bus/index.js'
 import {parseBool} from '../../utils/helpers.js'
 import {soliditySha3} from '../../utils/sha3.js'
-import * as CoreIpc from '../../core/ipc.ts'
-import * as NetworkIpc from '../../network/ipc.ts'
+import * as CoreIpc from '../../core/ipc.js'
+import * as NetworkIpc from '../../network/ipc.js'
 import axios from 'axios'
 import * as crypto from '../../utils/crypto.js'
 import Log from '../../common/muon-log.js'
 import Ajv from "ajv"
 import {mixGetPost} from "../middlewares.js";
+import {MuonNodeInfo} from "../../common/types";
+import {GatewayCallParams} from "../types";
 
 const log = Log('muon:gateway:api')
-const ajv = new Ajv()
+const ajv = new Ajv({coerceTypes: true})
 let requestQueue = new QueueProducer(`gateway-requests`);
 
 const SHIELD_FORWARD_URL = process.env.SHIELD_FORWARD_URL
@@ -29,8 +31,8 @@ async function storeRequestLog(logData) {
   await log.save();
 }
 
-function extraLogs(req, result) {
-  let logs = {
+function extraLogs(req, result?: any) {
+  let logs: any = {
     time: Date.now(),
     ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress,
     extra: {
@@ -73,14 +75,15 @@ async function getAppTimeout(app) {
   return appTimeouts[app];
 }
 
-async function callProperNode(requestData) {
+async function callProperNode(requestData: GatewayCallParams) {
   /** forward deployment app request to Deployer node */
   if(requestData.app === 'deployment'){
     const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
     if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
       log(`current node is not deployer`)
       let deployers = (await NetworkIpc.filterNodes({isDeployer: true})).map(p => p.peerId);
-      let onlineDeployers = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 5000})
+      let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 5000});
+      // @ts-ignore
       if(!onlineDeployers.length > 0)
         throw `cannot find any online deployer to forward request`;
       const randomIndex = Math.floor(Math.random() * onlineDeployers.length);
@@ -110,8 +113,8 @@ async function callProperNode(requestData) {
     throw `App not deployed`;
   }
   const {partners} = context.party
-  const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
-  if (partners.includes(currentNodeInfo.id)) {
+  const currentNodeInfo: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
+  if (!!currentNodeInfo && partners.includes(currentNodeInfo.id)) {
     return await requestQueue.send(requestData)
   } else {
     const randomIndex = Math.floor(Math.random() * partners.length);
@@ -153,6 +156,15 @@ const MUON_REQUEST_SCHEMA = {
     mode: {
       enum: ["sign", "view"],
       default: "sign",
+    },
+    fee: {
+      type: "object",
+      properties: {
+        spender: {type: "string"},
+        timestamp: {type: "number"},
+        signature: {type: "string"},
+      },
+      required: ["spender", "timestamp", "signature"],
     }
   },
   required: ["app", "method"],
@@ -161,16 +173,17 @@ const MUON_REQUEST_SCHEMA = {
 
 let router = Router();
 
+// @ts-ignore
 router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
   // @ts-ignore
-  let {app, method, params = {}, nSign, mode = "sign", gwSign} = req.mixed
+  let {app, method, params = {}, nSign, mode = "sign", gwSign, fee} = req.mixed
 
   if (!["sign", "view"].includes(mode)) {
     return res.json({success: false, error: {message: "Request mode is invalid"}})
   }
 
   gwSign = parseBool(gwSign);
-  const requestData = {app, method, params, nSign, mode, gwSign}
+  const requestData: GatewayCallParams = {app, method, params, nSign, mode, gwSign, fee}
   log("request arrived %o", requestData);
 
   if(!ajv.validate(MUON_REQUEST_SCHEMA, requestData)){

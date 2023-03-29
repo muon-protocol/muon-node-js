@@ -4,7 +4,7 @@ import {remoteApp, remoteMethod, gatewayMethod, globalBroadcastHandler, broadcas
 import TssPlugin from "./tss-plugin.js";
 import {MuonNodeInfo, Override} from "../../common/types";
 import HealthCheck from "./health-check.js";
-import {GatewayCallData} from "../../gateway/types";
+import {GatewayCallParams} from "../../gateway/types";
 import AppManager from "./app-manager.js";
 import * as NetworkIpc from '../../network/ipc.js'
 import {GlobalBroadcastChannels} from "../../common/contantes.js";
@@ -12,7 +12,7 @@ import CollateralInfoPlugin from "./collateral-info.js";
 import {timeout} from '../../utils/helpers.js'
 import * as NetworkDHTPlugin from '../../network/plugins/network-dht.js'
 
-type DHTReqData = Override<GatewayCallData, {params: { key: string, data?: string }}>
+type DHTReqData = Override<GatewayCallParams, {params: { key: string, data?: string }}>
 
 
 @remoteApp
