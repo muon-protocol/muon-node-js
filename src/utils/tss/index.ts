@@ -223,6 +223,10 @@ function schnorrAggregateSigs(t, sigs, indices): {s: BN, e: BN}{
   return {s, e}
 }
 
+export function validatePublicKey(publicKey: PublicKey): boolean {
+  return curve.curve.validate(publicKey);
+}
+
 export {
   curve,
   random,

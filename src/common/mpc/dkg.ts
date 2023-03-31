@@ -1,4 +1,5 @@
 import {MapOf, RoundOutput, RoundProcessor} from "./types";
+import validations from './dkg-validations.js';
 import {MultiPartyComputation} from "./base.js";
 import {bn2str} from './utils.js'
 import Web3 from 'web3'
@@ -126,82 +127,11 @@ export class DistKey {
   }
 }
 
-const pattern_id = "^[1-9][0-9]*$";
-const schema_uint32 = {type: 'string', pattern: `^0x[0-9A-Fa-f]{64}$`};
-const schema_public_key = {type: 'string', pattern: `^[0-9A-Fa-f]{66}$`};
-const InputSchema = {
-  'round1': {
-    type: 'object',
-    properties: {
-      broadcast: {
-        type: 'object',
-        properties: {
-          Fx: {
-            type: 'array',
-            items: schema_public_key
-          },
-          sig: {
-            type: 'object',
-            properties:{
-              nonce: schema_public_key,
-              signature: {type: "string"},
-            },
-            required:['nonce', 'signature']
-          }
-        },
-        required: ["Fx", "sig"]
-      },
-    },
-    required: ['broadcast']
-  },
-  'round2':{
-    type: 'object',
-    properties: {
-      send: {
-        type: 'object',
-        properties: {
-          f: schema_uint32,
-        },
-        required: ['f']
-      },
-      broadcast: {
-        type: "object",
-        properties: {
-          allPartiesFxHash: {
-            type: 'object',
-            patternProperties: {
-              [pattern_id]: schema_uint32
-            }
-          }
-        },
-        required: ['allPartiesFxHash']
-      }
-    },
-    required: ['send', 'broadcast']
-  },
-  'round3': {
-    type: 'object',
-    properties: {
-      broadcast: {
-        type: 'object',
-        properties: {
-          malicious: {
-            type: 'array',
-            items: {type: 'string'},
-          }
-        },
-        required: ['malicious'],
-      },
-    },
-    required: ['broadcast'],
-  }
-}
-
 export class DistributedKeyGeneration extends MultiPartyComputation {
 
   private readonly value: BN | undefined;
   public readonly extraParams: any;
-  protected InputSchema: object = InputSchema;
+  protected RoundValidations: object = validations;
 
   constructor(id: string, starter: string, partners: string[], t: number, value?: BN|string, extra: any={}) {
     // @ts-ignore
