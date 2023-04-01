@@ -219,7 +219,7 @@ export default class AppManager extends CallablePlugin {
       log(`pid[${process.pid}] app[${appId}] context deleting...`)
 
       if(!this.appContexts[appId] || !deploymentReqIds.includes(this.appContexts[appId].deploymentRequest.reqId)) {
-        log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
+        // log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
         return
       }
       delete this.appContexts[appId]

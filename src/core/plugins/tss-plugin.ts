@@ -96,6 +96,7 @@ class TssPlugin extends CallablePlugin {
     this.muon.on("collateral:node:edit", this.onNodeEdit.bind(this));
     this.muon.on("collateral:node:delete", this.onNodeDelete.bind(this));
 
+    this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
     this.muon.on('global-tss-key:generate', this.onTssKeyGenerate.bind(this));
     this.muon.on('party:generate', this.loadParty.bind(this));
 
@@ -372,6 +373,15 @@ class TssPlugin extends CallablePlugin {
       this.appTss[appId] = key;
     }
     return this.appTss[appId];
+  }
+  private async onAppContextDelete(data: {appId: string, deploymentReqIds: string[]}) {
+    let {appId} = data
+    if(!this.appTss[appId])
+      return;
+    const partyId = this.appTss[appId].party!.id;
+    if(partyId)
+     delete this.parties[partyId]
+    delete this.appTss[appId]
   }
 
   async onAppTssDelete(appId, appTssConfig) {

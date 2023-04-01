@@ -448,7 +448,7 @@ class BaseAppPlugin extends CallablePlugin {
         this.log('sending request to aggregator nodes ...')
         NetworkIpc.sendToAggregatorNode("AppRequest", requestData)
           .then(aggregatorNodeIdList => {
-            this.log(`request sent to nodes: %o`, aggregatorNodeIdList)
+            this.log(`request sent to aggregator nodes: %o`, aggregatorNodeIdList)
           })
           .catch(e => {
             this.log(`error when sending request to aggregator nodes %o`, e)
