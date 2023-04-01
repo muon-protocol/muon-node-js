@@ -210,9 +210,9 @@ class BaseAppPlugin extends CallablePlugin {
   /** useful when current node is not in the app party */
   private async findTssPublicKey(): Promise<PublicKey | null> {
     /** if key exist in current node */
-    let publicKey = this.appTss?.publicKey
-    if(publicKey)
-      return publicKey
+    let appContest = this.appManager.getAppContext(this.APP_ID)
+    if(appContest?.publicKey)
+      return DistributedKey.loadPubKey(appContest.publicKey.encoded);
 
     /** ask deployers for app tss public key */
     const deployersPeerId: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId);
@@ -1114,7 +1114,10 @@ class BaseAppPlugin extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.GetTssPublicKey)
   async __getTssPublicKey(data, callerInfo) {
-    return this.appTss!.publicKey!.encode("hex", true)
+    let appContest = this.appManager.getAppContext(this.APP_ID)
+    if(appContest?.publicKey)
+      return appContest.publicKey.encoded
+    throw `missing app tss publicKey`
   }
 }
 
