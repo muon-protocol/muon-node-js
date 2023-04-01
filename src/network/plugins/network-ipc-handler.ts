@@ -417,7 +417,10 @@ class NetworkIpcHandler extends CallablePlugin {
           if(n.wallet === process.env.SIGN_WALLET_ADDRESS) {
             return this.__aggregateData(data, this.collateralPlugin.currentNodeInfo!)
               .then(() => n)
-              .catch(e => null)
+              .catch(e => {
+                console.log("SendToAggregatorNode:ex", e);
+                return null;
+              })
           }
           else {
             return this.findPeer(n.peerId)
@@ -428,7 +431,10 @@ class NetworkIpcHandler extends CallablePlugin {
                 )
               )
               .then(() => n)
-              .catch(e => null)
+              .catch(e => {
+                console.log("SendToAggregatorNode:ex", e);
+                return null;
+              })
           }
         })
       );
