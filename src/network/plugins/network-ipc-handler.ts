@@ -419,6 +419,7 @@ class NetworkIpcHandler extends CallablePlugin {
               .then(() => n)
               .catch(e => {
                 console.log("SendToAggregatorNode:ex", e);
+                return null;
               })
           }
           else {
@@ -432,6 +433,7 @@ class NetworkIpcHandler extends CallablePlugin {
               .then(() => n)
               .catch(e => {
                 console.log("SendToAggregatorNode:ex", e);
+                return null;
               })
           }
         })
