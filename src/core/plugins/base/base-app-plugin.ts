@@ -211,21 +211,12 @@ class BaseAppPlugin extends CallablePlugin {
   private async findTssPublicKey(): Promise<PublicKey | null> {
     /** if key exist in current node */
     let appContest = this.appManager.getAppContext(this.APP_ID)
+    if(!appContest)
+      appContest = await this.appManager.queryAndLoadAppContext(this.APP_ID)
     if(appContest?.publicKey)
       return DistributedKey.loadPubKey(appContest.publicKey.encoded);
-
-    /** ask deployers for app tss public key */
-    const deployersPeerId: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId);
-    let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployersPeerId, 3, {timeout: 5000, return: 'peerId'})
-    // @ts-ignore
-    const publicKeyStr: string = await Promise.any(onlineDeployers.map(peerId => {
-      return this.remoteCall(
-        peerId,
-        RemoteMethods.GetTssPublicKey,
-      )
-    }))
-
-    return DistributedKey.loadPubKey(publicKeyStr);
+    else
+      return null;
   }
 
   /**
