@@ -291,9 +291,6 @@ class TssPlugin extends CallablePlugin {
       }
       else{
         log(`trying to recover global tss key... timeout(6000)`)
-        await timeout(6000);
-
-        // this.tryToFindOthers();
 
         while (!this.isReady) {
           log("waiting for tss, timeout(5000)");
