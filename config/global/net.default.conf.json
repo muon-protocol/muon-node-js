@@ -18,7 +18,7 @@
   },
   "nodes": {
     "onlineList": "http://103.75.196.96/nodes",
-    "aggregators": ["4"]
+    "aggregators": ["4", "14012"]
   },
   "bootstrap": [
     "/ip4/104.131.177.195/tcp/5000/p2p/Qma3GsJmB47xYuyahPZPSadh1avvxfyYQwk8R3UnFrQ6aP",
