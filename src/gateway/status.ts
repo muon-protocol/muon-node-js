@@ -58,7 +58,7 @@ router.use('/', asyncHandler(async (req, res, next) => {
     },
     addedToNetwork: !!nodeInfo,
     network: {
-      nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker']) : undefined,
+      nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker','isOnline']) : undefined,
       address: multiAddress,
     }
   })
