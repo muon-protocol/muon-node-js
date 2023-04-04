@@ -12,7 +12,7 @@ import NetworkContentPlugin from "./content-plugin.js";
 import {parseBool, timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import {isPrivate} from "../utils.js";
 
 class AggregatorBus extends MessagePublisher {
@@ -38,7 +38,7 @@ if(!!REQUESTS_PUB_SUB_CHANNEL) {
   reqAggregatorBus = new AggregatorBus(REQUESTS_PUB_SUB_CHANNEL, configs)
 }
 
-const log = Log('muon:network:plugins:ipc-handler')
+const log = logger('muon:network:plugins:ipc-handler')
 let requestQueue = new QueueProducer(`gateway-requests`);
 
 const tasksCache = new NodeCache({
@@ -418,7 +418,7 @@ class NetworkIpcHandler extends CallablePlugin {
             return this.__aggregateData(data, this.collateralPlugin.currentNodeInfo!)
               .then(() => n)
               .catch(e => {
-                console.log("SendToAggregatorNode:ex", e);
+                log.error("SendToAggregatorNode:ex, %O", e);
                 return null;
               })
           }
@@ -432,7 +432,7 @@ class NetworkIpcHandler extends CallablePlugin {
               )
               .then(() => n)
               .catch(e => {
-                console.log("SendToAggregatorNode:ex", e);
+                log.error("SendToAggregatorNode:ex %O", e);
                 return null;
               })
           }

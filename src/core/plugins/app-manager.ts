@@ -14,6 +14,7 @@ import _ from 'lodash'
 import {logger} from '@libp2p/logger'
 import {pub2json} from "../../utils/helpers.js";
 import DistributedKey from "../../utils/tss/distributed-key.js";
+import {findMinFullyConnectedSubGraph} from "../../common/graph-utils/index.js";
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -21,14 +22,15 @@ const RemoteMethods = {
   GetAppDeploymentInfo: "get-app-deployment-info",
   AppDeploymentInquiry: "app-deployment-inquiry",
   AppDeploymentInfo: "app-deployment-info",
-  GetAppTss: "get-app-tss"
+  GetAppTss: "get-app-tss",
+  GetAppPartyLatency: "get-app-latency"
 }
 
 @remoteApp
 export default class AppManager extends CallablePlugin {
-  private appContexts: {[index: string]: any} = {}
-  private contextIdToAppIdMap: {[index: string]: string}={}
-  private appTssConfigs: {[index: string]: any} = {}
+  private appContexts: { [index: string]: any } = {}
+  private contextIdToAppIdMap: { [index: string]: string } = {}
+  private appTssConfigs: { [index: string]: any } = {}
   private loading: TimeoutPromise = new TimeoutPromise();
 
   async onStart() {
@@ -47,9 +49,9 @@ export default class AppManager extends CallablePlugin {
   }
 
   onNodeAdd(nodeInfo: MuonNodeInfo) {
-    if(!this.isLoaded())
+    if (!this.isLoaded())
       return;
-    if(nodeInfo.isDeployer) {
+    if (nodeInfo.isDeployer) {
       let deploymentContext = this.appContexts['1'];
       deploymentContext.party.partners = [
         ...deploymentContext.party.partners,
@@ -59,9 +61,9 @@ export default class AppManager extends CallablePlugin {
   }
 
   onNodeDelete(nodeInfo: MuonNodeInfo) {
-    if(!this.isLoaded())
+    if (!this.isLoaded())
       return;
-    if(nodeInfo.isDeployer) {
+    if (nodeInfo.isDeployer) {
       let deploymentContext = this.appContexts['1'];
       deploymentContext.party.partners = deploymentContext.party.partners.filter(id => id != nodeInfo.id)
     }
@@ -80,8 +82,8 @@ export default class AppManager extends CallablePlugin {
     await this.collateralPlugin.waitToLoad();
     const currentNode = this.collateralPlugin.currentNodeInfo!;
     let deploymentTssPublicKey: any = undefined;
-    if(currentNode && currentNode.isDeployer) {
-      if(!!this.tssPlugin.tssKey) {
+    if (currentNode && currentNode.isDeployer) {
+      if (!!this.tssPlugin.tssKey) {
         deploymentTssPublicKey = pub2json(this.tssPlugin.tssKey.publicKey!)
       }
     }
@@ -94,7 +96,7 @@ export default class AppManager extends CallablePlugin {
           appName: "deployment",
           isBuiltIn: true,
           party: {
-            partners: this.collateralPlugin.filterNodes({isDeployer: true}).map(({id})=>id),
+            partners: this.collateralPlugin.filterNodes({isDeployer: true}).map(({id}) => id),
             t: this.collateralPlugin.TssThreshold,
             max: this.collateralPlugin.MaxGroupSize
           },
@@ -106,7 +108,7 @@ export default class AppManager extends CallablePlugin {
 
       const tssKeyContext = {}
       allAppContexts.forEach(ac => {
-        if(ac.publicKey?.encoded) {
+        if (ac.publicKey?.encoded) {
           tssKeyContext[ac.publicKey?.encoded] = ac;
         }
         this.appContexts[ac.appId] = ac;
@@ -115,13 +117,13 @@ export default class AppManager extends CallablePlugin {
 
       const allTssKeys = await AppTssConfig.find({});
       allTssKeys.forEach(key => {
-        if(tssKeyContext[key.publicKey.encoded])
+        if (tssKeyContext[key.publicKey.encoded])
           this.appTssConfigs[key.appId] = key;
       })
       log('apps tss keys loaded.')
 
       this.loading.resolve(true);
-    }catch (e) {
+    } catch (e) {
       console.error(`core.AppManager.loadAppsInfo`, e);
     }
   }
@@ -134,7 +136,7 @@ export default class AppManager extends CallablePlugin {
   async saveAppContext(context: object) {
     // @ts-ignore
     const oldDoc = await AppContext.findOne({version: context.version, appId: context.appId})
-    if(oldDoc) {
+    if (oldDoc) {
       _.assign(oldDoc, context)
       oldDoc.dangerousAllowToSave = true
       await oldDoc.save()
@@ -166,7 +168,7 @@ export default class AppManager extends CallablePlugin {
 
   async saveAppTssConfig(appTssConfig: any) {
     // @ts-ignore
-    if(appTssConfig.keyShare) {
+    if (appTssConfig.keyShare) {
       let newConfig = new AppTssConfig(appTssConfig)
       /**
        * Do not use this code in any other place
@@ -208,25 +210,24 @@ export default class AppManager extends CallablePlugin {
     this.contextIdToAppIdMap[doc._id] = doc.appId
   }
 
-  private async onAppContextDelete(data: {appId: string, deploymentReqIds: string[]}) {
+  private async onAppContextDelete(data: { appId: string, deploymentReqIds: string[] }) {
     try {
       const {appId, deploymentReqIds} = data
-      if(!appId || !Array.isArray(deploymentReqIds)) {
+      if (!appId || !Array.isArray(deploymentReqIds)) {
         log.error('missing appId/deploymentReqIds.');
         return;
       }
 
       log(`pid[${process.pid}] app[${appId}] context deleting...`)
 
-      if(!this.appContexts[appId] || !deploymentReqIds.includes(this.appContexts[appId].deploymentRequest.reqId)) {
+      if (!this.appContexts[appId] || !deploymentReqIds.includes(this.appContexts[appId].deploymentRequest.reqId)) {
         // log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
         return
       }
       delete this.appContexts[appId]
       delete this.appTssConfigs[appId]
       log(`app[${appId}] context deleted.`)
-    }
-    catch (e) {
+    } catch (e) {
       log(`error when deleting app context %O`, e);
     }
   }
@@ -247,8 +248,7 @@ export default class AppManager extends CallablePlugin {
           /** TssPlugin needs to refresh tss key info */
           // @ts-ignore
           await this.emit("app-tss:delete", doc.appId, doc)
-        }
-        catch (e) {
+        } catch (e) {
           console.log(`AppManager.onAppTssConfigChange`, e);
         }
         break
@@ -257,7 +257,7 @@ export default class AppManager extends CallablePlugin {
         let documentId = change.documentKey._id.toString();
         try {
           const appId = Object.keys(this.appTssConfigs).find(appId => (this.appTssConfigs[appId]._id.toString() === documentId))
-          if(!appId) {
+          if (!appId) {
             console.error(`AppTssConfig deleted but appId not found`, change)
             return
           }
@@ -265,8 +265,7 @@ export default class AppManager extends CallablePlugin {
           delete this.appTssConfigs[appId]
           // @ts-ignore
           await this.emit("app-tss:delete", appId, appTssConfig)
-        }
-        catch (e) {
+        } catch (e) {
           console.log(`AppManager.onAppTssConfigChange`, e);
         }
         break
@@ -277,30 +276,30 @@ export default class AppManager extends CallablePlugin {
   }
 
   async loadAppContextFromNetwork(holders: MuonNodeInfo[], appId: string) {
-    for(let i=0 ; i<holders.length ; i++) {
+    for (let i = 0; i < holders.length; i++) {
       let data = await this.remoteCall(
         holders[i].peerId,
         RemoteMethods.AppDeploymentInfo,
         appId
       )
-      if(data) {
+      if (data) {
         try {
           const context = await this.saveAppContext(data);
           return context;
-        }catch (e) {}
+        } catch (e) {}
       }
     }
   }
 
   getAppDeploymentInfo(appId: string): AppDeploymentInfo {
-    if(!this.appIsDeployed(appId)) {
+    if (!this.appIsDeployed(appId)) {
       return {
         appId,
         deployed: false,
         status: this.getAppDeploymentStatus(appId),
       }
     }
-    if(!this.appHasTssKey(appId)) {
+    if (!this.appHasTssKey(appId)) {
       return {
         appId,
         deployed: true,
@@ -320,10 +319,11 @@ export default class AppManager extends CallablePlugin {
   }
 
   appQueryResult = {}
+
   async queryAndLoadAppContext(appId) {
     /** cache for 5 minutes */
-    if(this.appQueryResult[appId]){
-      if(Date.now() - this.appQueryResult[appId].time < 60e3)
+    if (this.appQueryResult[appId]) {
+      if (Date.now() - this.appQueryResult[appId].time < 60e3)
         return this.appQueryResult[appId].result;
     }
     /** refresh result */
@@ -346,12 +346,12 @@ export default class AppManager extends CallablePlugin {
         {timeout: 15000}
       )
         .catch(e => {
-          log('error when calling remote method AppState %o',e);
+          log('error when calling remote method AppState %o', e);
           return "error"
         })
     }));
     const trueCallResult = callResult.filter(r => r?.deployed)
-    if(trueCallResult.length < 1) {
+    if (trueCallResult.length < 1) {
       this.appQueryResult[appId] = {
         time: Date.now(),
         result: null
@@ -365,7 +365,7 @@ export default class AppManager extends CallablePlugin {
       // @ts-ignore
     let holders: MuonNodeInfo[] = callResult
         .map((r, i) => {
-          if(r.deployed)
+          if (r.deployed)
             return candidateNodes[i]
           else
             return null;
@@ -380,12 +380,13 @@ export default class AppManager extends CallablePlugin {
   }
 
   tssKeyQueryResult = {}
+
   async queryAndLoadAppTssKey(appId) {
-    if(!this.appIsDeployed(appId))
+    if (!this.appIsDeployed(appId))
       return null;
     /** cache for 5 minutes */
-    if(this.tssKeyQueryResult[appId]){
-      if(Date.now() - this.tssKeyQueryResult[appId].time < 60e3)
+    if (this.tssKeyQueryResult[appId]) {
+      if (Date.now() - this.tssKeyQueryResult[appId].time < 60e3)
         return this.tssKeyQueryResult[appId].result;
     }
     let appContext = this.appContexts[appId];
@@ -409,14 +410,14 @@ export default class AppManager extends CallablePlugin {
         {timeout: 15000}
       )
         .catch(e => {
-          if(process.env.VERBOSE)
+          if (process.env.VERBOSE)
             console.error(`core.AppManager.queryAndLoadAppTssKey [GetAppTss] Error`, e);
           return "error"
         })
     }));
 
     const trueCallResult = callResult.filter(r => !!r)
-    if(trueCallResult.length < 1) {
+    if (trueCallResult.length < 1) {
       this.tssKeyQueryResult[appId] = {
         time: Date.now(),
         result: null
@@ -441,7 +442,7 @@ export default class AppManager extends CallablePlugin {
   }
 
   appIsDeployed(appId: string): boolean {
-    return appId=='1' || !!this.appContexts[appId]
+    return appId == '1' || !!this.appContexts[appId]
   }
 
   appIsBuiltIn(appId: string): boolean {
@@ -460,20 +461,19 @@ export default class AppManager extends CallablePlugin {
     let context = this.getAppContext(appId);
 
     let statusCode = 0
-    if(!!context)
-      statusCode ++;
-    if(this.appHasTssKey(appId))
-      statusCode ++;
+    if (!!context)
+      statusCode++;
+    if (this.appHasTssKey(appId))
+      statusCode++;
 
     return ["NEW", "TSS_GROUP_SELECTED", "DEPLOYED"][statusCode] as AppDeploymentStatus;
   }
 
   appHasTssKey(appId: string): boolean {
-    if(appId=='1') {
+    if (appId == '1') {
       const nodeInfo = this.collateralPlugin.currentNodeInfo!
       return nodeInfo?.isDeployer && !!this.tssPlugin.tssKey
-    }
-    else {
+    } else {
       return !!this.appTssConfigs[appId];
     }
   }
@@ -497,7 +497,7 @@ export default class AppManager extends CallablePlugin {
    * @param options.appId {string} - if has value, the nodes that has ready app tss key, will be selected.
    * @param options.timeout {number} - times to wait for remote response (in millisecond)
    */
-  async findNAvailablePartners(appId: string, searchList: string[], count: number, options:{timeout?: number, return?: string}={}): Promise<string[]> {
+  async findNAvailablePartners(appId: string, searchList: string[], count: number, options: { timeout?: number, return?: string } = {}): Promise<string[]> {
     options = {
       timeout: 15000,
       return: 'id',
@@ -509,10 +509,10 @@ export default class AppManager extends CallablePlugin {
 
     let responseList: string[] = []
     let n = count;
-    if(selfIndex >= 0) {
-      peers = peers.filter((_, i) => (i!==selfIndex))
+    if (selfIndex >= 0) {
+      peers = peers.filter((_, i) => (i !== selfIndex))
       const status = this.getAppDeploymentStatus(appId)
-      if(status === 'DEPLOYED')
+      if (status === 'DEPLOYED')
         responseList.push(this.currentNodeInfo![options!.return!]);
       n--;
     }
@@ -532,7 +532,7 @@ export default class AppManager extends CallablePlugin {
     const execTimes = new Array(peers.length).fill(-1)
     const startTime = Date.now()
     let finalized = false;
-    for(let i=0 ; i<peers.length ; i++) {
+    for (let i = 0; i < peers.length; i++) {
       this.remoteCall(
         peers[i].peerId,
         RemoteMethods.GetAppDeploymentInfo,
@@ -541,7 +541,7 @@ export default class AppManager extends CallablePlugin {
       )
         .then(({status}) => {
           execTimes[i] = Date.now() - startTime
-          if(status === "DEPLOYED") {
+          if (status === "DEPLOYED") {
             responseList.push(peers[i][options!.return!])
             n--;
           }
@@ -551,13 +551,13 @@ export default class AppManager extends CallablePlugin {
         })
         .finally(() => {
           if (n <= 0) {
-            if(!finalized)
+            if (!finalized)
               log("find availability exec times %o, nodes: %o", execTimes, peers.map(p => p.id))
             finalized = true
             resultPromise.resolve(responseList);
           }
-          if(--pendingRequests <= 0) {
-            if(!finalized)
+          if (--pendingRequests <= 0) {
+            if (!finalized)
               log("find availability exec times %o, nodes: %o", execTimes, peers.map(p => p.id))
             finalized = true
             resultPromise.resolve(responseList);
@@ -566,6 +566,53 @@ export default class AppManager extends CallablePlugin {
     }
 
     return resultPromise.promise;
+  }
+
+  async findOptimalAvailablePartners(appId: string, count: number, options: { timeout?: number, return?: string } = {}): Promise<string[]> {
+    options = {
+      timeout: 5000,
+      return: 'id',
+      ...options
+    }
+    const context = this.getAppContext(appId)
+    if (!context)
+      throw `app not deployed`;
+
+    let peers = this.collateralPlugin.filterNodes({list: context.party.partners})
+    log(`finding ${count} optimal available of ${context.appName} app partners ...`)
+
+    let responseTimes = await Promise.all(
+      peers.map(p => {
+        return (
+          p.wallet === process.env.SIGN_WALLET_ADDRESS
+          ?
+          this.__getAppPartyLatency({appId}, this.collateralPlugin.currentNodeInfo)
+          :
+          this.remoteCall(
+            p.peerId,
+            RemoteMethods.GetAppPartyLatency,
+            {appId},
+            {timeout: options.timeout}
+          )
+        )
+          .catch(e => null)
+      })
+    )
+    responseTimes = responseTimes.reduce((obj, r, i) => (obj[peers[i].id]=r, obj), {});
+    const graph = {}
+    for(const [receiver, times] of Object.entries(responseTimes)) {
+      if(times === null)
+        continue;
+      for(const [sender, time] of Object.entries(times)) {
+        if(time === null)
+          continue ;
+        if(!graph[sender])
+          graph[sender] = {}
+        graph[sender][receiver] = time;
+      }
+    }
+    const minGraph = findMinFullyConnectedSubGraph(graph, count);
+    return Object.keys(minGraph)
   }
 
   /**
@@ -590,11 +637,45 @@ export default class AppManager extends CallablePlugin {
   @remoteMethod(RemoteMethods.GetAppTss)
   async __getAppTss(appId, callerInfo) {
     const tssKey = this.getAppTssKey(appId)
-    if(!tssKey)
+    if (!tssKey)
       return null;
     return {
       version: tssKey.version,
       publicKey: tssKey.publicKey.encoded,
     }
+  }
+
+  @remoteMethod(RemoteMethods.GetAppPartyLatency)
+  async __getAppPartyLatency(data: { appId: string }, callerInfo) {
+    const {appId} = data;
+    if (!appId)
+      throw `appId not defined`;
+    const context = this.getAppContext(appId)
+    if (!context)
+      throw `app not deployed`
+    const peers = this.collateralPlugin.filterNodes({list: context.party.partners})
+    const startTime = Date.now();
+    const responses = await Promise.all(
+      peers.map(p => {
+        return (
+          p.wallet === process.env.SIGN_WALLET_ADDRESS
+          ?
+          this.__getAppDeploymentInfo(appId)
+          :
+          this.remoteCall(
+            p.peerId,
+            RemoteMethods.GetAppDeploymentInfo,
+            appId
+          )
+        )
+          .then(({status}) => {
+            if (status !== 'DEPLOYED')
+              return null;
+            return Date.now() - startTime
+          })
+          .catch(e => null)
+      })
+    )
+    return responses.reduce((obj, r, i) => (obj[peers[i].id]=r, obj), {});
   }
 }
