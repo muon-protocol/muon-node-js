@@ -48,6 +48,8 @@ export function getFullyConnectedSubGraph(inputGraph: WeightedGraph) {
     for(const [dest, weight] of Object.entries(connections)) {
       if(graph[dest]===undefined || graph[dest][src]===undefined)
         delete connections[dest];
+      if(getKeys(connections).length === 0)
+        delete graph[src];
     }
   }
 
