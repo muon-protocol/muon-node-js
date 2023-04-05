@@ -1,5 +1,11 @@
 const getKeys = obj => Object.keys(obj);
 const getVals = obj => Object.values(obj);
+const avg = arr => {
+  let sum = 0
+  for(let i=0 ; i<arr.length ; i++)
+    sum += arr[i]
+  return sum / arr.length
+}
 
 export type UnweightedGraph = {
   [index: string]: string []
@@ -91,7 +97,8 @@ export function findMinFullyConnectedSubGraph(inputGraph: WeightedGraph, n: numb
       return (
         /** lower connection weight has more priority */
         // @ts-ignore
-        Math.max(...getVals(conn1)) < Math.max(...getVals(conn2))
+        // Math.max(...getVals(conn1)) < Math.max(...getVals(conn2))
+        avg(getVals(conn1)) < avg(getVals(conn2))
         /** lower ID has more priority */
         || parseInt(key1) < parseInt(key2)
       ) ? 1 : -1
