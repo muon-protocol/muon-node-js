@@ -10,8 +10,8 @@ function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions) {
   return callQueue.send({method, params}, options);
 }
 
-function getNetworkConfig() {
-  return call(IpcMethods.GetNetworkConfig);
+function getNetworkConfig(options?: IpcCallOptions) {
+  return call(IpcMethods.GetNetworkConfig, {} , options);
 }
 
 function getCollateralInfo(options?: IpcCallOptions) {
@@ -97,8 +97,8 @@ function subscribeToBroadcastChannel(channel: string) {
   return call(IpcMethods.SubscribeToBroadcastChannel, channel)
 }
 
-function getUptime() {
-  return call(IpcMethods.GetUptime)
+function getUptime(options?: IpcCallOptions) {
+  return call(IpcMethods.GetUptime, {} , options)
 }
 
 function findNOnlinePeer(peerIds: string[], count: number, options?: {timeout?: number, return?: string}): Promise<string[]> {
@@ -109,8 +109,8 @@ function getConnectedPeerIds(): Promise<string[]> {
   return call(IpcMethods.GetConnectedPeerIds)
 }
 
-function getNodeMultiAddress(): Promise<string[]> {
-  return call(IpcMethods.GetNodeMultiAddress)
+function getNodeMultiAddress(options?: IpcCallOptions): Promise<string[]> {
+  return call(IpcMethods.GetNodeMultiAddress, {} , options)
 }
 
 /**
