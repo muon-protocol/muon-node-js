@@ -95,9 +95,17 @@ class Explorer extends CallablePlugin {
     if(!nodeInfo) {
       throw `unknown peer`
     }
+    const startTime = Date.now();
+    const [peerInfo, nodeStatus] = await Promise.all([
+      NetworkIpc.getPeerInfo(nodeInfo.peerId)
+        .catch(e => e.message),
+      this.healthPlugin.getNodeStatus(nodeInfo)
+        .catch(e => e.message)
+    ])
     return {
-      peerInfo: await NetworkIpc.getPeerInfo(nodeInfo.peerId),
-      nodeInfo: await this.healthPlugin.getNodeStatus(nodeInfo).catch(e => e.message)
+      peerInfo,
+      nodeInfo: nodeStatus,
+      execTime: Date.now() - startTime,
     }
   }
 

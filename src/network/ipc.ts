@@ -6,7 +6,7 @@ import {NodeFilterOptions} from "./plugins/collateral-info";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 
-function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions) {
+function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions): Promise<any> {
   return callQueue.send({method, params}, options);
 }
 
@@ -42,7 +42,7 @@ function forwardRemoteCall(peer, method, params, options) {
   return call(IpcMethods.RemoteCall, {peer, method, params, options})
 }
 
-function getPeerInfo(peerId: string): JsonPeerInfo|null {
+function getPeerInfo(peerId: string): Promise<JsonPeerInfo|null> {
   // @ts-ignore
   return call(IpcMethods.GetPeerInfo, {peerId})
 }

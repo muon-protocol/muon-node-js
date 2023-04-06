@@ -757,6 +757,8 @@ class BaseAppPlugin extends CallablePlugin {
 
   async verify(hash: string, signature: string, nonceAddress: string): Promise<boolean> {
     const signingPubKey = await this.findTssPublicKey();
+    if(!signingPubKey)
+      throw `app[${this.APP_NAME}] tss publicKey not found`
     return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey!);
   }
 
