@@ -2,7 +2,7 @@ import {muonSha3} from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
 
 /**  */
-const ADMIN_WALLETS = (`${process.env.ADMIN_WALLETS}${process.env.SIGN_WALLET_ADDRESS}`)
+const ADMIN_WALLETS = (`${process.env.ADMIN_WALLETS||""}|${process.env.SIGN_WALLET_ADDRESS}`)
   .split("|")
   .filter(w => !!w)
   .map(w => w.toLowerCase())
@@ -22,6 +22,7 @@ export const onlyAdmins = (req, res, next) => {
   if(at) {
     let [timestamp, lifetime, signature] = at.split(':')
     timestamp = parseInt(timestamp)
+    lifetime = parseInt(lifetime)
     if(timestamp < 0)
       throw `bad access token`
     let hash = muonSha3(
