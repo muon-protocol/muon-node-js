@@ -84,6 +84,7 @@ export default class CollateralInfoPlugin extends BasePlugin{
   }
 
   async onNodeAdd(nodeInfo: MuonNodeInfo) {
+    await this.waitToLoad()
     log(`Core.CollateralInfo.onNodeAdd %o`, nodeInfo)
     this._nodesList.push(nodeInfo)
 
@@ -95,7 +96,8 @@ export default class CollateralInfoPlugin extends BasePlugin{
     this.allowedWallets.push(nodeInfo.wallet);
   }
 
-  onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
+  async onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
+    await this.waitToLoad()
     const {nodeInfo, oldNodeInfo} = data
     log(`Core.CollateralInfo.onNodeEdit %o`, {nodeInfo, oldNodeInfo})
     const listIndex = this._nodesList.findIndex(item => item.id === nodeInfo.id)
@@ -113,7 +115,8 @@ export default class CollateralInfoPlugin extends BasePlugin{
     this.allowedWallets.push(nodeInfo.wallet);
   }
 
-  onNodeDelete(nodeInfo: MuonNodeInfo) {
+  async onNodeDelete(nodeInfo: MuonNodeInfo) {
+    await this.waitToLoad()
     log(`Core.CollateralInfo.onNodeDelete %o`, nodeInfo)
 
     /** remove from nodesList */
