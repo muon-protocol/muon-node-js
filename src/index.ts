@@ -46,12 +46,12 @@ process.on('unhandledRejection', async function(reason, _promise) {
   }
   console.log('reporting crash to muon servers ...')
   const reportResults = await Promise.all([
-    // axios.post('https://testnet.muon.net/crash-report/report', reportData, axiosConfigs)
-    //   .then(() => "OK")
-    //   .catch(e => "Failed"),
-    axios.post('http://localhost:8001/crash-report/report', reportData, axiosConfigs)
+    axios.post('https://testnet.muon.net/crash-report/report', reportData, axiosConfigs)
       .then(() => "OK")
       .catch(e => "Failed"),
+    // axios.post('http://localhost:8001/crash-report/report', reportData, axiosConfigs)
+    //   .then(() => "OK")
+    //   .catch(e => "Failed"),
   ])
     .catch(e => {})
   console.log(`reporting crash done ${reportResults}.`)
