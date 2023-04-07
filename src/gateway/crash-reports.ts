@@ -66,7 +66,14 @@ router.use('/query', mixGetPost, onlyAdmins, asyncHandler(async (req, res, next)
 
 router.use('/list', mixGetPost, onlyAdmins, asyncHandler(async (req, res, next) => {
   res.json({
-    list: Object.keys(reports)
+    list: Object.keys(reports).reduce((obj, id) => {
+      let message = reports[id].error.reason;
+      console.log(reports[id])
+      if(typeof message === 'object')
+        message = message.message
+      obj[id] = message
+      return obj
+    }, {})
   })
 }))
 

@@ -31,14 +31,14 @@ process.on('unhandledRejection', async function(reason, _promise) {
       // @ts-ignore
       stack: reason?.stack || null,
     },
-    hash: muonSha3(
-      {t: 'uint64', v: timestamp},
-      {t: 'address', v: wallet},
-      {t: 'string', v: 'crash-report'},
-    ),
     signature: "",
   };
-  reportData.signature = crypto.sign(reportData.hash)
+  const hash = muonSha3(
+    {t: 'uint64', v: timestamp},
+    {t: 'address', v: wallet},
+    {t: 'string', v: 'crash-report'},
+  );
+  reportData.signature = crypto.sign(hash)
   console.log("crash report data", reportData)
 
   const axiosConfigs: AxiosRequestConfig = {
