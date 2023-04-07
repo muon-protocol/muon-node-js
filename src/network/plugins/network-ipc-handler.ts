@@ -54,6 +54,7 @@ const tasksCache = new NodeCache({
 
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
+  GetNodesList: "get-nodes-list",
   GetOnlinePeers: "get-online-peers",
   GetNetworkConfig: "get-net-conf",
   GetCollateralInfo: "get-collateral-info",
@@ -136,6 +137,12 @@ class NetworkIpcHandler extends CallablePlugin {
   async __filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
     return this.collateralPlugin.filterNodes(filter)
       .map(({id, active, staker, wallet, peerId, isOnline, isDeployer}) => ({id, active, staker, wallet, peerId, isOnline, isDeployer}));
+  }
+
+  @ipcMethod(IpcMethods.GetNodesList)
+  async __getNodesList(output: string|string[]) {
+    let outProps = Array.isArray(output) ? output : [output]
+    return this.collateralPlugin.filterNodes({}).map(n => _.pick(n, outProps))
   }
 
   /**

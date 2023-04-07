@@ -22,6 +22,10 @@ function filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
   return call(IpcMethods.FilterNodes, filter);
 }
 
+function getNodesList(output: string|string[] = ['id','wallet','peerId'], options?: IpcCallOptions): Promise<any[]> {
+  return call(IpcMethods.GetNodesList, output, options)
+}
+
 function getOnlinePeers(): Promise<string[]> {
   return call(IpcMethods.GetOnlinePeers);
 }
@@ -128,6 +132,7 @@ export {
   getNetworkConfig,
   getCollateralInfo,
   filterNodes,
+  getNodesList,
   getOnlinePeers,
   broadcastToChannel,
   forwardRemoteCall,

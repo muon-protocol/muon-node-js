@@ -5,6 +5,7 @@ import mongoose from 'mongoose'
 import api from './api/index.js'
 import status from './status.js'
 import mine from './mine.js'
+import crashReport from './crash-reports.js'
 import delegate from './delegate-routing.js'
 import Log from '../common/muon-log.js'
 
@@ -39,6 +40,7 @@ async function start(options) {
   app.use('/status', status)
   app.use('/delegate', delegate)
   app.use('/mine', mine)
+  app.use('/crash-report', crashReport)
 
   /**
    Error handler
