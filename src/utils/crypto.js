@@ -5,8 +5,10 @@ import {hashCallOutput} from './eth.js'
 const BN = Web3.utils.BN
 const web3 = new Web3();
 const PRIVATE_KEY = process.env.SIGN_WALLET_PRIVATE_KEY
-const account = web3.eth.accounts.privateKeyToAccount(PRIVATE_KEY)
-web3.eth.accounts.wallet.add(account)
+if(PRIVATE_KEY) {
+  const account = web3.eth.accounts.privateKeyToAccount(PRIVATE_KEY)
+  web3.eth.accounts.wallet.add(account)
+}
 
 function soliditySha3(params){
   return web3.utils.soliditySha3(...params);
