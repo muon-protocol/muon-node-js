@@ -77,6 +77,8 @@ router.use('/list', mixGetPost, onlyAdmins, asyncHandler(async (req, res, next) 
         if (typeof message === 'object')
           message = message.message
       }
+      if(message === undefined)
+        message = reports[id].error
       obj[id] = message
       return obj
     }, {})
