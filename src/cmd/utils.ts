@@ -46,14 +46,16 @@ export async function waitToRequestBeAnnounced(apiEndpoint: string, request: any
     if(!t || !announced)
       continue;
 
+    //console.log(check?.result?.announced)
+
     const announcedCount = Object.values(announced).filter(n => n===true).length;
     if(announcedCount >= t) {
       confirmed = true;
       if(configs.checkSecondaryParty){
         const announced = check?.result?.announced?.secondary
-        if(!!announced) {
+        if(!!announced && Object.keys(announced).length>0) {
           const announcedCount = Object.values(announced).filter(n => n===true).length;
-          confirmed = announcedCount >= t;
+          confirmed = announcedCount >= t || announcedCount === Object.keys(announced).length;
         }
       }
     }
