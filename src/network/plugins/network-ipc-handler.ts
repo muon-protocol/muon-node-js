@@ -431,11 +431,15 @@ class NetworkIpcHandler extends CallablePlugin {
           }
           else {
             return this.findPeer(n.peerId)
-              .then(peer => this.remoteCall(
-                peer,
-                RemoteMethods.AggregateData,
-                data
-                )
+              .then(peer => {
+                if(!peer)
+                  throw `peer not found`
+                return this.remoteCall(
+                    peer,
+                    RemoteMethods.AggregateData,
+                    data
+                  )
+                }
               )
               .then(() => n)
               .catch(e => {
