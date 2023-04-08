@@ -626,7 +626,8 @@ export default class AppManager extends CallablePlugin {
 
   async findOptimalAvailablePartners(appId: string, count: number, options: { timeout?: number, return?: string } = {}): Promise<string[]> {
     options = {
-      timeout: 5000,
+      //TODO: find N best partners instead of setting timeout
+      timeout: 2000,
       return: 'id',
       ...options
     }
@@ -732,7 +733,7 @@ export default class AppManager extends CallablePlugin {
             p.peerId,
             RemoteMethods.GetAppDeploymentInfo,
             appId,
-            {timeout: 2500}
+            {timeout: 2000}
           )
         )
           .then(({status}) => {
