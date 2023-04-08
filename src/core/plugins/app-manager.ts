@@ -16,6 +16,7 @@ import {pub2json} from "../../utils/helpers.js";
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import {findMinFullyConnectedSubGraph} from "../../common/graph-utils/index.js";
 import {PublicKey} from "../../utils/tss/types";
+import {aesDecrypt, isAesEncrypted} from "../../utils/crypto.js";
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -119,8 +120,11 @@ export default class AppManager extends CallablePlugin {
 
       const allTssKeys = await AppTssConfig.find({});
       allTssKeys.forEach(key => {
-        if (tssKeyContext[key.publicKey.encoded])
+        if (tssKeyContext[key.publicKey.encoded]) {
+          if(isAesEncrypted(key.keyShare))
+            key.keyShare = aesDecrypt(key.keyShare, process.env.SIGN_WALLET_PRIVATE_KEY);
           this.appTssConfigs[key.appId] = key;
+        }
       })
       log('apps tss keys loaded.')
 
@@ -236,6 +240,8 @@ export default class AppManager extends CallablePlugin {
 
   private async onAppTssConfigAdd(doc) {
     log(`app tss config add %o`, _.omit(doc, ['keyShare']))
+    if(isAesEncrypted(doc.keyShare))
+      doc.keyShare = aesDecrypt(doc.keyShare, process.env.SIGN_WALLET_PRIVATE_KEY)
     this.appTssConfigs[doc.appId] = doc;
   }
 
@@ -244,6 +250,8 @@ export default class AppManager extends CallablePlugin {
     switch (change.operationType) {
       case "replace": {
         const doc = change.fullDocument;
+        if(isAesEncrypted(doc.keyShare))
+          doc.keyShare = aesDecrypt(doc.keyShare, process.env.SIGN_WALLET_PRIVATE_KEY)
         this.appTssConfigs[doc.appId] = doc;
 
         try {
