@@ -371,6 +371,7 @@ class TssPlugin extends CallablePlugin {
     }
     return this.appTss[appId];
   }
+
   private async onAppContextDelete(data: {appId: string, deploymentReqIds: string[]}) {
     let {appId} = data
     if(!this.appTss[appId])
@@ -708,7 +709,7 @@ class TssPlugin extends CallablePlugin {
     )
     const succeeded = partners.filter((p, i) => callResult[i] !== 'error')
     if(succeeded.length < newParty.t)
-      throw `Only ${succeeded} partners succeeded when creating the party.`
+      throw `Only ${succeeded.length} partners succeeded when creating the party.`
     return newParty.id;
   }
 

@@ -207,18 +207,6 @@ class BaseAppPlugin extends CallablePlugin {
     return this.tssPlugin.getAppTssKey(this.APP_ID)
   }
 
-  /** useful when current node is not in the app party */
-  private async findTssPublicKey(): Promise<PublicKey | null> {
-    /** if key exist in current node */
-    let appContest = this.appManager.getAppContext(this.APP_ID)
-    if(!appContest)
-      appContest = await this.appManager.queryAndLoadAppContext(this.APP_ID)
-    if(appContest?.publicKey)
-      return DistributedKey.loadPubKey(appContest.publicKey.encoded);
-    else
-      return null;
-  }
-
   /**
    * A request need's (2 * REMOTE_CALL_TIMEOUT + 5000) millisecond to be confirmed.
    * One REMOTE_CALL_TIMEOUT for first node
@@ -526,7 +514,8 @@ class BaseAppPlugin extends CallablePlugin {
       let moreAnnounceList = await this.getConfirmAnnounceList(request);
       this.log(`custom announce list: %o`, moreAnnounceList)
       if(Array.isArray(moreAnnounceList)) {
-        if(moreAnnounceList.findIndex(n => typeof n !== "string") < 0) {
+        /** ignore if array contains non string item */
+        if(moreAnnounceList.findIndex(n => (typeof n !== "string")) < 0) {
           announceList = [
             ... announceList,
             ... moreAnnounceList
@@ -756,7 +745,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async verify(hash: string, signature: string, nonceAddress: string): Promise<boolean> {
-    const signingPubKey = await this.findTssPublicKey();
+    const signingPubKey = await this.appManager.findTssPublicKey(this.APP_ID);
     if(!signingPubKey)
       throw `app[${this.APP_NAME}] tss publicKey not found`
     return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey!);

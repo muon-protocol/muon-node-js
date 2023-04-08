@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import TimeoutPromise from "../../common/timeout-promise.js";
-import {AppDeploymentInfo, AppDeploymentStatus, MuonNodeInfo} from "../../common/types";
+import {AppDeploymentInfo, AppDeploymentStatus, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import TssPlugin from "./tss-plugin.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import CollateralInfoPlugin from "./collateral-info.js";
@@ -15,6 +15,7 @@ import {logger} from '@libp2p/logger'
 import {pub2json} from "../../utils/helpers.js";
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import {findMinFullyConnectedSubGraph} from "../../common/graph-utils/index.js";
+import {PublicKey} from "../../utils/tss/types";
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -32,6 +33,7 @@ export default class AppManager extends CallablePlugin {
   private contextIdToAppIdMap: { [index: string]: string } = {}
   private appTssConfigs: { [index: string]: any } = {}
   private loading: TimeoutPromise = new TimeoutPromise();
+  private deploymentPublicKey: PublicKey | null = null;
 
   async onStart() {
     await super.onStart()
@@ -482,6 +484,52 @@ export default class AppManager extends CallablePlugin {
     return this.appTssConfigs[appId];
   }
 
+  /** useful when current node is not in the app party */
+  publicKeyQueryTime = 0;
+  async findTssPublicKey(appId: string): Promise<PublicKey | null> {
+    if(appId === '1') {
+      const currentNode: MuonNodeInfo = this.collateralPlugin.currentNodeInfo!;
+      if(currentNode.isDeployer) {
+        return this.tssPlugin.tssKey?.publicKey || null;
+      }
+      else {
+        if(!this.deploymentPublicKey && this.publicKeyQueryTime + 2*60e3 < Date.now()) {
+          this.publicKeyQueryTime = Date.now();
+
+          const deployers: MuonNodeInfo[] = _.shuffle(this.collateralPlugin.filterNodes({isDeployer: true}));
+          // @ts-ignore
+          const publicKeyStr = await Promise.any(
+            deployers.slice(0, 3).map(n => {
+              return this.remoteCall(
+                n.peerId,
+                RemoteMethods.GetAppTss,
+                appId,
+                {timeout: 5000}
+              )
+                .then(result => {
+                  if(!result)
+                    throw `missing publicKey`
+                  return result.publicKey
+                })
+            })
+          )
+          this.deploymentPublicKey = DistributedKey.loadPubKey(publicKeyStr);
+        }
+        return this.deploymentPublicKey;
+      }
+    }
+    else {
+      /** if key exist in current node */
+      let appContest = this.getAppContext(appId)
+      if (!appContest)
+        appContest = await this.queryAndLoadAppContext(appId)
+      if (appContest?.publicKey)
+        return DistributedKey.loadPubKey(appContest.publicKey.encoded);
+      else
+        return null;
+    }
+  }
+
   isLoaded() {
     return this.loading.isFulfilled;
   }
@@ -636,12 +684,22 @@ export default class AppManager extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.GetAppTss)
   async __getAppTss(appId, callerInfo) {
-    const tssKey = this.getAppTssKey(appId)
-    if (!tssKey)
+    let publicKey:JsonPublicKey|null = null;
+
+    if(appId === '1') {
+      const currentNode: MuonNodeInfo = this.collateralPlugin.currentNodeInfo!
+      publicKey = currentNode.isDeployer ? pub2json(this.tssPlugin.tssKey?.publicKey!) : null
+    }
+    else {
+      publicKey = this.getAppTssKey(appId)?.publicKey;
+    }
+
+    if (!publicKey)
       return null;
+
     return {
-      version: tssKey.version,
-      publicKey: tssKey.publicKey.encoded,
+      version: 0,
+      publicKey: publicKey.encoded,
     }
   }
 
