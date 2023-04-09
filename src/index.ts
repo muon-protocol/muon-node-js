@@ -1,5 +1,6 @@
 import cluster, {Worker} from 'cluster'
 import * as os from 'os'
+import axios, {AxiosRequestConfig} from 'axios'
 import Log from './common/muon-log.js'
 import * as Gateway from './gateway/index.js'
 import * as Network from './network/index.js'
@@ -8,16 +9,53 @@ import * as NetworkIpc from './network/ipc.js'
 import * as SharedMemory from './common/shared-memory/index.js'
 import { parseBool, timeout } from './utils/helpers.js'
 import { createRequire } from "module";
+import {muonSha3} from "./utils/sha3.js";
+import * as crypto from "./utils/crypto.js";
 
 // const require = createRequire(import.meta.url);
 const log = Log('muon:boot')
 
 type ClusterType = 'gateway' | 'networking' | "core"
 
-process.on('unhandledRejection', function(reason, _promise) {
+process.on('unhandledRejection', async function(reason, _promise) {
   // console.log("Unhandled promise rejection", _promise);
   console.dir(reason, {depth: 5})
-  throw `Unhandled promise rejection reason: ${reason}`
+  const timestamp = Date.now(), wallet = process.env.SIGN_WALLET_ADDRESS
+
+  const reportData:any = {
+    timestamp,
+    wallet,
+    cluster: process.env.MUON_CLUSTER_TYPE || "unknown",
+    error: {
+      reason,
+      // @ts-ignore
+      stack: reason?.stack || null,
+    },
+    signature: "",
+  };
+  const hash = muonSha3(
+    {t: 'uint64', v: timestamp},
+    {t: 'address', v: wallet},
+    {t: 'string', v: 'crash-report'},
+  );
+  reportData.signature = crypto.sign(hash)
+  console.log("crash report data", reportData)
+
+  const axiosConfigs: AxiosRequestConfig = {
+    timeout: 3000
+  }
+  console.log('reporting crash to muon servers ...')
+  const reportResults = await Promise.all([
+    axios.post('https://testnet.muon.net/crash-report/report', reportData, axiosConfigs)
+      .then(() => "OK")
+      .catch(e => "Failed"),
+    // axios.post('http://localhost:8001/crash-report/report', reportData, axiosConfigs)
+    //   .then(() => "OK")
+    //   .catch(e => "Failed"),
+  ])
+    .catch(e => {})
+  console.log(`reporting crash done ${reportResults}.`)
+  process.exit(1);
 });
 
 

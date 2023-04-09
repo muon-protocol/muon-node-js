@@ -35,7 +35,7 @@ export default class QueueProducer<MessageType> extends BaseMessageQueue {
    * @param options.await - wait to end the event process and then run new one.
    * @returns {Promise<Object>}
    */
-  send(message: MessageType, options: IpcCallOptions={}){
+  send(message: MessageType, options: IpcCallOptions={}): Promise<any>{
     options = {
       timeout: 0,
       timeoutMessage: "Queue request timeout!",

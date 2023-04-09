@@ -6,12 +6,12 @@ import {NodeFilterOptions} from "./plugins/collateral-info";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 
-function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions) {
+function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions): Promise<any> {
   return callQueue.send({method, params}, options);
 }
 
-function getNetworkConfig() {
-  return call(IpcMethods.GetNetworkConfig);
+function getNetworkConfig(options?: IpcCallOptions) {
+  return call(IpcMethods.GetNetworkConfig, {} , options);
 }
 
 function getCollateralInfo(options?: IpcCallOptions) {
@@ -20,6 +20,10 @@ function getCollateralInfo(options?: IpcCallOptions) {
 
 function filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
   return call(IpcMethods.FilterNodes, filter);
+}
+
+function getNodesList(output: string|string[] = ['id','wallet','peerId'], options?: IpcCallOptions): Promise<any[]> {
+  return call(IpcMethods.GetNodesList, output, options)
 }
 
 function getOnlinePeers(): Promise<string[]> {
@@ -42,7 +46,7 @@ function forwardRemoteCall(peer, method, params, options) {
   return call(IpcMethods.RemoteCall, {peer, method, params, options})
 }
 
-function getPeerInfo(peerId: string): JsonPeerInfo|null {
+function getPeerInfo(peerId: string): Promise<JsonPeerInfo|null> {
   // @ts-ignore
   return call(IpcMethods.GetPeerInfo, {peerId})
 }
@@ -97,8 +101,8 @@ function subscribeToBroadcastChannel(channel: string) {
   return call(IpcMethods.SubscribeToBroadcastChannel, channel)
 }
 
-function getUptime() {
-  return call(IpcMethods.GetUptime)
+function getUptime(options?: IpcCallOptions) {
+  return call(IpcMethods.GetUptime, {} , options)
 }
 
 function findNOnlinePeer(peerIds: string[], count: number, options?: {timeout?: number, return?: string}): Promise<string[]> {
@@ -109,8 +113,8 @@ function getConnectedPeerIds(): Promise<string[]> {
   return call(IpcMethods.GetConnectedPeerIds)
 }
 
-function getNodeMultiAddress(): Promise<string[]> {
-  return call(IpcMethods.GetNodeMultiAddress)
+function getNodeMultiAddress(options?: IpcCallOptions): Promise<string[]> {
+  return call(IpcMethods.GetNodeMultiAddress, {} , options)
 }
 
 /**
@@ -128,6 +132,7 @@ export {
   getNetworkConfig,
   getCollateralInfo,
   filterNodes,
+  getNodesList,
   getOnlinePeers,
   broadcastToChannel,
   forwardRemoteCall,

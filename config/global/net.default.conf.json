@@ -13,12 +13,13 @@
       "http://104.131.177.195:8080/delegate",
       "http://3.130.24.220:8080/delegate",
       "http://194.195.211.27:8080/delegate",
-      "http://209.250.252.247:8080/delegate"
+      "http://209.250.252.247:8080/delegate",
+      "http://95.217.20.127:8000/delegate"
     ]
   },
   "nodes": {
     "onlineList": "http://103.75.196.96/nodes",
-    "aggregators": ["4"]
+    "aggregators": ["4", "14012"]
   },
   "bootstrap": [
     "/ip4/104.131.177.195/tcp/5000/p2p/Qma3GsJmB47xYuyahPZPSadh1avvxfyYQwk8R3UnFrQ6aP",

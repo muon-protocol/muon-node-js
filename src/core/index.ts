@@ -234,11 +234,6 @@ async function start() {
           config: {},
         },
         {
-          name: "mpc",
-          module: (await import("./plugins/mpc-runner.js")).default,
-          config: {},
-        },
-        {
           name: "mpcnet",
           module: (await import("./plugins/mpc-network.js")).default,
           config: {},

@@ -12,7 +12,7 @@ import NetworkContentPlugin from "./content-plugin.js";
 import {parseBool, timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import {isPrivate} from "../utils.js";
 
 class AggregatorBus extends MessagePublisher {
@@ -38,7 +38,7 @@ if(!!REQUESTS_PUB_SUB_CHANNEL) {
   reqAggregatorBus = new AggregatorBus(REQUESTS_PUB_SUB_CHANNEL, configs)
 }
 
-const log = Log('muon:network:plugins:ipc-handler')
+const log = logger('muon:network:plugins:ipc-handler')
 let requestQueue = new QueueProducer(`gateway-requests`);
 
 const tasksCache = new NodeCache({
@@ -54,6 +54,7 @@ const tasksCache = new NodeCache({
 
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
+  GetNodesList: "get-nodes-list",
   GetOnlinePeers: "get-online-peers",
   GetNetworkConfig: "get-net-conf",
   GetCollateralInfo: "get-collateral-info",
@@ -136,6 +137,12 @@ class NetworkIpcHandler extends CallablePlugin {
   async __filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
     return this.collateralPlugin.filterNodes(filter)
       .map(({id, active, staker, wallet, peerId, isOnline, isDeployer}) => ({id, active, staker, wallet, peerId, isOnline, isDeployer}));
+  }
+
+  @ipcMethod(IpcMethods.GetNodesList)
+  async __getNodesList(output: string|string[]) {
+    let outProps = Array.isArray(output) ? output : [output]
+    return this.collateralPlugin.filterNodes({}).map(n => _.pick(n, outProps))
   }
 
   /**
@@ -417,7 +424,10 @@ class NetworkIpcHandler extends CallablePlugin {
           if(n.wallet === process.env.SIGN_WALLET_ADDRESS) {
             return this.__aggregateData(data, this.collateralPlugin.currentNodeInfo!)
               .then(() => n)
-              .catch(e => null)
+              .catch(e => {
+                log.error("SendToAggregatorNode:ex, %O", e);
+                return null;
+              })
           }
           else {
             return this.findPeer(n.peerId)
@@ -428,7 +438,10 @@ class NetworkIpcHandler extends CallablePlugin {
                 )
               )
               .then(() => n)
-              .catch(e => null)
+              .catch(e => {
+                log.error("SendToAggregatorNode:ex %O", e);
+                return null;
+              })
           }
         })
       );

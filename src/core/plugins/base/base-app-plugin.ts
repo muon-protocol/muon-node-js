@@ -207,27 +207,6 @@ class BaseAppPlugin extends CallablePlugin {
     return this.tssPlugin.getAppTssKey(this.APP_ID)
   }
 
-  /** useful when current node is not in the app party */
-  private async findTssPublicKey(): Promise<PublicKey | null> {
-    /** if key exist in current node */
-    let publicKey = this.appTss?.publicKey
-    if(publicKey)
-      return publicKey
-
-    /** ask deployers for app tss public key */
-    const deployersPeerId: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId);
-    let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployersPeerId, 3, {timeout: 5000, return: 'peerId'})
-    // @ts-ignore
-    const publicKeyStr: string = await Promise.any(onlineDeployers.map(peerId => {
-      return this.remoteCall(
-        peerId,
-        RemoteMethods.GetTssPublicKey,
-      )
-    }))
-
-    return DistributedKey.loadPubKey(publicKeyStr);
-  }
-
   /**
    * A request need's (2 * REMOTE_CALL_TIMEOUT + 5000) millisecond to be confirmed.
    * One REMOTE_CALL_TIMEOUT for first node
@@ -314,15 +293,22 @@ class BaseAppPlugin extends CallablePlugin {
       let t0 = Date.now(), t1, t2, t3, t4, t5, t6;
       let appParty = this.appParty!;
       /** find available partners to sign the request */
-      const availablePartners: string[] = await this.appManager.findNAvailablePartners(
+      const availablePartners = await this.appManager.findOptimalAvailablePartners(
         this.APP_ID,
-        appParty.partners,
         Math.min(
           Math.ceil(appParty.t*1.5),
           appParty.partners.length,
         ),
-        {timeout: 5000}
       );
+      // const availablePartners: string[] = await this.appManager.findNAvailablePartners(
+      //   this.APP_ID,
+      //   appParty.partners,
+      //   Math.min(
+      //     Math.ceil(appParty.t*1.5),
+      //     appParty.partners.length,
+      //   ),
+      //   {timeout: 5000}
+      // );
       // let count = Math.min(
       //   Math.ceil(appParty.t*1.5),
       //   appParty.partners.length,
@@ -448,7 +434,7 @@ class BaseAppPlugin extends CallablePlugin {
         this.log('sending request to aggregator nodes ...')
         NetworkIpc.sendToAggregatorNode("AppRequest", requestData)
           .then(aggregatorNodeIdList => {
-            this.log(`request sent to nodes: %o`, aggregatorNodeIdList)
+            this.log(`request sent to aggregator nodes: %o`, aggregatorNodeIdList)
           })
           .catch(e => {
             this.log(`error when sending request to aggregator nodes %o`, e)
@@ -528,7 +514,8 @@ class BaseAppPlugin extends CallablePlugin {
       let moreAnnounceList = await this.getConfirmAnnounceList(request);
       this.log(`custom announce list: %o`, moreAnnounceList)
       if(Array.isArray(moreAnnounceList)) {
-        if(moreAnnounceList.findIndex(n => typeof n !== "string") < 0) {
+        /** ignore if array contains non string item */
+        if(moreAnnounceList.findIndex(n => (typeof n !== "string")) < 0) {
           announceList = [
             ... announceList,
             ... moreAnnounceList
@@ -758,7 +745,9 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async verify(hash: string, signature: string, nonceAddress: string): Promise<boolean> {
-    const signingPubKey = await this.findTssPublicKey();
+    const signingPubKey = await this.appManager.findTssPublicKey(this.APP_ID);
+    if(!signingPubKey)
+      throw `app[${this.APP_NAME}] tss publicKey not found`
     return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey!);
   }
 
@@ -1114,7 +1103,10 @@ class BaseAppPlugin extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.GetTssPublicKey)
   async __getTssPublicKey(data, callerInfo) {
-    return this.appTss!.publicKey!.encode("hex", true)
+    let appContest = this.appManager.getAppContext(this.APP_ID)
+    if(appContest?.publicKey)
+      return appContest.publicKey.encoded
+    throw `missing app tss publicKey`
   }
 }
 

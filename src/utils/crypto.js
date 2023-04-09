@@ -1,12 +1,15 @@
 import ethers from 'ethers'
 import Web3 from 'web3'
 import {hashCallOutput} from './eth.js'
+import crypto from "crypto"
 
 const BN = Web3.utils.BN
 const web3 = new Web3();
 const PRIVATE_KEY = process.env.SIGN_WALLET_PRIVATE_KEY
-const account = web3.eth.accounts.privateKeyToAccount(PRIVATE_KEY)
-web3.eth.accounts.wallet.add(account)
+if(PRIVATE_KEY) {
+  const account = web3.eth.accounts.privateKeyToAccount(PRIVATE_KEY)
+  web3.eth.accounts.wallet.add(account)
+}
 
 function soliditySha3(params){
   return web3.utils.soliditySha3(...params);
@@ -74,6 +77,45 @@ function toBaseUnit(value, decimals) {
   }
 
   return new BN(wei.toString(10), 10);
+}
+
+const AES_ENCRYPTION_ALGORITHM = "aes-256-gcm"
+
+export function aesCreateIv(random, privateKey) {
+  return web3.utils.soliditySha3(
+    {t: 'uint256', v: '0x'+privateKey},
+    {t: 'uint128', v: '0x'+random}
+  ).substr(2, 32)
+}
+
+export function aesEncrypt(message, privateKey) {
+  const random = crypto.randomBytes(16).toString('hex')
+  const iv = aesCreateIv(random, privateKey);
+  const initVector = Buffer.from(iv, 'hex')
+  const Securitykey = Buffer.from(privateKey, "hex");
+  const cipher = crypto.createCipheriv(AES_ENCRYPTION_ALGORITHM, Securitykey, initVector);
+
+  return random
+    + ":"
+    + cipher.update(message, "utf-8", "hex")
+    + cipher.final('hex')
+    + ":" + cipher.getAuthTag().toString('hex')
+}
+
+export function aesDecrypt(encrypted, privateKey) {
+  const [random, encryptedData, authTag] = encrypted.split(':')
+  const iv = aesCreateIv(random, privateKey);
+  const initVector = Buffer.from(iv, 'hex')
+  const Securitykey = Buffer.from(privateKey, "hex");
+  const decipher = crypto.createDecipheriv(AES_ENCRYPTION_ALGORITHM, Securitykey, initVector);
+  decipher.setAuthTag(Buffer.from(authTag, 'hex'))
+
+  return decipher.update(encryptedData, "hex", "utf-8")
+    + decipher.final("utf8")
+}
+
+export function isAesEncrypted(cipher) {
+  return cipher.split(':').length === 3
 }
 
 export {

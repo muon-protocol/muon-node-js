@@ -1,5 +1,6 @@
 import mongoose from 'mongoose'
 import {MODEL_APP_CONTEXT, MODEL_APP_TSS_CONFIG} from './constants.js'
+import {isAesEncrypted, aesEncrypt} from '../../utils/crypto.js'
 
 const TssPublicKeyInfo = mongoose.Schema({
   address: {type: String, required: true},
@@ -19,6 +20,10 @@ const modelSchema = mongoose.Schema({
 modelSchema.pre('save', function (next) {
   if(!this.dangerousAllowToSave)
     throw `AppTssConfig save only allowed from NetworkAppManager`
+
+  const {keyShare} = this
+  if(!isAesEncrypted(keyShare))
+    this.keyShare = aesEncrypt(keyShare, process.env.SIGN_WALLET_PRIVATE_KEY);
 
   next();
 })

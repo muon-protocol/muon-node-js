@@ -13,13 +13,19 @@ const router = Router();
 
 router.use('/', asyncHandler(async (req, res, next) => {
   const [netConfig, nodeInfo, multiAddress, uptime, commitId] = await Promise.all([
-    NetworkIpc.getNetworkConfig().catch(e => null),
+    NetworkIpc.getNetworkConfig({
+      timeout: 1000,
+    }).catch(e => null),
     NetworkIpc.getCurrentNodeInfo({
-      timeout: 5000,
+      timeout: 1000,
       timeoutMessage: "Getting current node info timed out"
     }).catch(e => null),
-    NetworkIpc.getNodeMultiAddress().catch(e => null),
-    NetworkIpc.getUptime().catch(e => null),
+    NetworkIpc.getNodeMultiAddress({
+      timeout: 1000,
+    }).catch(e => null),
+    NetworkIpc.getUptime({
+      timeout: 1000,
+    }).catch(e => null),
     getCommitId().catch(e => null)
   ]);
 
@@ -58,7 +64,7 @@ router.use('/', asyncHandler(async (req, res, next) => {
     },
     addedToNetwork: !!nodeInfo,
     network: {
-      nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker']) : undefined,
+      nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker','isOnline']) : undefined,
       address: multiAddress,
     }
   })

@@ -96,6 +96,7 @@ class TssPlugin extends CallablePlugin {
     this.muon.on("collateral:node:edit", this.onNodeEdit.bind(this));
     this.muon.on("collateral:node:delete", this.onNodeDelete.bind(this));
 
+    this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
     this.muon.on('global-tss-key:generate', this.onTssKeyGenerate.bind(this));
     this.muon.on('party:generate', this.loadParty.bind(this));
 
@@ -290,9 +291,6 @@ class TssPlugin extends CallablePlugin {
       }
       else{
         log(`trying to recover global tss key... timeout(6000)`)
-        await timeout(6000);
-
-        // this.tryToFindOthers();
 
         while (!this.isReady) {
           log("waiting for tss, timeout(5000)");
@@ -372,6 +370,16 @@ class TssPlugin extends CallablePlugin {
       this.appTss[appId] = key;
     }
     return this.appTss[appId];
+  }
+
+  private async onAppContextDelete(data: {appId: string, deploymentReqIds: string[]}) {
+    let {appId} = data
+    if(!this.appTss[appId])
+      return;
+    const partyId = this.appTss[appId].party!.id;
+    if(partyId)
+     delete this.parties[partyId]
+    delete this.appTss[appId]
   }
 
   async onAppTssDelete(appId, appTssConfig) {
@@ -592,7 +600,7 @@ class TssPlugin extends CallablePlugin {
         }
         else {
           log(`app[${appId}] tss is not ready yet`)
-          throw `app[${appId}] tss is not ready yet`;
+          throw `app tss is not ready yet`;
         }
       }
       catch (e) {
@@ -701,7 +709,7 @@ class TssPlugin extends CallablePlugin {
     )
     const succeeded = partners.filter((p, i) => callResult[i] !== 'error')
     if(succeeded.length < newParty.t)
-      throw `Only ${succeeded} partners succeeded when creating the party.`
+      throw `Only ${succeeded.length} partners succeeded when creating the party.`
     return newParty.id;
   }
 

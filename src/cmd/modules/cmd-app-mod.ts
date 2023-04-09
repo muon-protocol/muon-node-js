@@ -90,7 +90,7 @@ async function deployApp(argv, configs) {
     console.log(`deployment tx ${deployResponse.result.reqId}.`)
 
     console.log(`deployment confirmation waiting ...`);
-    await waitToRequestBeAnnounced(configs.url, deployResponse.result);
+    await waitToRequestBeAnnounced(configs.url, deployResponse.result, {checkSecondaryParty: true});
   }
 
   console.log('generating app tss key ...')
