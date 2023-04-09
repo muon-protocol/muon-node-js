@@ -17,7 +17,7 @@ export default class FakeNetwork implements IMpcNetwork{
     this.receiveBus = bus;
   }
 
-  registerMcp(mpc: MultiPartyComputation) {
+  async registerMcp(mpc: MultiPartyComputation) {
     if(this.mpcMap.has(mpc.id))
       throw `MPC[${mpc.id}] already registered to MPCNetwork`
     this.mpcMap.set(mpc.id, mpc);
