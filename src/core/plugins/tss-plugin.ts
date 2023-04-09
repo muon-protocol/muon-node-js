@@ -19,7 +19,7 @@ import {MultiPartyComputation} from "../../common/mpc/base.js";
 import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import Log from '../../common/muon-log.js'
 import {bn2hex} from "../../utils/tss/utils.js";
-import useDistributedKey from "../../utils/tss/use-distributed-key.js";
+import {useOneTime} from "../../utils/tss/use-one-time.js";
 
 const {shuffle} = lodash;
 const {utils:{toBN}} = Web3;
@@ -876,7 +876,7 @@ class TssPlugin extends CallablePlugin {
       throw `Cannot use tss key as nonce`;
 
     let nonce = await this.getSharedKey(nonceId);
-    await useDistributedKey(nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`)
+    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`)
     let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
     return {
       id: appTssKey!.id,

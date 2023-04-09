@@ -18,7 +18,7 @@ import AppManager from "../app-manager.js";
 import TssParty from "../../../utils/tss/party.js";
 import CollateralInfoPlugin from "../collateral-info.js";
 import {AppRequest, MuonNodeInfo} from "../../../common/types";
-import useDistributedKey from "../../../utils/tss/use-distributed-key.js";
+import {useOneTime} from "../../../utils/tss/use-one-time.js";
 import chalk from 'chalk'
 import Ajv from "ajv"
 import {logger} from '@libp2p/logger'
@@ -379,6 +379,7 @@ class BaseAppPlugin extends CallablePlugin {
         if(fee) {
           newRequest.data.fee.amount = fee.amount
           newRequest.data.fee.signature = fee.sign
+          await useOneTime('fee', fee.sign, newRequest.reqId)
         }
 
         this.log('broadcasting request ...');
@@ -839,7 +840,7 @@ class BaseAppPlugin extends CallablePlugin {
     let k_i = nonce.share
     let K = nonce.publicKey!;
 
-    await useDistributedKey(K.encode('hex', true), resultHash)
+    await useOneTime("key", K.encode('hex', true), resultHash)
     // TODO: remove nonce after sign
     let signature = tss.schnorrSign(tssKey.share!, k_i!, K, resultHash)
 
@@ -1060,6 +1061,7 @@ class BaseAppPlugin extends CallablePlugin {
       if(feeConfigs && !feeConfigs.signers.includes(signer)) {
         throw `fee consumption signature mismatched.`
       }
+      await useOneTime('fee', signature, request.reqId);
     }
 
     let sign = await this.makeSignature(request, result, hash)

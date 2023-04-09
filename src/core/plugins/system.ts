@@ -11,7 +11,7 @@ import * as NetworkIpc from '../../network/ipc.js'
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import AppManager from "./app-manager.js";
 import * as CoreIpc from '../ipc.js'
-import useDistributedKey from "../../utils/tss/use-distributed-key.js";
+import {useOneTime} from "../../utils/tss/use-one-time.js";
 import {logger} from '@libp2p/logger'
 import {pub2json, timeout} from '../../utils/helpers.js'
 import {bn2hex} from "../../utils/tss/utils.js";
@@ -279,7 +279,7 @@ class System extends CallablePlugin {
 
       /** store tss key */
       let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
-      await useDistributedKey(key.publicKey!.encode('hex', true), `app-${appId}-tss`)
+      await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
       await this.appManager.saveAppTssConfig({
         version: context.version,
         appId: appId,
