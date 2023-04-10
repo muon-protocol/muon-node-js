@@ -49,7 +49,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     return this.muon.getPlugin('tss-plugin');
   }
 
-  async registerMcp(mpc: MultiPartyComputation) {
+  async registerMpc(mpc: MultiPartyComputation) {
     if(mpcCache.has(mpc.id))
       throw `MPC[${mpc.id}] already registered to MPCNetwork`
     mpcCache.set(mpc.id, mpc);

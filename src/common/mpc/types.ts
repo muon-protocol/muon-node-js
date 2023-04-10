@@ -3,7 +3,7 @@ import {MultiPartyComputation} from "./base";
 export interface IMpcNetwork {
   id: string,
   askRoundData: (from: string, mpcId: string, round: number, data?:any) => Promise<PartnerRoundReceive>,
-  registerMcp: (mpc: MultiPartyComputation) => void
+  registerMpc: (mpc: MultiPartyComputation) => void
 }
 
 export interface MPCConstructData {

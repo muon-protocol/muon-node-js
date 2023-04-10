@@ -170,7 +170,7 @@ export class MultiPartyComputation {
     this.roundsPromise = new LevelPromise(this.rounds.length+1, timeout);
     /** assign MPC task to this process */
     try {
-      await network.registerMcp(this);
+      await network.registerMpc(this);
     }catch (e) {
       this.roundsPromise.reject(e);
     }
