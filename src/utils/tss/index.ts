@@ -3,10 +3,6 @@ import ethJsUtil from 'ethereumjs-util'
 import {BN, toBN, keccak256, range, pub2addr} from './utils.js'
 import assert from 'assert'
 import elliptic from 'elliptic'
-const ZERO = toBN(0)
-const ONE = toBN(1)
-const TWO = toBN(2)
-const THREE = toBN(3)
 
 const EC = elliptic.ec;
 const curve = new EC('secp256k1');
@@ -22,7 +18,7 @@ const HALF_N = curve.n!.shrn(1).addn(1);
 // );
 const H = curve.keyFromPublic("04206ae271fa934801b55f5144bec8416be0b85f22d452ad410f3f0fca1083dc7ae41249696c446f8c5b166760377115943662991c35ff02f9585f892970af89ed", 'hex').getPublic()
 
-function pointAdd(point1?: PublicKey, point2?: PublicKey): PublicKey {
+export function pointAdd(point1?: PublicKey, point2?: PublicKey): PublicKey {
   if (point1 === null)
     return point2!;
   if (point2 === null)
@@ -31,7 +27,7 @@ function pointAdd(point1?: PublicKey, point2?: PublicKey): PublicKey {
   return point1!.add(point2!);
 }
 
-function calcPoly(x, polynomial) {
+export function calcPoly(x, polynomial) {
   if (!BN.isBN(x))
     x = toBN(x);
   let result = toBN(0);
@@ -42,27 +38,17 @@ function calcPoly(x, polynomial) {
   // return result;
 }
 
-function calcPolyPointOld(x, polynomial): PublicKey {
-  if (!BN.isBN(x))
-    x = toBN(x);
-  let result: PublicKey | null = null;
-  for (let i = 0; i < polynomial.length; i++) {
-    result = pointAdd(result!, polynomial[i].mul(x.pow(toBN(i))));
-  }
-  return result!;
-}
-
-function calcPolyPoint(x: string|number, polynomial: PublicKey[]): PublicKey {
+export function calcPolyPoint(x: string|number, polynomial: PublicKey[]): PublicKey {
   const bnx = toBN(x);
   const coeffs = polynomial.map((_,i) => bnx.pow(toBN(i)).umod(curve.n!))
   return curve.curve._endoWnafMulAdd(polynomial, coeffs, false);
 }
 
-function random() {
+export function random() {
   return curve.genKeyPair().getPrivate();
 }
 
-function shareKey(privateKey, t, n, indices, polynomial) {
+export function shareKey(privateKey, t, n, indices, polynomial) {
   if(indices){
     assert(indices.length === n)
   }
@@ -87,7 +73,7 @@ function shareKey(privateKey, t, n, indices, polynomial) {
   }
 }
 
-function lagrangeCoef(j, t, shares, index) {
+export function lagrangeCoef(j, t, shares, index) {
   let _x = BN.isBN(index) ? index : toBN(index);
   let prod = arr => arr.reduce((acc, current) => acc.mul(current), toBN(1));
   let x_j = toBN(shares[j].i)
@@ -101,7 +87,7 @@ function lagrangeCoef(j, t, shares, index) {
   return numerator.mul(denominator.invm(curve.n));
 }
 
-function reconstructKey(shares, t, index=0) {
+export function reconstructKey(shares, t, index=0) {
   assert(shares.length >= t);
   let sum = toBN(0);
   for (let j = 0; j < t; j++) {
@@ -112,36 +98,30 @@ function reconstructKey(shares, t, index=0) {
   return sum.umod(curve.n!);
 }
 
-function addKeys(key1, key2) {
+export function addKeys(key1, key2) {
   return key1.add(key2).umod(curve.n)
 }
 
-function subKeys(key1, key2) {
+export function subKeys(key1, key2) {
   return key1.sub(key2).umod(curve.n)
 }
 
-function keyFromPrivate(prv) {
+export function keyFromPrivate(prv) {
   if(typeof prv === 'string')
     prv = prv.replace(/^0x/i, '')
   return curve.keyFromPrivate(prv)
 }
 
-function keyFromPublic(pubKeyStr, encoding='hex') {
+export function keyFromPublic(pubKeyStr, encoding='hex') {
   return curve.keyFromPublic(pubKeyStr, encoding).getPublic()
 }
 
-// function key2pub(privateKey) {
-//   let _PK = BN.isBN(privateKey) ? privateKey : toBN(privateKey)
-//   let {x, y} = curve.g.mul(_PK);
-//   return new Point(x, y);
-// }
-
-function key2pub(privateKey) {
+export function key2pub(privateKey) {
   let _PK = BN.isBN(privateKey) ? privateKey : toBN(privateKey)
   return curve.g.mul(_PK);
 }
 
-function schnorrHash(publicKey, msg) {
+export function schnorrHash(publicKey, msg) {
   let address = pub2addr(publicKey)
   let addressBuff = Buffer.from(address.replace(/^0x/i, ''), 'hex');
   let msgBuff = Buffer.from(msg.replace(/^0x/i, ''), 'hex');
@@ -150,7 +130,7 @@ function schnorrHash(publicKey, msg) {
   return keccak256(totalBuff)
 }
 
-function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
+export function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
   let _sharedPrivateKey = BN.isBN(sharedPrivateKey) ? sharedPrivateKey : toBN(sharedPrivateKey);
   let e = toBN(schnorrHash(kPub, msg))
   let s = sharedK.sub(_sharedPrivateKey.mul(e)).umod(curve.n);
@@ -171,27 +151,28 @@ export function splitSignature(signature: string): {s: BN, e: BN} {
   }
 }
 
-function schnorrVerify(pubKey: PublicKey, msg, sig:{s: BN, e: BN}|string) {
+export function schnorrVerify(pubKey: PublicKey, msg, sig:{s: BN, e: BN}|string) {
   if(typeof sig === 'string')
     sig = splitSignature(sig);
-  if(!sig.s.lt(curve.n!))
-    throw "signature must be reduced modulo N"
-  let r_v = pointAdd(curve.g.mul(sig.s), pubKey.mul(sig.e))
+  if(!validatePublicKey(pubKey))
+    return false
+  const s = sig.s.umod(curve.n!)
+  let r_v = pointAdd(curve.g.mul(s), pubKey.mul(sig.e))
   let e_v = schnorrHash(r_v, msg)
   return toBN(e_v).eq(sig.e);
 }
 
-function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey) {
+export function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey) {
   nonceAddress = nonceAddress.toLowerCase();
   const nonce = toBN(nonceAddress)
   hash = toBN(hash)
-  signature = toBN(signature)
+  signature = toBN(signature).umod(curve.n!);
 
-  if(!signature.lt(curve.n))
-    throw "signature must be reduced modulo N"
+  if(!validatePublicKey(signingPubKey))
+    return false;
 
   if(nonce.isZero() || signature.isZero() || hash.isZero())
-    throw `no zero inputs allowed`
+    return false
 
   // @ts-ignore
   const e = toBN(keccak256(Buffer.concat([
@@ -211,7 +192,7 @@ function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPub
   return nonceAddress === addr;
 }
 
-function schnorrAggregateSigs(t, sigs, indices): {s: BN, e: BN}{
+export function schnorrAggregateSigs(t, sigs, indices): {s: BN, e: BN}{
   assert(sigs.length >= t);
   let ts = toBN(0)
   range(0, t).map(j => {
@@ -229,25 +210,7 @@ export function validatePublicKey(publicKey: PublicKey): boolean {
 
 export {
   curve,
-  random,
-  pointAdd,
-  calcPoly,
-  keyFromPrivate,
-  keyFromPublic,
-  calcPolyPoint,
-  shareKey,
-  lagrangeCoef,
-  reconstructKey,
-  toBN,
-  addKeys,
-  subKeys,
-  key2pub,
   pub2addr,
-  schnorrHash,
-  schnorrSign,
-  schnorrVerify,
-  schnorrVerifyWithNonceAddress,
-  schnorrAggregateSigs,
   // use
   H,
   HALF_N,

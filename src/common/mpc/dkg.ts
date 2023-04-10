@@ -9,6 +9,8 @@ import {PublicKey} from "../../utils/tss/types";
 import BN from 'bn.js';
 import {muonSha3} from "../../utils/sha3.js";
 
+const {toBN} = Web3.utils
+
 /**
  * Round1 input/output types
  */
@@ -115,7 +117,7 @@ export class DistKey {
       throw `DistKeyJson address mismatched with publicKey`
     return new DistKey(
       key.index,
-      TssModule.toBN(key.share),
+      toBN(key.share),
       address,
       publicKey,
       key.partners,
@@ -144,13 +146,13 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       if(BN.isBN(value))
         this.value = value
       else
-        this.value = Web3.utils.toBN(value);
+        this.value = toBN(value);
     }
   }
 
   async round1(_, __, networkId: string, qualified: string[]): Promise<RoundOutput<Round1Result, Round1Broadcast>> {
     // @ts-ignore
-    let fx = new Polynomial(this.t, TssModule.curve, this.value ? TssModule.toBN(this.value) : undefined);
+    let fx = new Polynomial(this.t, TssModule.curve, this.value ? toBN(this.value) : undefined);
     const Fx = fx.coefPubKeys();
 
     const k: BN = TssModule.random();
@@ -247,8 +249,8 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     //   const commitment = r1Msg[sender].broadcast.commitment.map(pubKey => TssModule.keyFromPublic(pubKey))
     //   let p1 = TssModule.calcPolyPoint(networkId, commitment)
     //   let p2 = TssModule.pointAdd(
-    //     TssModule.curve.g.mul(TssModule.toBN(f)),
-    //     TssModule.H.mul(TssModule.toBN(h))
+    //     TssModule.curve.g.mul(toBN(f)),
+    //     TssModule.H.mul(toBN(h))
     //   );
     //   if(!p1.eq(p2)) {
     //     // throw `DistributedKey partial data verification failed from partner ${sender}.`
@@ -309,7 +311,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
       const Fx = r1Msgs[sender].broadcast.Fx.map(k => TssModule.keyFromPublic(k))
       const p1 = TssModule.calcPolyPoint(networkId, Fx);
-      const p2 = TssModule.curve.g.mul(TssModule.toBN(r2Msgs[sender].send.f))
+      const p2 = TssModule.curve.g.mul(toBN(r2Msgs[sender].send.f))
       if(!p1.eq(p2)) {
         console.log(`partner [${sender}] founded malignant at round3 Fx check`)
         malicious.push(sender);
@@ -343,10 +345,10 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     let share = qualified
       .map(from => r2Msgs[from].send.f)
       .reduce((acc, current) => {
-        acc.iadd(TssModule.toBN(current))
+        acc.iadd(toBN(current))
         return acc
-      }, TssModule.toBN('0'))
-    const nInv = TssModule.toBN(qualified.length.toString()).invm(TssModule.curve.n!)
+      }, toBN('0'))
+    const nInv = toBN(qualified.length.toString()).invm(TssModule.curve.n!)
     share.imul(nInv)
     share = share.umod(TssModule.curve.n)
 
