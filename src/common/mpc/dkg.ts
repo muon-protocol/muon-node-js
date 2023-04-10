@@ -1,4 +1,5 @@
 import {MapOf, RoundOutput, RoundProcessor} from "./types";
+import validations from './dkg-validations.js';
 import {MultiPartyComputation} from "./base.js";
 import {bn2str} from './utils.js'
 import Web3 from 'web3'
@@ -6,39 +7,45 @@ import Polynomial from "../../utils/tss/polynomial.js";
 import * as TssModule from "../../utils/tss/index.js";
 import {PublicKey} from "../../utils/tss/types";
 import BN from 'bn.js';
-
-/**
- * Round0 input/output types
- */
-type Round0Result = any;
-type Round0Broadcast = {
-  commitmentHash: string,
-}
+import {muonSha3} from "../../utils/sha3.js";
 
 /**
  * Round1 input/output types
  */
-type Round1Result = {
-  f: string,
-  h: string
-}
+type Round1Result = any
 type Round1Broadcast = {
-  commitment: string[],
-  allPartiesCommitmentHash: MapOf<string>
+  /** commitment */
+  Fx: string[],
+  /** proof of possession */
+  sig: {
+    /** PublicKey of random generated nonce */
+    nonce: string,
+    /** schnorr signature */
+    signature: string,
+  },
 }
 
 /**
  * Round2 input/output types
  */
-type Round2Result = any
+type Round2Result = {
+  /** key share */
+  f: string,
+}
 type Round2Broadcast = {
-  Fx: string[],
-  malignant: string[]
+  /**
+   hash of commitment received from other parties
+   will be used in malicious behaviour detection
+   */
+  allPartiesFxHash: MapOf<string>,
 }
 
+/**
+ * broadcast malicious partners
+ */
 type Round3Result = any;
 type Round3Broadcast = {
-  malignant: string[],
+  malicious: string[],
 }
 
 export type DistKeyJson = {
@@ -120,106 +127,15 @@ export class DistKey {
   }
 }
 
-const pattern_id = "^[1-9][0-9]*$";
-const schema_uint32 = {type: 'string', pattern: `^0x[0-9A-Fa-f]{64}$`};
-const schema_public_key = {type: 'string', pattern: `^[0-9A-Fa-f]{66}$`};
-const InputSchema = {
-  'round0': {
-    type: 'object',
-    properties: {
-      broadcast: {
-        type: 'object',
-        properties: {
-          commitmentHash: schema_uint32
-        },
-        required: ['commitmentHash'],
-      }
-    },
-    required: ['broadcast'],
-  },
-  'round1': {
-    type: 'object',
-    properties: {
-      send: {
-        type: 'object',
-        properties: {
-          f: schema_uint32,
-          h: schema_uint32,
-        },
-        required: ['f', 'h']
-      },
-      broadcast: {
-        type: 'object',
-        properties: {
-          commitment: {
-            type: 'array',
-            items: schema_public_key
-          },
-          allPartiesCommitmentHash: {
-            type: 'object',
-            patternProperties: {
-              [pattern_id]: schema_uint32
-            }
-          }
-        },
-        required: ['commitment', 'allPartiesCommitmentHash']
-      },
-    },
-    required: ['send', 'broadcast']
-  },
-  'round2':{
-    type: 'object',
-    properties: {
-      broadcast: {
-        type: 'object',
-        properties: {
-          Fx: {
-            type: 'array',
-            items: schema_public_key
-          },
-          malignant: {
-            type: "array",
-            items: {
-              type: 'string',
-              pattern: pattern_id
-            }
-          }
-        },
-        required: ['Fx', 'malignant']
-      }
-    },
-    required: ['broadcast']
-  },
-  'round3': {
-    type: 'object',
-    properties: {
-      broadcast: {
-        type: 'object',
-        properties: {
-          malignant: {
-            type: 'array',
-            items: {
-              type: 'string',
-              pattern: pattern_id
-            }
-          }
-        },
-        required: ['malignant']
-      }
-    },
-    required: ['broadcast']
-  }
-}
-
 export class DistributedKeyGeneration extends MultiPartyComputation {
 
   private readonly value: BN | undefined;
   public readonly extraParams: any;
-  protected InputSchema: object = InputSchema;
+  protected RoundValidations: object = validations;
 
   constructor(id: string, starter: string, partners: string[], t: number, value?: BN|string, extra: any={}) {
     // @ts-ignore
-    super(['round0', 'round1', 'round2', 'round3'], ...Object.values(arguments));
+    super(['round1', 'round2', 'round3'], ...Object.values(arguments));
     // console.log(`${this.ConstructorName} construct with`, {id, partners, t, value});
 
     this.extraParams = extra;
@@ -232,107 +148,113 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     }
   }
 
-  round0(_, __, networkId: string, qualified: string[]): RoundOutput<Round0Result, Round0Broadcast> {
+  async round1(_, __, networkId: string, qualified: string[]): Promise<RoundOutput<Round1Result, Round1Broadcast>> {
     // @ts-ignore
     let fx = new Polynomial(this.t, TssModule.curve, this.value ? TssModule.toBN(this.value) : undefined);
-    let hx = new Polynomial(this.t, TssModule.curve);
-
     const Fx = fx.coefPubKeys();
-    const Hx = hx.coefPubKeys(TssModule.H)
-    const commitment = Fx.map((Fxi, i) => TssModule.pointAdd(Fxi, Hx[i])).map(k => k.encode('hex', true))
 
-    const store = {fx, hx, Fx, Hx, commitment}
-    const send = {}
-    const broadcast= {
-      commitmentHash: Web3.utils.soliditySha3(
-        ...commitment.map(pubKey => ({t: 'bytes', v: pubKey})),
-      )!
+    const k: BN = TssModule.random();
+    const kPublic = TssModule.keyFromPrivate(k).getPublic();
+
+    const popMsg = muonSha3(
+      /** i */
+      {type: "uint64", value: networkId},
+      /** CTX */
+      {type: "string", value: this.id},
+      /** g^(ai0) */
+      {type: "bytes", value: '0x'+Fx[0].encode('hex', true)},
+      /** Ri = g^k */
+      {type: "bytes", value: "0x"+kPublic.encode('hex', true)},
+    )
+    const popSign = TssModule.schnorrSign(fx.coefficients[0].getPrivate(), k, kPublic, popMsg)
+    const sig = {
+      nonce: kPublic.encode('hex', true),
+      signature: TssModule.stringifySignature(popSign)
     }
+
+    const store = {fx, Fx, sig}
+    const send: Round1Result = {}
+    const broadcast:Round1Broadcast = {
+      Fx: Fx.map(pubKey => pubKey.encode('hex', true)),
+      sig
+    }
+
     return {store, send, broadcast}
   }
 
-  async round1(prevStepOutput: MapOf<Round0Result>, preStepBroadcast: MapOf<Round0Broadcast>, networkId: string, qualified: string[]):
-    Promise<RoundOutput<Round1Result, Round1Broadcast>> {
-    const r0Msgs = this.getRoundReceives('round0')
-
-    /** broadcast all commitment hashes received from other participants */
-    const allPartiesCommitmentHash = {}
-    Object.keys(r0Msgs).forEach(from => {
-      allPartiesCommitmentHash[from] = r0Msgs[from].broadcast.commitmentHash
-    })
-
-    const store = {}
-    const send = {}
-
-    qualified.forEach(id => {
-      send[id] = {
-        f: bn2str(this.getStore('round0').fx.calc(id)),
-        h: bn2str(this.getStore('round0').hx.calc(id)),
-      }
-    })
-
-    const broadcast= {
-      commitment: this.getStore('round0').commitment,
-      allPartiesCommitmentHash
-    }
-
-    return {store, send, broadcast, qualifieds: qualified}
-  }
-
-  round2(prevStepOutput: MapOf<Round1Result>, preStepBroadcast: MapOf<Round1Broadcast>, networkId: string, qualified: string[]):
+  round2(prevStepOutput: MapOf<Round1Result>, prevStepBroadcast: MapOf<Round1Broadcast>, networkId: string, qualified: string[]):
     RoundOutput<Round2Result, Round2Broadcast> {
     /**
      * Check all partners broadcast same commitment to all other parties.
      */
-    const r0Msg = this.getRoundReceives('round0')
     const r1Msg = this.getRoundReceives('round1')
 
     const malignant: string[] = [];
 
     /** check each node's commitments sent to all nodes are the same. */
     qualified.forEach(sender => {
-      const {commitmentHash: hash1} = r0Msg[sender].broadcast
-      /** match sent hash with commitment */
-      const realHash = Web3.utils.soliditySha3(
-        ...r1Msg[sender].broadcast.commitment.map(v => ({t: 'bytes', v}))
+      const {Fx, sig: {nonce, signature}} = prevStepBroadcast[sender];
+      const popHash = muonSha3(
+        /** i */
+        {type: "uint64", value: sender},
+        /** CTX */
+        {type: "string", value: this.id},
+        /** g^(ai0) */
+        {type: "bytes", value: '0x'+Fx[0]},
+        /** Ri = g^k */
+        {type: "bytes", value: nonce},
       )
-
-      if(hash1 !== realHash) {
-        // throw `complain #1 about partner ${sender}`
-        console.log(`partner [${sender}] founded malignant at round2 commitment hash matching`)
+      const verified = TssModule.schnorrVerify(
+        TssModule.keyFromPublic(Fx[0]),
+        popHash,
+        signature
+      );
+      if(!verified) {
         malignant.push(sender)
         return;
       }
-
-      /** check for the same commitment sent to all parties */
-      qualified.every(receiver => {
-        if(!r1Msg[receiver]) {
-          console.log(`======= receiver: ${receiver} ======`, {qualified})
-          console.dir(r1Msg, {depth: 4})
-        }
-        const hash2 = r1Msg[receiver].broadcast.allPartiesCommitmentHash[sender]
-        if(hash1 !== hash2) {
-          // throw `complain #1 about partner ${sender}`
-          console.log(`partner [${sender}] founded malignant at round2 comparing with others`)
-          malignant.push(sender)
-          return false
-        }
-        return true;
-      })
-
-      /** check the f & h matches with commitment */
-      const {f, h} = r1Msg[sender].send
-      const commitment = r1Msg[sender].broadcast.commitment.map(pubKey => TssModule.keyFromPublic(pubKey))
-      let p1 = TssModule.calcPolyPoint(networkId, commitment)
-      let p2 = TssModule.pointAdd(
-        TssModule.curve.g.mul(TssModule.toBN(f)),
-        TssModule.H.mul(TssModule.toBN(h))
-      );
-      if(!p1.eq(p2)) {
-        // throw `DistributedKey partial data verification failed from partner ${sender}.`
-        console.log(`partner [${sender}] founded malignant at round2 commitment matching`)
-        malignant.push(sender)
-      }
+      // const {commitmentHash: hash1} = r0Msg[sender].broadcast
+    //   /** match sent hash with commitment */
+    //   const realHash = Web3.utils.soliditySha3(
+    //     ...r1Msg[sender].broadcast.commitment.map(v => ({t: 'bytes', v}))
+    //   )
+    //
+    //   if(hash1 !== realHash) {
+    //     // throw `complain #1 about partner ${sender}`
+    //     console.log(`partner [${sender}] founded malignant at round2 commitment hash matching`)
+    //     malignant.push(sender)
+    //     return;
+    //   }
+    //
+    //   /** check for the same commitment sent to all parties */
+    //   qualified.every(receiver => {
+    //     if(!r1Msg[receiver]) {
+    //       console.log(`======= receiver: ${receiver} ======`, {qualified})
+    //       console.dir(r1Msg, {depth: 4})
+    //     }
+    //     const hash2 = r1Msg[receiver].broadcast.allPartiesCommitmentHash[sender]
+    //     if(hash1 !== hash2) {
+    //       // throw `complain #1 about partner ${sender}`
+    //       console.log(`partner [${sender}] founded malignant at round2 comparing with others`)
+    //       malignant.push(sender)
+    //       return false
+    //     }
+    //     return true;
+    //   })
+    //
+    //   /** check the f & h matches with commitment */
+    //   const {f, h} = r1Msg[sender].send
+    //   const commitment = r1Msg[sender].broadcast.commitment.map(pubKey => TssModule.keyFromPublic(pubKey))
+    //   let p1 = TssModule.calcPolyPoint(networkId, commitment)
+    //   let p2 = TssModule.pointAdd(
+    //     TssModule.curve.g.mul(TssModule.toBN(f)),
+    //     TssModule.H.mul(TssModule.toBN(h))
+    //   );
+    //   if(!p1.eq(p2)) {
+    //     // throw `DistributedKey partial data verification failed from partner ${sender}.`
+    //     console.log(`partner [${sender}] founded malignant at round2 commitment matching`)
+    //     malignant.push(sender)
+    //   }
     })
 
     /**
@@ -346,9 +268,16 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     const store = {}
     const send = {}
     const broadcast= {
-      Fx: this.getStore('round0').Fx.map(pubKey => pubKey.encode('hex', true)),
-      malignant,
+      allPartiesFxHash: {}
+      // Fx: this.getStore('round0').Fx.map(pubKey => pubKey.encode('hex', true)),
+      // malignant,
     }
+    newQualified.forEach(id => {
+      send[id] = {
+        f: bn2str(this.getStore('round1').fx.calc(id)),
+      }
+      broadcast.allPartiesFxHash[id] = muonSha3(...prevStepBroadcast[id].Fx.map(v => ({t: 'bytes', v})))
+    })
     return {store, send, broadcast, qualifieds: newQualified}
   }
 
@@ -360,27 +289,42 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     const r1Msgs = this.getRoundReceives('round1')
     const r2Msgs = this.getRoundReceives('round2')
 
-    const malignant: string[] = []
+    const malicious: string[] = []
+
     /** verify round2.broadcast.Fx received from all partners */
     qualified.map(sender => {
-      const Fx = r2Msgs[sender].broadcast.Fx.map(k => TssModule.keyFromPublic(k))
+      /** sender commitment hash */
+      const senderFxHash = muonSha3(...r1Msgs[sender].broadcast.Fx.map(v => ({t: 'bytes', v})));
+
+      /** check for the same commitment sent to all parties */
+      qualified.every(receiver => {
+        const senderFxSentToReceiver = r2Msgs[receiver].broadcast.allPartiesFxHash[sender]
+        if(senderFxHash !== senderFxSentToReceiver) {
+          console.log(`partner [${sender}] founded malignant at round2 comparing commitment with others`)
+          malicious.push(sender)
+          return false
+        }
+        return true;
+      })
+
+      const Fx = r1Msgs[sender].broadcast.Fx.map(k => TssModule.keyFromPublic(k))
       const p1 = TssModule.calcPolyPoint(networkId, Fx);
-      const p2 = TssModule.curve.g.mul(TssModule.toBN(r1Msgs[sender].send.f))
+      const p2 = TssModule.curve.g.mul(TssModule.toBN(r2Msgs[sender].send.f))
       if(!p1.eq(p2)) {
         console.log(`partner [${sender}] founded malignant at round3 Fx check`)
-        malignant.push(sender);
+        malicious.push(sender);
       }
     })
 
     /**
      * Propagate data
      */
-    const newQualified = qualified.filter(id => !malignant.includes(id));
+    const newQualified = qualified.filter(id => !malicious.includes(id));
 
     const store = {}
     const send = {}
     const broadcast= {
-      malignant,
+      malicious,
     }
 
     return {store, send, broadcast, qualifieds: newQualified}
@@ -397,7 +341,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
     /** share calculation */
     let share = qualified
-      .map(from => r1Msgs[from].send.f)
+      .map(from => r2Msgs[from].send.f)
       .reduce((acc, current) => {
         acc.iadd(TssModule.toBN(current))
         return acc
@@ -408,7 +352,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
     let totalFx: PublicKey[] = []
     qualified.forEach((sender, i) => {
-      let Fx = r2Msgs[sender].broadcast.Fx;
+      let Fx = r1Msgs[sender].broadcast.Fx;
       if(i === 0)
         totalFx = Fx.map(pub => TssModule.keyFromPublic(pub))
       else {

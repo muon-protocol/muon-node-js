@@ -26,7 +26,7 @@ export class MultiPartyComputation {
   private roundsPromise: LevelPromise;
   /** roundsArrivedMessages[roundId][from] = <ResultT> */
   private roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>> = {}
-  protected InputSchema: object;
+  protected RoundValidations: object;
   protected log: Logger;
 
   constructor(rounds: string[], id: string, starter: string, partners: string[]) {
@@ -191,11 +191,11 @@ export class MultiPartyComputation {
   private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any) {
     const roundTitle = this.rounds[roundIndex];
     let result: any = await network.askRoundData(from, this.id, roundIndex, dataToSend);
-    if(this.InputSchema[roundTitle] && !ajv.validate(this.InputSchema[roundTitle], result)){
+    if(this.RoundValidations[roundTitle] && !this.RoundValidations[roundTitle](result)){
       // console.dir({r,currentRound, result}, {depth: null})
-      this.log.error("round data validation error schema: %O, data: %o",this.InputSchema[roundTitle], result)
+      this.log.error(`round[${roundTitle}] data validation error. data: %o`, result)
       // @ts-ignore
-      throw ajv.errors.map(e => e.message).join("\n");
+      throw this.RoundValidations[roundTitle].errors.map(e => e.message).join("\n");
     }
     return result;
   }
