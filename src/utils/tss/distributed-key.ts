@@ -81,14 +81,14 @@ class DistributedKey {
     this.timeoutPromise = new TimeoutPromise(timeout, "DistributedKey timeout")
   }
 
-  static loadPubKey(publicKey): PublicKey {
-    if(typeof publicKey === "string")
-      return tss.keyFromPublic(publicKey.replace("0x", ""), "hex")
-    else if(Array.isArray(publicKey))
-      return tss.keyFromPublic({x: publicKey[0], y: publicKey[1]})
-    else
-      return publicKey
-  }
+  // static loadPubKey(publicKey): PublicKey {
+  //   if(typeof publicKey === "string")
+  //     return tss.keyFromPublic(publicKey.replace("0x", ""), "hex")
+  //   else if(Array.isArray(publicKey))
+  //     return tss.keyFromPublic({x: publicKey[0], y: publicKey[1]})
+  //   else
+  //     return publicKey
+  // }
 
   static load(party, _key){
     let key = new DistributedKey(party, _key.id);
@@ -97,7 +97,7 @@ class DistributedKey {
     key.h_x = null;
     key.share = toBN(_key.share);
     key.sharePubKey = tss.keyFromPrivate(_key.share).getPublic().encode('hex', true);
-    key.publicKey = this.loadPubKey(_key.publicKey)
+    key.publicKey = tss.keyFromPublic(_key.publicKey)
     key.address = tss.pub2addr(key.publicKey)
     if(_key.partners)
       key.partners = _key.partners;

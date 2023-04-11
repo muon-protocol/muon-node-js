@@ -112,8 +112,13 @@ export function keyFromPrivate(prv) {
   return curve.keyFromPrivate(prv)
 }
 
-export function keyFromPublic(pubKeyStr, encoding='hex') {
-  return curve.keyFromPublic(pubKeyStr, encoding).getPublic()
+export function keyFromPublic(pubKey:string|Uint8Array|Buffer|number[]|{x:string,y:string}, encoding='hex'): PublicKey {
+  if(typeof pubKey === "string")
+    return curve.keyFromPublic(pubKey.replace("0x", ""), 'hex').getPublic()
+  else if(Array.isArray(pubKey) && typeof pubKey[0] === 'string' && typeof pubKey[1]==='string')
+    return curve.keyFromPublic({x: pubKey[0], y: pubKey[1]}).getPublic()
+  else
+    return curve.keyFromPublic(pubKey, encoding).getPublic()
 }
 
 export function key2pub(privateKey) {

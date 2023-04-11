@@ -410,7 +410,7 @@ class System extends CallablePlugin {
       t: context.party.t,
       partners: context.party.partners,//.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
-    let party = this.tssPlugin.parties[partyId];
+    const party = this.tssPlugin.getAppParty(appId);
     if(!party)
       throw `Party not created`
 
@@ -438,14 +438,14 @@ class System extends CallablePlugin {
     for(let context of allContexts) {
       /** select context to be deleted */
       if(context.deploymentRequest.data.timestamp <= deploymentTimestamp) {
-        deleteContextList.push(context.deploymentRequest.reqId)
+        deleteContextList.push(context)
         /** add context key into delete list */
         if(context.publicKey?.encoded)
           deleteKeyList.push(context.publicKey?.encoded)
       }
     }
     await AppContext.deleteMany({
-      "deploymentRequest.reqId": {$in: deleteContextList}
+      "deploymentRequest.reqId": {$in: deleteContextList.map(c => c.deploymentRequest.reqId)}
     });
 
     await AppTssConfig.deleteMany({
@@ -453,7 +453,7 @@ class System extends CallablePlugin {
       "publicKey.encoded": {$in: deleteKeyList},
     });
     log(`deleting app from memory of all cluster %s`, appId)
-    CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, deploymentReqIds: deleteContextList}})
+    CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, contexts: deleteContextList}})
   }
 
   @remoteMethod(RemoteMethods.GetAppPublicKey)

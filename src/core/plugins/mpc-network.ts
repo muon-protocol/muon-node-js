@@ -2,7 +2,8 @@ import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators.js";
 import CallablePlugin from "./base/callable-plugin.js";
 import {IMpcNetwork, PartnerRoundReceive} from "../../common/mpc/types";
 import {MultiPartyComputation} from "../../common/mpc/base.js";
-import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg.js";
+import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
+import {DistKey} from '../../common/mpc/dist-key.js'
 import CollateralInfoPlugin from "./collateral-info.js";
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import * as NetworkIpc from '../../network/ipc.js'

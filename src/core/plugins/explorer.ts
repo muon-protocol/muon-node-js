@@ -253,14 +253,21 @@ class Explorer extends CallablePlugin {
       partnersStatus = responses.reduce((obj, result, index) => {
         const node = partners[index]
         obj[node.id] = result
-
-        /** call remote node to load app context*/
-        this.remoteCall(
-          node.peerId,
-          RemoteMethods.LoadAppContextAndKey,
-          appId
-        )
-          .catch(e => {})
+        if(node.wallet === process.env.SIGN_WALLET_ADDRESS){
+          this.__loadAppContextAndKey(appId, this.collateralPlugin.currentNodeInfo!)
+            .catch(e => {
+            })
+        }
+        else {
+          /** call remote node to load app context*/
+          this.remoteCall(
+            node.peerId,
+            RemoteMethods.LoadAppContextAndKey,
+            appId
+          )
+            .catch(e => {
+            })
+        }
 
         return obj
       }, {})
@@ -300,7 +307,7 @@ class Explorer extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.LoadAppContextAndKey)
   async __loadAppContextAndKey(appId, callerInfo: MuonNodeInfo) {
-    if(!callerInfo.isDeployer)
+    if(!callerInfo.isDeployer && callerInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
       return;
     const status:AppDeploymentStatus = this.appManager.getAppDeploymentStatus(appId)
     let context;

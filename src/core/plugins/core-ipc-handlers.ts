@@ -9,7 +9,6 @@ import {AppRequest} from "../../common/types";
 
 export const IpcMethods = {
   ForwardRemoteCall: 'forward-remote-call',
-  GenerateTssKey: 'generate-tss-key',
   GetTssKey: 'get-tss-key',
   GetAppId: 'get-app-id',
   GetAppContext: 'get-app-context',
@@ -53,15 +52,6 @@ class CoreIpcHandlers extends CallablePlugin {
   async __onGetTssKeyRequest(data: {keyId: string}, callerInfo) {
     let key = await this.muon.getPlugin('tss-plugin').getSharedKey(data.keyId)
     return key.toSerializable();
-  }
-
-  @ipcMethod(IpcMethods.GenerateTssKey)
-  async __onGenerateTssKeyRequest(data: {keyId?: string}, callerInfo) {
-    let key = await this.muon.getPlugin('tss-plugin').keyGen(null, {id:data.keyId});
-    Object.keys(key.pubKeyParts).forEach(w => {
-      key.pubKeyParts[w] = key.pubKeyParts[w].map(pubKey => pubKey.encode('hex'))
-    })
-    return key;
   }
 
   @ipcMethod(IpcMethods.GetAppId)

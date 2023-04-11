@@ -13,7 +13,6 @@ import AppTssConfig from "../../common/db-models/AppTssConfig.js"
 import _ from 'lodash'
 import {logger} from '@libp2p/logger'
 import {pub2json} from "../../utils/helpers.js";
-import DistributedKey from "../../utils/tss/distributed-key.js";
 import {findMinFullyConnectedSubGraph} from "../../common/graph-utils/index.js";
 import {PublicKey} from "../../utils/tss/types";
 import {aesDecrypt, isAesEncrypted} from "../../utils/crypto.js";
@@ -135,7 +134,7 @@ export default class AppManager extends CallablePlugin {
   }
 
   async onDeploymentTssKeyGenerate(tssKey) {
-    const publicKey = DistributedKey.loadPubKey(tssKey.publicKey);
+    const publicKey = TssModule.keyFromPublic(tssKey.publicKey);
     this.appContexts['1'].publicKey = pub2json(publicKey);
   }
 
@@ -216,16 +215,16 @@ export default class AppManager extends CallablePlugin {
     this.contextIdToAppIdMap[doc._id] = doc.appId
   }
 
-  private async onAppContextDelete(data: { appId: string, deploymentReqIds: string[] }) {
+  private async onAppContextDelete(data: { appId: string, contexts: any[] }) {
     try {
-      const {appId, deploymentReqIds} = data
-      if (!appId || !Array.isArray(deploymentReqIds)) {
-        log.error('missing appId/deploymentReqIds.');
+      const {appId, contexts} = data
+      if (!appId || !Array.isArray(contexts)) {
+        log.error('missing appId/contexts.');
         return;
       }
 
       log(`pid[${process.pid}] app[${appId}] context deleting...`)
-
+      const deploymentReqIds = contexts.map(c => c.deploymentRequest.reqId)
       if (!this.appContexts[appId] || !deploymentReqIds.includes(this.appContexts[appId].deploymentRequest.reqId)) {
         // log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
         return
@@ -521,7 +520,7 @@ export default class AppManager extends CallablePlugin {
                 })
             })
           )
-          this.deploymentPublicKey = DistributedKey.loadPubKey(publicKeyStr);
+          this.deploymentPublicKey = TssModule.keyFromPublic(publicKeyStr);
         }
         return this.deploymentPublicKey;
       }
@@ -532,7 +531,7 @@ export default class AppManager extends CallablePlugin {
       if (!appContest)
         appContest = await this.queryAndLoadAppContext(appId)
       if (appContest?.publicKey)
-        return DistributedKey.loadPubKey(appContest.publicKey.encoded);
+        return TssModule.keyFromPublic(appContest.publicKey.encoded);
       else
         return null;
     }
