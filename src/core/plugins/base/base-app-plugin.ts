@@ -66,7 +66,6 @@ const RemoteMethods = {
   WantSign: 'wantSign',
   InformRequestConfirmation: 'InformReqConfirmation',
   GetTssPublicKey: "get-tss-pub",
-  HB: "HB",
 }
 
 @remoteApp
@@ -952,11 +951,6 @@ class BaseAppPlugin extends CallablePlugin {
     await requestConfirmationCache.set(request.reqId, '1');
 
     return `OK`;
-  }
-
-  @remoteMethod(RemoteMethods.HB)
-  async __HB(data, callerInfo) {
-    return true;
   }
 
   @remoteMethod(RemoteMethods.GetTssPublicKey)

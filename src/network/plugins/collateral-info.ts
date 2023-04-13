@@ -20,18 +20,6 @@ const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
 const MuonNodesPaginationAbi = require('../../data/MuonNodesPagination-ABI.json')
 const log = logger('muon:network:plugins:collateral')
 
-const HEARTBEAT_EXPIRE = parseInt(process.env.HEARTBEAT_EXPIRE!) || 20*60*1000; // Keep heartbeet in memory for 5 minutes
-
-const heartbeatCache = new NodeCache({
-  stdTTL: HEARTBEAT_EXPIRE/1000,
-  // /**
-  //  * (default: 600)
-  //  * The period in seconds, as a number, used for the automatic delete check interval.
-  //  * 0 = no periodic check.
-  //  */
-  checkperiod: 60,
-  useClones: false,
-});
 
 export type NodeFilterOptions = {
   list?: string[],
@@ -76,59 +64,10 @@ export default class CollateralInfoPlugin extends CallablePlugin{
 
   async onStart() {
     await super.onStart()
-
-    // this.__broadcastHeartbeat()
-    // heartbeatCache.on("del", this.onHeartbeatExpired.bind(this));
-  }
-
-  private async __broadcastHeartbeat() {
-    while(true) {
-      try {
-        log('broadcasting heartbeat')
-        this.broadcast("HB")
-      }catch (e) {
-        log(`error when broadcasting hurt beat`)
-      }
-
-      /** delay between each broadcast */
-      await timeout(HEARTBEAT_EXPIRE/2 + Math.random() * 60e3)
-    }
-  }
-
-  @broadcastHandler
-  async __broadcastHandler(data, callerInfo: MuonNodeInfo) {
-    if(data === 'HB') {
-      log(`Heartbeat arrived from ${callerInfo.id}`)
-      this.onPeerOnline(callerInfo.peerId);
-    }
-  }
-
-  onHeartbeatExpired(key, value){
-    log(`heartbeat expired for node ${key}`)
-    this.onPeerOffline(key);
-  }
-
-  private onPeerOnline(peerId: string) {
-    // heartbeatCache.set(peerId, Date.now())
-    // this.updateNodeInfo(peerId, {isOnline: true})
-    // log(`peer[${peerId}] is online now`)
-    // CoreIpc.fireEvent({
-    //   type: "peer:online",
-    //   data: peerId,
-    // });
-  }
-
-  private onPeerOffline(peerId: string) {
-    // this.updateNodeInfo(peerId, {isOnline: false})
-    // log(`peer[${peerId}] is offline now`)
-    // CoreIpc.fireEvent({
-    //   type: "peer:offline",
-    //   data: peerId,
-    // });
   }
 
   get onlinePeers(): string[] {
-    return heartbeatCache.keys()
+    return []
   }
 
   get onlinePeersInfo(): MuonNodeInfo[] {
@@ -153,8 +92,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     }
 
     await timeout(5000);
-
-    this.onPeerOnline(peerInfo.peerId)
   }
 
   private updateNodeInfo(index: string, dataToMerge: object) {
@@ -244,7 +181,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         wallet: item.nodeAddress,
         peerId: item.peerId,
         isDeployer: item.isDeployer,
-        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || heartbeatCache.has(item.peerId)
+        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS
       }))
 
     let exist = {};
@@ -364,7 +301,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         wallet: item.nodeAddress,
         peerId: item.peerId,
         isDeployer: item.isDeployer,
-        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || heartbeatCache.has(item.peerId)
+        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS
       }))
 
     return {
@@ -449,8 +386,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         CoreIpc.fireEvent({
           type: "collateral:node:edit",
           data: {
-            nodeInfo: {...n, isOnline: heartbeatCache.has(n.peerId)},
-            oldNodeInfo: {...oldNode, isOnline: heartbeatCache.has(oldNode.peerId)},
+            nodeInfo: {...n},
+            oldNodeInfo: {...oldNode},
           }
         })
         return;
