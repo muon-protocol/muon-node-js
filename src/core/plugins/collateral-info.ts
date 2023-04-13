@@ -13,7 +13,6 @@ export default class CollateralInfoPlugin extends BasePlugin{
   networkInfo: NetworkInfo;
   private allowedWallets: string[] = []
 
-  private connectedNodes: MapOf<boolean> = {}
   private _nodesList: MuonNodeInfo[];
   private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
   /**
@@ -24,40 +23,11 @@ export default class CollateralInfoPlugin extends BasePlugin{
   async onStart(){
     super.onStart();
 
-    this.muon.on("peer:connect", this.onPeerConnect.bind(this))
-    this.muon.on("peer:disconnect", this.onPeerDisconnect.bind(this))
-
     this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
     this.muon.on("collateral:node:edit", this.onNodeEdit.bind(this));
     this.muon.on("collateral:node:delete", this.onNodeDelete.bind(this));
 
     this._loadCollateralInfo();
-
-    // // TODO: check more this change
-    // this.muon.once('peer:connect', () => {
-    //   console.log('first node connected ...')
-    //   // Listen to contract events and inform any changes.
-    //   // TODO: uncomment this. (commented for debug)
-    //   // this._watchContractEvents();
-    //
-    //   this._loadCollateralInfo();
-    // })
-  }
-
-  private onPeerConnect(peerId) {
-    log(`peer connect %o`, peerId)
-    this.connectedNodes[peerId] = true
-  }
-
-  private onPeerDisconnect(peerId) {
-    log(`peer disconnect %o`, peerId)
-    delete this.connectedNodes[peerId]
-  }
-
-  get availablePeerIds(): string[] {
-    return this._nodesList
-      .filter(n => n.isOnline)
-      .map(n => n.peerId)
   }
 
   private updateNodeInfo(index: string, dataToMerge: object, keysToDelete?:string[]) {
@@ -155,11 +125,6 @@ export default class CollateralInfoPlugin extends BasePlugin{
       this.allowedWallets.push(n.wallet);
     })
 
-    let connectedList = await NetworkIpc.getConnectedPeerIds()
-    connectedList.forEach(peerId => {
-      this.connectedNodes[peerId] = true
-    })
-
     log('Collateral info loaded.');
     // @ts-ignore
     this.emit('loaded');
@@ -169,10 +134,6 @@ export default class CollateralInfoPlugin extends BasePlugin{
   // TODO: not implemented
   getAllowedWallets(){
     return this.allowedWallets;
-  }
-
-  getDeployerNodes(): MuonNodeInfo[] {
-    return this._nodesList.filter(n => n.isDeployer)
   }
 
   /**
@@ -225,13 +186,8 @@ export default class CollateralInfoPlugin extends BasePlugin{
     /** make result unique */
     result = lodash.uniqBy(result, 'id')
 
-    if(options.isConnected != undefined){
-      result = result.filter(n => (!!this.connectedNodes[n.peerId])===options.isConnected)
-    }
     if(options.isDeployer != undefined)
       result = result.filter(n => n.isDeployer === options.isDeployer)
-    if(options.isOnline != undefined)
-      result = result.filter(n => n.isOnline === options.isOnline)
     if(options.excludeSelf)
       result = result.filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
     return result

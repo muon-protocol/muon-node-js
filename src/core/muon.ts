@@ -131,15 +131,6 @@ export default class Muon extends Events {
     // @ts-ignore
     this.globalEventBus.on("message", this.onGlobalEventReceived.bind(this));
     this._onceStarted();
-
-    setTimeout(async () => {
-      const peerIds = await NetworkIpc.getOnlinePeers()
-      if(peerIds.length > 0) {
-        peerIds.forEach(peerId => {
-          fireEvent({type: "peer:discovery", data: peerId})
-        })
-      }
-    }, 1000);
   }
 
   async _onceStarted() {

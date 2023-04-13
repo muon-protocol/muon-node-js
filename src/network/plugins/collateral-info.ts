@@ -9,11 +9,9 @@ import chalk from 'chalk'
 import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
 import {peerId2Str} from "../utils.js";
-import {broadcastHandler, remoteApp, remoteMethod} from "./base/app-decorators.js";
+import {remoteApp, remoteMethod} from "./base/app-decorators.js";
 import { peerIdFromString } from '@libp2p/peer-id'
-import NodeCache from 'node-cache';
 import lodash from "lodash";
-import axios from "axios";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
@@ -23,8 +21,6 @@ const log = logger('muon:network:plugins:collateral')
 
 export type NodeFilterOptions = {
   list?: string[],
-  isOnline?: boolean,
-  isConnected?: boolean
   isDeployer?: boolean,
   excludeSelf?: boolean
 }
@@ -66,16 +62,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     await super.onStart()
   }
 
-  get onlinePeers(): string[] {
-    return []
-  }
-
-  get onlinePeersInfo(): MuonNodeInfo[] {
-    return this.onlinePeers
-      .map(peerId => this.getNodeInfo(peerId)!)
-      .filter(info => !!info)
-  }
-
   private getNodeId(peerId): string {
     const id = this.getNodeInfo(peerId2Str(peerId))?.id || 'unknown'
     return `[${id}]:${peerId2Str(peerId)}`
@@ -99,7 +85,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     if(nodeInfo) {
       log(`updating node [${nodeInfo.id}]`, dataToMerge);
       /** update fields */
-      // console.log("((((((", JSON.stringify(this._nodesList.map(n => n.isOnline)))
       // console.log('updating', nodeInfo)
       if(dataToMerge) {
         Object.keys(dataToMerge).forEach(key => {
@@ -181,7 +166,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         wallet: item.nodeAddress,
         peerId: item.peerId,
         isDeployer: item.isDeployer,
-        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS
       }))
 
     let exist = {};
@@ -200,13 +184,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       allNodes
     }
   }
-
-  // private async getInfo(address: string, network: string) {
-  //   return {
-  //     _lastUpdateTime: await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network),
-  //     _nodes: await axios.get('http://192.3.136.81/allNodes').then(({data}) => data)
-  //   }
-  // }
 
   private async paginateAndGetInfo(paginationAddress:string, nodeManagerAddress: string, network: string) {
     const itemPerPage = 1500;
@@ -301,7 +278,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         wallet: item.nodeAddress,
         peerId: item.peerId,
         isDeployer: item.isDeployer,
-        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS
       }))
 
     return {
@@ -456,15 +432,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       return Infinity;
   }
 
-  hasEnoughPartners(): boolean {
-    /**
-     * onlinePartners not include current node
-     */
-    return this.onlinePeers
-      .map(peerId => this.getNodeInfo(peerId))
-      .filter(info => !!info).length + 1 >= this.TssThreshold
-  }
-
   get currentNodeInfo(): MuonNodeInfo | undefined {
     return this.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
   }
@@ -477,15 +444,9 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     return this.networkInfo?.maxGroupSize;
   }
 
-  async getNodesList() {
+  async getNodesList(): Promise<MuonNodeInfo[]> {
     await this.waitToLoad();
-    let connectedPeers = this.network.getConnectedPeers();
-    return this._nodesList.map(n => {
-      let res = {...n};
-      if(connectedPeers[n.peerId])
-        res.isOnline = true;
-      return res;
-    });
+    return this._nodesList;
   }
 
   waitToLoad(){
@@ -519,14 +480,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     /** make result unique */
     result = lodash.uniqBy(result, 'id')
 
-    if(options.isConnected !== undefined) {
-      let connectedList = this.getConnectedPeerIds()
-      result = result.filter(n => connectedList.includes(n.peerId)===options.isConnected)
-    }
     if(options.isDeployer != undefined)
       result = result.filter(n => n.isDeployer === options.isDeployer)
-    if(options.isOnline != undefined)
-      result = result.filter(n => n.isOnline === options.isOnline)
     if(options.excludeSelf)
       result = result.filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
     return result

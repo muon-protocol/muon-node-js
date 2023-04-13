@@ -55,7 +55,6 @@ const tasksCache = new NodeCache({
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetNodesList: "get-nodes-list",
-  GetOnlinePeers: "get-online-peers",
   GetNetworkConfig: "get-net-conf",
   GetCollateralInfo: "get-collateral-info",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
@@ -98,11 +97,6 @@ class NetworkIpcHandler extends CallablePlugin {
 
   async onStart() {
     super.onStart()
-
-    // @ts-ignore
-    this.network.once('peer:connect', async (peerId) => {
-      await timeout(5000);
-    })
   }
 
   get broadcastPlugin(): NetworkBroadcastPlugin {
@@ -136,22 +130,13 @@ class NetworkIpcHandler extends CallablePlugin {
   @ipcMethod(IpcMethods.FilterNodes)
   async __filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
     return this.collateralPlugin.filterNodes(filter)
-      .map(({id, active, staker, wallet, peerId, isOnline, isDeployer}) => ({id, active, staker, wallet, peerId, isOnline, isDeployer}));
+      .map(({id, active, staker, wallet, peerId, isDeployer}) => ({id, active, staker, wallet, peerId, isDeployer}));
   }
 
   @ipcMethod(IpcMethods.GetNodesList)
   async __getNodesList(output: string|string[]) {
     let outProps = Array.isArray(output) ? output : [output]
     return this.collateralPlugin.filterNodes({}).map(n => _.pick(n, outProps))
-  }
-
-  /**
-   * @private
-   * @ returns {Promise<string[]>} - list of online peers peerId
-   */
-  @ipcMethod(IpcMethods.GetOnlinePeers)
-  async __onGetOnlinePeers(): Promise<string[]> {
-    return this.collateralPlugin.onlinePeers;
   }
 
   @ipcMethod(IpcMethods.GetNetworkConfig)

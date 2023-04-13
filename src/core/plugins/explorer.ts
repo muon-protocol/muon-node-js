@@ -60,10 +60,7 @@ class Explorer extends CallablePlugin {
 
     // TODO: replace with onlinePartners
     // TODO: this returns only deployer nodes
-    let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
-      isOnline: true,
-      excludeSelf: true
-    })
+    let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({excludeSelf: true})
 
     let currentNode = this.collateralPlugin.currentNodeInfo!;
 

@@ -26,10 +26,6 @@ function getNodesList(output: string|string[] = ['id','wallet','peerId'], option
   return call(IpcMethods.GetNodesList, output, options)
 }
 
-function getOnlinePeers(): Promise<string[]> {
-  return call(IpcMethods.GetOnlinePeers);
-}
-
 function broadcastToChannel(channel, message) {
   return call(IpcMethods.BroadcastToChannel, {channel, message})
 }
@@ -133,7 +129,6 @@ export {
   getCollateralInfo,
   filterNodes,
   getNodesList,
-  getOnlinePeers,
   broadcastToChannel,
   forwardRemoteCall,
   getPeerInfo,
