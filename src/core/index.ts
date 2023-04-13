@@ -41,24 +41,10 @@ async function getEnvPlugins(): Promise<MuonPlugin[]> {
   return result;
 }
 
-function isV3(app) {
-  return !!app.signParams;
-}
-
 function prepareApp(app, fileName, isBuiltInApp = false, filePath = "")
   : [Constructor<BasePlugin>, MuonPluginConfigs] {
   if (!app.APP_ID) {
-    if (isV3(app)) {
-      app.APP_ID = sha3(fileName);
-    } else {
-      log(
-        chalk.yellow(
-          `Deprecated app version: ${app.APP_NAME} app has old version and need to upgrade to v3.`
-        )
-      );
-      // @ts-ignore
-      app.APP_ID = "0x" + sha3(fileName).slice(-8);
-    }
+    app.APP_ID = sha3(fileName);
   }
 
   app.APP_ID = BigInt(app.APP_ID).toString(10);
