@@ -209,7 +209,9 @@ export function schnorrAggregateSigs(t, sigs, indices): {s: BN, e: BN}{
   return {s, e}
 }
 
-export function validatePublicKey(publicKey: PublicKey): boolean {
+export function validatePublicKey(publicKey: string|PublicKey): boolean {
+  if(typeof publicKey === 'string')
+    publicKey = keyFromPublic(publicKey);
   return curve.curve.validate(publicKey);
 }
 

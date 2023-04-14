@@ -224,8 +224,11 @@ router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
   else {
     callProperNode(requestData)
       .then(async result => {
-        /** if request forwarded to other node */
-        if(result.gwAddress !== process.env.SIGN_WALLET_ADDRESS) {
+        /**
+         If request forwarded to other node
+         When client calling @gatewayMethod of any plugin, appId is 0
+         */
+        if(result?.appId !== '0' && result?.gwAddress !== process.env.SIGN_WALLET_ADDRESS) {
           if(appIsShielded[app]) {
             await shieldConfirmedResult(requestData, result)
           }
