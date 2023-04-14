@@ -3,10 +3,10 @@ import CollateralInfoPlugin from "./collateral-info.js";
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
 import * as CoreIpc from '../../core/ipc.js'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import {peerId2Str} from "../utils.js";
 
-const log = Log('muon:network:plugins:broadcast')
+const log = logger('muon:network:plugins:broadcast')
 
 export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 

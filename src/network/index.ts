@@ -46,14 +46,10 @@ class Network extends Events {
     const netConfig = this.configs.net;
     let peerId = await createFromJSON(configs.peerId);
 
-    const pubsubPeerDiscoveryInterval = parseInt(process.env.PUBSUB_PEER_DISCOVERY_INTERVAL || "10")
     const peerDiscovery: any[] = [
       // mdns({
       //   interval: 60e3
       // }),
-      // pubsubPeerDiscovery({
-      //   interval: (pubsubPeerDiscoveryInterval+Math.floor(Math.random() * pubsubPeerDiscoveryInterval))*60e3
-      // })
     ]
     let bootstrapList: string[] = netConfig.bootstrap ?? [];
     /** exclude self address */

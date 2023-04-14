@@ -11,13 +11,13 @@ import Web3 from 'web3'
 import chalk from "chalk"
 import { Constructor } from "../common/types";
 import BasePlugin from "./plugins/base/base-plugin.js";
-import Log from "../common/muon-log.js"
+import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
 import {filePathInfo} from "../utils/helpers.js";
 
 const {__dirname} = filePathInfo(import.meta)
 const {utils: { sha3 }} = Web3
-const log = Log("muon:core");
+const log = logger("muon:core");
 
 const muonAppRequire = createRequire(import.meta.url);
 // override .js loader

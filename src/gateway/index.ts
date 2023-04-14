@@ -7,10 +7,10 @@ import status from './status.js'
 import mine from './mine.js'
 import crashReport from './crash-reports.js'
 import delegate from './delegate-routing.js'
-import Log from '../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import {GatewayGlobalConfigs, load as loadConfigs} from './configurations.js';
 
-const log = Log('muon:gateway')
+const log = logger('muon:gateway')
 let app = express()
 
 async function start() {

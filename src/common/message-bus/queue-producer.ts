@@ -2,10 +2,10 @@ import BaseMessageQueue from './base-message-queue.js'
 import { IpcCallOptions } from "../types";
 import TimeoutPromise from '../timeout-promise.js'
 import NodeCache from 'node-cache'
-import Log from '../muon-log.js'
+import {logger} from '@libp2p/logger'
 import {MessageBusConfigs} from "./types";
 
-const logError = Log("muon:queue-produces:error")
+const log = logger("muon:queue-produces:error")
 
 const callCache = new NodeCache({
   stdTTL: 15*60, // Keep call in memory for 15 minutes
@@ -68,7 +68,7 @@ export default class QueueProducer<MessageType> extends BaseMessageQueue {
         content.promise.resolve(response)
       }
       else {
-        logError(
+        log.error(
           `${this.ConstructorName}[${this.busName}] result contains message %O rawResponse %O`,
           content.message,
           rawResponse
@@ -77,7 +77,7 @@ export default class QueueProducer<MessageType> extends BaseMessageQueue {
       }
     }
     else{
-      logError(`${this.ConstructorName}[${this.busName}] Result promise not found: %O`, rawResponse);
+      log.error(`${this.ConstructorName}[${this.busName}] Result promise not found: %O`, rawResponse);
       // TODO: what to do? it may timed out.
     }
   }

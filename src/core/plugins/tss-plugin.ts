@@ -15,13 +15,13 @@ import TssParty from "../../utils/tss/party.js";
 import {IMpcNetwork} from "../../common/mpc/types";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from "../../common/mpc/dist-key.js";
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import {bn2hex} from "../../utils/tss/utils.js";
 import {useOneTime} from "../../utils/tss/use-one-time.js";
 
 const {shuffle} = lodash;
 const {utils:{toBN}} = Web3;
-const log = Log('muon:core:plugins:tss')
+const log = logger('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
 

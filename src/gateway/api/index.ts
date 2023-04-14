@@ -8,13 +8,13 @@ import * as CoreIpc from '../../core/ipc.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import axios from 'axios'
 import * as crypto from '../../utils/crypto.js'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import Ajv from "ajv"
 import {mixGetPost} from "../middlewares.js";
 import {MuonNodeInfo} from "../../common/types";
 import {GatewayCallParams} from "../types";
 
-const log = Log('muon:gateway:api')
+const log = logger('muon:gateway:api')
 const ajv = new Ajv({coerceTypes: true})
 let requestQueue = new QueueProducer(`gateway-requests`);
 

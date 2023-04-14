@@ -3,11 +3,10 @@ import TimeoutPromise from '../../common/timeout-promise.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import {NetworkInfo, NodeFilterOptions} from '../../network/plugins/collateral-info.js'
 import {MuonNodeInfo} from "../../common/types";
-import Log from '../../common/muon-log.js'
-import {MapOf} from "../../common/mpc/types";
+import {logger} from '@libp2p/logger'
 import lodash from 'lodash'
 
-const log = Log('muon:core:plugins:collateral')
+const log = logger('muon:core:plugins:collateral')
 
 export default class CollateralInfoPlugin extends BasePlugin{
   networkInfo: NetworkInfo;

@@ -2,11 +2,11 @@ import BaseNetworkPlugin from './base/base-network-plugin.js';
 import CollateralInfoPlugin from "./collateral-info.js";
 import {loadCID} from '../../utils/cid.js'
 import all from 'it-all'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import {Libp2pPeerInfo} from "../types";
 import {peerId2Str} from "../utils.js";
 
-const log = Log('muon:network:plugins:content')
+const log = logger('muon:network:plugins:content')
 
 export default class NetworkContentPlugin extends BaseNetworkPlugin {
 

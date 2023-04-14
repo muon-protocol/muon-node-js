@@ -1,7 +1,7 @@
 import cluster, {Worker} from 'cluster'
 import * as os from 'os'
 import axios, {AxiosRequestConfig} from 'axios'
-import Log from './common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import * as Gateway from './gateway/index.js'
 import * as Network from './network/index.js'
 import * as Core from './core/index.js'
@@ -13,7 +13,7 @@ import {muonSha3} from "./utils/sha3.js";
 import * as crypto from "./utils/crypto.js";
 
 // const require = createRequire(import.meta.url);
-const log = Log('muon:boot')
+const log = logger('muon:boot')
 
 type ClusterType = 'gateway' | 'networking' | "core"
 
