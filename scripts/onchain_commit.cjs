@@ -1,5 +1,5 @@
 require('dotenv').config({path:__dirname+'/../.env'});
-const netConf = require('../config/global/net.default.conf.json');
+const netConf = require('../config/global/default.net.conf.json');
 const nodeManagerContractAddress = netConf.nodeManager.address;
 const nodeManagerABI = require('../src/data/NodeManager-ABI.json');
 

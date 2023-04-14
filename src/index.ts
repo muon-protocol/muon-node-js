@@ -153,10 +153,7 @@ async function boot() {
     // require('./core').start();
     switch (clusterType) {
       case 'gateway': {
-        Gateway.start({
-          host: process.env.GATEWAY_HOST,
-          port: process.env.GATEWAY_PORT,
-        })
+        Gateway.start()
           .catch(e => {
             console.log(`Gateway failed to start.`, e)
           })
