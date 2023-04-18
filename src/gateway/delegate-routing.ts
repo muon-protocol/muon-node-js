@@ -6,6 +6,7 @@ import {muonSha3} from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
 import {MuonNodeInfo} from "../common/types";
 import asyncHandler from 'express-async-handler'
+import axios from "axios";
 
 const router = Router();
 const log = logger("muon:gateway:routing")
@@ -52,6 +53,14 @@ router.use('/query', mixGetPost, asyncHandler(async (req, res, next) => {
   })
 }))
 
+async function checkNodeStatus(peerId, ip, gatewayPort) {
+  let status:any = await axios.get(`http://${ip}:${gatewayPort}/status`, {timeout: 2500})
+    .then(({data}) => data)
+  if(status.peerId !== peerId)
+    return false
+  return true;
+}
+
 router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
   // @ts-ignore
   const {timestamp, gatewayPort, peerInfo, signature} = req.mixed;
@@ -86,6 +95,18 @@ router.use('/discovery', mixGetPost, asyncHandler(async (req, res, next) => {
     }, {depth: 5})
     throw `signature mismatch`
   }
+
+  // @ts-ignore
+  const hasCorrectIp = await Promise.any(
+    peerInfo.multiaddrs.map(ma => {
+      const ipRegex = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/
+      const ip = ma.match(ipRegex)[0]
+      return checkNodeStatus(peerInfo.id, ip, gatewayPort)
+    })
+  )
+
+  if(!hasCorrectIp)
+    throw `wrong ip address`
 
   onlines[realPeerInfo[0].id] = {
     timestamp,
