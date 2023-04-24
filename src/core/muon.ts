@@ -40,6 +40,7 @@ export type MuonConfigs = {
     tss: {
       threshold: number,
       max: number,
+      defaultTTL: number,
       pendingPeriod: number,
     },
     nodeManager: {

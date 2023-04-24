@@ -12,12 +12,10 @@ const owners = [
   "0x340C978265378998D589B41F1f51F137c344C22a"
 ]
 
-/** one week */
-const DEFAULT_APP_TTL = 7*24*3600;
-
 module.exports = {
     APP_NAME: "deployment",
     REMOTE_CALL_TIMEOUT: 120e3,
+    TTL: 2*60,
     APP_ID: 1,
     owners,
 
@@ -144,12 +142,13 @@ module.exports = {
             }
             case Methods.Deploy: {
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
+                const ttl = this.TTL ?? tssConfigs.defaultTTL;
                 const {selectedNodes} = init
                 let {seed, t=tssConfigs.threshold, n=tssConfigs.max} = params
                 t = Math.max(t, tssConfigs.threshold);
                 return {
                     rotationEnabled: true,
-                    ttl: DEFAULT_APP_TTL,
+                    ttl,
                     timestamp: request.data.timestamp,
                     seed,
                     tssThreshold: t,
@@ -165,6 +164,7 @@ module.exports = {
                     throw `app deployment info not found`
 
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
+                const ttl = this.TTL ?? tssConfigs.defaultTTL;
 
                 if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
                     throw `deployed partners mismatched with key-gen partners`
@@ -177,8 +177,8 @@ module.exports = {
 
                 return {
                     rotationEnabled: true,
-                    ttl: DEFAULT_APP_TTL,
-                    expiration: request.data.timestamp + DEFAULT_APP_TTL + tssConfigs.pendingPeriod,
+                    ttl,
+                    expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
                     seed: context.seed,
                     publicKey
                 }

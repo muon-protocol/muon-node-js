@@ -85,6 +85,8 @@ class BaseAppPlugin extends CallablePlugin {
   /**=================================*/
   APP_NAME: string | null = null
   REMOTE_CALL_TIMEOUT = 60000
+  /** default value will apply from ./config/global/[default.]net.conf.json {tss.defaultTTL} */
+  TTL: number;
   requestManager = new AppRequestManager();
   /** initialize when loading */
   isBuiltInApp: boolean
