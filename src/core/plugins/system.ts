@@ -2,7 +2,7 @@ import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info";
 import TssPlugin from "./tss-plugin";
-import {AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
+import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import {soliditySha3} from '../../utils/sha3.js'
 import * as tssModule from '../../utils/tss/index.js'
 import AppContextModel from "../../common/db-models/app-context.js"
@@ -17,7 +17,7 @@ import {pub2json, timeout} from '../../utils/helpers.js'
 import {bn2hex} from "../../utils/tss/utils.js";
 import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
-import BaseAppPlugin from "./base/base-app-plugin";
+import _ from 'lodash'
 
 const log = logger("muon:core:plugins:system");
 
@@ -313,49 +313,61 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async undeployApp(appNameOrId: string) {
-    // let app = this.muon.getAppById(appNameOrId) || this.muon.getAppByName(appNameOrId);
-    // if(!app)
-    //   throw `App not found by identifier: ${appNameOrId}`
-    // const appId = app.APP_ID
-    //
-    // /** check app party */
-    // const party = this.tssPlugin.getAppParty(appId)!;
-    // if(!party)
-    //   throw `App not deployed`;
-    //
-    // /** check app context */
-    // let context = this.appManager.getAppContext(appId);
-    // const deploymentTimestamp = context.deploymentRequest.data.timestamp;
-    // const tssKeyAddress = context.publicKey?.address || null
-    //
-    // let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
-    // const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: [...deployers, ...party.partners]})
-    // log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
-    // await Promise.all(partnersToCall.map(node => {
-    //   if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-    //     return this.__undeployApp({appId, deploymentTimestamp}, this.collateralPlugin.currentNodeInfo)
-    //       .catch(e => {
-    //         log.error(`error when undeploy at current node: %O`, e)
-    //         return e?.message || "unknown error occurred"
-    //       });
-    //   }
-    //   else{
-    //     return this.remoteCall(
-    //       node.peerId,
-    //       RemoteMethods.Undeploy,
-    //       {appId, deploymentTimestamp}
-    //     )
-    //       .catch(e => {
-    //         log.error(`error when undeploy at ${node.peerId}: %O`, e)
-    //         return e?.message || "unknown error occurred"
-    //       });
-    //   }
-    // }))
-    //
-    // this.broadcast({type: "undeploy", details: {
-    //     appId,
-    //     deploymentTimestamp
-    // }})
+    let app = this.muon.getAppById(appNameOrId) || this.muon.getAppByName(appNameOrId);
+    if(!app)
+      throw `App not found by identifier: ${appNameOrId}`
+    const appId = app.APP_ID
+
+    /** check app to be deployed */
+    const seeds = this.appManager.getAppSeeds(appId);
+
+    /** check app context */
+    let allContexts: AppContext[] = this.appManager.getAppAllContext(appId);
+
+    /** most recent deployment time */
+    const deploymentTimestamp = allContexts
+      .map(ctx => ctx.deploymentRequest?.data.timestamp!)
+      .sort((a, b) => b - a)[0]
+
+    let appPartners: string[] = [].concat(
+      // @ts-ignore
+      ...allContexts.map(ctx => ctx.party.partners),
+    )
+
+    let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
+
+    const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+      list: [
+        ...deployers,
+        ...appPartners
+      ]
+    })
+    log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
+    await Promise.all(partnersToCall.map(node => {
+      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
+        return this.__undeployApp({appId, deploymentTimestamp}, this.collateralPlugin.currentNodeInfo)
+          .catch(e => {
+            log.error(`error when undeploy at current node: %O`, e)
+            return e?.message || "unknown error occurred"
+          });
+      }
+      else{
+        return this.remoteCall(
+          node.peerId,
+          RemoteMethods.Undeploy,
+          {appId, deploymentTimestamp}
+        )
+          .catch(e => {
+            log.error(`error when undeploy at ${node.peerId}: %O`, e)
+            return e?.message || "unknown error occurred"
+          });
+      }
+    }))
+
+    this.broadcast({type: "undeploy", details: {
+        appId,
+        deploymentTimestamp
+    }})
   }
 
   @appApiMethod({})

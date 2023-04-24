@@ -244,6 +244,8 @@ export default class AppManager extends CallablePlugin {
       for(const context of contexts) {
         const {appId, seed} = context
         log(`pid[${process.pid}] app[${appId}] context deleting...`)
+        this.appSeeds[appId] = this.appSeeds[appId].filter(s => s !== seed);
+
         if (!this.appContexts[seed]) {
           // log.error(`pid[${process.pid}] AppContextModel deleted but app data not found ${appId}`)
           return
