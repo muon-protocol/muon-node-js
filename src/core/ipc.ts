@@ -1,4 +1,4 @@
-import {AppRequest, IpcCallOptions, MuonNodeInfo} from "../common/types";
+import {AppContext, AppRequest, IpcCallOptions, MuonNodeInfo} from "../common/types";
 import { QueueProducer, MessagePublisher } from '../common/message-bus/index.js'
 import { BROADCAST_CHANNEL } from './plugins/broadcast.js'
 import { IPC_CHANNEL } from './plugins/core-ipc-plugin.js'
@@ -8,7 +8,7 @@ import {IpcMethods, CoreIpcMethod} from "./plugins/core-ipc-handlers.js";
 const callQueue = new QueueProducer(IPC_CHANNEL)
 const broadcastQueue = new QueueProducer(BROADCAST_CHANNEL)
 
-const GLOBAL_EVENT_CHANNEL = 'core-global-events'
+export const GLOBAL_EVENT_CHANNEL = 'core-global-events'
 const coreGlobalEvents = new MessagePublisher(GLOBAL_EVENT_CHANNEL)
 
 export type CoreGlobalEvent = {
@@ -25,23 +25,23 @@ export type CoreGlobalEvent = {
  * @param options.pid - define cluster PID to running ipc method
  * @returns {Promise<Object>}
  */
-function call(method: CoreIpcMethod, params: any, options: IpcCallOptions={}) {
+export function call(method: CoreIpcMethod, params: any, options: IpcCallOptions={}) {
   return callQueue.send({method, params}, options);
 }
 
-function broadcast(data: any, options: IpcCallOptions={}) {
+export function broadcast(data: any, options: IpcCallOptions={}) {
   return broadcastQueue.send(data, options)
 }
 
-function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
+export function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
   coreGlobalEvents.send(event, options)
 }
 
-async function forwardRemoteCall(data: any, callerInfo: MuonNodeInfo, options: IpcCallOptions) {
+export async function forwardRemoteCall(data: any, callerInfo: MuonNodeInfo, options: IpcCallOptions) {
   return await call(IpcMethods.ForwardRemoteCall, {data, callerInfo}, options);
 }
 
-async function getAppId(appName: string): Promise<string> {
+export async function getAppId(appName: string): Promise<string> {
   return await call(IpcMethods.GetAppId, {appName})
 }
 
@@ -49,15 +49,23 @@ async function getAppId(appName: string): Promise<string> {
  * Return local app context
  * @param appName
  */
-async function getAppContext(appName) {
-  return await call(IpcMethods.GetAppContext, appName)
+export async function getAppContext(appName: string, seed: string) {
+  return await call(IpcMethods.GetAppContext, {appName, seed})
+}
+
+/**
+ * Return local app context
+ * @param appName
+ */
+export async function getAppOldestContext(appName: string) {
+  return await call(IpcMethods.GetAppOldestContext, {appName})
 }
 
 /**
  * Return minimum time the app needs to confirm the request
  * @param appName
  */
-async function getAppTimeout(appName) {
+export async function getAppTimeout(appName) {
   return await call(IpcMethods.GetAppTimeout, appName)
 }
 
@@ -65,43 +73,26 @@ async function getAppTimeout(appName) {
  * If app context not found locally, it's need to query muon network to find it.
  * @param appName
  */
-async function queryAppContext(appName) {
-  return await call(IpcMethods.QueryAppContext, appName)
+export async function queryAppAllContext(appName): Promise<AppContext[]> {
+  return await call(IpcMethods.QueryAppAllContext, appName)
 }
 
-async function isDeploymentExcerpt(appName, method) {
+export async function isDeploymentExcerpt(appName, method) {
   return await call(IpcMethods.IsDeploymentExcerpt, {appName, method})
 }
 
-async function shieldConfirmedRequest(request) {
+export async function shieldConfirmedRequest(request) {
   return await call(IpcMethods.ShieldConfirmedRequest, request);
 }
 
-async function ensureAppTssKeyExist(appId) {
-  return await call(IpcMethods.EnsureAppTssKeyExist, appId);
+export async function ensureAppTssKeyExist(appId: string, seed: string) {
+  return await call(IpcMethods.EnsureAppTssKeyExist, {appId, seed});
 }
 
-async function findNAvailablePartners(appId: string, searchList: string[], count: number) {
-  return await call(IpcMethods.FindNAvailablePartners, {appId, searchList, count})
+export async function findNAvailablePartners(appId: string, seed: string, searchList: string[], count: number) {
+  return await call(IpcMethods.FindNAvailablePartners, {appId, seed, searchList, count})
 }
 
-async function verifyRequestSignature(request: AppRequest) {
+export async function verifyRequestSignature(request: AppRequest) {
   return call(IpcMethods.VerifyRequestSignature, request);
-}
-
-export {
-  call,
-  broadcast,
-  fireEvent,
-  forwardRemoteCall,
-  getAppId,
-  getAppContext,
-  getAppTimeout,
-  queryAppContext,
-  isDeploymentExcerpt,
-  shieldConfirmedRequest,
-  findNAvailablePartners,
-  ensureAppTssKeyExist,
-  verifyRequestSignature,
-  GLOBAL_EVENT_CHANNEL,
 }

@@ -11,7 +11,7 @@ import * as crypto from '../../utils/crypto.js'
 import {logger} from '@libp2p/logger'
 import Ajv from "ajv"
 import {mixGetPost} from "../middlewares.js";
-import {MuonNodeInfo} from "../../common/types";
+import {AppContext, MuonNodeInfo} from "../../common/types";
 import {GatewayCallParams} from "../types";
 
 const log = logger('muon:gateway:api')
@@ -98,11 +98,18 @@ async function callProperNode(requestData: GatewayCallParams) {
     return await requestQueue.send(requestData)
   }
 
-  let context = await CoreIpc.getAppContext(requestData.app);
+  let context: any = await CoreIpc.getAppOldestContext(requestData.app);
   if (!context) {
     log("context not found. query the network for context.")
     try {
-      context = await CoreIpc.queryAppContext(requestData.app)
+      const allContexts: any[] = await CoreIpc.queryAppAllContext(requestData.app)
+      // if(allContexts.length > 0) {}
+      /** find oldest context */
+      context = allContexts.reduce((oldest: AppContext, ctx: AppContext): AppContext => {
+        if(!oldest)
+          return ctx;
+        return ((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (oldest.deploymentRequest?.data.timestamp ?? Infinity)) ? ctx : oldest;
+      }, null);
     }catch (e) {
       log('query app context failed %o', e)
       throw e;

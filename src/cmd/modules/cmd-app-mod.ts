@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {muonCall, waitToRequestBeAnnounced} from '../utils.js'
 import {getConfigs} from "./cmd-conf-mod.js";
+import {AppDeploymentStatus} from "../../common/types";
 
 function expectConfirmed(response) {
   try {
@@ -51,7 +52,7 @@ async function deployApp(argv, configs) {
       appName: app,
     }
   })
-  const appStatus = statusResult?.result?.status
+  const appStatus: AppDeploymentStatus = statusResult?.result?.status
   const appId = statusResult?.result?.appId
   if (!appStatus) {
     console.log(statusResult);
@@ -62,6 +63,7 @@ async function deployApp(argv, configs) {
 
   if(appStatus === "DEPLOYED")
     throw `App already deployed`;
+  let deploymentSeed: string;
 
   if(appStatus === 'NEW') {
     console.log(`random seed generating ...`)
@@ -76,6 +78,7 @@ async function deployApp(argv, configs) {
     console.log(`random seed generated`, {randomSeed: randomSeedResponse.result.signatures[0].signature})
 
     console.log('deploying ...')
+    deploymentSeed = randomSeedResponse.result.signatures[0].signature
     const deployResponse = await muonCall(configs.url, {
       app: 'deployment',
       method: `deploy`,
@@ -83,7 +86,7 @@ async function deployApp(argv, configs) {
         appId,
         reqId: randomSeedResponse.result.reqId,
         nonce: randomSeedResponse.result.data.init.nonceAddress,
-        seed: randomSeedResponse.result.signatures[0].signature
+        seed: deploymentSeed
       }
     })
     expectConfirmed(deployResponse)
@@ -92,6 +95,13 @@ async function deployApp(argv, configs) {
     console.log(`deployment confirmation waiting ...`);
     await waitToRequestBeAnnounced(configs.url, deployResponse.result, {checkSecondaryParty: true});
   }
+  else if(appStatus === "TSS_GROUP_SELECTED") {
+    let context = statusResult?.result.contexts.find(ctx => ctx.status === "TSS_GROUP_SELECTED")
+    deploymentSeed = context.deploymentSeed
+  }
+  else {
+    throw `Unknown App status ${appStatus}`
+  }
 
   console.log('generating app tss key ...')
   const tssResponse = await muonCall(configs.url, {
@@ -99,6 +109,7 @@ async function deployApp(argv, configs) {
     method: "tss-key-gen",
     params: {
       appId,
+      seed: deploymentSeed,
     }
   })
   expectConfirmed(tssResponse)

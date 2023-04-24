@@ -5,8 +5,8 @@ import TssPlugin from "./tss-plugin";
 import {AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import {soliditySha3} from '../../utils/sha3.js'
 import * as tssModule from '../../utils/tss/index.js'
-import AppContext from "../../common/db-models/AppContext.js"
-import AppTssConfig from "../../common/db-models/AppTssConfig.js"
+import AppContextModel from "../../common/db-models/app-context.js"
+import AppTssConfigModel from "../../common/db-models/app-tss-config.js"
 import * as NetworkIpc from '../../network/ipc.js'
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import AppManager from "./app-manager.js";
@@ -104,11 +104,8 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod()
-  getNetworkInfo() {
-    return {
-      tssThreshold: this.collateralPlugin.networkInfo?.tssThreshold!,
-      maxGroupSize: this.collateralPlugin.networkInfo?.maxGroupSize!,
-    }
+  getNetworkConfigs() {
+    return this.muon.configs.net;
   }
 
   @appApiMethod({})
@@ -134,26 +131,32 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  getAppDeploymentInfo(appId: string): AppDeploymentInfo {
-    return this.appManager.getAppDeploymentInfo(appId);
+  getAppDeploymentInfo(appId: string, seed: string): AppDeploymentInfo {
+    return this.appManager.getAppDeploymentInfo(appId, seed)
   }
 
   @appApiMethod({})
-  async genAppTss(appId) {
-    const context = this.appManager.getAppContext(appId);
+  getAppLastDeploymentInfo(appId: string): AppDeploymentInfo {
+    const context = this.appManager.getAppLastContext(appId)
+    return this.appManager.getAppDeploymentInfo(appId, context?.seed);
+  }
+
+  @appApiMethod({})
+  async generateAppTss(appId, seed) {
+    const context = this.appManager.getAppContext(appId, seed);
     if(!context)
       throw `App deployment info not found.`
 
     const generatorInfo = this.collateralPlugin.getNodeInfo(context.party.partners[0])!
     if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
-      return await this.__generateAppTss({appId}, null);
+      return await this.__generateAppTss({appId, seed}, this.collateralPlugin.currentNodeInfo);
     }
     else {
       // TODO: if partner is not online
       return await this.remoteCall(
         generatorInfo.peerId,
         RemoteMethods.GenerateAppTss,
-        {appId},
+        {appId, seed},
         {timeout: 65e3}
       )
     }
@@ -161,7 +164,7 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async getAppTss(appId) {
-    const context = await AppContext.findOne({appId}).exec();
+    const context = await AppContextModel.findOne({appId}).exec();
     if(!context)
       throw `App deployment info not found.`
     const id = this.getAppTssKeyId(appId, context.seed)
@@ -170,8 +173,8 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async findAndGetAppPublicKey(appId, keyId): Promise<JsonPublicKey> {
-    const context = this.appManager.getAppContext(appId)
+  async findAndGetAppPublicKey(appId: string, seed: string, keyId: string): Promise<JsonPublicKey> {
+    const context = this.appManager.getAppContext(appId, seed)
     if(!context)
       throw `App deployment info not found.`
     const appPartners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
@@ -180,7 +183,7 @@ class System extends CallablePlugin {
 
     let responses = await Promise.all(appPartners.map(node => {
       if(node.id === this.collateralPlugin.currentNodeInfo?.id) {
-        return this.__getAppPublicKey({appId, keyId}, this.collateralPlugin.currentNodeInfo)
+        return this.__getAppPublicKey({appId, seed, keyId}, this.collateralPlugin.currentNodeInfo)
           .catch(e => {
             log.error(e.message)
             return 'error'
@@ -190,7 +193,7 @@ class System extends CallablePlugin {
         return this.remoteCall(
           node.peerId,
           RemoteMethods.GetAppPublicKey,
-          {appId, keyId}
+          {appId, seed, keyId}
         )
           .catch(e => {
             log.error(e.message)
@@ -198,6 +201,12 @@ class System extends CallablePlugin {
           })
       }
     }))
+
+    console.log({
+      appId,
+      seed,
+      responses
+    })
 
     let counts: MapOf<number> = {}, max:string|null=null;
     for(const str of responses) {
@@ -230,11 +239,8 @@ class System extends CallablePlugin {
   async writeAppContextIntoDb(request, result) {
     let {appId, seed} = request.data.params
     const partners = result.selectedNodes
-    const version = 0;
-    const deployTime = request.confirmedAt * 1000
 
     await this.appManager.saveAppContext({
-      version, // TODO: version definition
       appId,
       appName: this.muon.getAppNameById(appId),
       isBuiltIn: this.appManager.appIsBuiltIn(appId),
@@ -244,15 +250,16 @@ class System extends CallablePlugin {
         max: result.maxGroupSize,
         partners
       },
-      deploymentRequest: request,
-      deployTime
+      rotationEnabled: result.rotationEnabled,
+      ttl: result.ttl,
+      deploymentRequest: request
     })
 
     return true
   }
 
   @appApiMethod({})
-  async storeAppContext(request: AppRequest, result) {
+  async appDeploymentConfirmed(request: AppRequest, result) {
     /** store app context */
     const context = await this.writeAppContextIntoDb(request, result);
 
@@ -262,95 +269,98 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async appKeyGenConfirmed(request) {
-    const {data: {params: {appId}, init: {id: keyId}}} = request;
+    const {
+      data: {
+        params: {appId},
+        init: {id: keyId},
+        result: {rotationEnabled, ttl, expiration, seed, publicKey},
+      }
+    } = request;
+    console.log({rotationEnabled, ttl, expiration, seed, publicKey})
 
     /** check context exist */
-    const context = await AppContext.findOne({appId}).exec();
+    const context = await AppContextModel.findOne({appId}).exec();
     if(!context) {
       throw `App deployment info not found to process tss KeyGen confirmation.`
     }
 
     const currentNode = this.collateralPlugin.currentNodeInfo!;
     if(context.party.partners.includes(currentNode.id)) {
-      /** check key not created before */
-      if(context.publicKey?.encoded) {
-        throw `App context already has key`
-      }
+      // TODO: check context has key or not ?
 
       /** store tss key */
       let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
       await this.appManager.saveAppTssConfig({
-        version: context.version,
         appId: appId,
-        context: context._id,
+        seed,
+        keyGenRequest: request,
         publicKey: pub2json(key.publicKey!),
         keyShare: bn2hex(key.share!),
+        expiration,
       })
     }
     else {
       await this.appManager.saveAppTssConfig({
-        version: context.version,
         appId: appId,
-        context: context._id,
-        publicKey: request.data.init.publicKey
+        seed,
+        keyGenRequest: request,
+        publicKey: request.data.init.publicKey,
+        expiration,
       })
     }
   }
 
   @appApiMethod({})
-  async undeployApp(appNameOrId) {
-    let app = this.muon.getAppById(appNameOrId) || this.muon.getAppByName(appNameOrId);
-    if(!app)
-      throw `App not found by identifier: ${appNameOrId}`
-    const appId = app.APP_ID
-
-    /** check app party */
-    const party = this.tssPlugin.getAppParty(appId)!;
-    if(!party)
-      throw `App not deployed`;
-
-    /** check app context */
-    let context = this.appManager.getAppContext(appId);
-    const deploymentTimestamp = context.deploymentRequest.data.timestamp;
-    const tssKeyAddress = context.publicKey?.address || null
-
-    let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
-    const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: [...deployers, ...party.partners]})
-    log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
-    await Promise.all(partnersToCall.map(node => {
-      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__undeployApp({appId, deploymentTimestamp}, this.collateralPlugin.currentNodeInfo)
-          .catch(e => {
-            log.error(`error when undeploy at current node: %O`, e)
-            return e?.message || "unknown error occurred"
-          });
-      }
-      else{
-        return this.remoteCall(
-          node.peerId,
-          RemoteMethods.Undeploy,
-          {appId, deploymentTimestamp}
-        )
-          .catch(e => {
-            log.error(`error when undeploy at ${node.peerId}: %O`, e)
-            return e?.message || "unknown error occurred"
-          });
-      }
-    }))
-
-    this.broadcast({type: "undeploy", details: {
-        appId,
-        deploymentTimestamp
-    }})
+  async undeployApp(appNameOrId: string) {
+    // let app = this.muon.getAppById(appNameOrId) || this.muon.getAppByName(appNameOrId);
+    // if(!app)
+    //   throw `App not found by identifier: ${appNameOrId}`
+    // const appId = app.APP_ID
+    //
+    // /** check app party */
+    // const party = this.tssPlugin.getAppParty(appId)!;
+    // if(!party)
+    //   throw `App not deployed`;
+    //
+    // /** check app context */
+    // let context = this.appManager.getAppContext(appId);
+    // const deploymentTimestamp = context.deploymentRequest.data.timestamp;
+    // const tssKeyAddress = context.publicKey?.address || null
+    //
+    // let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
+    // const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: [...deployers, ...party.partners]})
+    // log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
+    // await Promise.all(partnersToCall.map(node => {
+    //   if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
+    //     return this.__undeployApp({appId, deploymentTimestamp}, this.collateralPlugin.currentNodeInfo)
+    //       .catch(e => {
+    //         log.error(`error when undeploy at current node: %O`, e)
+    //         return e?.message || "unknown error occurred"
+    //       });
+    //   }
+    //   else{
+    //     return this.remoteCall(
+    //       node.peerId,
+    //       RemoteMethods.Undeploy,
+    //       {appId, deploymentTimestamp}
+    //     )
+    //       .catch(e => {
+    //         log.error(`error when undeploy at ${node.peerId}: %O`, e)
+    //         return e?.message || "unknown error occurred"
+    //       });
+    //   }
+    // }))
+    //
+    // this.broadcast({type: "undeploy", details: {
+    //     appId,
+    //     deploymentTimestamp
+    // }})
   }
 
   @appApiMethod({})
-  async getAppContext(appId) {
-    let contexts = await AppContext.find({
-      appId
-    });
-    return contexts[0]
+  async getAppContext(appId, seed) {
+    return this.appManager.getAppContext(appId, seed)
   }
 
   @appApiMethod({})
@@ -391,10 +401,12 @@ class System extends CallablePlugin {
    */
 
   @remoteMethod(RemoteMethods.GenerateAppTss)
-  async __generateAppTss({appId}, callerInfo) {
+  async __generateAppTss({appId, seed}, callerInfo) {
     // console.log(`System.__generateAppTss`, {appId});
+    if(!callerInfo.isDeployer)
+      throw `Only deployers can call System.__generateAppTss`;
 
-    const context = await AppContext.findOne({appId}).exec();
+    const context = this.appManager.getAppContext(appId, seed);
     if(!context)
       throw `App deployment info not found.`
 
@@ -403,14 +415,14 @@ class System extends CallablePlugin {
       throw `App context already has key`
     }
 
-    const partyId = this.tssPlugin.getAppPartyId(context.appId, context.version)
+    const partyId = this.tssPlugin.getAppPartyId(context)
 
     await this.tssPlugin.createParty({
       id: partyId,
       t: context.party.t,
       partners: context.party.partners,//.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
-    const party = this.tssPlugin.getAppParty(appId);
+    const party = this.tssPlugin.getAppParty(appId, seed);
     if(!party)
       throw `Party not created`
 
@@ -426,44 +438,50 @@ class System extends CallablePlugin {
   @remoteMethod(RemoteMethods.Undeploy)
   async __undeployApp(data: {appId, deploymentTimestamp}, callerInfo) {
     if(!callerInfo.isDeployer)
-      throw `Only deployer can call this method`
+      throw `Only deployer can call this method`;
     let {appId, deploymentTimestamp} = data;
 
     log(`deleting app from persistent db %s`, appId);
     /** get list of old contexts */
-    const allContexts = await AppContext.find({appId})
+    const allContexts = await AppContextModel.find({appId})
     const deleteContextList: any[] = []
-    const deleteKeyList: any[] = [];
 
     for(let context of allContexts) {
       /** select context to be deleted */
       if(context.deploymentRequest.data.timestamp <= deploymentTimestamp) {
         deleteContextList.push(context)
-        /** add context key into delete list */
-        if(context.publicKey?.encoded)
-          deleteKeyList.push(context.publicKey?.encoded)
       }
     }
-    await AppContext.deleteMany({
-      "deploymentRequest.reqId": {$in: deleteContextList.map(c => c.deploymentRequest.reqId)}
+    const seedsToDelete = deleteContextList.map(c => c.seed)
+    await AppContextModel.deleteMany({
+      $or: [
+        /** for backward compatibility. old keys may not have this field. */
+        {seed: { "$exists" : false }},
+        {seed: {$in: seedsToDelete}},
+      ]
     });
 
-    await AppTssConfig.deleteMany({
+    await AppTssConfigModel.deleteMany({
       appId,
-      "publicKey.encoded": {$in: deleteKeyList},
+      $or: [
+        /** for backward compatibility. old keys may not have this field. */
+        {seed: { "$exists" : false }},
+        {seed: {$in: seedsToDelete}},
+      ]
     });
     log(`deleting app from memory of all cluster %s`, appId)
-    CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, contexts: deleteContextList}})
+    CoreIpc.fireEvent({type: 'app-context:delete', data: {contexts: deleteContextList}})
   }
 
   @remoteMethod(RemoteMethods.GetAppPublicKey)
-  async __getAppPublicKey(data: {appId: string, keyId: string}, callerInfo) {
-    const {appId, keyId} = data;
+  async __getAppPublicKey(data: {appId: string, seed: string, keyId}, callerInfo) {
+    const {appId, seed, keyId} = data;
 
-    const context = this.appManager.getAppContext(appId)
+    const context = this.appManager.getAppContext(appId, seed)
     if(!context)
       throw `App deployment info not found.`
     let key = await this.tssPlugin.getSharedKey(keyId)
+    // let key = await this.tssPlugin.getAppTssKey(appId, seed)
     if(!key)
       throw `App tss key not found.`
 

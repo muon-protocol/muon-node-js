@@ -48,18 +48,27 @@ export type MuonNodeInfo = {
     isDeployer: boolean
 }
 
-export type AppDeploymentStatus = "NEW" | "TSS_GROUP_SELECTED" | "DEPLOYED";
+/**
+ * Apps deployment statuses
+ *
+ * NEW: app not deployed.
+ * TSS_GROUP_SELECTED: App deployed but TSS key not generated.
+ * DEPLOYED: App deployed and TSS key generated.
+ * PENDING: App deployed and tss key generated but it is about to expire.
+ * EXPIRED: App deployment expired and tss key is no longer valid.
+ */
+export type AppDeploymentStatus = "NEW" | "TSS_GROUP_SELECTED" | "DEPLOYED" | "PENDING" | "EXPIRED";
 
 export type AppDeploymentInfo = {
     appId: string,
+    /** app deployment seed */
+    seed: string|null,
     /** Is app deployed? */
     deployed: boolean,
     /** deployment status*/
     status: AppDeploymentStatus,
     /** reqId of confirmed deployment request signed by global tss group */
     reqId?: string,
-    /** context version */
-    version?: number,
     /** hash of context */
     contextHash?: string,
 };
@@ -93,6 +102,7 @@ export type AppRequest = {
     app: string,
     appId: string,
     method: string,
+    deploymentSeed: string,
     gwAddress: string,
     data: {
         uid: string,
@@ -134,4 +144,30 @@ export type AppRequest = {
     startedAt: number,
     confirmedAt: number,
     signatures: MuonSignature[]
+}
+
+export type AppContext = {
+    appId: string,
+    appName: string,
+    seed: string,
+    isBuiltIn?: boolean,
+    party: {
+        t: number,
+        max: number,
+        partners: string[]
+    },
+    rotationEnabled?: boolean,
+    ttl?: number,
+    deploymentRequest?: AppRequest,
+    keyGenRequest?: AppRequest,
+    publicKey?: JsonPublicKey
+}
+
+export type AppTssConfig = {
+    appId: string,
+    seed: string,
+    keyGenRequest: AppRequest,
+    publicKey: JsonPublicKey,
+    keyShare?: string,
+    expiration?: number,
 }

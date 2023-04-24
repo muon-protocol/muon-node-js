@@ -104,7 +104,7 @@ export default class GatewayInterface extends BasePlugin{
     catch (e) {
       if(typeof e === 'string')
         e = {message: e};
-      log.error('gateway-interface error %O')
+      log.error('gateway-interface error %o', e)
 
       let {message, data: errorData, ...otherProps} = e;
       throw {

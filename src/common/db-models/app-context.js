@@ -16,16 +16,23 @@ const TssPublicKeyInfo = mongoose.Schema({
 }, {_id: false})
 
 const modelSchema = mongoose.Schema({
-  version: {type: Number},
   appId: {type: String, required: true},
   appName: {type: String, required: true},
   seed: {type: String, required: true},
   isBuiltIn: {type: Boolean, default: false},
   party: {type: TssPartyInfo},
+  /**
+   Is TSS key periodic rotation enabled?
+   If enabled, TSS key will expire and needs to be reshared periodically.
+   */
+  rotationEnabled: {type: Boolean, default: true},
+  /**
+   Amount of time that a Context is valid after creation (in seconds)
+   */
+  ttl: {type: Number},
   deploymentRequest: {type: Object, required: true},
+  keyGenRequest: {type: Object},
   publicKey: {type: TssPublicKeyInfo},
-  deployTime: {type: Date, required: true},
-  reShareTime: {type: Date},
 }, {timestamps: true});
 
 modelSchema.pre('save', function (next) {
@@ -40,7 +47,6 @@ modelSchema.pre('save', function (next) {
 modelSchema.virtual('hash').get(function () {
   return soliditySha3([
     {t: 'uint256', v: this.appId},
-    // {t: 'uint64', v: this.version},
     {t: 'uint256', v: this.seed},
   ])
 });
@@ -48,12 +54,16 @@ modelSchema.virtual('hash').get(function () {
 // modelSchema.index({ owner: 1, version: 1, appId: 1}, { unique: true });
 
 export function hash(context) {
-  return soliditySha3([
-    {t: "uint32", v: context.version},
+  const items = [
+    {t: "uint256", v: context.seed},
     {t: "uint256", v: context.appId},
     {t: "uint32", v: context.party.t},
     ... context.party.partners.map(v => ({t: 'uint64', v}))
-  ])
+  ]
+  console.log(">>>>>>>>>",{items})
+  const hash = soliditySha3(items)
+  console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", {hash})
+  return hash
 }
 
 export default mongoose.model(MODEL_APP_CONTEXT, modelSchema);

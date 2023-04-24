@@ -1,7 +1,8 @@
 {
   "tss": {
     "threshold": 7,
-    "max": 20
+    "max": 20,
+    "pendingPeriod": 3600
   },
   "nodeManager": {
     "network": "bsctest",

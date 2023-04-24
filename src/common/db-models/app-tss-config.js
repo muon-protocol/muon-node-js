@@ -10,11 +10,12 @@ const TssPublicKeyInfo = mongoose.Schema({
 },{_id: false})
 
 const modelSchema = mongoose.Schema({
-  version: {type: Number},
   appId: {type: String, required: true},
-  context: {type: mongoose.Schema.Types.ObjectId, ref: MODEL_APP_CONTEXT},
+  seed: {type: String, required: true},
+  keyGenRequest: {type: Object, required: true},
   publicKey: {type: TssPublicKeyInfo, required: true},
-  keyShare: {type: String, required: true},
+  keyShare: {type: String},
+  expiration: {type: Number},
 }, {timestamps: true});
 
 modelSchema.pre('save', function (next) {
@@ -22,7 +23,7 @@ modelSchema.pre('save', function (next) {
     throw `AppTssConfig save only allowed from NetworkAppManager`
 
   const {keyShare} = this
-  if(!isAesEncrypted(keyShare))
+  if(!!keyShare && !isAesEncrypted(keyShare))
     this.keyShare = aesEncrypt(keyShare, process.env.SIGN_WALLET_PRIVATE_KEY);
 
   next();

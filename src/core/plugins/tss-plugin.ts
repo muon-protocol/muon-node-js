@@ -86,7 +86,11 @@ class TssPlugin extends CallablePlugin {
   parties:{[index: string]: TssParty} = {}
   tssKey: DistributedKey | null = null;
   tssParty: TssParty | null = null;
-  appTss:{[index: string]: DistributedKey} = {}
+  /**
+   map appId and seed to App TSS key
+   example: appTss[appId][seed] = DistributedKey
+   */
+  appTss:{[index: string]: {[index: string]: DistributedKey}} = {}
 
   async onStart() {
     super.onStart();
@@ -294,7 +298,7 @@ class TssPlugin extends CallablePlugin {
         while (!this.isReady) {
           log("waiting for tss, timeout(5000)");
           await timeout(5000);
-          const {isReady, readyPartners} = await this.queryTssIsReady('1')
+          const {isReady, readyPartners} = await this.queryTssIsReady('1', '1')
 
           if(isReady){
             log(`global tss is ready.`);
@@ -316,85 +320,89 @@ class TssPlugin extends CallablePlugin {
   /**
    * Query from the network to check that Tss is ready or not
    */
-  private async queryTssIsReady(appId: string): Promise<{isReady: boolean, readyPartners?: MuonNodeInfo[]}> {
-    const appParty:TssParty|undefined = this.getAppParty(appId);
-    if(!appParty)
+  private async queryTssIsReady(appId: string, seed: string): Promise<{isReady: boolean, readyPartners?: MuonNodeInfo[]}> {
+    const context = this.appManager.getAppContext(appId, seed);
+    if(!context)
       return {isReady: false}
-    let onlinePartners: MuonNodeInfo[] = this.collateralPlugin
+    let partners: MuonNodeInfo[] = this.collateralPlugin
       .filterNodes({
-        list: appParty.partners,
+        list: context.party.partners,
         excludeSelf: true
       });
 
-    let statuses = await Promise.all(onlinePartners.map(p => {
+    let statuses = await Promise.all(partners.map(p => {
       return this.remoteCall(
         p.peerId,
         RemoteMethods.checkTssStatus,
-        {appId}
+        {appId, seed}
       ).catch(e => 'error')
     }))
 
     let isReadyArr = statuses.map(s => s.isReady)
-    const readyPartners = onlinePartners.filter((p, i) => isReadyArr[i])
+    const readyPartners = partners.filter((p, i) => isReadyArr[i])
 
     return {
-      isReady: readyPartners.length >= appParty.t,
+      isReady: readyPartners.length >= context.party.t,
       readyPartners,
     };
   }
 
-  appHasTssKey(appId: string): boolean {
-    return !!this.appTss[appId]
-  }
-
-  getAppTssKey(appId: string): DistributedKey | null {
+  getAppTssKey(appId: string, seed: string): DistributedKey | null {
     if(appId == '1') {
       return this.tssKey;
     }
     if(!this.appTss[appId]) {
-      const context = this.appManager.getAppContext(appId)
-      if(!context)
-        return null
-      const _key = this.appManager.getAppTssKey(appId)
-      if(!_key)
-        return null
-      let party = this.getAppParty(appId)
-      const key = DistributedKey.load(party, {
-        id: `app-${appId}`,
-        share: _key.keyShare,
-        publicKey: _key.publicKey.encoded,
-        partners: context.party.partners
-      })
-      this.appTss[appId] = key;
+      this.appTss[appId] = {}
+      if(!this.appTss[appId][seed]) {
+        const context = this.appManager.getAppContext(appId, seed)
+        if (!context)
+          return null
+        const _key = this.appManager.getAppTssKey(appId, seed)
+        if (!_key)
+          return null
+        let party = this.getAppParty(appId, seed)
+        const key = DistributedKey.load(party, {
+          id: `app-${appId}`,
+          share: _key.keyShare,
+          publicKey: _key.publicKey.encoded,
+          partners: context.party.partners
+        })
+        this.appTss[appId][seed] = key;
+      }
     }
-    return this.appTss[appId];
+    return this.appTss[appId][seed];
   }
 
-  private async onAppContextDelete(data: {appId: string, contexts: any[]}) {
-    let {appId, contexts} = data
+  private async onAppContextDelete(data: {contexts: any[]}) {
+    let {contexts} = data
     for(const context of contexts) {
-      const partyId = this.getAppPartyId(appId, context.version);
+      const {appId, seed} = context
+      const partyId = this.getAppPartyId(context);
       delete this.parties[partyId]
+      if(!!this.appTss[appId])
+        delete this.appTss[appId][seed]
     }
-    delete this.appTss[appId]
   }
 
   async onAppTssDelete(appId, appTssConfig) {
     log(`AppTss delete from db %s %o`, appId, appTssConfig)
-    delete this.appTss[appId]
+    const {seed} = appTssConfig
+    if(!!this.appTss[appId])
+      delete this.appTss[appId][seed]
   }
 
-  getAppPartyId(appId, version) {
-    return `app-${appId}-${version}-party`;
+  getAppPartyId(context) {
+    const {seed} = context
+    return `app-${seed}-party`;
   }
 
-  getAppParty(appId: string) {
-    const _context = this.appManager.getAppContext(appId)
+  getAppParty(appId: string, seed: string) {
+    const _context = this.appManager.getAppContext(appId, seed)
     /** is app deployed? return if not. */
     if(!_context)
       return undefined;
 
-    const partyId = this.getAppPartyId(appId, _context.version);
+    const partyId = this.getAppPartyId(_context);
 
     if(!this.parties[partyId]) {
       this.loadParty({
@@ -421,7 +429,7 @@ class TssPlugin extends CallablePlugin {
       return this.remoteCall(
         peerId,
         RemoteMethods.checkTssStatus,
-        {appId: '1'}
+        {appId: '1', seed: '1'}
       ).catch(e => 'error')
     }))
 
@@ -431,19 +439,6 @@ class TssPlugin extends CallablePlugin {
 
 
     return numReadyNodes < this.collateralPlugin.TssThreshold;
-  }
-
-  async tryToFindOthers(numTry=1) {
-    for (let i = 0 ; i < numTry ; i++) {
-      this.broadcast({
-        method: BroadcastMessage.WhoIsThere,
-        params: {
-          peerId: process.env.PEER_ID,
-        }
-      })
-      log("tryToFindOthers timeout(5000)")
-      await timeout(5000)
-    }
   }
 
   saveTssConfig(party, key) {
@@ -494,7 +489,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   async tryToRecoverGlobalTssKey(partners: MuonNodeInfo[]){
-    let tssKey = await this.recoverAppTssKey('1', partners);
+    let tssKey = await this.recoverAppTssKey('1', '1', partners);
 
     this.tssKey = tssKey
     this.isReady = true;
@@ -504,8 +499,8 @@ class TssPlugin extends CallablePlugin {
     return true;
   }
 
-  private async recoverAppTssKey(appId: string, partners: MuonNodeInfo[]): Promise<DistributedKey> {
-    let appParty = this.getAppParty(appId);
+  private async recoverAppTssKey(appId: string, seed: string, partners: MuonNodeInfo[]): Promise<DistributedKey> {
+    let appParty = this.getAppParty(appId, seed);
 
     if(!appParty)
       throw `AppParty does not exist for recovering the key.`
@@ -534,7 +529,7 @@ class TssPlugin extends CallablePlugin {
             // online partners
             p.peerId,
             RemoteMethods.recoverMyKey,
-            {nonce: nonce.id, appId},
+            {nonce: nonce.id, appId, seed},
             {taskId: nonce.id}
           ).catch(e => {
             console.log(`TssPlugin.tryToRecoverGlobalTssKey ERROR:`, e)
@@ -574,24 +569,32 @@ class TssPlugin extends CallablePlugin {
   }
 
   private appTssKeyRecoveryCheckTime = 0;
-  async checkAppTssKeyRecovery(appId: string) {
+  async checkAppTssKeyRecovery(appId: string, seed: string) {
     if(this.appTssKeyRecoveryCheckTime + 5*60e3 < Date.now()){
       log(`checking to recover app[${appId}] tss key`)
       this.appTssKeyRecoveryCheckTime = Date.now();
       try {
-        const {isReady, readyPartners} = await this.queryTssIsReady(appId);
+        let context = this.appManager.getAppContext(appId, seed);
+        if(!context.keyGenRequest) {
+          const contexts = await this.appManager.queryAndLoadAppContext(appId);
+          context = contexts.find(ctx => ctx.seed === seed)
+          if(!contexts || !context.keyGenRequest)
+            throw `app tss is not ready yet`
+        }
+        const {isReady, readyPartners} = await this.queryTssIsReady(appId, seed);
         if(isReady) {
           log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
-          let key = await this.recoverAppTssKey(appId, readyPartners!);
+          let key = await this.recoverAppTssKey(appId, seed, readyPartners!);
           if(key) {
             log(`app tss key recovered`)
-            const context = this.appManager.getAppContext(appId);
+            const netConfigs = this.muon.configs.net
             await this.appManager.saveAppTssConfig({
-              version: context.version,
               appId: appId,
-              context: context._id,
+              seed,
+              keyGenRequest: context.keyGenRequest,
               publicKey: pub2json(key.publicKey!),
               keyShare: bn2hex(key.share!),
+              expiration: context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
             })
           }
         }
@@ -847,19 +850,19 @@ class TssPlugin extends CallablePlugin {
    * @private
    */
   @remoteMethod(RemoteMethods.recoverMyKey)
-  async __recoverMyKey(data: {nonce: string, appId: string}, callerInfo: MuonNodeInfo) {
+  async __recoverMyKey(data: {nonce: string, appId: string, seed: string}, callerInfo: MuonNodeInfo) {
     // TODO: can malicious user use a nonce twice?
-    const {nonce: nonceId, appId} = data;
+    const {nonce: nonceId, appId, seed} = data;
 
     // console.log('TssPlugin.__recoverMyKey', data, callerInfo.wallet)
-    const appParty = this.getAppParty(appId)
+    const appParty = this.getAppParty(appId, seed)
     if(!appParty)
       throw `Missing app Party.`
 
     if(!appParty.partners.includes(callerInfo.id))
       throw `Only party partners can can request to recover the key`
 
-    const appTssKey = this.getAppTssKey(appId)
+    const appTssKey = this.getAppTssKey(appId, seed)
 
     // if(!this.tssKey || !this.tssParty){
     if(!appTssKey){
@@ -935,10 +938,10 @@ class TssPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.checkTssStatus)
-  async __checkTssStatus(data:{appId: string}, callerInfo): Promise<{isReady: boolean, address?: string}> {
-    const {appId} = data
+  async __checkTssStatus(data:{appId: string, seed: string}, callerInfo): Promise<{isReady: boolean, address?: string}> {
+    const {appId, seed} = data
 
-    const appTssKey = this.getAppTssKey(appId)
+    const appTssKey = this.getAppTssKey(appId, seed)
 
     if(!appTssKey) {
       return {isReady: false}
