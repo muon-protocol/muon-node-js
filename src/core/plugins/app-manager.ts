@@ -784,7 +784,7 @@ export default class AppManager extends CallablePlugin {
           )
         )
           .then(({status}) => {
-            if (status !== 'DEPLOYED')
+            if (status !== 'DEPLOYED' && status !== "PENDING")
               return null;
             return Date.now() - startTime
           })

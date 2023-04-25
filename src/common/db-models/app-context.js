@@ -60,10 +60,7 @@ export function hash(context) {
     {t: "uint32", v: context.party.t},
     ... context.party.partners.map(v => ({t: 'uint64', v}))
   ]
-  console.log(">>>>>>>>>",{items})
-  const hash = soliditySha3(items)
-  console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", {hash})
-  return hash
+  return soliditySha3(items)
 }
 
 export default mongoose.model(MODEL_APP_CONTEXT, modelSchema);
