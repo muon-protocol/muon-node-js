@@ -127,6 +127,13 @@ class Network extends Events {
       },
       peerDiscovery,
       peerRouters,
+      denyInboundEncryptedConnection: (peerId, maConn) => {
+        let peerIdStr = peerId.toString();
+        // TODO: return true if peerId is not a valid network node
+        // The process should be simple. Otherwise it will be pron to 
+        // DDOS attack.
+        return false;
+      }
       // config: {
       //   peerDiscovery: {
       //     // [Libp2pBundle.Bootstrap.tag]: {
