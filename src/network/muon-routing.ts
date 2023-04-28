@@ -1,237 +1,280 @@
-import { logger } from '@libp2p/logger'
-import axios, {AxiosInstance} from 'axios'
-import { CID } from 'multiformats/cid'
-import PQueue from 'p-queue'
-import defer from 'p-defer'
-import errCode from 'err-code'
-import anySignal from 'any-signal'
-import type { PeerId } from '@libp2p/interface-peer-id'
-import type { AbortOptions } from 'ipfs-core-types/src/utils'
-import type { PeerRouting } from '@libp2p/interface-peer-routing'
-import type { PeerInfo } from '@libp2p/interface-peer-info'
-import type { Startable } from '@libp2p/interfaces/startable'
-import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
-import { multiaddr } from '@multiformats/multiaddr'
-import {parseBool, timeout} from "../utils/helpers.js";
-import * as crypto from '../utils/crypto.js'
-import {muonSha3} from "../utils/sha3.js";
-import {isPrivate} from "./utils.js";
+import { logger } from "@libp2p/logger";
+import axios, { AxiosInstance } from "axios";
+import { CID } from "multiformats/cid";
+import PQueue from "p-queue";
+import defer from "p-defer";
+import errCode from "err-code";
+import anySignal from "any-signal";
+import type { PeerId } from "@libp2p/interface-peer-id";
+import type { AbortOptions } from "ipfs-core-types/src/utils";
+import type { PeerRouting } from "@libp2p/interface-peer-routing";
+import type { PeerInfo } from "@libp2p/interface-peer-info";
+import type { Startable } from "@libp2p/interfaces/startable";
+import { peerIdFromBytes, peerIdFromString } from "@libp2p/peer-id";
+import { multiaddr } from "@multiformats/multiaddr";
+import { parseBool, timeout } from "../utils/helpers.js";
+import * as crypto from "../utils/crypto.js";
+import { muonSha3 } from "../utils/sha3.js";
+import { isPrivate } from "./utils.js";
 
-const log = logger('muon:network:routing')
+const log = logger("muon:network:routing");
 
-const FINDPEER_DEFAULT_TIMEOUT = 30e3 // 30 second default
-const CONCURRENT_HTTP_REQUESTS = 4
+const FINDPEER_DEFAULT_TIMEOUT = 30e3; // 30 second default
+const CONCURRENT_HTTP_REQUESTS = 10;
 
 export type MuonRoutingInit = {
   /**
    List of routing service providers
    */
-  baseUrls: string[],
+  baseUrls: string[];
+
   /**
    Discovery interval.
+   
    Default: 300000 (every 5 minutes)
    */
-  discoveryInterval?: number,
+  discoveryInterval?: number;
+
   /**
-   IF true, we will not send our discovery data
+   This flag prevents the node from publishing
+   its peerInfo if it is true
+
    Default: false
    */
-  listenOnly?: boolean
-}
+  listenOnly?: boolean;
+};
 
 export interface HTTPClientExtraOptions {
-  headers?: Record<string, string>
-  searchParams?: URLSearchParams
+  headers?: Record<string, string>;
+  searchParams?: URLSearchParams;
 }
 
 export class MuonRouting implements PeerRouting, Startable {
-
   private readonly init;
   private readonly components;
   private readonly apis: AxiosInstance[];
-  private readonly httpQueue: PQueue
-  private started: boolean
-  private abortController: AbortController
-  private discoveryInterval: number
-  private listenOnly: boolean
+  private readonly httpQueue: PQueue;
+  private started: boolean;
+  private abortController: AbortController;
+  private discoveryInterval: number;
+  private listenOnly: boolean;
 
   constructor(init: MuonRoutingInit, components: any) {
-    log('initializing ...')
+    log("Initalizing MuonRouting ...");
     this.init = init;
-    this.discoveryInterval = init?.discoveryInterval ?? 5*60000;
-    this.listenOnly = init?.listenOnly ?? false
+    this.discoveryInterval = init?.discoveryInterval ?? 5 * 60000;
+    this.listenOnly = init?.listenOnly ?? false;
     this.components = components;
 
-    this.started = false
-    this.abortController = new AbortController()
+    this.started = false;
+    this.abortController = new AbortController();
 
-    // limit concurrency to avoid request flood in web browser
+    // limit concurrency to avoid request flood
     // https://github.com/libp2p/js-libp2p-delegated-content-routing/issues/12
     this.httpQueue = new PQueue({
-      concurrency: CONCURRENT_HTTP_REQUESTS
-    })
+      concurrency: CONCURRENT_HTTP_REQUESTS,
+    });
 
-    this.apis = init.baseUrls.map(baseUrl => axios.create({
-      baseURL: baseUrl,
-      responseType: 'json',
-      timeout: 5000,
-    }))
+    this.apis = init.baseUrls.map((baseUrl) =>
+      axios.create({
+        baseURL: baseUrl,
+        responseType: "json",
+        timeout: 5000,
+      })
+    );
 
-    log(`enabled via %o`, init.baseUrls)
+    log(`MuonRouting endpoints: `, init.baseUrls);
   }
 
-  isStarted () {
-    return this.started
+  isStarted() {
+    return this.started;
   }
 
-  start () {
-    this.started = true
+  start() {
+    this.started = true;
   }
 
-  stop () {
-    this.httpQueue.clear()
-    this.abortController.abort()
-    this.abortController = new AbortController()
-    this.started = false
+  stop() {
+    this.httpQueue.clear();
+    this.abortController.abort();
+    this.abortController = new AbortController();
+    this.started = false;
   }
 
   afterStart() {
-    // Don't broadcast if we are only listening
+    // Don't publish on listenOnly mode
     if (this.listenOnly) {
-      return
+      return;
     }
 
-    // Broadcast immediately, and then run on interval
-    this._discovery()
+    // Broadcasts immediately once, and then repeats
+    // on a regular interval
+    this._discovery();
   }
 
   /**
-   * Attempts to find the given peer
+   * Selects a delegate node at random and attempts to find
+   * the peerInfo associated with the given PeerId
    */
-  async findPeer(id: PeerId, options: HTTPClientExtraOptions & AbortOptions = {}) {
-    log('findPeer starts: %p', id)
+  async findPeer(
+    id: PeerId,
+    options: HTTPClientExtraOptions & AbortOptions = {}
+  ) {
+    log("findPeer starts: %p", id);
 
     options.timeout = options.timeout ?? FINDPEER_DEFAULT_TIMEOUT;
-    options.signal = anySignal([this.abortController.signal].concat((options.signal != null) ? [options.signal] : []));
+    options.signal = anySignal(
+      [this.abortController.signal].concat(
+        options.signal != null ? [options.signal] : []
+      )
+    );
 
-    const onStart = defer()
-    const onFinish = defer()
+    const onStart = defer();
+    const onFinish = defer();
 
     void this.httpQueue.add(async () => {
-      onStart.resolve()
-      return await onFinish.promise
-    })
+      onStart.resolve();
+      return await onFinish.promise;
+    });
 
     try {
-      await onStart.promise
+      await onStart.promise;
 
-      const randomIndex = Math.floor(Math.random() * this.apis.length)
-      log(`requesting to delegate server %o ...`, this.apis[randomIndex].defaults.baseURL)
-      let result = await this.apis[randomIndex].post(
-        '/findpeer',
-        {id: `${id}`},
-        {
-          timeout: options.timeout
-        })
-        .then(({data}) => data)
+      const randomIndex = Math.floor(Math.random() * this.apis.length);
+      log(
+        `Calling delegate server %o ...`,
+        this.apis[randomIndex].defaults.baseURL
+      );
+      let result = await this.apis[randomIndex]
+        .post(
+          "/findpeer",
+          { id: `${id}` },
+          {
+            timeout: options.timeout,
+          }
+        )
+        .then(({ data }) => data);
 
-      log(`delegate server response %O`, result)
-      let info = result?.peerInfo
-      if(!info)
-        throw `peer not found`
+      log(`Delegate server response %O`, result);
+      let info = result?.peerInfo;
+      if (!info) {
+        throw `Peer ${id} not found`;
+      }
 
       const peerInfo: PeerInfo = {
         id: peerIdFromString(info.id),
-        multiaddrs: info.multiaddrs.map(ma => multiaddr(ma)),
-        protocols: []
-      }
-      return peerInfo
+        multiaddrs: info.multiaddrs.map((ma) => multiaddr(ma)),
+        protocols: [],
+      };
+      return peerInfo;
     } catch (err: any) {
-      log.error('findPeer errored: %o', err)
+      log.error("findPeer errored: %o", err);
 
-      throw err
+      throw err;
     } finally {
-      onFinish.resolve()
-      log('findPeer finished: %p', id)
+      onFinish.resolve();
+      log("findPeer finished: %p", id);
     }
 
-    throw errCode(new Error('Not found'), 'ERR_NOT_FOUND')
+    throw errCode(new Error("Not found"), "ERR_NOT_FOUND");
   }
 
   /**
-   * Attempt to find the closest peers on the network to the given key
+   * Attempts to find the closest peers on the network
+   * to the given key.
    */
-  async * getClosestPeers (key: Uint8Array, options: HTTPClientExtraOptions & AbortOptions = {}) {
-      yield * []
+  async *getClosestPeers(
+    key: Uint8Array,
+    options: HTTPClientExtraOptions & AbortOptions = {}
+  ) {
+    yield* [];
   }
 
-  async _discovery () {
-    log(`discovery started.`)
-    const peerId = this.components.peerId
+  /**
+   * Sends the current node's peer info to all
+   * of the delegate nodes.
+
+   * It sends once and then schedules to repeat
+   * at regular intervals
+   */
+  async _discovery() {
+    log(`MuonRouting discovery strated.`);
+    const peerId = this.components.peerId;
 
     if (peerId.publicKey == null) {
-      throw new Error('PeerId was missing public key')
+      throw new Error("PeerId is not valid.");
     }
 
     while (true) {
-      log(`sending discovery data ...`);
+      log(`Sending discovery data ...`);
       try {
-        let multiAddrs = this.components.addressManager.getAddresses()
-        let allowPrivateIps = parseBool(process.env.DISABLE_ANNOUNCE_FILTER!)
-        let gatewayPort: number = parseInt(process.env.GATEWAY_PORT!)
+        let multiAddrs = this.components.addressManager.getAddresses();
+
+        // By default the nodes do not publish their private/local ips
+        // Local Muon simulators can enable publishing local ips.
+        let allowPrivateIps = parseBool(process.env.DISABLE_ANNOUNCE_FILTER!);
+
+        let gatewayPort: number = parseInt(process.env.GATEWAY_PORT!);
         if (!allowPrivateIps)
-          multiAddrs = multiAddrs.filter(ma => !isPrivate(ma))
+          multiAddrs = multiAddrs.filter((ma) => !isPrivate(ma));
 
-        if(multiAddrs.length > 0) {
-          const peerInfo = {
-            id: `${peerId}`,
-            multiaddrs: multiAddrs.map(ma => ma.toString()),
-            protocols: []
-          }
-
-          const timestamp = Date.now();
-          const hash = muonSha3(
-            {type: "uint16", value: gatewayPort},
-            {type: "uint64", value: timestamp},
-            {type: "string", value: peerInfo.id},
-            ...(
-              peerInfo.multiaddrs.map(value => ({type: "string", value}))
-            )
-          )
-
-          const discoveryData = {
-            gatewayPort,
-            peerInfo,
-            timestamp,
-            signature: crypto.sign(hash)
-          }
-
-          // @ts-ignore
-          const responses = await Promise.any(this.apis.map(api => {
-            return api.post('/discovery', discoveryData, {timeout: 5000})
-              .then(({data}) => data)
-              .catch(e => {
-                const errorMessage = e?.response?.data?.error || e?.message || "unknown error"
-                log.error(`sent to ${api.defaults.baseURL} error: %O`, errorMessage)
-                return e.message || 'unknown error'
-              })
-          }))
-
-          log('discovery sent done. result: %o', responses)
+        if (multiAddrs.length == 0) {
+          throw `MuonRouting multiaddrs is empty.`;
         }
-        else {
-          log(`node ip list is empty.`)
-        }
-      }catch (e) {
-        log.error(`discovery error: %O`, e)
+
+        const peerInfo = {
+          id: `${peerId}`,
+          multiaddrs: multiAddrs.map((ma) => ma.toString()),
+          protocols: [],
+        };
+
+        const timestamp = Date.now();
+        const hash = muonSha3(
+          { type: "uint16", value: gatewayPort },
+          { type: "uint64", value: timestamp },
+          { type: "string", value: peerInfo.id },
+          ...peerInfo.multiaddrs.map((value) => ({ type: "string", value }))
+        );
+
+        const discoveryData = {
+          gatewayPort,
+          peerInfo,
+          timestamp,
+          signature: crypto.sign(hash),
+        };
+
+        // @ts-ignore
+        const responses = await Promise.any(
+          this.apis.map((api) => {
+            return api
+              .post("/discovery", discoveryData, { timeout: 5000 })
+              .then(({ data }) => data)
+              .catch((e) => {
+                const errorMessage =
+                  e?.response?.data?.error || e?.message || "unknown error";
+                log.error(
+                  `Error on calling delegate node: ${api.defaults.baseURL} %O`,
+                  errorMessage
+                );
+                return e.message || "unknown error";
+              });
+          })
+        );
+
+        log("Discovery responses: %o", responses);
+      } catch (e) {
+        log.error(`Discovery error: %O`, e);
       }
 
-      const deltaTime = (Math.random() - 0.5) * this.discoveryInterval
-      await timeout(this.discoveryInterval + deltaTime)
+      // randomize time of the next call
+      const deltaTime = (Math.random() - 0.5) * this.discoveryInterval;
+      await timeout(this.discoveryInterval + deltaTime);
     }
   }
 }
 
-export function muonRouting(init: MuonRoutingInit): (components?: any) => PeerRouting {
+export function muonRouting(
+  init: MuonRoutingInit
+): (components?: any) => PeerRouting {
   return (components?: any) => new MuonRouting(init, components);
 }
