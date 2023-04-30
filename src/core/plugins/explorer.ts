@@ -106,20 +106,20 @@ class Explorer extends CallablePlugin {
     }
   }
 
-  @gatewayMethod("node-peer")
-  async __nodePeerInfo(data: GetNodeInfo) {
-    let {id} = data?.params || {}
-    if(!id) {
-      throw `id is undefined`
-    }
-    let nodeInfo = this.collateralPlugin.getNodeInfo(id)!
-    if(!nodeInfo) {
-      throw `unknown peer`
-    }
-    return {
-      peerInfo: await NetworkIpc.getPeerInfoLight(nodeInfo.peerId)
-    }
-  }
+  // @gatewayMethod("node-peer")
+  // async __nodePeerInfo(data: GetNodeInfo) {
+  //   let {id} = data?.params || {}
+  //   if(!id) {
+  //     throw `id is undefined`
+  //   }
+  //   let nodeInfo = this.collateralPlugin.getNodeInfo(id)!
+  //   if(!nodeInfo) {
+  //     throw `unknown peer`
+  //   }
+  //   return {
+  //     peerInfo: await NetworkIpc.getPeerInfoLight(nodeInfo.peerId)
+  //   }
+  // }
 
   /**
    * For all nodes in announce list of app, this function confirms that app.onConfirm has been called on this node.

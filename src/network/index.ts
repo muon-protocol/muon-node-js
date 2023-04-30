@@ -17,7 +17,7 @@ import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
 import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
-import NetworkDHTPlugin from "./plugins/network-dht.js";
+// import NetworkDHTPlugin from "./plugins/network-dht.js";
 import {logger} from "@libp2p/logger"
 import {findMyIp, parseBool} from "../utils/helpers.js";
 import {muonRouting} from "./muon-routing.js";
@@ -341,7 +341,7 @@ async function start() {
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],
       "ipc-handler": [IpcHandlerPlugin, {}],
-      dht: [NetworkDHTPlugin, {}]
+      // dht: [NetworkDHTPlugin, {}]
     },
     net,
     // TODO: pass it into the tss-plugin

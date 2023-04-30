@@ -7,7 +7,7 @@ import {QueueProducer, MessagePublisher, MessageBusConfigs} from "../../common/m
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
-import NetworkDHTPlugin from "./network-dht.js";
+// import NetworkDHTPlugin from "./network-dht.js";
 import NetworkContentPlugin from "./content-plugin.js";
 import {parseBool, timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
@@ -59,14 +59,14 @@ export const IpcMethods = {
   GetCollateralInfo: "get-collateral-info",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
   BroadcastToChannel: "broadcast-to-channel",
-  PutDHT: "put-dht",
-  GetDHT: "get-dht",
+  // PutDHT: "put-dht",
+  // GetDHT: "get-dht",
   ReportClusterStatus: "report-cluster-status",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
   RemoteCall: "remote-call",
   GetPeerInfo: "GPI",
-  GetPeerInfoLight: "GPILight",
+  //GetPeerInfoLight: "GPILight",
   GetClosestPeer: "GCPeer",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
@@ -103,9 +103,9 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.network.getPlugin('broadcast')
   }
 
-  get DHTPlugin(): NetworkDHTPlugin {
-    return this.network.getPlugin('dht')
-  }
+  // get DHTPlugin(): NetworkDHTPlugin {
+  //   return this.network.getPlugin('dht')
+  // }
 
   get collateralPlugin(): CollateralInfoPlugin {
     return this.network.getPlugin('collateral');
@@ -146,16 +146,13 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.GetCollateralInfo)
   async __onIpcGetCollateralInfo(data = {}, callerInfo) {
-    // console.log(`NetworkIpcHandler.__onIpcGetCollateralInfo`, data, callerInfo);
     const collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
-    // await collateralPlugin.waitToLoad();
 
     let {networkInfo} = collateralPlugin;
     return {
       contract: this.network.configs.net.nodeManager,
       networkInfo,
       nodesList: await collateralPlugin.getNodesList(),
-      // nodesList: (await collateralPlugin.getNodesList()).map(item => _.omit(item, ['peer']))
     }
   }
 
@@ -166,21 +163,20 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.BroadcastToChannel)
   async __broadcastToChannel(data: {channel: string, message: any}) {
-    // console.log("NetworkIpcHandler.__broadcastToChannel", data);
     this.broadcastToChannel(data.channel, data.message);
     return "Ok"
   }
 
-  @ipcMethod(IpcMethods.PutDHT)
-  async __putDHT(data: {key: string, value: any}) {
-    let ret = await this.DHTPlugin.put(data.key, data.value);
-    return ret
-  }
+  // @ipcMethod(IpcMethods.PutDHT)
+  // async __putDHT(data: {key: string, value: any}) {
+  //   let ret = await this.DHTPlugin.put(data.key, data.value);
+  //   return ret
+  // }
 
-  @ipcMethod(IpcMethods.GetDHT)
-  async __getDHT(data: {key: string}) {
-    return await this.DHTPlugin.get(data.key);
-  }
+  // @ipcMethod(IpcMethods.GetDHT)
+  // async __getDHT(data: {key: string}) {
+  //   return await this.DHTPlugin.get(data.key);
+  // }
 
   assignTaskToProcess(taskId: string, pid: number) {
     tasksCache.set(taskId, pid);
@@ -194,7 +190,6 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.ReportClusterStatus)
   async __reportClusterStatus(data: { pid: number, status: "start" | "exit" }) {
-    // console.log("NetworkIpcHandler.__reportClusterStatus", {data,callerInfo});
     let {pid, status} = data
     switch (status) {
       case "start":
@@ -204,7 +199,6 @@ class NetworkIpcHandler extends CallablePlugin {
         delete this.clustersPids[pid];
         break;
     }
-    // console.log("NetworkIpcHandler.__reportClusterStatus", this.clustersPids);
   }
 
   clusterPermissions = {};
@@ -252,7 +246,6 @@ class NetworkIpcHandler extends CallablePlugin {
    */
   @ipcMethod(IpcMethods.RemoteCall)
   async __onRemoteCallRequest(data) {
-    // console.log(`NetworkIpcHandler.__onRemoteCallRequest`, data);
     const peer = await this.findPeer(data?.peer);
     if(!peer) {
       log(`trying to call offline node %o`, data)
@@ -273,17 +266,17 @@ class NetworkIpcHandler extends CallablePlugin {
     }
   }
 
-  @ipcMethod(IpcMethods.GetPeerInfoLight)
-  async __getPeerInfoLight(data): Promise<JsonPeerInfo|null> {
-    let peerInfo:PeerInfo|null = await this.findPeerLocal(data?.peerId);
-    if(!peerInfo)
-      return null
-    return {
-      id: peerInfo.id.toString(),
-      multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
-      protocols: peerInfo.protocols
-    }
-  }
+  // @ipcMethod(IpcMethods.GetPeerInfoLight)
+  // async __getPeerInfoLight(data): Promise<JsonPeerInfo|null> {
+  //   let peerInfo:PeerInfo|null = await this.findPeerLocal(data?.peerId);
+  //   if(!peerInfo)
+  //     return null
+  //   return {
+  //     id: peerInfo.id.toString(),
+  //     multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
+  //     protocols: peerInfo.protocols
+  //   }
+  // }
 
   @ipcMethod(IpcMethods.GetClosestPeer)
   async __getClosestPeer(data:{peerId?: string, cid?: string}): Promise<JsonPeerInfo[]> {
@@ -327,7 +320,6 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
   async __forwardGateWayRequest(data: {id: string, requestData: Object, appTimeout: number}) {
-    // console.log(`NetworkIpcHandler.__forwardGateWayRequest`, data);
     const nodeInfo = this.collateralPlugin.getNodeInfo(data.id)
     if(!nodeInfo) {
       throw `Unknown id ${data.id}`
@@ -458,7 +450,6 @@ class NetworkIpcHandler extends CallablePlugin {
    */
   @remoteMethod(RemoteMethods.ExecIpcRemoteCall)
   async __onIpcRemoteCallExec(data, callerInfo) {
-    // console.log(`NetworkIpcHandler.__onIpcRemoteCallExec`, data);
     let taskId, options: IpcCallOptions = {};
     if (data?.options?.taskId) {
       taskId = data?.options.taskId;
@@ -475,7 +466,6 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.ExecGateWayRequest)
   async __execGatewayRequest(data, callerInfo) {
-    // console.log(`NetworkIpcHandler.__execGatewayRequest`, data)
     return await requestQueue.send(data)
   }
 
