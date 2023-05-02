@@ -19,9 +19,9 @@ import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
 import BaseAppPlugin from "./base/base-app-plugin";
 
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const Rand = require('rand-seed').default;
+// import { createRequire } from "module";
+// const require = createRequire(import.meta.url);
+// const Rand = require('rand-seed').default;
 
 const log = logger("muon:core:plugins:system");
 
@@ -126,21 +126,21 @@ class System extends CallablePlugin {
     let availableNodesMap = {};
     availableNodes.map(node => availableNodesMap[node.id]=node);
 
-    const rand = new Rand(seed);
+    // const rand = new Rand(seed);
     let selectedNodes: MuonNodeInfo[] = [], rndNode:number = 0;
 
     let maxId = parseInt(availableNodes[availableNodes.length-1].id);
-    while(selectedNodes.length != n){
-      rndNode = Math.floor(rand.next() * maxId);
+    // while(selectedNodes.length != n){
+    //   rndNode = Math.floor(rand.next() * maxId);
       
-      // Only active ids will be added to selectedNodes.
-      // The process works fine even if the available 
-      // nodes change during deployment, as long as the
-      // updated nodes are not in the selected list.
-      if(availableNodesMap[rndNode]){
-        selectedNodes.push(availableNodesMap[rndNode]);
-      }
-    }
+    //   // Only active ids will be added to selectedNodes.
+    //   // The process works fine even if the available 
+    //   // nodes change during deployment, as long as the
+    //   // updated nodes are not in the selected list.
+    //   if(availableNodesMap[rndNode]){
+    //     selectedNodes.push(availableNodesMap[rndNode]);
+    //   }
+    // }
     return selectedNodes;
   }
 
