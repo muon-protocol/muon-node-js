@@ -126,7 +126,7 @@ class System extends CallablePlugin {
     let availableNodesMap = {};
     availableNodes.map(node => availableNodesMap[node.id]=node);
 
-    const rand = new Rand(seed);
+    // const rand = new Rand(seed);
     let selectedNodes: MuonNodeInfo[] = [], rndNode:number = 0;
 
     let maxId = parseInt(availableNodes[availableNodes.length-1].id);
