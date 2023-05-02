@@ -18,7 +18,10 @@ import {bn2hex} from "../../utils/tss/utils.js";
 import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
 import BaseAppPlugin from "./base/base-app-plugin";
-import Rand, {PRNG} from 'rand-seed';
+
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const Rand = require('rand-seed').default;
 
 const log = logger("muon:core:plugins:system");
 
