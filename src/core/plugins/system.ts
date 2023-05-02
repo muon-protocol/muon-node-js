@@ -18,6 +18,7 @@ import {bn2hex} from "../../utils/tss/utils.js";
 import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
 import BaseAppPlugin from "./base/base-app-plugin";
+import Rand, {PRNG} from 'rand-seed';
 
 const log = logger("muon:core:plugins:system");
 
@@ -114,19 +115,30 @@ class System extends CallablePlugin {
   @appApiMethod({})
   async selectRandomNodes(seed, t, n): Promise<MuonNodeInfo[]> {
     const availableNodes = await this.getAvailableNodes();
-    if(availableNodes.length < t)
-      throw `No enough nodes to select n subset`
-    let nodesHash = availableNodes.map(node => {
-      return {
-        node,
-        hash: soliditySha3([
-          {t: 'uint256', v: seed},
-          {t: 'uint64', v: node.id},
-        ])!
+    if(availableNodes.length < t){
+      throw "Insufficient nodes for subnet creation";
+    }
+
+    // nodeId => true
+    let availableNodesMap = {};
+    availableNodes.map(node => availableNodesMap[node.id]=node);
+
+    const rand = new Rand(seed);
+    let selectedNodes: MuonNodeInfo[] = [], rndNode:number = 0;
+
+    let maxId = parseInt(availableNodes[availableNodes.length-1].id);
+    while(selectedNodes.length != n){
+      rndNode = Math.floor(rand.next() * maxId);
+      
+      // Only active ids will be added to selectedNodes.
+      // The process works fine even if the available 
+      // nodes change during deployment, as long as the
+      // updated nodes are not in the selected list.
+      if(availableNodesMap[rndNode]){
+        selectedNodes.push(availableNodesMap[rndNode]);
       }
-    });
-    nodesHash.sort((a, b) => (a.hash > b.hash ? 1 : -1))
-    return nodesHash.slice(0, n).map(i => i.node)
+    }
+    return selectedNodes;
   }
 
   getAppTssKeyId(appId, seed) {

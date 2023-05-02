@@ -61,6 +61,7 @@
     "node-cache": "^5.1.2",
     "nodemon": "^2.0.7",
     "pure-ipfs-only-hash": "^4.0.2",
+    "rand-seed": "^1.0.2",
     "redis": "^3.1.2",
     "tronweb": "^4.1.0",
     "tslib": "^2.5.0",
