@@ -51,6 +51,8 @@ check_for_update (){
     git checkout package.json package-lock.json
     update_check=`git pull --recurse-submodules origin "$current_branch" 2>&1`
     
+    log `$_NODE  $_NPM install 2>&1`
+
     if [ $? -ne 0 ]; then
         log "Git pull error.";
         log "$update_check;"
@@ -67,7 +69,7 @@ check_for_update (){
         log "Installing dependencies: $_NODE  $_NPM install";
         log `pwd`;
         log `$_NODE  $_NPM install 2>&1`
-        #log `$_NPM install 2>&1`
+        log `$_NPM install 2>&1`
         log "Restarting PM2: $_NODE $_PM2 restart $_PM2_APP";
         log `$_NODE $_PM2 restart "$_PM2_APP"`
         log "============ updating done =============";
