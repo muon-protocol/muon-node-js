@@ -16,7 +16,6 @@ const owners = [
 module.exports = {
     APP_NAME: "deployment",
     REMOTE_CALL_TIMEOUT: 120e3,
-    TTL: 2*60,
     APP_ID: 1,
     owners,
 
@@ -199,13 +198,14 @@ module.exports = {
             }
             case Methods.Deploy: {
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const ttl = this.TTL ?? tssConfigs.defaultTTL;
                 const {selectedNodes} = init
                 let {
+                    appId,
                     seed: {value: seed},
                     t=tssConfigs.threshold,
                     n=tssConfigs.max
                 } = params
+                const ttl = await this.callPlugin("system", "getAppTTL", appId);
 
                 t = Math.max(t, tssConfigs.threshold);
 
@@ -221,14 +221,15 @@ module.exports = {
             }
             case Methods.TssRotate: {
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const ttl = this.TTL ?? tssConfigs.defaultTTL;
                 const {selectedNodes} = init
                 let {
+                    appId,
                     previousSeed,
                     seed: {value: seed},
                     t=tssConfigs.threshold,
                     n=tssConfigs.max
                 } = params
+                const ttl = await this.callPlugin("system", "getAppTTL", appId);
 
                 t = Math.max(t, tssConfigs.threshold);
 
@@ -255,18 +256,25 @@ module.exports = {
                     throw `app deployment info not found`
 
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const ttl = this.TTL ?? tssConfigs.defaultTTL;
+                const ttl = await this.callPlugin("system", "getAppTTL", appId);
 
                 if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
                     throw `deployed partners mismatched with key-gen partners`
                 }
 
-                const oldContext = await this.callPlugin("system", "getAppContext", appId, context.previousSeed)
                 if(!context)
                     throw `app previous deployment info not found`
 
                 /** ensure a random key already generated */
-                let publicKey = oldContext.publicKey;
+                let publicKey;
+                if(method === Methods.TssKeyGen) {
+                    publicKey = await this.callPlugin('system', "findAndGetAppPublicKey", appId, seed, init.id)
+                }
+                else {
+                    const oldContext = await this.callPlugin("system", "getAppContext", appId, context.previousSeed)
+                    publicKey = oldContext.publicKey;
+                }
+
                 if(!publicKey)
                     throw `App new tss key not found`;
 

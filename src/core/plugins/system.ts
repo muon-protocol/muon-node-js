@@ -19,6 +19,7 @@ import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
 import _ from 'lodash'
 import TssParty from "../../utils/tss/party";
+import BaseAppPlugin from "./base/base-app-plugin";
 
 const log = logger("muon:core:plugins:system");
 
@@ -473,6 +474,13 @@ class System extends CallablePlugin {
       id: key.id,
       publicKey: pub2json(key.publicKey!)
     }
+  }
+
+  @appApiMethod({})
+  getAppTTL(appId: number): number {
+    const tssConfigs = this.muon.configs.net.tss;
+    const app: BaseAppPlugin = this.muon.getAppById(appId)
+    return app.TTL ?? tssConfigs.defaultTTL;
   }
 
   /**

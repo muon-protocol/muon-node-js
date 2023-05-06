@@ -313,12 +313,25 @@ class BaseAppPlugin extends CallablePlugin {
       }
       if(this.onArrive){
         this.log(`calling onArrive ...`)
-        newRequest.data.init = await this.onArrive(clone(newRequest))
+        try {
+          newRequest.data.init = await this.onArrive(clone(newRequest))
+        }
+        catch (e) {
+          this.log.error("error calling onArrive %O", e)
+          throw e;
+        }
         this.log(`calling onArrive done successfully.`)
       }
 
       this.log(`calling onRequest ...`)
-      let result = await this.onRequest(clone(newRequest))
+      let result;
+      try {
+        result = await this.onRequest(clone(newRequest))
+      }
+      catch (e) {
+        this.log.error("error calling onRequest %O", e)
+        throw e;
+      }
       this.log(`app result: %O`, result)
       newRequest.data.result = result
 
