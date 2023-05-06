@@ -9,7 +9,7 @@ redis.on("error", function(error) {
   console.error(`muon.utils.useOneTime error`, error);
 });
 
-export async function useOneTime(group: string, item: string, usedFor: string) {
+export async function useOneTime(group: "key"|"fee", item: string, usedFor: string) {
   if(!usedFor)
     throw `useOneTime error: usedFor param most be valid string`
   let alreadyUserFor = await redisGetset(`use ${group}:${item}`, usedFor);

@@ -111,7 +111,8 @@ export type AppRequest = {
         result: any,
         signParams: TypedValue[],
         init: {
-            nonceAddress: string
+            nonceAddress: string,
+            [key: string]: any,
         },
         fee: {
             /** returned from Fee server */
@@ -139,7 +140,8 @@ export type AppRequest = {
              * )
              */
             signature: string,
-        }
+        },
+        [key: string]: any,
     }
     startedAt: number,
     confirmedAt: number,
@@ -149,6 +151,7 @@ export type AppRequest = {
 export type AppContext = {
     appId: string,
     appName: string,
+    previousSeed: string,
     seed: string,
     isBuiltIn?: boolean,
     party: {

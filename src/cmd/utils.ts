@@ -1,5 +1,6 @@
 import axios from 'axios'
 import {timeout} from "../utils/helpers.js";
+import {MapOf} from "../common/mpc/types";
 
 export function muonCall(url, request) {
   return axios.post(url, request)
@@ -8,13 +9,13 @@ export function muonCall(url, request) {
 
 export type AnnounceCheckOptions = {
   announceTimeout?: number,
-  checkSecondaryParty?: boolean,
+  checkAllGroups?: boolean,
 }
 
 export async function waitToRequestBeAnnounced(apiEndpoint: string, request: any, options?:AnnounceCheckOptions) {
   const configs = {
     announceTimeout: 3*60e3,
-    checkSecondaryParty: false,
+    checkAllGroups: false,
     ...options
   };
   let confirmed = false;
@@ -42,25 +43,22 @@ export async function waitToRequestBeAnnounced(apiEndpoint: string, request: any
       throw `invalid request`
 
     const t = check?.result?.tss?.t
-    const announced = check?.result?.announced?.primary
-    if(!t || !announced)
+    const groupsAnnounced: MapOf<boolean>[] = check?.result?.groupsAnnounced
+    if(!t || !groupsAnnounced[0])
       continue;
 
-    //console.log(check?.result?.announced)
+    let numGroupsToCheck = 1;
+    if(configs.checkAllGroups)
+      numGroupsToCheck = groupsAnnounced.length
 
-    const announcedCount = Object.values(announced).filter(n => n===true).length;
-    if(announcedCount >= t) {
-      confirmed = true;
-      if(configs.checkSecondaryParty){
-        const announced = check?.result?.announced?.secondary
-        if(!!announced && Object.keys(announced).length>0) {
-          const announcedCount = Object.values(announced).filter(n => n===true).length;
-          confirmed = announcedCount >= t || announcedCount === Object.keys(announced).length;
-        }
-      }
+    confirmed = true;
+    for(let i=0 ; i<numGroupsToCheck && confirmed ; i++) {
+      const announcedCount = Object.values(groupsAnnounced[i]).filter(n => n === true).length;
+      confirmed = announcedCount >= t;
     }
-    else
-      console.log(`${announcedCount} of ${t} are announced.`);
+
+    if(!confirmed)
+      console.log(`not announced yet.`);
   }
   console.log('request confirmed by app party')
 }

@@ -18,6 +18,7 @@ const TssPublicKeyInfo = mongoose.Schema({
 const modelSchema = mongoose.Schema({
   appId: {type: String, required: true},
   appName: {type: String, required: true},
+  previousSeed: {type: String},
   seed: {type: String, required: true},
   isBuiltIn: {type: Boolean, default: false},
   party: {type: TssPartyInfo},
@@ -38,6 +39,10 @@ const modelSchema = mongoose.Schema({
 modelSchema.pre('save', function (next) {
   /** force appId to be hex string */
   this.appId = BigInt(this.appId).toString(10);
+  if(this.deploymentRequest.method === 'tss-rotate'){
+    if(!this.previousSeed)
+      throw `Missing previousSeed on context`
+  }
   if(!this.dangerousAllowToSave)
     throw `AppContext save only allowed from NetworkAppManager`
 

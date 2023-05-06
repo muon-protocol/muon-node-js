@@ -79,7 +79,8 @@ class BaseAppPlugin extends CallablePlugin {
   onArrive: (request: any) => any;
   onRequest: (request: any) => any;
   signParams: (request: object, result: any) => any[];
-  getConfirmAnnounceList: (request: object) => Promise<string[]>;
+  /** multiple group can be returned in order to check separately in confirmation check */
+  getConfirmAnnounceGroups: (request: object) => Promise<string[][]>;
   onConfirm: (request: object, result: any, signatures: any[]) => void;
   METHOD_PARAMS_SCHEMA: object = {};
   /**=================================*/
@@ -487,8 +488,9 @@ class BaseAppPlugin extends CallablePlugin {
     let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
 
     let announceList = this.getParty(request.deploymentSeed)!.partners;
-    if(!!this.getConfirmAnnounceList) {
-      let moreAnnounceList = await this.getConfirmAnnounceList(request);
+    if(!!this.getConfirmAnnounceGroups) {
+      const announceGroups: string[][] = await this.getConfirmAnnounceGroups(request);
+      const moreAnnounceList: string[] = ([] as string[]).concat(...announceGroups)
       this.log(`custom announce list: %o`, moreAnnounceList)
       if(Array.isArray(moreAnnounceList)) {
         /** ignore if array contains non string item */

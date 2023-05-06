@@ -35,6 +35,11 @@ const RemoteMethods = {
   GetAppPartyLatency: "get-app-latency"
 }
 
+export type AppContextQueryOptions = {
+  seeds?: string[],
+  includeExpired?: boolean,
+}
+
 @remoteApp
 export default class AppManager extends CallablePlugin {
   /** map App deployment seed to context */
@@ -152,8 +157,8 @@ export default class AppManager extends CallablePlugin {
     this.appContexts['1'].publicKey = pub2json(publicKey);
   }
 
-  async saveAppContext(context: object) {
-    context = _.omit(context, ["_id"]);
+  async saveAppContext(context: AppContext) {
+    context = _.omit(context, ["_id"]) as AppContext;
     // @ts-ignore
     const oldDoc = await AppContextModel.findOne({seed: context.seed, appId: context.appId})
     if (oldDoc) {
@@ -283,11 +288,21 @@ export default class AppManager extends CallablePlugin {
     return result
   }
 
-  async queryAndLoadAppContext(appId): Promise<AppContext[]> {
+  async queryAndLoadAppContext(appId, options:AppContextQueryOptions={}): Promise<AppContext[]> {
+    // TODO: query if the seed missed, check all usage
+
+    const {
+      seeds = [],
+      includeExpired
+    } = options
+
     /** Ignore query if found local. */
     const localContexts = this.getAppAllContext(appId);
-    if(localContexts.length > 0)
-      return localContexts;
+    const localSeeds: string[] = localContexts.map(({seed}) => seed);
+    if(localContexts.length > 0) {
+      if(seeds.length > 0 && !seeds.find(seed => !localSeeds.includes(seed)))
+        return localContexts;
+    }
 
     /** query only deployer nodes */
     const deployerNodes: string[] = this.collateralPlugin
@@ -307,7 +322,7 @@ export default class AppManager extends CallablePlugin {
         return this.remoteCall(
           peerId,
           RemoteMethods.GetAppContext,
-          appId,
+          {appId, options},
           {timeout: 5000}
         )
           .then(contexts => {
@@ -511,7 +526,7 @@ export default class AppManager extends CallablePlugin {
       const nodeInfo = this.collateralPlugin.currentNodeInfo!
       return nodeInfo?.isDeployer && !!this.tssPlugin.tssKey
     } else {
-      return !!this.appTssConfigs[seed] && getTimestamp() < this.appTssConfigs[seed].expiration;
+      return !!this.appTssConfigs[seed];
     }
   }
 
@@ -731,8 +746,13 @@ export default class AppManager extends CallablePlugin {
 
   /** return App all active context list */
   @remoteMethod(RemoteMethods.GetAppContext)
-  async __getAppContext(appId, callerInfo): Promise<any[]> {
-    return this.getAppAllContext(appId)
+  async __getAppContext(data: {appId:string, options: AppContextQueryOptions}, callerInfo): Promise<any[]> {
+    const {appId, options} = data;
+    let contexts = this.getAppAllContext(appId, options.includeExpired)
+    if(options?.seeds && options.seeds.length > 0){
+      contexts = contexts.filter(ctx => options.seeds!.includes(ctx.seed))
+    }
+    return contexts;
   }
 
   @remoteMethod(RemoteMethods.GetAppTss)

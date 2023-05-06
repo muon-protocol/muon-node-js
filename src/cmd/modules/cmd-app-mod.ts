@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {muonCall, waitToRequestBeAnnounced} from '../utils.js'
 import {getConfigs} from "./cmd-conf-mod.js";
 import {AppDeploymentStatus} from "../../common/types";
+import {APP_STATUS_EXPIRED, APP_STATUS_PENDING, APP_STATUS_TSS_GROUP_SELECTED} from "../../core/constants.js";
 
 function expectConfirmed(response) {
   try {
@@ -38,6 +39,11 @@ export async function handler(argv) {
   switch (action) {
     case 'deploy': {
       await deployApp(argv, configs)
+      break;
+    }
+    case "reshare": {
+      await reshareApp(argv, configs)
+      break;
     }
   }
 }
@@ -84,20 +90,22 @@ async function deployApp(argv, configs) {
       method: `deploy`,
       params: {
         appId,
-        reqId: randomSeedResponse.result.reqId,
-        nonce: randomSeedResponse.result.data.init.nonceAddress,
-        seed: deploymentSeed
+        seed:{
+          value: deploymentSeed,
+          reqId: randomSeedResponse.result.reqId,
+          nonce: randomSeedResponse.result.data.init.nonceAddress,
+        }
       }
     })
     expectConfirmed(deployResponse)
     console.log(`deployment tx ${deployResponse.result.reqId}.`)
 
     console.log(`deployment confirmation waiting ...`);
-    await waitToRequestBeAnnounced(configs.url, deployResponse.result, {checkSecondaryParty: true});
+    await waitToRequestBeAnnounced(configs.url, deployResponse.result, {checkAllGroups: true});
   }
   else if(appStatus === "TSS_GROUP_SELECTED") {
     let context = statusResult?.result.contexts.find(ctx => ctx.status === "TSS_GROUP_SELECTED")
-    deploymentSeed = context.deploymentSeed
+    deploymentSeed = context.seed
   }
   else {
     throw `Unknown App status ${appStatus}`
@@ -118,5 +126,99 @@ async function deployApp(argv, configs) {
   console.log(`keygen confirmation waiting ...`);
   await waitToRequestBeAnnounced(configs.url, tssResponse.result);
   console.log(`tss key generating done with this generators: [${tssResponse.result.data.init.keyGenerators}].`, tssResponse.result.data.result)
+
+}
+
+async function reshareApp(argv, configs) {
+  const {app} = argv;
+  console.log('retrieving app ID ...')
+  const statusResult = await muonCall(configs.url, {
+    app: 'explorer',
+    method: "app",
+    params: {
+      appName: app,
+    }
+  })
+  const {success, result: {appId, appName, contexts=[]}} = statusResult;
+  if(!success || !appId) {
+    console.log(`Unable to get App info`)
+    return ;
+  }
+
+  /** find a pending context that has no rotated context. */
+  const contextToRotate = contexts.find(ctx1 => {
+    if(ctx1.status === APP_STATUS_PENDING || ctx1.status === APP_STATUS_EXPIRED) {
+      let rotatedContext = contexts.find(ctx2 => {
+        return !!ctx2.previousSeed && ctx2.previousSeed === ctx1.seed
+      })
+      /** ignore context that rotated */
+      return !rotatedContext;
+    }
+    else
+      return false
+  })
+  let keyGenSeed: any = null;
+  if(!!contextToRotate) {
+    console.log(`random seed generating ...`)
+    const randomSeedResponse = await muonCall(configs.url, {
+      app: 'deployment',
+      method: `random-seed`,
+      params: {
+        appId,
+        previousSeed: contextToRotate.seed,
+      }
+    })
+    expectConfirmed(randomSeedResponse)
+    console.log(`random seed generated`, {randomSeed: randomSeedResponse.result.signatures[0].signature})
+
+    console.log('selecting new party ...')
+    const reshareSeed = randomSeedResponse.result.signatures[0].signature
+    const reshareResponse = await muonCall(configs.url, {
+      app: 'deployment',
+      method: `tss-rotate`,
+      params: {
+        appId,
+        previousSeed: contextToRotate.seed,
+        seed:{
+          value: reshareSeed,
+          reqId: randomSeedResponse.result.reqId,
+          nonce: randomSeedResponse.result.data.init.nonceAddress,
+        }
+      }
+    })
+    expectConfirmed(reshareResponse)
+    console.log(`party select tx ${reshareResponse.result.reqId}.`)
+
+    console.log(`party select confirmation waiting ...`);
+    await waitToRequestBeAnnounced(configs.url, reshareResponse.result, {checkAllGroups: true});
+
+    keyGenSeed = reshareResponse.result.data.result.seed;
+  }
+  else {
+    /** If there is no PENDING context, find a context to KeyGen */
+    const groupSelectedContext = contexts.find(ctx => ctx.status === APP_STATUS_TSS_GROUP_SELECTED);
+    if(!groupSelectedContext) {
+      console.log("There is no pending context to reshare it.")
+      return;
+    }
+
+    keyGenSeed = groupSelectedContext.seed
+  }
+
+  console.log('resharing app tss key ...')
+  const tssResponse = await muonCall(configs.url, {
+    app: `deployment`,
+    method: "tss-reshare",
+    params: {
+      appId,
+      seed: keyGenSeed,
+    }
+  })
+  expectConfirmed(tssResponse)
+  console.log(`reshare tx ${tssResponse.result.reqId}.`)
+
+  console.log(`reshare confirmation waiting ...`);
+  await waitToRequestBeAnnounced(configs.url, tssResponse.result);
+  console.log(`tss key resharing done with this generators: [${tssResponse.result.data.init.keyGenerators}].`, tssResponse.result.data.result)
 
 }

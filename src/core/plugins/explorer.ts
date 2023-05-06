@@ -111,18 +111,16 @@ class Explorer extends CallablePlugin {
     if(!isValid)
       throw `request validation failed.`
 
-    const announceList: any = {primary: [], secondary: []}, hasAnnouncement = !!app.onConfirm;
+    const announceGroups: string[][] = [], hasAnnouncement = !!app.onConfirm;
     if(hasAnnouncement){
-      announceList.primary = appParty.partners
-      if(!!app.getConfirmAnnounceList) {
-        announceList.secondary = await app.getConfirmAnnounceList(request)
+      announceGroups.push(appParty.partners)
+      if(!!app.getConfirmAnnounceGroups) {
+        const moreAnnounceGroups = await app.getConfirmAnnounceGroups(request)
+        moreAnnounceGroups.forEach(group => announceGroups.push(group))
       }
     }
 
-    const listToCheck = [
-      ...announceList['primary'],
-      ...(announceList['secondary']||[]),
-    ]
+    const listToCheck = ([] as string[]).concat(...announceGroups);
 
     const partners = this.collateralPlugin.filterNodes({list: listToCheck});
     const announced: boolean[] = await Promise.all(partners.map(node => {
@@ -147,11 +145,10 @@ class Explorer extends CallablePlugin {
         n: appParty.max
       },
       hasAnnouncement,
-      announceList,
-      announced: {
-        primary: announceList.primary.reduce((obj, id) => (obj[id]=announceMap[id], obj), {}),
-        secondary: announceList.secondary.reduce((obj, id) => (obj[id]=announceMap[id], obj), {}),
-      }
+      announceGroups,
+      groupsAnnounced: announceGroups.map(group => {
+        return group.reduce((obj, id) => (obj[id]=announceMap[id], obj), {})
+      })
     }
   }
 
@@ -232,7 +229,7 @@ class Explorer extends CallablePlugin {
     if(appId === '0')
       throw `App not found`;
 
-    let contexts: AppContext[] = this.appManager.getAppAllContext(appId!)
+    let contexts: AppContext[] = this.appManager.getAppAllContext(appId!, true)
     if(contexts.length === 0)
       contexts = await this.appManager.queryAndLoadAppContext(appId!)
 
@@ -242,7 +239,8 @@ class Explorer extends CallablePlugin {
         status: statusTitle,
         isBuiltIn: context.isBuiltIn,
         deployedTime: context.deploymentRequest?.data.timestamp,
-        deploymentSeed: context.seed,
+        previousSeed: context.previousSeed,
+        seed: context.seed,
         tss: !context ? null : {
           threshold: {
             t: context.party?.t,

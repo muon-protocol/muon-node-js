@@ -5,6 +5,7 @@ const Methods = {
     RandomSeed: "random-seed",
     Deploy: "deploy",
     TssKeyGen: "tss-key-gen",
+    TssRotate: "tss-rotate",
     TssReshare: "tss-reshare"
 }
 
@@ -33,6 +34,24 @@ module.exports = {
         }
     },
 
+    /**
+     * Verify that this seed is generated for deployment
+     *
+     * @param request {AppRequest} - current request
+     * @param seed {string} - random seed value
+     * @param reqId {string} - random seed generation request ID
+     * @param nonce {string} - nonce address that used for seed generation
+     * @returns {Promise<void>} - will return successfully if seed was ok.
+     */
+    validateSeed: async function(request, seed, reqId, nonce) {
+      const randomSeedRequest = {...request, method: Methods.RandomSeed, reqId}
+      const seedResult = await this.onRequest(randomSeedRequest)
+      const seedSignParams = this.signParams(randomSeedRequest, seedResult)
+      const hash = this.hashAppSignParams(randomSeedRequest, seedSignParams)
+      if(!await this.verify(hash, seed, nonce))
+        throw `seed not verified`
+    },
+
     validateRequest: async function(request) {
         let {
             method,
@@ -47,38 +66,65 @@ module.exports = {
                 break;
             }
             case Methods.Deploy: {
-                const {appId, seed, nonce, reqId} = params
+                const {appId, seed: {value: seed, nonce, reqId}} = params
                 const context = await this.callPlugin('system', "getAppContext", appId, seed)
                 if(!!context) {
                     throw `App already deployed`;
                 }
-
-                const randomSeedRequest = {...request, method: Methods.RandomSeed, reqId}
-                const seedResult = await this.onRequest(randomSeedRequest)
-                const seedSignParams = this.signParams(randomSeedRequest, seedResult)
-                const hash = this.hashAppSignParams(randomSeedRequest, seedSignParams)
-                if(!await this.verify(hash, seed, nonce))
-                    throw `seed not verified`
+                await this.validateSeed(request, seed, reqId, nonce);
                 break;
             }
             case Methods.TssKeyGen: {
                 const {appId, seed} = params
                 if(!appId || !seed)
-                    throw `Missing params appId/seed.`
+                    throw { message: `Missing params appId/seed.`, params}
                 const {status} = this.callPlugin('system', "getAppDeploymentInfo", appId, seed)
                 if(status !== "TSS_GROUP_SELECTED")
                     throw `App context is not in key generation state. The state is currently ${status}.`
                 break;
             }
+            case Methods.TssRotate: {
+                const {appId, previousSeed, seed: {value: seed, reqId, nonce}} = params
+
+                const oldContext = await this.callPlugin('system', "getAppContext", appId, previousSeed)
+
+                if(!oldContext)
+                    throw `App context not found`
+
+                /** Most recent status of App should be PENDING (about to expire) */
+                const {status} = this.callPlugin('system', "getAppDeploymentInfo", appId, previousSeed)
+
+                if(status !== 'PENDING' && status !== 'EXPIRED')
+                    throw `Previous context status is not PENDING/EXPIRED. It is ${status}`
+
+                await this.validateSeed(request, seed, reqId, nonce);
+                break
+            }
             case Methods.TssReshare: {
                 const {appId, seed} = params
-              const context = await this.callPlugin('system', "getAppContext", appId, seed)
-              if(!context) {
-                throw `App not deployed`;
-              }
 
-              if(context.appName !== 'tss')
-                throw `Not allowed for this app`
+                /** ensure the app's context exists */
+                let newContext = await this.callPlugin('system', "getAppContext", appId, seed)
+                if(!newContext || !newContext.previousSeed)
+                    throw `The App's new deployment info not found`
+
+                /** ensure the app's previous context exists */
+                let previousContext = await this.callPlugin('system', "getAppContext", appId, newContext.previousSeed)
+                if(!previousContext)
+                  throw `The App's previous deployment info not found`
+
+                /** Most recent status of App should be PENDING (about to expire) */
+                const newInfo = this.callPlugin('system', "getAppDeploymentInfo", appId, seed)
+
+                if(!newInfo.deployed || newInfo.status !== 'TSS_GROUP_SELECTED')
+                    throw `App not rotated.`
+
+                const oldInfo = this.callPlugin('system', "getAppDeploymentInfo", appId, newContext.previousSeed)
+
+                if(oldInfo.status !== 'PENDING' && oldInfo.status !== "EXPIRED")
+                    throw `App key cannot be reshared`
+
+                break;
             }
         }
     },
@@ -89,9 +135,10 @@ module.exports = {
             data: { params }
         } = request
         switch (method) {
-            case Methods.Deploy: {
+            case Methods.Deploy:
+            case Methods.TssRotate: {
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                let {seed, t=tssConfigs.threshold, n=tssConfigs.max} = params
+                let {seed: {value: seed}, t=tssConfigs.threshold, n=tssConfigs.max} = params
                 t = Math.max(t, tssConfigs.threshold);
                 const selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
                 return {
@@ -104,7 +151,7 @@ module.exports = {
                 /** ensure app context to be exist */
                 let context = await this.callPlugin('system', "getAppContext", appId, seed)
                 if(!context)
-                    throw `app deployment info not found`
+                    throw {message: `app deployment info not found`, params}
 
                 const {id, publicKey, generators} = await this.callPlugin('system', "generateAppTss", appId, seed)
 
@@ -116,9 +163,19 @@ module.exports = {
                 }
             }
             case Methods.TssReshare: {
-                const {appId} = params
-                const reshareNonce = await this.callPlugin('system', "generateReshareNonce", appId, request.data.uid)
-                // return {reshareNonce}
+                const { appId, seed } = params
+
+                /** ensure app context to be exist */
+                let context = await this.callPlugin('system', "getAppContext", appId, seed)
+
+                const {id, publicKey, generators} = await this.callPlugin('system', "reshareAppTss", appId, seed)
+
+                return {
+                    id,
+                    publicKey,
+                    partners: context.party.partners,
+                    keyGenerators: generators
+                }
             }
         }
     },
@@ -135,17 +192,23 @@ module.exports = {
                 return status;
             }
             case Methods.RandomSeed: {
-                const {previous = "0x0", appId} = params
+                const {previousSeed = "0x0", appId} = params
                 if (!appId)
                     throw "appId is undefined"
-                return {previous, appId}
+                return {previousSeed, appId}
             }
             case Methods.Deploy: {
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
                 const ttl = this.TTL ?? tssConfigs.defaultTTL;
                 const {selectedNodes} = init
-                let {seed, t=tssConfigs.threshold, n=tssConfigs.max} = params
+                let {
+                    seed: {value: seed},
+                    t=tssConfigs.threshold,
+                    n=tssConfigs.max
+                } = params
+
                 t = Math.max(t, tssConfigs.threshold);
+
                 return {
                     rotationEnabled: true,
                     ttl,
@@ -156,7 +219,35 @@ module.exports = {
                     selectedNodes,
                 };
             }
-            case Methods.TssKeyGen: {
+            case Methods.TssRotate: {
+                const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
+                const ttl = this.TTL ?? tssConfigs.defaultTTL;
+                const {selectedNodes} = init
+                let {
+                    previousSeed,
+                    seed: {value: seed},
+                    t=tssConfigs.threshold,
+                    n=tssConfigs.max
+                } = params
+
+                t = Math.max(t, tssConfigs.threshold);
+
+                const oldContext = await this.callPlugin("system", "getAppContext", this.APP_ID, previousSeed);
+
+                return {
+                    rotationEnabled: true,
+                    ttl,
+                    timestamp: request.data.timestamp,
+                    previousSeed,
+                    seed,
+                    tssThreshold: t,
+                    maxGroupSize: n,
+                    oldNodes: oldContext.party.partners,
+                    selectedNodes,
+                };
+            }
+            case Methods.TssKeyGen:
+            case Methods.TssReshare: {
                 const {appId, seed} = params
                 /** ensure app context to be exist */
                 let context = await this.callPlugin('system', "getAppContext", appId, seed)
@@ -170,8 +261,12 @@ module.exports = {
                     throw `deployed partners mismatched with key-gen partners`
                 }
 
+                const oldContext = await this.callPlugin("system", "getAppContext", appId, context.previousSeed)
+                if(!context)
+                    throw `app previous deployment info not found`
+
                 /** ensure a random key already generated */
-                let publicKey = await this.callPlugin('system', "findAndGetAppPublicKey", appId, seed, init.id)
+                let publicKey = oldContext.publicKey;
                 if(!publicKey)
                     throw `App new tss key not found`;
 
@@ -182,10 +277,6 @@ module.exports = {
                     seed: context.seed,
                     publicKey
                 }
-            }
-
-            case Methods.TssReshare: {
-                return 'done'
             }
             default:
                 throw "Unknown method"
@@ -203,20 +294,26 @@ module.exports = {
             }
             case Methods.RandomSeed:
                 return [
-                    {type: "uint256", value: result.previous},
+                    {type: "uint256", value: result.previousSeed},
                     {type: "uint256", value: result.appId},
                 ];
-            case Methods.Deploy: {
-                const {seed} = request.data.params
+            case Methods.Deploy:
+            case Methods.TssRotate: {
+                const {
+                    previousSeed,
+                    seed: {value: seed}
+                } = request.data.params
                 return [
                     {t: 'bool', v: result.rotationEnabled},
                     {t: 'uint64', v: result.ttl},
                     {t: 'uint64', v: result.timestamp},
+                    ...(request.method === Methods.TssRotate ? [{t: 'uint256', v: previousSeed}] : []),
                     {t: 'uint256', v: seed},
                     ...result.selectedNodes.map(v => ({t: 'uint64', v}))
                 ]
             }
-            case Methods.TssKeyGen: {
+            case Methods.TssKeyGen:
+            case Methods.TssReshare: {
                 const {appId} = request.data.params
                 return [
                     {t: "bool", v: request.data.result.rotationEnabled},
@@ -226,21 +323,41 @@ module.exports = {
                     {t: 'address', v:request.data.result.publicKey.address}
                 ]
             }
-            case Methods.TssReshare: {
-                return [{t: 'string', v: 'done'}]
-            }
             default:
                 throw "Unknown method"
         }
     },
 
-    getConfirmAnnounceList: async function(request) {
-        switch (request.method) {
+    getConfirmAnnounceGroups: async function(request) {
+        let {
+            method,
+            data: { params, init }
+        } = request
+
+        switch (method) {
             case Methods.Deploy: {
-                return request.data.init.selectedNodes
+                return [
+                  init.selectedNodes,
+                ]
+            }
+            case Methods.TssRotate: {
+                return [
+                  init.selectedNodes,
+                ]
             }
             case Methods.TssKeyGen: {
-                return request.data.init.keyGenerators
+                return [
+                  init.keyGenerators
+                ]
+            }
+            case Methods.TssReshare: {
+                const {appId, seed} = params
+                const newContext = await this.callPlugin("system", "getAppContext", appId, seed);
+                const previousContext = await this.callPlugin("system", "getAppContext", appId, newContext.previousSeed)
+                return [
+                  newContext.party.partners,
+                  previousContext.party.partners,
+                ]
             }
             default:
                 return []
@@ -253,7 +370,8 @@ module.exports = {
             data: { params, init }
         } = request
         switch (method) {
-            case Methods.Deploy: {
+            case Methods.Deploy:
+            case Methods.TssRotate: {
                 let success = await this.callPlugin(
                     "system",
                     "appDeploymentConfirmed",
@@ -261,12 +379,17 @@ module.exports = {
                 )
                 if(!success)
                     throw "Fail to store app context."
-                break
+                break;
             }
             case Methods.TssKeyGen: {
                 const {appId} = params
                 // await this.callPlugin('system', "storeAppTss", appId, init.id)
                 await this.callPlugin('system', "appKeyGenConfirmed", request)
+                break
+            }
+            case Methods.TssReshare: {
+                await this.callPlugin('system', "appReshareConfirmed", request)
+                break
             }
         }
     }
