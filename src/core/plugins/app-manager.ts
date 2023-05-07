@@ -465,11 +465,17 @@ export default class AppManager extends CallablePlugin {
     return this.appContexts[seed];
   }
 
-  /** return oldest  */
-  getAppOldestContext(appId: string): AppContext|null {
-    return this.getAppSeeds(appId)
+  /**
+   By default returns oldest active context
+   */
+  getAppOldestContext(appId: string, includeExpired:boolean=false): AppContext|null {
+    let contexts = this.getAppSeeds(appId)
       .map(seed => this.appContexts[seed])
-      .reduce((first: AppContext, ctx: AppContext): AppContext => {
+    if(!includeExpired) {
+      const now = getTimestamp()
+      contexts = contexts.filter(ctx => ((ctx.expiration ?? Infinity) > now))
+    }
+    return contexts.reduce((first: AppContext, ctx: AppContext): AppContext => {
         if(!first)
           return ctx
         if((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (first.deploymentRequest?.data.timestamp ?? Infinity))

@@ -281,6 +281,7 @@ class System extends CallablePlugin {
       },
       rotationEnabled: result.rotationEnabled,
       ttl: result.ttl,
+      expiration: result.expiration,
       deploymentRequest: request
     })
 
@@ -305,7 +306,6 @@ class System extends CallablePlugin {
         result: {rotationEnabled, ttl, expiration, seed, publicKey},
       }
     } = request;
-    console.log({rotationEnabled, ttl, expiration, seed, publicKey})
 
     /** check context exist */
     const context = await AppContextModel.findOne({appId}).exec();
@@ -346,10 +346,9 @@ class System extends CallablePlugin {
       data: {
         params: {appId},
         init: {id: reshareKeyId},
-        result: {rotationEnabled, ttl, expiration, seed, publicKey},
+        result: {expiration, seed, publicKey},
       }
     } = request;
-    console.log({rotationEnabled, ttl, expiration, seed, publicKey})
 
     /** check context exist */
     const context = this.appManager.getAppContext(appId, seed);
@@ -460,23 +459,6 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async generateTssKeyBetweenPartners(t, partners: string[]) {
-    const partyId = soliditySha3(partners.map(v => ({t:'string', v})))!
-
-    await this.tssPlugin.createParty({id: partyId, t, partners});
-    let party = this.tssPlugin.parties[partyId];
-    if(!party)
-      throw `Party not created`
-
-    let key = await this.tssPlugin.keyGen(party, {timeout: 65e3, lowerThanHalfN: true})
-
-    return {
-      id: key.id,
-      publicKey: pub2json(key.publicKey!)
-    }
-  }
-
-  @appApiMethod({})
   getAppTTL(appId: number): number {
     const tssConfigs = this.muon.configs.net.tss;
     const app: BaseAppPlugin = this.muon.getAppById(appId)
@@ -511,7 +493,7 @@ class System extends CallablePlugin {
     const appReshareParty: TssParty = await this.tssPlugin.getAppParty(appId, newContext.seed, true)!;
 
     log(`generating nonce for recovering app[${appId}] tss key`)
-    let nonce = await this.tssPlugin.keyGen(appReshareParty, {
+    let nonce = await this.tssPlugin.keyGen({appId, seed: newContext.seed, isForReshare: true}, {
       id: `recovery-${uuid()}`,
       partners: _.uniq([
         this.collateralPlugin.currentNodeInfo!.id,
@@ -551,7 +533,7 @@ class System extends CallablePlugin {
     const party = this.tssPlugin.getAppParty(appId, seed)!
 
     log(`generating nonce for resharing app[${appId}] tss key`)
-    let nonce = await this.tssPlugin.keyGen(party, {
+    let nonce = await this.tssPlugin.keyGen({appId, seed}, {
       id: `resharing-${uuid()}`,
       partners: _.uniq([
         this.collateralPlugin.currentNodeInfo!.id,
@@ -590,11 +572,8 @@ class System extends CallablePlugin {
       t: context.party.t,
       partners: context.party.partners,//.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
-    const party = this.tssPlugin.getAppParty(appId, seed);
-    if(!party)
-      throw `Party not created`
 
-    let key = await this.tssPlugin.keyGen(party, {timeout: 65e3, lowerThanHalfN: true})
+    let key = await this.tssPlugin.keyGen({appId, seed}, {timeout: 65e3, lowerThanHalfN: true})
 
     return {
       id: key.id,

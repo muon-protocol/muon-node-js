@@ -521,7 +521,11 @@ class BaseAppPlugin extends CallablePlugin {
 
     const responses: string[] = await Promise.all(partners.map(async node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return await this.__onRequestConfirmation(request, node)
+        return this.__onRequestConfirmation(request, node)
+          .catch(e => {
+            this.log.error(`informRequestConfirmation error %o`, e)
+            return 'error'
+          })
       }
       else {
         return this.remoteCall(
@@ -531,7 +535,7 @@ class BaseAppPlugin extends CallablePlugin {
           {taskId: `keygen-${nonce.id}`, timeout: 10e3}
         )
           .catch(e => {
-            this.log(`informRequestConfirmation error %o`, e)
+            this.log.error(`informRequestConfirmation error %o`, e)
             return 'error'
           })
       }
@@ -557,7 +561,7 @@ class BaseAppPlugin extends CallablePlugin {
     const seed = request.deploymentSeed;
 
     if(!this.getTss(seed)){
-      throw {message: 'App tss is not initialized'};
+      throw {message: 'App tss is not initialized', seed};
     }
 
     let party = this.getParty(seed);
@@ -566,7 +570,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     this.log(`generating nonce with ${nonceParticipantsCount} partners.`)
-    let nonce = await tssPlugin.keyGen(party, {
+    let nonce = await tssPlugin.keyGen({appId: this.APP_ID, seed}, {
       id: `nonce-${request.reqId}`,
       partners: availablePartners,
       maxPartners: nonceParticipantsCount
@@ -990,7 +994,13 @@ class BaseAppPlugin extends CallablePlugin {
     }
 
     this.log('calling onConfirm ...')
-    await this.onConfirm(request, request.data.result, request.signatures)
+    try {
+      await this.onConfirm(request, request.data.result, request.signatures)
+    }
+    catch (e) {
+      this.log.error("error calling onConfirm %O", e)
+      throw e;
+    }
     this.log('calling onConfirm done successfully.')
 
     await requestConfirmationCache.set(request.reqId, '1');

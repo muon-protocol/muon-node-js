@@ -116,7 +116,7 @@ module.exports = {
                 const newInfo = this.callPlugin('system', "getAppDeploymentInfo", appId, seed)
 
                 if(!newInfo.deployed || newInfo.status !== 'TSS_GROUP_SELECTED')
-                    throw `App not rotated.`
+                    throw {message: `App not rotated.`, deploymentInfo: newInfo}
 
                 const oldInfo = this.callPlugin('system', "getAppDeploymentInfo", appId, newContext.previousSeed)
 
@@ -212,6 +212,7 @@ module.exports = {
                 return {
                     rotationEnabled: true,
                     ttl,
+                    expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
                     timestamp: request.data.timestamp,
                     seed,
                     tssThreshold: t,
@@ -238,6 +239,7 @@ module.exports = {
                 return {
                     rotationEnabled: true,
                     ttl,
+                    expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
                     timestamp: request.data.timestamp,
                     previousSeed,
                     seed,
@@ -314,6 +316,7 @@ module.exports = {
                 return [
                     {t: 'bool', v: result.rotationEnabled},
                     {t: 'uint64', v: result.ttl},
+                    {t: 'uint64', v: result.expiration},
                     {t: 'uint64', v: result.timestamp},
                     ...(request.method === Methods.TssRotate ? [{t: 'uint256', v: previousSeed}] : []),
                     {t: 'uint256', v: seed},

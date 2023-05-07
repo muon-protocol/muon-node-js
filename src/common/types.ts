@@ -161,6 +161,7 @@ export type AppContext = {
     },
     rotationEnabled?: boolean,
     ttl?: number,
+    expiration?: number,
     deploymentRequest?: AppRequest,
     keyGenRequest?: AppRequest,
     publicKey?: JsonPublicKey
@@ -173,4 +174,10 @@ export type AppTssConfig = {
     publicKey: JsonPublicKey,
     keyShare?: string,
     expiration?: number,
+}
+
+export type PartyInfo = {
+    appId: string,
+    seed: string,
+    isForReshare?: boolean
 }

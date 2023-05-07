@@ -131,7 +131,7 @@ async function deployApp(argv, configs) {
 
 async function reshareApp(argv, configs) {
   const {app} = argv;
-  console.log('retrieving app ID ...')
+  console.log('Retrieving app ID ...')
   const statusResult = await muonCall(configs.url, {
     app: 'explorer',
     method: "app",
@@ -159,7 +159,8 @@ async function reshareApp(argv, configs) {
   })
   let keyGenSeed: any = null;
   if(!!contextToRotate) {
-    console.log(`random seed generating ...`)
+    console.log(`Rotation is needed for a context.`)
+    console.log(`Random seed generating ...`)
     const randomSeedResponse = await muonCall(configs.url, {
       app: 'deployment',
       method: `random-seed`,
@@ -169,9 +170,9 @@ async function reshareApp(argv, configs) {
       }
     })
     expectConfirmed(randomSeedResponse)
-    console.log(`random seed generated`, {randomSeed: randomSeedResponse.result.signatures[0].signature})
+    console.log(`Random seed generated`, {randomSeed: randomSeedResponse.result.signatures[0].signature})
 
-    console.log('selecting new party ...')
+    console.log('Selecting new party ...')
     const reshareSeed = randomSeedResponse.result.signatures[0].signature
     const reshareResponse = await muonCall(configs.url, {
       app: 'deployment',
@@ -187,14 +188,15 @@ async function reshareApp(argv, configs) {
       }
     })
     expectConfirmed(reshareResponse)
-    console.log(`party select tx ${reshareResponse.result.reqId}.`)
+    console.log(`Party select tx ${reshareResponse.result.reqId}.`)
 
-    console.log(`party select confirmation waiting ...`);
+    console.log(`Party select confirmation waiting ...`);
     await waitToRequestBeAnnounced(configs.url, reshareResponse.result, {checkAllGroups: true});
 
     keyGenSeed = reshareResponse.result.data.result.seed;
   }
   else {
+    console.log("Rotation is not needed for any context.")
     /** If there is no PENDING context, find a context to KeyGen */
     const groupSelectedContext = contexts.find(ctx => ctx.status === APP_STATUS_TSS_GROUP_SELECTED);
     if(!groupSelectedContext) {
@@ -205,7 +207,7 @@ async function reshareApp(argv, configs) {
     keyGenSeed = groupSelectedContext.seed
   }
 
-  console.log('resharing app tss key ...')
+  console.log('Resharing app tss key ...')
   const tssResponse = await muonCall(configs.url, {
     app: `deployment`,
     method: "tss-reshare",
@@ -215,10 +217,10 @@ async function reshareApp(argv, configs) {
     }
   })
   expectConfirmed(tssResponse)
-  console.log(`reshare tx ${tssResponse.result.reqId}.`)
+  console.log(`Reshare tx ${tssResponse.result.reqId}.`)
 
-  console.log(`reshare confirmation waiting ...`);
+  console.log(`Reshare confirmation waiting ...`);
   await waitToRequestBeAnnounced(configs.url, tssResponse.result);
-  console.log(`tss key resharing done with this generators: [${tssResponse.result.data.init.keyGenerators}].`, tssResponse.result.data.result)
+  console.log(`TSS key resharing done with this generators: [${tssResponse.result.data.init.keyGenerators}].`, tssResponse.result.data.result)
 
 }

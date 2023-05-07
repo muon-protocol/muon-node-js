@@ -9,7 +9,7 @@ import CollateralInfoPlugin from "./collateral-info.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import * as CoreIpc from '../ipc.js'
-import {AppContext, MuonNodeInfo} from "../../common/types";
+import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import TssParty from "../../utils/tss/party.js";
 import {IMpcNetwork} from "../../common/mpc/types";
@@ -107,6 +107,7 @@ class TssPlugin extends CallablePlugin {
     this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
 
     await this.collateralPlugin.waitToLoad()
+    await this.appManager.waitToLoad();
     this.loadTssInfo();
 
   }
@@ -227,17 +228,7 @@ class TssPlugin extends CallablePlugin {
 
     //TODO: handle {isValid: false};
 
-    let party = TssParty.load({
-      id: 'deployers-party',
-      t: networkInfo.tssThreshold,
-      max: networkInfo.maxGroupSize,
-      partners: this.collateralPlugin.filterNodes({
-        isDeployer: true
-      })
-        .map(n => n.id)
-    });
-    this.parties[party.id] = party
-    this.tssParty = party;
+    this.tssParty = this.getAppParty("1", "1")!;
     log(`tss party loaded.`)
 
     // @ts-ignore
@@ -351,22 +342,22 @@ class TssPlugin extends CallablePlugin {
     }
     if(!this.appTss[appId]) {
       this.appTss[appId] = {}
-      if(!this.appTss[appId][seed]) {
-        const context = this.appManager.getAppContext(appId, seed)
-        if (!context)
-          return null
-        const _key = this.appManager.getAppTssKey(appId, seed)
-        if (!_key)
-          return null
-        let party = this.getAppParty(appId, seed)
-        const key = DistributedKey.load(party, {
-          id: `app-${appId}`,
-          share: _key.keyShare,
-          publicKey: _key.publicKey.encoded,
-          partners: context.party.partners
-        })
-        this.appTss[appId][seed] = key;
-      }
+    }
+    if(!this.appTss[appId][seed]) {
+      const context = this.appManager.getAppContext(appId, seed)
+      if (!context)
+        return null
+      const _key = this.appManager.getAppTssKey(appId, seed)
+      if (!_key)
+        return null
+      let party = this.getAppParty(appId, seed)
+      const key = DistributedKey.load(party, {
+        id: `app-${appId}`,
+        share: _key.keyShare,
+        publicKey: _key.publicKey.encoded,
+        partners: context.party.partners
+      })
+      this.appTss[appId][seed] = key;
     }
     return this.appTss[appId][seed];
   }
@@ -498,9 +489,8 @@ class TssPlugin extends CallablePlugin {
 
   private async tryToRecoverGlobalTssKey(readyPartners: MuonNodeInfo[]){
     log(`generating nonce for recovering global tss key`)
-    const deployersParty = this.getAppParty('1', '1')
 
-    let nonce = await this.keyGen(deployersParty, {
+    let nonce = await this.keyGen({appId: "1", seed: "1"}, {
       id: `recovery-${uuid()}`,
       partners: [
         this.collateralPlugin.currentNodeInfo!.id,
@@ -602,13 +592,10 @@ class TssPlugin extends CallablePlugin {
         }
         const readyPartners = await this.getTssReadyPartners(appId, seed);
         if(readyPartners.length > context.party.t) {
-          const appParty = this.getAppParty(appId, seed)
-          if(!appParty)
-            throw `App party not found`
           log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
           log(`generating nonce for recovering app[${appId}] tss key`)
           let nonce = await this.keyGen(
-            appParty,
+            {appId, seed},
             {
               id: `recovery-${uuid()}`,
               partners: [
@@ -669,10 +656,13 @@ class TssPlugin extends CallablePlugin {
           continue;
         }
         log(`Deployers %o are available to create global tss`, onlineDeployers)
-        let key: DistributedKey = await this.keyGen(this.tssParty, {
-          partners: onlineDeployers,
-          lowerThanHalfN: true
-        })
+        let key: DistributedKey = await this.keyGen(
+          {appId: "1", seed: "1"},
+          {
+            partners: onlineDeployers,
+            lowerThanHalfN: true
+          }
+        )
 
         let keyPartners = this.collateralPlugin.filterNodes({list: key.partners, excludeSelf: true})
         let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
@@ -763,9 +753,14 @@ class TssPlugin extends CallablePlugin {
    * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
    * @returns {Promise<DistributedKey>}
    */
-  async keyGen(party, options: KeyGenOptions={}): Promise<DistributedKey> {
+  async keyGen(partyInfo: PartyInfo, options: KeyGenOptions={}): Promise<DistributedKey> {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, partners: oPartners, maxPartners, timeout=60000, value} = options;
+
+    const party = this.getAppParty(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare)
+
+    if(!party)
+      throw {message: `party not found`, partyInfo}
 
     let candidatePartners = party.partners;
     if(oPartners)
@@ -810,7 +805,7 @@ class TssPlugin extends CallablePlugin {
         options.value,
         /** extra values usable in DKG */
         {
-          party: party.id,
+          partyInfo,
           keyId,
           lowerThanHalfN: options.lowerThanHalfN,
         }
