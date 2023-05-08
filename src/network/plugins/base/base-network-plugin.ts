@@ -18,24 +18,30 @@ export default class BaseNetworkPlugin extends Events {
     super()
     this.network = network
     this.configs = {...configs}
-  }
-
-  /**
-   * This method will call immediately after plugin create.
-   * @returns {Promise<void>}
-   */
-  async onInit(){
     this.defaultLogger = logger(`muon:network:plugin:${this.ConstructorName}`)
   }
 
   /**
-   * This method will call immediately after Network start.
-   * @returns {Promise<void>}
+   * Runs right after the plugin has been created.
+   */
+  async onInit(){
+    
+  }
+
+  /**
+   * Runs right after the plugin has been started
    */
   async onStart(){
     this.registerBroadcastHandler()
   }
 
+  /**
+   * Returns the PeerInfo object associated with the
+   * specified peerId.
+   * First, it looks for the peerId in the local peerStore. 
+   * If it is not found there, then it queries the 
+   * peerRouting (delegated nodes) for it.
+   */
   async findPeer(peerId): Promise<Libp2pPeerInfo|null>{
     if(!isPeerId(peerId)) {
       try {
