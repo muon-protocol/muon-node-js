@@ -143,7 +143,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         }
       }catch (e) {
         log('loading network info failed. %o', e)
-        await timeout(5000)
+        await timeout(Math.floor(Math.random(1*60*1000))+5000)
       }
     }while(!rawResult)
 
