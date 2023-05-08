@@ -116,6 +116,7 @@ async function wrappedCall(network, web3ApiCall, args=[]) {
       || errorMessage.includes("Invalid JSON RPC response")
       || errorMessage.includes("we can't execute this request")
       || errorMessage.includes("Returned error: execution aborted")
+      || errorMessage.includes("Returned error: Internal error")
     ) {
       const chainId = getNetworkId(network);
       console.log(`error on web3 call`, {chainId}, e.message)
