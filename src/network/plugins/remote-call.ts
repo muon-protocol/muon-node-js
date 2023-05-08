@@ -172,7 +172,7 @@ class RemoteCall extends BaseNetworkPlugin {
 
       let nodeInfo = collateralPlugin.getNodeInfo(peerId2Str(peerId))
       if(!nodeInfo){
-        throw {message: `Unrecognized sender.`};
+        throw {message: `Unrecognized receiver.`};
       }
 
       let data = JSON.parse(message);
@@ -193,7 +193,7 @@ class RemoteCall extends BaseNetworkPlugin {
         }
       }
       else{
-        throw {message: `Invalid outgoing message`}
+        throw {message: `Invalid call response.`}
       }
     }catch (e) {
       log.error("RemoteCall.handleSendResponse failed. err: %O, data: %s", 
