@@ -11,13 +11,13 @@ import Web3 from 'web3'
 import chalk from "chalk"
 import { Constructor } from "../common/types";
 import BasePlugin from "./plugins/base/base-plugin.js";
-import Log from "../common/muon-log.js"
+import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
 import {filePathInfo} from "../utils/helpers.js";
 
 const {__dirname} = filePathInfo(import.meta)
 const {utils: { sha3 }} = Web3
-const log = Log("muon:core");
+const log = logger("muon:core");
 
 const muonAppRequire = createRequire(import.meta.url);
 // override .js loader
@@ -41,24 +41,10 @@ async function getEnvPlugins(): Promise<MuonPlugin[]> {
   return result;
 }
 
-function isV3(app) {
-  return !!app.signParams;
-}
-
 function prepareApp(app, fileName, isBuiltInApp = false, filePath = "")
   : [Constructor<BasePlugin>, MuonPluginConfigs] {
   if (!app.APP_ID) {
-    if (isV3(app)) {
-      app.APP_ID = sha3(fileName);
-    } else {
-      log(
-        chalk.yellow(
-          `Deprecated app version: ${app.APP_NAME} app has old version and need to upgrade to v3.`
-        )
-      );
-      // @ts-ignore
-      app.APP_ID = "0x" + sha3(fileName).slice(-8);
-    }
+    app.APP_ID = sha3(fileName);
   }
 
   app.APP_ID = BigInt(app.APP_ID).toString(10);
@@ -223,11 +209,11 @@ async function start() {
           module: (await import("./plugins/explorer.js")).default,
           config: {},
         },
-        {
-          name: "dht",
-          module: (await import("./plugins/dht.js")).default,
-          config: {},
-        },
+        // {
+        //   name: "dht",
+        //   module: (await import("./plugins/dht.js")).default,
+        //   config: {},
+        // },
         {
           name: "system",
           module: (await import("./plugins/system.js")).default,

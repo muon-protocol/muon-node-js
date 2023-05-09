@@ -60,10 +60,7 @@ class Explorer extends CallablePlugin {
 
     // TODO: replace with onlinePartners
     // TODO: this returns only deployer nodes
-    let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
-      isOnline: true,
-      excludeSelf: true
-    })
+    let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({excludeSelf: true})
 
     let currentNode = this.collateralPlugin.currentNodeInfo!;
 
@@ -109,20 +106,20 @@ class Explorer extends CallablePlugin {
     }
   }
 
-  @gatewayMethod("node-peer")
-  async __nodePeerInfo(data: GetNodeInfo) {
-    let {id} = data?.params || {}
-    if(!id) {
-      throw `id is undefined`
-    }
-    let nodeInfo = this.collateralPlugin.getNodeInfo(id)!
-    if(!nodeInfo) {
-      throw `unknown peer`
-    }
-    return {
-      peerInfo: await NetworkIpc.getPeerInfoLight(nodeInfo.peerId)
-    }
-  }
+  // @gatewayMethod("node-peer")
+  // async __nodePeerInfo(data: GetNodeInfo) {
+  //   let {id} = data?.params || {}
+  //   if(!id) {
+  //     throw `id is undefined`
+  //   }
+  //   let nodeInfo = this.collateralPlugin.getNodeInfo(id)!
+  //   if(!nodeInfo) {
+  //     throw `unknown peer`
+  //   }
+  //   return {
+  //     peerInfo: await NetworkIpc.getPeerInfoLight(nodeInfo.peerId)
+  //   }
+  // }
 
   /**
    * For all nodes in announce list of app, this function confirms that app.onConfirm has been called on this node.
@@ -253,14 +250,21 @@ class Explorer extends CallablePlugin {
       partnersStatus = responses.reduce((obj, result, index) => {
         const node = partners[index]
         obj[node.id] = result
-
-        /** call remote node to load app context*/
-        this.remoteCall(
-          node.peerId,
-          RemoteMethods.LoadAppContextAndKey,
-          appId
-        )
-          .catch(e => {})
+        if(node.wallet === process.env.SIGN_WALLET_ADDRESS){
+          this.__loadAppContextAndKey(appId, this.collateralPlugin.currentNodeInfo!)
+            .catch(e => {
+            })
+        }
+        else {
+          /** call remote node to load app context*/
+          this.remoteCall(
+            node.peerId,
+            RemoteMethods.LoadAppContextAndKey,
+            appId
+          )
+            .catch(e => {
+            })
+        }
 
         return obj
       }, {})
@@ -300,7 +304,7 @@ class Explorer extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.LoadAppContextAndKey)
   async __loadAppContextAndKey(appId, callerInfo: MuonNodeInfo) {
-    if(!callerInfo.isDeployer)
+    if(!callerInfo.isDeployer && callerInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
       return;
     const status:AppDeploymentStatus = this.appManager.getAppDeploymentStatus(appId)
     let context;

@@ -8,13 +8,13 @@ import * as CoreIpc from '../../core/ipc.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import axios from 'axios'
 import * as crypto from '../../utils/crypto.js'
-import Log from '../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import Ajv from "ajv"
 import {mixGetPost} from "../middlewares.js";
 import {MuonNodeInfo} from "../../common/types";
 import {GatewayCallParams} from "../types";
 
-const log = Log('muon:gateway:api')
+const log = logger('muon:gateway:api')
 const ajv = new Ajv({coerceTypes: true})
 let requestQueue = new QueueProducer(`gateway-requests`);
 
@@ -224,8 +224,11 @@ router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
   else {
     callProperNode(requestData)
       .then(async result => {
-        /** if request forwarded to other node */
-        if(result.gwAddress !== process.env.SIGN_WALLET_ADDRESS) {
+        /**
+         If request forwarded to other node
+         When client calling @gatewayMethod of any plugin, appId is 0
+         */
+        if(result?.appId !== '0' && result?.gwAddress !== process.env.SIGN_WALLET_ADDRESS) {
           if(appIsShielded[app]) {
             await shieldConfirmedResult(requestData, result)
           }

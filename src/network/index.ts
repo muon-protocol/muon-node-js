@@ -17,7 +17,7 @@ import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
 import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
-import NetworkDHTPlugin from "./plugins/network-dht.js";
+// import NetworkDHTPlugin from "./plugins/network-dht.js";
 import {logger} from "@libp2p/logger"
 import {findMyIp, parseBool} from "../utils/helpers.js";
 import {muonRouting} from "./muon-routing.js";
@@ -46,14 +46,10 @@ class Network extends Events {
     const netConfig = this.configs.net;
     let peerId = await createFromJSON(configs.peerId);
 
-    const pubsubPeerDiscoveryInterval = parseInt(process.env.PUBSUB_PEER_DISCOVERY_INTERVAL || "10")
     const peerDiscovery: any[] = [
       // mdns({
       //   interval: 60e3
       // }),
-      // pubsubPeerDiscovery({
-      //   interval: (pubsubPeerDiscoveryInterval+Math.floor(Math.random() * pubsubPeerDiscoveryInterval))*60e3
-      // })
     ]
     let bootstrapList: string[] = netConfig.bootstrap ?? [];
     /** exclude self address */
@@ -131,6 +127,13 @@ class Network extends Events {
       },
       peerDiscovery,
       peerRouters,
+      denyInboundEncryptedConnection: (peerId, maConn) => {
+        let peerIdStr = peerId.toString();
+        // TODO: return true if peerId is not a valid network node
+        // The process should be simple. Otherwise it will be pron to 
+        // DDOS attack.
+        return false;
+      }
       // config: {
       //   peerDiscovery: {
       //     // [Libp2pBundle.Bootstrap.tag]: {
@@ -338,7 +341,7 @@ async function start() {
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],
       "ipc-handler": [IpcHandlerPlugin, {}],
-      dht: [NetworkDHTPlugin, {}]
+      // dht: [NetworkDHTPlugin, {}]
     },
     net,
     // TODO: pass it into the tss-plugin

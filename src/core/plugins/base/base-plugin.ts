@@ -1,13 +1,13 @@
 import Muon from "../../muon";
 import {MuonNodeInfo} from "../../../common/types";
 import CollateralInfoPlugin from "../collateral-info";
-import Log from '../../../common/muon-log.js'
+import {logger} from '@libp2p/logger'
 import Events from 'events-async'
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
 import * as SharedMem from '../../../common/shared-memory/index.js'
 
-const log = Log('muon:core:plugins:base')
+const log = logger('muon:core:plugins:base')
 
 export default class BasePlugin extends Events{
   private readonly _muon;

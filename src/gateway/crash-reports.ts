@@ -53,7 +53,7 @@ router.use('/report', asyncHandler(async (req, res, next) => {
   res.json({success: true})
 }))
 
-router.use('/query', mixGetPost, onlyAdmins, asyncHandler(async (req, res, next) => {
+router.use('/query', mixGetPost, asyncHandler(async (req, res, next) => {
   // @ts-ignore
   let {id} = req.mixed
 
@@ -64,7 +64,7 @@ router.use('/query', mixGetPost, onlyAdmins, asyncHandler(async (req, res, next)
   res.json(reports[id] || null)
 }))
 
-router.use('/list', mixGetPost, onlyAdmins, asyncHandler(async (req, res, next) => {
+router.use('/list', mixGetPost, asyncHandler(async (req, res, next) => {
   res.json({
     list: Object.keys(reports).reduce((obj, id) => {
       let message;

@@ -67,8 +67,6 @@ DISABLE_PUBLIC_IP_ANNOUNCE=1
 
 INFURA_PROJECT_ID=${data.infuraProjectId}
 
-NUM_SIGN_TO_CONFIRM = 2
-
 WEB3_PROVIDER_GANACHE = "http://localhost:8545"
 WEB3_PROVIDER_ETH = "https://mainnet.infura.io/v3/${data.infuraProjectId}"
 WEB3_PROVIDER_ROPSTEN = "https://ropsten.infura.io/v3/${data.infuraProjectId}"

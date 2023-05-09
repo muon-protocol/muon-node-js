@@ -9,34 +9,18 @@ import chalk from 'chalk'
 import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
 import {peerId2Str} from "../utils.js";
-import {broadcastHandler, remoteApp, remoteMethod} from "./base/app-decorators.js";
+import {remoteApp, remoteMethod} from "./base/app-decorators.js";
 import { peerIdFromString } from '@libp2p/peer-id'
-import NodeCache from 'node-cache';
 import lodash from "lodash";
-import axios from "axios";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
 const MuonNodesPaginationAbi = require('../../data/MuonNodesPagination-ABI.json')
 const log = logger('muon:network:plugins:collateral')
 
-const HEARTBEAT_EXPIRE = parseInt(process.env.HEARTBEAT_EXPIRE!) || 20*60*1000; // Keep heartbeet in memory for 5 minutes
-
-const heartbeatCache = new NodeCache({
-  stdTTL: HEARTBEAT_EXPIRE/1000,
-  // /**
-  //  * (default: 600)
-  //  * The period in seconds, as a number, used for the automatic delete check interval.
-  //  * 0 = no periodic check.
-  //  */
-  checkperiod: 60,
-  useClones: false,
-});
 
 export type NodeFilterOptions = {
   list?: string[],
-  isOnline?: boolean,
-  isConnected?: boolean
   isDeployer?: boolean,
   excludeSelf?: boolean
 }
@@ -68,6 +52,10 @@ export default class CollateralInfoPlugin extends CallablePlugin{
 
     let {nodeManager} = this.network.configs.net;
     log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
+    // Waits a random time(0-5 secs) to avoid calling
+    // RPC nodes by all network nodes at the same time
+    // When the network restarts
+    await timeout(Math.floor(Math.random()*5*1e3));
     await this._loadCollateralInfo();
 
     // @ts-ignore
@@ -76,65 +64,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
 
   async onStart() {
     await super.onStart()
-
-    // this.__broadcastHeartbeat()
-    // heartbeatCache.on("del", this.onHeartbeatExpired.bind(this));
-  }
-
-  private async __broadcastHeartbeat() {
-    while(true) {
-      try {
-        log('broadcasting heartbeat')
-        this.broadcast("HB")
-      }catch (e) {
-        log(`error when broadcasting hurt beat`)
-      }
-
-      /** delay between each broadcast */
-      await timeout(HEARTBEAT_EXPIRE/2 + Math.random() * 60e3)
-    }
-  }
-
-  @broadcastHandler
-  async __broadcastHandler(data, callerInfo: MuonNodeInfo) {
-    if(data === 'HB') {
-      log(`Heartbeat arrived from ${callerInfo.id}`)
-      this.onPeerOnline(callerInfo.peerId);
-    }
-  }
-
-  onHeartbeatExpired(key, value){
-    log(`heartbeat expired for node ${key}`)
-    this.onPeerOffline(key);
-  }
-
-  private onPeerOnline(peerId: string) {
-    // heartbeatCache.set(peerId, Date.now())
-    // this.updateNodeInfo(peerId, {isOnline: true})
-    // log(`peer[${peerId}] is online now`)
-    // CoreIpc.fireEvent({
-    //   type: "peer:online",
-    //   data: peerId,
-    // });
-  }
-
-  private onPeerOffline(peerId: string) {
-    // this.updateNodeInfo(peerId, {isOnline: false})
-    // log(`peer[${peerId}] is offline now`)
-    // CoreIpc.fireEvent({
-    //   type: "peer:offline",
-    //   data: peerId,
-    // });
-  }
-
-  get onlinePeers(): string[] {
-    return heartbeatCache.keys()
-  }
-
-  get onlinePeersInfo(): MuonNodeInfo[] {
-    return this.onlinePeers
-      .map(peerId => this.getNodeInfo(peerId)!)
-      .filter(info => !!info)
   }
 
   private getNodeId(peerId): string {
@@ -153,8 +82,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     }
 
     await timeout(5000);
-
-    this.onPeerOnline(peerInfo.peerId)
   }
 
   private updateNodeInfo(index: string, dataToMerge: object) {
@@ -162,7 +89,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     if(nodeInfo) {
       log(`updating node [${nodeInfo.id}]`, dataToMerge);
       /** update fields */
-      // console.log("((((((", JSON.stringify(this._nodesList.map(n => n.isOnline)))
       // console.log('updating', nodeInfo)
       if(dataToMerge) {
         Object.keys(dataToMerge).forEach(key => {
@@ -221,7 +147,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         }
       }catch (e) {
         log('loading network info failed. %o', e)
-        await timeout(5000)
+        await timeout(Math.floor(Math.random()*1*60*1000)+5000)
       }
     }while(!rawResult)
 
@@ -244,7 +170,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         wallet: item.nodeAddress,
         peerId: item.peerId,
         isDeployer: item.isDeployer,
-        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || heartbeatCache.has(item.peerId)
       }))
 
     let exist = {};
@@ -263,13 +188,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       allNodes
     }
   }
-
-  // private async getInfo(address: string, network: string) {
-  //   return {
-  //     _lastUpdateTime: await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network),
-  //     _nodes: await axios.get('http://192.3.136.81/allNodes').then(({data}) => data)
-  //   }
-  // }
 
   private async paginateAndGetInfo(paginationAddress:string, nodeManagerAddress: string, network: string) {
     const itemPerPage = 1500;
@@ -364,7 +282,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         wallet: item.nodeAddress,
         peerId: item.peerId,
         isDeployer: item.isDeployer,
-        isOnline: item.nodeAddress === process.env.SIGN_WALLET_ADDRESS || heartbeatCache.has(item.peerId)
       }))
 
     return {
@@ -449,8 +366,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         CoreIpc.fireEvent({
           type: "collateral:node:edit",
           data: {
-            nodeInfo: {...n, isOnline: heartbeatCache.has(n.peerId)},
-            oldNodeInfo: {...oldNode, isOnline: heartbeatCache.has(oldNode.peerId)},
+            nodeInfo: {...n},
+            oldNodeInfo: {...oldNode},
           }
         })
         return;
@@ -519,15 +436,6 @@ export default class CollateralInfoPlugin extends CallablePlugin{
       return Infinity;
   }
 
-  hasEnoughPartners(): boolean {
-    /**
-     * onlinePartners not include current node
-     */
-    return this.onlinePeers
-      .map(peerId => this.getNodeInfo(peerId))
-      .filter(info => !!info).length + 1 >= this.TssThreshold
-  }
-
   get currentNodeInfo(): MuonNodeInfo | undefined {
     return this.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
   }
@@ -540,15 +448,9 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     return this.networkInfo?.maxGroupSize;
   }
 
-  async getNodesList() {
+  async getNodesList(): Promise<MuonNodeInfo[]> {
     await this.waitToLoad();
-    let connectedPeers = this.network.getConnectedPeers();
-    return this._nodesList.map(n => {
-      let res = {...n};
-      if(connectedPeers[n.peerId])
-        res.isOnline = true;
-      return res;
-    });
+    return this._nodesList;
   }
 
   waitToLoad(){
@@ -582,14 +484,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     /** make result unique */
     result = lodash.uniqBy(result, 'id')
 
-    if(options.isConnected !== undefined) {
-      let connectedList = this.getConnectedPeerIds()
-      result = result.filter(n => connectedList.includes(n.peerId)===options.isConnected)
-    }
     if(options.isDeployer != undefined)
       result = result.filter(n => n.isDeployer === options.isDeployer)
-    if(options.isOnline != undefined)
-      result = result.filter(n => n.isOnline === options.isOnline)
     if(options.excludeSelf)
       result = result.filter(n => n.wallet !== process.env.SIGN_WALLET_ADDRESS)
     return result

@@ -7,15 +7,16 @@ import status from './status.js'
 import mine from './mine.js'
 import crashReport from './crash-reports.js'
 import delegate from './delegate-routing.js'
-import Log from '../common/muon-log.js'
+import {logger} from '@libp2p/logger'
+import {GatewayGlobalConfigs, load as loadConfigs} from './configurations.js';
 
-const log = Log('muon:gateway')
+const log = logger('muon:gateway')
 let app = express()
 
-async function start(options) {
+async function start() {
   log(`gateway starting ...`)
-  var port = options.port || 8080
-  var host = options.host || '127.0.0.1'
+
+  const configs:GatewayGlobalConfigs = loadConfigs()
 
   app.use(cors())
 
@@ -36,11 +37,16 @@ async function start(options) {
 
   log(`MongoDB successfully connected.`)
 
-  app.use('/v1/', api)
-  app.use('/status', status)
-  app.use('/delegate', delegate)
-  app.use('/mine', mine)
-  app.use('/crash-report', crashReport)
+  if(configs.routes.enable.api)
+    app.use('/v1/', api)
+  if(configs.routes.enable.status)
+    app.use('/status', status)
+  if(configs.routes.enable.delegate)
+    app.use('/delegate', delegate)
+  if(configs.routes.enable.mine)
+    app.use('/mine', mine)
+  if(configs.routes.enable.crashReport)
+    app.use('/crash-report', crashReport)
 
   /**
    Error handler
@@ -57,6 +63,7 @@ async function start(options) {
       })
   })
 
+  const {port, host} = configs
   app.listen(port, host, function () {
     log(`Running gateway on port ${port} at ${host}`)
   })

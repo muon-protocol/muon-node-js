@@ -3,6 +3,7 @@ import {createCIDFromString, cid2str} from '../../utils/cid.js'
 import Violation from '../../common/db-models/Violation.js'
 import { subscribeLogEvent } from '../../utils/eth.js'
 import { createRequire } from "module";
+import BaseAppPlugin from "./base/base-app-plugin";
 
 const require = createRequire(import.meta.url);
 const muonAbi = require('../../utils/muon-abi')
@@ -75,19 +76,13 @@ export default class ContentVerifyPlugin extends BasePlugin {
   async verifyContent(content, cid) {
     let request,
       description,
-      verified = false,
-      expectedResult,
-      actualResult
+      verified = false
     let actualCid = cid2str(await createCIDFromString(content))
     if (cid.toLowerCase() === actualCid.toLowerCase()) {
       request = JSON.parse(content)
-      let app = this.muon.getAppByName(request.app)
+      let app:BaseAppPlugin = this.muon.getAppByName(request.app)
       if (app) {
-        if (app.isVerifiedRequest !== undefined) {
-          [verified, expectedResult, actualResult] = await app.isVerifiedRequest(request)
-        } else {
-          description = `app.isVerifiedRequest not implemented for [${request.app}]`
-        }
+        verified = await app.verifyCompletedRequest(request, false);
       } else {
         description = 'unknown app'
       }
@@ -98,7 +93,7 @@ export default class ContentVerifyPlugin extends BasePlugin {
       })
       description = 'cid mismatch'
     }
-    return [verified, description, expectedResult, actualResult]
+    return [verified, description]
   }
 
   getChainsContract() {

@@ -1,4 +1,3 @@
-// import { JSONPeerId } from 'peer-id'
 import {PeerInfo} from "@libp2p/interface-peer-info";
 export { PeerId, isPeerId } from '@libp2p/interface-peer-id';
 import { Peer } from '@libp2p/interface-peer-store';
@@ -13,12 +12,12 @@ export interface INetworkPlugin {
     constructor(network: any, configs: any): INetworkPlugin;
 
     /**
-     * Run immediately after plugin construction
+     * Executes right away when the plugin is created
      */
     onInit(): void;
 
     /**
-     * Run after libp2p start successfully
+     * Runs after libp2p has started successfully
      */
     onStart(): void;
 }

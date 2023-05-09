@@ -1,17 +1,16 @@
-import type { Multiaddr } from '@multiformats/multiaddr'
-import isIpPrivate from 'private-ip'
-import {PeerId} from './types'
+import type { Multiaddr } from "@multiformats/multiaddr";
+import isIpPrivate from "private-ip";
+import { PeerId } from "./types";
 
 /**
- * Check if a given multiaddr has a private address.
+ * This function checks if a given
+ * multiaddress is private or not.
  */
-export function isPrivate (ma: Multiaddr) {
-  const { address } = ma.nodeAddress()
-
-  return Boolean(isIpPrivate(address))
+export function isPrivate(ma: Multiaddr) {
+  const { address } = ma.nodeAddress();
+  return Boolean(isIpPrivate(address));
 }
 
 export function peerId2Str(peerId: PeerId): string {
-  return peerId.toString()
+  return peerId.toString();
 }
-

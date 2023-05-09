@@ -55,12 +55,10 @@ class ContentApp extends CallablePlugin {
     let content: string | null = await this.getContent(cid)
     let verifyPlugin: ContentVerifyPlugin = this.muon.getPlugin('content-verify');
     if(content){
-      let [verified, description, expectedResult, actualResult] = await verifyPlugin.verifyContent(content, cid)
+      let [verified, description] = await verifyPlugin.verifyContent(content, cid)
       return {
         verified,
         description,
-        expectedResult,
-        actualResult,
         data
       }
     }

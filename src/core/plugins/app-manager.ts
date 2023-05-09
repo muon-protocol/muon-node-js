@@ -13,7 +13,6 @@ import AppTssConfig from "../../common/db-models/AppTssConfig.js"
 import _ from 'lodash'
 import {logger} from '@libp2p/logger'
 import {pub2json} from "../../utils/helpers.js";
-import DistributedKey from "../../utils/tss/distributed-key.js";
 import {findMinFullyConnectedSubGraph} from "../../common/graph-utils/index.js";
 import {PublicKey} from "../../utils/tss/types";
 import {aesDecrypt, isAesEncrypted} from "../../utils/crypto.js";
@@ -23,7 +22,7 @@ const log = logger('muon:core:plugins:app-manager')
 const RemoteMethods = {
   GetAppDeploymentInfo: "get-app-deployment-info",
   AppDeploymentInquiry: "app-deployment-inquiry",
-  AppDeploymentInfo: "app-deployment-info",
+  GetAppContext: "get-app-context",
   GetAppTss: "get-app-tss",
   GetAppPartyLatency: "get-app-latency"
 }
@@ -135,11 +134,12 @@ export default class AppManager extends CallablePlugin {
   }
 
   async onDeploymentTssKeyGenerate(tssKey) {
-    const publicKey = DistributedKey.loadPubKey(tssKey.publicKey);
+    const publicKey = TssModule.keyFromPublic(tssKey.publicKey);
     this.appContexts['1'].publicKey = pub2json(publicKey);
   }
 
   async saveAppContext(context: object) {
+    context = _.omit(context, ["_id"]);
     // @ts-ignore
     const oldDoc = await AppContext.findOne({version: context.version, appId: context.appId})
     if (oldDoc) {
@@ -216,16 +216,16 @@ export default class AppManager extends CallablePlugin {
     this.contextIdToAppIdMap[doc._id] = doc.appId
   }
 
-  private async onAppContextDelete(data: { appId: string, deploymentReqIds: string[] }) {
+  private async onAppContextDelete(data: { appId: string, contexts: any[] }) {
     try {
-      const {appId, deploymentReqIds} = data
-      if (!appId || !Array.isArray(deploymentReqIds)) {
-        log.error('missing appId/deploymentReqIds.');
+      const {appId, contexts} = data
+      if (!appId || !Array.isArray(contexts)) {
+        log.error('missing appId/contexts.');
         return;
       }
 
       log(`pid[${process.pid}] app[${appId}] context deleting...`)
-
+      const deploymentReqIds = contexts.map(c => c.deploymentRequest.reqId)
       if (!this.appContexts[appId] || !deploymentReqIds.includes(this.appContexts[appId].deploymentRequest.reqId)) {
         // log.error(`pid[${process.pid}] AppContext deleted but app data not found ${appId}`)
         return
@@ -285,22 +285,6 @@ export default class AppManager extends CallablePlugin {
     }
   }
 
-  async loadAppContextFromNetwork(holders: MuonNodeInfo[], appId: string) {
-    for (let i = 0; i < holders.length; i++) {
-      let data = await this.remoteCall(
-        holders[i].peerId,
-        RemoteMethods.AppDeploymentInfo,
-        appId
-      )
-      if (data) {
-        try {
-          const context = await this.saveAppContext(data);
-          return context;
-        } catch (e) {}
-      }
-    }
-  }
-
   getAppDeploymentInfo(appId: string): AppDeploymentInfo {
     if (!this.appIsDeployed(appId)) {
       return {
@@ -328,65 +312,54 @@ export default class AppManager extends CallablePlugin {
     }
   }
 
-  appQueryResult = {}
-
   async queryAndLoadAppContext(appId) {
-    /** cache for 5 minutes */
-    if (this.appQueryResult[appId]) {
-      if (Date.now() - this.appQueryResult[appId].time < 60e3)
-        return this.appQueryResult[appId].result;
-    }
-    /** refresh result */
+    /** Ignore query if found local. */
+    if(this.appContexts[appId])
+      return this.appContexts[appId];
+
+    /** query only deployer nodes */
     const deployerNodes: string[] = this.collateralPlugin
       .filterNodes({
         isDeployer: true,
         excludeSelf: true
       })
       .map(p => p.peerId)
-    let t0 = Date.now()
-    const candidateNodeIds: string[] = await NetworkIpc.findNOnlinePeer(deployerNodes, 5, {timeout: 10000});
-    log(`nodes %o found online in ${Date.now() - t0} ms`, candidateNodeIds)
-    log(`calling nodes %o to get app status`, candidateNodeIds)
-    const candidateNodes = this.collateralPlugin.filterNodes({list: candidateNodeIds})
-    let callResult = await Promise.all(candidateNodes.map(node => {
-      return this.remoteCall(
-        node.peerId,
-        RemoteMethods.GetAppDeploymentInfo,
-        appId,
-        {timeout: 15000}
-      )
-        .catch(e => {
-          log('error when calling remote method AppState %o', e);
-          return "error"
-        })
-    }));
-    const trueCallResult = callResult.filter(r => r?.deployed)
-    if (trueCallResult.length < 1) {
-      this.appQueryResult[appId] = {
-        time: Date.now(),
-        result: null
-      }
-      return null;
-    }
 
-    /**
-     * the nodes, who has the app context data.
-     */
-      // @ts-ignore
-    let holders: MuonNodeInfo[] = callResult
-        .map((r, i) => {
-          if (r.deployed)
-            return candidateNodes[i]
-          else
-            return null;
-        })
-        .filter(h => !!h)
-    const context = await this.loadAppContextFromNetwork(holders, appId)
-    this.appQueryResult[appId] = {
-      time: Date.now(),
-      result: context || null
+    /** find 3 online deployer to do query */
+    const candidateNodePeerIds: string[] = await NetworkIpc.findNOnlinePeer(deployerNodes, 3, {timeout: 10000, return: 'peerId'});
+
+    log(`calling deployer nodes to get app context `)
+    // @ts-ignore
+    const context = await Promise.any(
+      candidateNodePeerIds.map(peerId => {
+        return this.remoteCall(
+          peerId,
+          RemoteMethods.GetAppContext,
+          appId,
+          {timeout: 5000}
+        )
+          .then(context => {
+            if(!context)
+              throw `not found`
+            return context;
+          })
+      })
+    )
+      .catch(e => null);
+    if(context) {
+      log(`app context found.`)
+      try {
+        const savedContext = await this.saveAppContext(context);
+        return savedContext;
+      } catch (e) {
+        log.error("error when storing context %o", e);
+        return null;
+      }
     }
-    return context
+    else {
+      log.error('app context not found.')
+      return null
+    }
   }
 
   tssKeyQueryResult = {}
@@ -394,40 +367,59 @@ export default class AppManager extends CallablePlugin {
   async queryAndLoadAppTssKey(appId) {
     if (!this.appIsDeployed(appId))
       return null;
-    /** cache for 5 minutes */
+
+    /** cache for 30 minutes */
     if (this.tssKeyQueryResult[appId]) {
-      if (Date.now() - this.tssKeyQueryResult[appId].time < 60e3)
+      if (Date.now() - this.tssKeyQueryResult[appId].time < 30e3)
         return this.tssKeyQueryResult[appId].result;
     }
+
     let appContext = this.appContexts[appId];
 
     /** refresh result */
-    const deployerNodes: string[] = this.collateralPlugin
+    const appParty: MuonNodeInfo[] = this.collateralPlugin
       .filterNodes({
-        isDeployer: true,
+        list: appContext.party.partners,
         excludeSelf: true
       })
-      .map(p => p.peerId)
-    const candidateNodeIds: string[] = await NetworkIpc.findNOnlinePeer(deployerNodes, 5, {timeout: 10e3});
-    log(`calling nodes %o to get app tss key`, candidateNodeIds)
-    const candidateNodes = this.collateralPlugin.filterNodes({list: candidateNodeIds})
 
-    let callResult = await Promise.all(candidateNodes.map(node => {
-      return this.remoteCall(
-        node.peerId,
-        RemoteMethods.GetAppTss,
-        appId,
-        {timeout: 15000}
-      )
-        .catch(e => {
-          if (process.env.VERBOSE)
-            console.error(`core.AppManager.queryAndLoadAppTssKey [GetAppTss] Error`, e);
-          return "error"
-        })
-    }));
+    log(`calling app party to get app tss key ...`)
 
-    const trueCallResult = callResult.filter(r => !!r)
-    if (trueCallResult.length < 1) {
+    let callResult = await Promise.all(
+      appParty.map(node => {
+        return this.remoteCall(
+          node.peerId,
+          RemoteMethods.GetAppTss,
+          appId,
+          {timeout: 15000}
+        )
+          .then(result => {
+            const {publicKey} = result;
+            if(!TssModule.validatePublicKey(publicKey))
+              throw "invalid public key"
+            return publicKey
+          })
+          .catch(e => {
+            if (process.env.VERBOSE)
+              console.error(`core.AppManager.queryAndLoadAppTssKey [GetAppTss] Error`, e);
+            return "error"
+          })
+      })
+    );
+
+    const counts: any = callResult.filter(r => !!r)
+      .reduce((counts, publicKey) => {
+        const {max} = counts;
+        if(!counts[publicKey])
+          counts[publicKey] = 1;
+        else
+          counts[publicKey] ++;
+        if(max === null || counts[publicKey] > counts[max])
+          counts.max = publicKey;
+        return counts;
+      }, {max: null})
+
+    if (!counts.max || counts[counts.max] < appContext.party.t) {
       this.tssKeyQueryResult[appId] = {
         time: Date.now(),
         result: null
@@ -435,11 +427,10 @@ export default class AppManager extends CallablePlugin {
       return null;
     }
 
-    let selectedResult = trueCallResult[0]
-    const publicKey = TssModule.keyFromPublic(selectedResult.publicKey.replace("0x", ""))
+    const publicKey = TssModule.keyFromPublic(counts.max)
     const result = {
       appId,
-      version: parseInt(selectedResult.version),
+      version: 0,
       publicKey: pub2json(publicKey)
     }
 
@@ -461,9 +452,6 @@ export default class AppManager extends CallablePlugin {
   }
 
   getAppContext(appId: string) {
-    // if(appId == '1') {
-    //   return this._deploymentContext;
-    // }
     return this.appContexts[appId];
   }
 
@@ -521,7 +509,7 @@ export default class AppManager extends CallablePlugin {
                 })
             })
           )
-          this.deploymentPublicKey = DistributedKey.loadPubKey(publicKeyStr);
+          this.deploymentPublicKey = TssModule.keyFromPublic(publicKeyStr);
         }
         return this.deploymentPublicKey;
       }
@@ -532,7 +520,7 @@ export default class AppManager extends CallablePlugin {
       if (!appContest)
         appContest = await this.queryAndLoadAppContext(appId)
       if (appContest?.publicKey)
-        return DistributedKey.loadPubKey(appContest.publicKey.encoded);
+        return TssModule.keyFromPublic(appContest.publicKey.encoded);
       else
         return null;
     }
@@ -627,7 +615,7 @@ export default class AppManager extends CallablePlugin {
   async findOptimalAvailablePartners(appId: string, count: number, options: { timeout?: number, return?: string } = {}): Promise<string[]> {
     options = {
       //TODO: find N best partners instead of setting timeout
-      timeout: 2000,
+      timeout: 3000,
       return: 'id',
       ...options
     }
@@ -686,8 +674,8 @@ export default class AppManager extends CallablePlugin {
     return this.appIsDeployed(appId) ? "yes" : 'no';
   }
 
-  @remoteMethod(RemoteMethods.AppDeploymentInfo)
-  async __appDeploymentData(appId, callerInfo) {
+  @remoteMethod(RemoteMethods.GetAppContext)
+  async __getAppContext(appId, callerInfo) {
     return this.getAppContext(appId)
   }
 
@@ -733,7 +721,7 @@ export default class AppManager extends CallablePlugin {
             p.peerId,
             RemoteMethods.GetAppDeploymentInfo,
             appId,
-            {timeout: 2000}
+            {timeout: 3000}
           )
         )
           .then(({status}) => {

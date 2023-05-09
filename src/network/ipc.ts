@@ -26,21 +26,17 @@ function getNodesList(output: string|string[] = ['id','wallet','peerId'], option
   return call(IpcMethods.GetNodesList, output, options)
 }
 
-function getOnlinePeers(): Promise<string[]> {
-  return call(IpcMethods.GetOnlinePeers);
-}
-
 function broadcastToChannel(channel, message) {
   return call(IpcMethods.BroadcastToChannel, {channel, message})
 }
 
-function putDHT(key, value) {
-  return call(IpcMethods.PutDHT, {key, value})
-}
+// function putDHT(key, value) {
+//   return call(IpcMethods.PutDHT, {key, value})
+// }
 
-function getDHT(key) {
-  return call(IpcMethods.GetDHT, {key})
-}
+// function getDHT(key) {
+//   return call(IpcMethods.GetDHT, {key})
+// }
 
 function forwardRemoteCall(peer, method, params, options) {
   return call(IpcMethods.RemoteCall, {peer, method, params, options})
@@ -51,10 +47,10 @@ function getPeerInfo(peerId: string): Promise<JsonPeerInfo|null> {
   return call(IpcMethods.GetPeerInfo, {peerId})
 }
 
-function getPeerInfoLight(peerId: string): JsonPeerInfo|null {
-  // @ts-ignore
-  return call(IpcMethods.GetPeerInfoLight, {peerId})
-}
+// function getPeerInfoLight(peerId: string): JsonPeerInfo|null {
+//   // @ts-ignore
+//   return call(IpcMethods.GetPeerInfoLight, {peerId})
+// }
 
 function getClosestPeer(peerId: string, cid: string): JsonPeerInfo|null {
   // @ts-ignore
@@ -133,11 +129,10 @@ export {
   getCollateralInfo,
   filterNodes,
   getNodesList,
-  getOnlinePeers,
   broadcastToChannel,
   forwardRemoteCall,
   getPeerInfo,
-  getPeerInfoLight,
+  // getPeerInfoLight,
   getClosestPeer,
   reportClusterStatus,
   assignTask,
@@ -154,6 +149,6 @@ export {
   getConnectedPeerIds,
   getNodeMultiAddress,
   sendToAggregatorNode,
-  putDHT,
-  getDHT
+  // putDHT,
+  // getDHT
 }

@@ -6,23 +6,22 @@ import Web3 from 'web3'
 import {timeout, stackTrace, uuid, pub2json} from '../../utils/helpers.js'
 import {remoteApp, remoteMethod, broadcastHandler} from './base/app-decorators.js'
 import CollateralInfoPlugin from "./collateral-info.js";
-import NodeCache from 'node-cache'
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import * as CoreIpc from '../ipc.js'
 import {MuonNodeInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
-import BN from 'bn.js';
 import TssParty from "../../utils/tss/party.js";
 import {IMpcNetwork} from "../../common/mpc/types";
-import {MultiPartyComputation} from "../../common/mpc/base.js";
-import {DistKey, DistributedKeyGeneration} from "../../common/mpc/dkg.js";
-import Log from '../../common/muon-log.js'
+import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
+import {DistKey} from "../../common/mpc/dist-key.js";
+import {logger} from '@libp2p/logger'
 import {bn2hex} from "../../utils/tss/utils.js";
+import {useOneTime} from "../../utils/tss/use-one-time.js";
 
 const {shuffle} = lodash;
 const {utils:{toBN}} = Web3;
-const log = Log('muon:core:plugins:tss')
+const log = logger('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
 
@@ -324,7 +323,6 @@ class TssPlugin extends CallablePlugin {
     let onlinePartners: MuonNodeInfo[] = this.collateralPlugin
       .filterNodes({
         list: appParty.partners,
-        // isOnline: true,
         excludeSelf: true
       });
 
@@ -372,13 +370,12 @@ class TssPlugin extends CallablePlugin {
     return this.appTss[appId];
   }
 
-  private async onAppContextDelete(data: {appId: string, deploymentReqIds: string[]}) {
-    let {appId} = data
-    if(!this.appTss[appId])
-      return;
-    const partyId = this.appTss[appId].party!.id;
-    if(partyId)
-     delete this.parties[partyId]
+  private async onAppContextDelete(data: {appId: string, contexts: any[]}) {
+    let {appId, contexts} = data
+    for(const context of contexts) {
+      const partyId = this.getAppPartyId(appId, context.version);
+      delete this.parties[partyId]
+    }
     delete this.appTss[appId]
   }
 
@@ -688,7 +685,6 @@ class TssPlugin extends CallablePlugin {
     // @ts-ignore
     const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
       list: partners,
-      // isOnline: true
     })
 
     let callResult = await Promise.all(
@@ -731,7 +727,6 @@ class TssPlugin extends CallablePlugin {
 
     let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
       list: candidatePartners,
-      // isOnline: true
     })
 
     if(maxPartners && maxPartners > 0) {
@@ -874,7 +869,8 @@ class TssPlugin extends CallablePlugin {
     if (nonceId === appTssKey!.id)
       throw `Cannot use tss key as nonce`;
 
-    let nonce = await this.getSharedKey(nonceId)
+    let nonce = await this.getSharedKey(nonceId);
+    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`)
     let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
     return {
       id: appTssKey!.id,

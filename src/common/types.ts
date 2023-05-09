@@ -45,8 +45,7 @@ export type MuonNodeInfo = {
     staker: string,
     wallet: string,
     peerId: string,
-    isDeployer: boolean,
-    isOnline?: boolean
+    isDeployer: boolean
 }
 
 export type AppDeploymentStatus = "NEW" | "TSS_GROUP_SELECTED" | "DEPLOYED";

@@ -158,33 +158,6 @@ class MemoryPlugin extends CallablePlugin {
   }
 
   /**
-   * Method for saving APPs data in memory. This method can be called after all nodes
-   * process the request. all nodes signature is needed to this data be saved.
-   * @param request
-   * @returns {Promise<void>}
-   */
-  async writeAppMem(request) {
-    if(!request.data.memWrite)
-      return;
-
-    let {key, timestamp, ttl, nSign, data, hash} = request.data.memWrite;
-    let signatures = request.signatures.map(sign => sign.memWriteSignature)
-    let memWrite: MemWrite = {
-      type: MemoryTypes.App,
-      key,
-      owner: request.app,
-      timestamp,
-      ttl,
-      nSign,
-      data,
-      hash,
-      signatures,
-    }
-    await this.storeMemWrite(memWrite);
-    this.broadcastWrite(memWrite);
-  }
-
-  /**
    * Any node can call this to save a data into the shared memory.
    * only the node signature needed to this data be saved.
    * @param memory

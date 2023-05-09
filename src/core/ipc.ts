@@ -2,7 +2,6 @@ import {AppRequest, IpcCallOptions, MuonNodeInfo} from "../common/types";
 import { QueueProducer, MessagePublisher } from '../common/message-bus/index.js'
 import { BROADCAST_CHANNEL } from './plugins/broadcast.js'
 import { IPC_CHANNEL } from './plugins/core-ipc-plugin.js'
-import DistributedKey from '../utils/tss/distributed-key.js'
 import {MessageOptions} from "../common/message-bus/msg-publisher.js";
 import {IpcMethods, CoreIpcMethod} from "./plugins/core-ipc-handlers.js";
 
@@ -40,18 +39,6 @@ function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
 
 async function forwardRemoteCall(data: any, callerInfo: MuonNodeInfo, options: IpcCallOptions) {
   return await call(IpcMethods.ForwardRemoteCall, {data, callerInfo}, options);
-}
-
-async function generateTssKey(keyId?: string) {
-  let key = await call(IpcMethods.GenerateTssKey, {keyId});
-  // console.log("CoreIpc.generateTssKey", JSON.stringify(key,null, 2))
-  // console.log("CoreIpc.generateTssKey", key.partners)
-  return DistributedKey.load(null, key)
-}
-
-async function getTssKey(keyId: string, options: IpcCallOptions) {
-  const key = await call(IpcMethods.GetTssKey, {keyId}, options);
-  return DistributedKey.load(null, key)
 }
 
 async function getAppId(appName: string): Promise<string> {
@@ -107,8 +94,6 @@ export {
   broadcast,
   fireEvent,
   forwardRemoteCall,
-  generateTssKey,
-  getTssKey,
   getAppId,
   getAppContext,
   getAppTimeout,

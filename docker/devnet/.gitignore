@@ -1,5 +1,0 @@
-.ssh/*
-testnet.env
-
-!.ssh/README.md
-!example.devnet.env

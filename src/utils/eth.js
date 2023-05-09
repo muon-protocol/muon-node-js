@@ -1,6 +1,6 @@
 import Web3 from 'web3'
 import EventEmbitter from 'events'
-import { sortObject, getTimestamp } from './helpers.js'
+import { sortObject, getTimestamp, timeout } from './helpers.js'
 import * as crypto from './crypto.js'
 import { createRequire } from "module";
 import EthRpcList from './eth-rpc-list.js';
@@ -114,10 +114,13 @@ async function wrappedCall(network, web3ApiCall, args=[]) {
     if(
       errorMessage.includes('CONNECTION ERROR')
       || errorMessage.includes("Invalid JSON RPC response")
+      || errorMessage.includes("we can't execute this request")
+      || errorMessage.includes("Returned error: execution aborted")
+      || errorMessage.includes("Returned error: Internal error")
     ) {
       const chainId = getNetworkId(network);
       console.log(`error on web3 call`, {chainId}, e.message)
-      delete web3Instances[chainId]
+      delete web3Instances[chainId];
     }
     throw e
   }

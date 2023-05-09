@@ -11,13 +11,17 @@ import * as NetworkIpc from '../../network/ipc.js'
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import AppManager from "./app-manager.js";
 import * as CoreIpc from '../ipc.js'
-import useDistributedKey from "../../utils/tss/use-distributed-key.js";
+import {useOneTime} from "../../utils/tss/use-one-time.js";
 import {logger} from '@libp2p/logger'
 import {pub2json, timeout} from '../../utils/helpers.js'
 import {bn2hex} from "../../utils/tss/utils.js";
 import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
 import BaseAppPlugin from "./base/base-app-plugin";
+
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const Rand = require('rand-seed').default;
 
 const log = logger("muon:core:plugins:system");
 
@@ -114,19 +118,30 @@ class System extends CallablePlugin {
   @appApiMethod({})
   async selectRandomNodes(seed, t, n): Promise<MuonNodeInfo[]> {
     const availableNodes = await this.getAvailableNodes();
-    if(availableNodes.length < t)
-      throw `No enough nodes to select n subset`
-    let nodesHash = availableNodes.map(node => {
-      return {
-        node,
-        hash: soliditySha3([
-          {t: 'uint256', v: seed},
-          {t: 'uint64', v: node.id},
-        ])!
+    if(availableNodes.length < t){
+      throw "Insufficient nodes for subnet creation";
+    }
+
+    // nodeId => MuonNodeInfo
+    let availableNodesMap = {};
+    availableNodes.map(node => availableNodesMap[node.id]=node);
+
+    const rand = new Rand(seed);
+    let selectedNodes: MuonNodeInfo[] = [], rndNode:number = 0;
+
+    let maxId = parseInt(availableNodes[availableNodes.length-1].id);
+    while(selectedNodes.length != n){
+      rndNode = Math.floor(rand.next() * maxId);
+      
+      // Only active ids will be added to selectedNodes.
+      // The process works fine even if the available 
+      // nodes change during deployment, as long as the
+      // updated nodes are not in the selected list.
+      if(availableNodesMap[rndNode]){
+        selectedNodes.push(availableNodesMap[rndNode]);
       }
-    });
-    nodesHash.sort((a, b) => (a.hash > b.hash ? 1 : -1))
-    return nodesHash.slice(0, n).map(i => i.node)
+    }
+    return selectedNodes;
   }
 
   getAppTssKeyId(appId, seed) {
@@ -279,7 +294,7 @@ class System extends CallablePlugin {
 
       /** store tss key */
       let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
-      await useDistributedKey(key.publicKey!.encode('hex', true), `app-${appId}-tss`)
+      await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
       await this.appManager.saveAppTssConfig({
         version: context.version,
         appId: appId,
@@ -410,7 +425,7 @@ class System extends CallablePlugin {
       t: context.party.t,
       partners: context.party.partners,//.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
     });
-    let party = this.tssPlugin.parties[partyId];
+    const party = this.tssPlugin.getAppParty(appId);
     if(!party)
       throw `Party not created`
 
@@ -438,14 +453,14 @@ class System extends CallablePlugin {
     for(let context of allContexts) {
       /** select context to be deleted */
       if(context.deploymentRequest.data.timestamp <= deploymentTimestamp) {
-        deleteContextList.push(context.deploymentRequest.reqId)
+        deleteContextList.push(context)
         /** add context key into delete list */
         if(context.publicKey?.encoded)
           deleteKeyList.push(context.publicKey?.encoded)
       }
     }
     await AppContext.deleteMany({
-      "deploymentRequest.reqId": {$in: deleteContextList}
+      "deploymentRequest.reqId": {$in: deleteContextList.map(c => c.deploymentRequest.reqId)}
     });
 
     await AppTssConfig.deleteMany({
@@ -453,7 +468,7 @@ class System extends CallablePlugin {
       "publicKey.encoded": {$in: deleteKeyList},
     });
     log(`deleting app from memory of all cluster %s`, appId)
-    CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, deploymentReqIds: deleteContextList}})
+    CoreIpc.fireEvent({type: 'app-context:delete', data: {appId, contexts: deleteContextList}})
   }
 
   @remoteMethod(RemoteMethods.GetAppPublicKey)
