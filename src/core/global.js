@@ -31,6 +31,7 @@ const { flatten, groupBy } = lodash;
 global.MuonAppUtils = {
   axios,
   Web3,
+  lodash,
   flatten,
   groupBy,
   tron,

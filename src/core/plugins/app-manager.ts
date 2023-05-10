@@ -100,6 +100,7 @@ export default class AppManager extends CallablePlugin {
     const currentNode = this.collateralPlugin.currentNodeInfo!;
     let deploymentTssPublicKey: any = undefined;
     if (currentNode && currentNode.isDeployer) {
+      // TODO: tssPlugin is not loaded yet, so the tssKey is null.
       if (!!this.tssPlugin.tssKey) {
         deploymentTssPublicKey = pub2json(this.tssPlugin.tssKey.publicKey!)
       }
@@ -147,7 +148,8 @@ export default class AppManager extends CallablePlugin {
       log('apps tss keys loaded.')
 
       this.loading.resolve(true);
-    } catch (e) {
+    }
+    catch (e) {
       console.error(`core.AppManager.loadAppsInfo`, e);
     }
   }
@@ -447,15 +449,12 @@ export default class AppManager extends CallablePlugin {
   }
 
   getAppAllContext(appId: string, includeExpired:boolean=false): AppContext[] {
-    const {pendingPeriod} = this.muon.configs.net.tss;
     const currentTime = getTimestamp()
     let contexts = this.getAppSeeds(appId)
       .map(seed => this.appContexts[seed]);
     if(!includeExpired) {
       contexts = contexts.filter(ctx => {
-        const {ttl, deploymentRequest: {data}} = ctx
-        const expiration = data.timestamp + ttl + pendingPeriod
-        return currentTime < expiration
+        return ctx.expiration > currentTime
       })
     }
     return contexts;
@@ -463,6 +462,15 @@ export default class AppManager extends CallablePlugin {
 
   getAppContext(appId: string, seed: string) {
     return this.appContexts[seed];
+  }
+
+  async getAppContextAsync(appId: string, seed: string, tryFromNetwork:boolean=false): Promise<AppContext|undefined> {
+    let context = this.appContexts[seed];
+    if(!context && tryFromNetwork) {
+      const contexts = await this.queryAndLoadAppContext(appId, {seeds: [seed], includeExpired: true})
+      context = contexts.find(ctx => ctx.seed === seed)
+    }
+    return context;
   }
 
   /**
@@ -499,26 +507,29 @@ export default class AppManager extends CallablePlugin {
   }
 
   getAppDeploymentStatus(appId: string, seed: string): AppDeploymentStatus {
-    let context = this.getAppContext(appId, seed);
-    const {pendingPeriod} = this.muon.configs.net.tss;
+    let context: AppContext = this.getAppContext(appId, seed);
 
     let status: AppDeploymentStatus = "NEW"
     if (!!context) {
       status = "TSS_GROUP_SELECTED";
 
-      if (!!seed && this.appHasTssKey(appId, seed)) {
+      if(appId === "1") {
         status = "DEPLOYED";
+      }
+      else {
+        if (!!seed && !!context.publicKey) {
+          status = "DEPLOYED";
 
-        if(appId !== '1') {
-          const deploymentTime = context.deploymentRequest.data.timestamp
-          const pendingStartTime = deploymentTime + context.ttl;
-          const pendingEndTime = pendingStartTime + pendingPeriod;
-          const currentTime = getTimestamp();
+          if (!!context.ttl) {
+            const deploymentTime = context.deploymentRequest!.data.timestamp
+            const pendingTime = deploymentTime + context.ttl;
+            const currentTime = getTimestamp();
 
-          if (currentTime > pendingStartTime) {
-            status = "PENDING";
-            if (currentTime > pendingEndTime)
-              status = "EXPIRED";
+            if (currentTime > pendingTime) {
+              status = "PENDING";
+              if (context.expiration! < currentTime)
+                status = "EXPIRED";
+            }
           }
         }
       }

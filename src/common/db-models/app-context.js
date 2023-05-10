@@ -31,6 +31,7 @@ const modelSchema = mongoose.Schema({
    Amount of time that a Context is valid after creation (in seconds)
    */
   ttl: {type: Number},
+  pendingPeriod: {type: Number},
   /**
    Party is not valid after this time
    This time is: CreationTime + TTL + PendingPeriod

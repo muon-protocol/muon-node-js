@@ -161,6 +161,7 @@ export type AppContext = {
     },
     rotationEnabled?: boolean,
     ttl?: number,
+    pendingPeriod?: number,
     expiration?: number,
     deploymentRequest?: AppRequest,
     keyGenRequest?: AppRequest,

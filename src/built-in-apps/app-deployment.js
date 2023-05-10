@@ -1,4 +1,7 @@
-// const {  } = MuonAppUtils
+const {
+    lodash,
+  soliditySha3,
+} = MuonAppUtils
 
 const Methods = {
     Check: "check",
@@ -12,6 +15,22 @@ const Methods = {
 const owners = [
   "0x340C978265378998D589B41F1f51F137c344C22a"
 ]
+
+const ROTATION_COEFFICIENT = 1.5;
+
+function shuffleNodes(nodes, seed) {
+    let unsorted = nodes.map(id => {
+        return {
+            id,
+            hash: soliditySha3([
+             {type: "uint64", value: id},
+             {type: "uint256", value: seed},
+         ])
+        }
+    })
+    let sorted = unsorted.sort((a, b) => (a.hash < b.hash ? -1 : 1))
+    return sorted.map(({id}) => id)
+}
 
 module.exports = {
     APP_NAME: "deployment",
@@ -85,10 +104,10 @@ module.exports = {
             case Methods.TssRotate: {
                 const {appId, previousSeed, seed: {value: seed, reqId, nonce}} = params
 
-                const oldContext = await this.callPlugin('system', "getAppContext", appId, previousSeed)
+                const oldContext = await this.callPlugin('system', "getAppContext", appId, previousSeed, true)
 
                 if(!oldContext)
-                    throw `App context not found`
+                    throw `App previous context not found on the deployment app's validateRequest method`
 
                 /** Most recent status of App should be PENDING (about to expire) */
                 const {status} = this.callPlugin('system', "getAppDeploymentInfo", appId, previousSeed)
@@ -103,12 +122,12 @@ module.exports = {
                 const {appId, seed} = params
 
                 /** ensure the app's context exists */
-                let newContext = await this.callPlugin('system', "getAppContext", appId, seed)
+                let newContext = await this.callPlugin('system', "getAppContext", appId, seed, true)
                 if(!newContext || !newContext.previousSeed)
                     throw `The App's new deployment info not found`
 
                 /** ensure the app's previous context exists */
-                let previousContext = await this.callPlugin('system', "getAppContext", appId, newContext.previousSeed)
+                let previousContext = await this.callPlugin('system', "getAppContext", appId, newContext.previousSeed, true)
                 if(!previousContext)
                   throw `The App's previous deployment info not found`
 
@@ -137,18 +156,40 @@ module.exports = {
             case Methods.Deploy:
             case Methods.TssRotate: {
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                let {seed: {value: seed}, t=tssConfigs.threshold, n=tssConfigs.max} = params
+                let {
+                    appId,
+                    previousSeed,
+                    seed: {value: seed},
+                    t=tssConfigs.threshold,
+                    n=tssConfigs.max
+                } = params;
+
                 t = Math.max(t, tssConfigs.threshold);
-                const selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
+                /** Choose a few nodes at random to join the party */
+                let selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
+                selectedNodes = selectedNodes.map(({id}) => id)
+                let previousNodes;
+                if(method === Methods.TssRotate) {
+                    const prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
+                    if (!prevContext)
+                        throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
+                    previousNodes = prevContext.party.partners
+                    /** Pick some nodes to retain in the new party */
+                    const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
+                    const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
+                    /** Merge nodes and retain n nodes */
+                    selectedNodes = lodash.uniq([...nodesToKeep, ...selectedNodes]).slice(0, n);
+                }
                 return {
-                    selectedNodes: selectedNodes.map(node => node.id)
+                    previousNodes,
+                    selectedNodes,
                 }
             }
             case Methods.TssKeyGen: {
                 const { appId, seed } = params
 
                 /** ensure app context to be exist */
-                let context = await this.callPlugin('system', "getAppContext", appId, seed)
+                let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
                 if(!context)
                     throw {message: `app deployment info not found`, params}
 
@@ -165,7 +206,7 @@ module.exports = {
                 const { appId, seed } = params
 
                 /** ensure app context to be exist */
-                let context = await this.callPlugin('system', "getAppContext", appId, seed)
+                let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
 
                 const {id, publicKey, generators} = await this.callPlugin('system', "reshareAppTss", appId, seed)
 
@@ -212,6 +253,7 @@ module.exports = {
                 return {
                     rotationEnabled: true,
                     ttl,
+                    pendingPeriod: tssConfigs.pendingPeriod,
                     expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
                     timestamp: request.data.timestamp,
                     seed,
@@ -222,7 +264,7 @@ module.exports = {
             }
             case Methods.TssRotate: {
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const {selectedNodes} = init
+                const {previousNodes, selectedNodes} = init
                 let {
                     appId,
                     previousSeed,
@@ -234,18 +276,17 @@ module.exports = {
 
                 t = Math.max(t, tssConfigs.threshold);
 
-                const oldContext = await this.callPlugin("system", "getAppContext", this.APP_ID, previousSeed);
-
                 return {
                     rotationEnabled: true,
                     ttl,
+                    pendingPeriod: tssConfigs.pendingPeriod,
                     expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
                     timestamp: request.data.timestamp,
                     previousSeed,
                     seed,
                     tssThreshold: t,
                     maxGroupSize: n,
-                    oldNodes: oldContext.party.partners,
+                    previousNodes,
                     selectedNodes,
                 };
             }
@@ -253,7 +294,7 @@ module.exports = {
             case Methods.TssReshare: {
                 const {appId, seed} = params
                 /** ensure app context to be exist */
-                let context = await this.callPlugin('system', "getAppContext", appId, seed)
+                let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
                 if(!context)
                     throw `app deployment info not found`
 
@@ -273,7 +314,7 @@ module.exports = {
                     publicKey = await this.callPlugin('system', "findAndGetAppPublicKey", appId, seed, init.id)
                 }
                 else {
-                    const oldContext = await this.callPlugin("system", "getAppContext", appId, context.previousSeed)
+                    const oldContext = await this.callPlugin("system", "getAppContext", appId, context.previousSeed, true)
                     publicKey = oldContext.publicKey;
                 }
 
@@ -316,6 +357,7 @@ module.exports = {
                 return [
                     {t: 'bool', v: result.rotationEnabled},
                     {t: 'uint64', v: result.ttl},
+                    {t: 'uint64', v: result.pendingPeriod},
                     {t: 'uint64', v: result.expiration},
                     {t: 'uint64', v: result.timestamp},
                     ...(request.method === Methods.TssRotate ? [{t: 'uint256', v: previousSeed}] : []),
@@ -353,21 +395,26 @@ module.exports = {
             }
             case Methods.TssRotate: {
                 return [
+                  /** inform the partners of new context */
                   init.selectedNodes,
+                    /** inform the partners of previous context that retained in new context */
+                  init.previousNodes.filter(id => init.selectedNodes.includes(id))
                 ]
             }
             case Methods.TssKeyGen: {
                 return [
+                    /**  Inform the partners who participated in the keygen process. */
                   init.keyGenerators
                 ]
             }
             case Methods.TssReshare: {
                 const {appId, seed} = params
-                const newContext = await this.callPlugin("system", "getAppContext", appId, seed);
-                const previousContext = await this.callPlugin("system", "getAppContext", appId, newContext.previousSeed)
+                const newContext = await this.callPlugin("system", "getAppContext", appId, seed, true);
+                const previousContext = await this.callPlugin("system", "getAppContext", appId, newContext.previousSeed, true)
                 return [
                   newContext.party.partners,
-                  previousContext.party.partners,
+                  /** Overlap of two party. */
+                  newContext.party.partners.filter(id => previousContext.party.partners.includes(id)),
                 ]
             }
             default:
@@ -393,8 +440,6 @@ module.exports = {
                 break;
             }
             case Methods.TssKeyGen: {
-                const {appId} = params
-                // await this.callPlugin('system', "storeAppTss", appId, init.id)
                 await this.callPlugin('system', "appKeyGenConfirmed", request)
                 break
             }

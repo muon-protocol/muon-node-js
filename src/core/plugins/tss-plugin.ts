@@ -414,6 +414,35 @@ class TssPlugin extends CallablePlugin {
     return this.parties[partyId];
   }
 
+  async getAppPartyAsync(appId: string, seed: string, isForReshare:boolean=false) {
+    const _context:AppContext|undefined = await this.appManager.getAppContextAsync(appId, seed, true)
+    /** is app deployed? return if not. */
+    if(!_context)
+      return undefined;
+
+    const partyId = this.getAppPartyId(_context, isForReshare);
+
+    if(!this.parties[partyId]) {
+      let partners = _context.party.partners
+      if(isForReshare){
+        const previousContext: AppContext|undefined = await this.appManager.getAppContextAsync(appId, _context.previousSeed, true)
+        if(!previousContext)
+          return undefined;
+        partners = lodash.uniq([
+          ..._context.party.partners,
+          ...previousContext.party.partners
+        ])
+      }
+      this.loadParty({
+        id: partyId,
+        t: _context.party.t,
+        max: _context.party.max,
+        partners
+      })
+    }
+    return this.parties[partyId];
+  }
+
   async isNeedToCreateKey(){
     const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId)
     const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
@@ -578,7 +607,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   private appTssKeyRecoveryCheckTime = 0;
-  async checkAppTssKeyRecovery(appId: string, seed: string) {
+  async checkAppTssKeyRecovery(appId: string, seed: string): Promise<boolean> {
     if(this.appTssKeyRecoveryCheckTime + 5*60e3 < Date.now()){
       log(`checking to recover app[${appId}] tss key`)
       this.appTssKeyRecoveryCheckTime = Date.now();
@@ -591,7 +620,7 @@ class TssPlugin extends CallablePlugin {
             throw `app tss is not ready yet`
         }
         const readyPartners = await this.getTssReadyPartners(appId, seed);
-        if(readyPartners.length > context.party.t) {
+        if(readyPartners.length >= context.party.t) {
           log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
           log(`generating nonce for recovering app[${appId}] tss key`)
           let nonce = await this.keyGen(
@@ -626,6 +655,8 @@ class TssPlugin extends CallablePlugin {
               keyShare: bn2hex(key.share!),
               expiration
             })
+
+            return true;
           }
         }
         else {
@@ -638,6 +669,7 @@ class TssPlugin extends CallablePlugin {
         throw e;
       }
     }
+    return false;
   }
 
   async tryToCreateTssKey(): Promise<DistributedKey> {

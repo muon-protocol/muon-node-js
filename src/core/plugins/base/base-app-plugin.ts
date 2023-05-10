@@ -976,7 +976,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.InformRequestConfirmation)
-  async __onRequestConfirmation(request, callerInfo) {
+  async __onRequestConfirmation(request: AppRequest, callerInfo) {
     if(!this.onConfirm)
       return `onConfirm not defined for this app`;
 
@@ -988,6 +988,8 @@ class BaseAppPlugin extends CallablePlugin {
       throw "Only request owner can inform confirmation."
     }
 
+
+    this.log(`verifying confirmed request. %o`, {app: request.app, method: request.method, params: request?.data?.params})
     const isValid = await this.verifyCompletedRequest(request);
     if(!isValid) {
       throw `TSS signature not verified`

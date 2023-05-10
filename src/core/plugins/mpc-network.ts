@@ -102,7 +102,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
               return;
 
             const {appId, seed, isForReshare} = mpc.extraParams.partyInfo as PartyInfo
-            const party = this.tssPlugin.getAppParty(appId, seed, isForReshare);
+            const party = await this.tssPlugin.getAppPartyAsync(appId, seed, isForReshare);
             if(!party) {
               throw `party[${mpc.extraParams.party}] not found`
             }

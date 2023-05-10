@@ -277,10 +277,11 @@ class System extends CallablePlugin {
       party: {
         t: result.tssThreshold,
         max: result.maxGroupSize,
-        partners
+        partners,
       },
       rotationEnabled: result.rotationEnabled,
       ttl: result.ttl,
+      pendingPeriod: result.pendingPeriod,
       expiration: result.expiration,
       deploymentRequest: request
     })
@@ -291,9 +292,14 @@ class System extends CallablePlugin {
   @appApiMethod({})
   async appDeploymentConfirmed(request: AppRequest, result) {
     /** store app context */
-    const context = await this.writeAppContextIntoDb(request, result);
+    try {
+      const context = await this.writeAppContextIntoDb(request, result);
+    }
+    catch (e) {
+      log.error("error on calling appDeploymentConfirmed %O", e)
+      throw e
+    }
 
-    // console.log(context);
     return true;
   }
 
@@ -351,37 +357,65 @@ class System extends CallablePlugin {
     } = request;
 
     /** check context exist */
-    const context = this.appManager.getAppContext(appId, seed);
-    if(!context) {
-      throw `App deployment info not found to process tss KeyGen confirmation.`
+    const newContext = await this.appManager.getAppContext(appId, seed);
+    if(!newContext) {
+      throw `App new context not found in app reshare confirmation.`
     }
 
     const currentNode = this.collateralPlugin.currentNodeInfo!;
-    if(context.party.partners.includes(currentNode.id)) {
+    if(newContext.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
-      let reshareKey: DistributedKey = await this.tssPlugin.getSharedKey(reshareKeyId)!
-      await useOneTime("key", reshareKeyId, `app-${appId}-tss`)
+      const prevContext = await this.appManager.getAppContextAsync(appId, newContext.previousSeed, true)
+      if(!prevContext) {
+        throw `App previous context not found in app reshare confirmation.`
+      }
 
-      const oldKey: DistributedKey = this.tssPlugin.getAppTssKey(appId, context.previousSeed)!
-      if(!oldKey)
-        throw `The old party's TSS key was not found.`
+      const overlapPartners = newContext.party.partners.filter(id => prevContext.party.partners.includes(id));
+      /** The current node can reshare immediately if it is in the overlap partners. */
+      if(overlapPartners.includes(currentNode.id) && this.appManager.appHasTssKey(appId, prevContext.seed)) {
+        let reshareKey: DistributedKey = await this.tssPlugin.getSharedKey(reshareKeyId)!
+        await useOneTime("key", reshareKeyId, `app-${appId}-tss`)
 
-      const appParty = this.tssPlugin.getAppParty(appId, seed)!
-      if(!appParty)
-        throw `App party not found`;
+        const oldKey: DistributedKey = this.tssPlugin.getAppTssKey(appId, newContext.previousSeed)!
+        if (!oldKey)
+          throw `The old party's TSS key was not found.`
 
-      let share = oldKey.share!.add(reshareKey.share!).sub(toBN('0x1')).umod(TssModule.curve.n!);
+        const appParty = this.tssPlugin.getAppParty(appId, seed)!
+        if (!appParty)
+          throw `App party not found`;
 
-      /** store tss key */
-      await this.appManager.saveAppTssConfig({
-        appId: appId,
-        seed,
-        keyGenRequest: request,
-        publicKey,
-        keyShare: bn2hex(share),
-        expiration,
-      })
+        const hexSeed = "0x" + BigInt(seed).toString(16)
+        let share = oldKey.share!.add(reshareKey.share!).sub(toBN(hexSeed)).umod(TssModule.curve.n!);
+
+        /** store tss key */
+        await this.appManager.saveAppTssConfig({
+          appId: appId,
+          seed,
+          keyGenRequest: request,
+          publicKey,
+          keyShare: bn2hex(share),
+          expiration,
+        })
+      }
+      /** Otherwise, it has to wait and try to recover its key later. */
+      else {
+        log(`current node is not in the party overlap. it should recover the key.`)
+
+        for(let numTry=3 ; numTry > 0 ; numTry--) {
+          await timeout(5000);
+          try {
+            const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed);
+            if(recovered) {
+              log(`tss key recovered successfully.`)
+              break;
+            }
+          }
+          catch (e) {
+            log.error('error when recovering tss key. %O', e)
+          }
+        }
+      }
     }
     else {
       await this.appManager.saveAppTssConfig({
@@ -454,8 +488,8 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async getAppContext(appId, seed) {
-    return this.appManager.getAppContext(appId, seed)
+  async getAppContext(appId, seed, tryFromNetwork:boolean=false) {
+    return this.appManager.getAppContextAsync(appId, seed, tryFromNetwork)
   }
 
   @appApiMethod({})
@@ -463,87 +497,6 @@ class System extends CallablePlugin {
     const tssConfigs = this.muon.configs.net.tss;
     const app: BaseAppPlugin = this.muon.getAppById(appId)
     return app.TTL ?? tssConfigs.defaultTTL;
-  }
-
-  /**
-   * New app party recover his old share of TSS key by contacting old party
-   * @param newContext
-   */
-  async reshareStep1(newContext: AppContext) {
-    const {appId, seed, previousSeed} = newContext
-    const previousContext: AppContext = this.appManager.getAppContext(appId, previousSeed);
-    if(!previousContext)
-      throw `App deployment info not found.`
-
-    /** check key not created before */
-    if(newContext.publicKey?.encoded) {
-      throw `App context already has key`
-    }
-
-    const jointPartyId = this.tssPlugin.getAppPartyId(newContext, true)
-    await this.tssPlugin.createParty({
-      id: jointPartyId,
-      t: newContext.party.t,
-      partners: _.uniq([
-        ...previousContext.party.partners,
-        ...newContext.party.partners
-      ]),
-    });
-
-    const appReshareParty: TssParty = await this.tssPlugin.getAppParty(appId, newContext.seed, true)!;
-
-    log(`generating nonce for recovering app[${appId}] tss key`)
-    let nonce = await this.tssPlugin.keyGen({appId, seed: newContext.seed, isForReshare: true}, {
-      id: `recovery-${uuid()}`,
-      partners: _.uniq([
-        this.collateralPlugin.currentNodeInfo!.id,
-        ...appReshareParty.partners,
-      ])
-    });
-    log(`nonce generated for recovering app[${appId}] tss key`)
-
-    /** Contact the new party partners to retrieve their share of the old TSS key.. */
-    const newPartners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
-      list: newContext.party.partners.filter(id => !previousContext.party.partners.includes(id))
-    })
-    const responses = await Promise.all(
-      newPartners.map(p => {
-        if(p.wallet === process.env.SIGN_WALLET_ADDRESS) {
-          return this.__addNewPartyToOldParty(
-            {appId, seed, previousSeed, nonce: nonce.id},
-            this.collateralPlugin.currentNodeInfo
-          )
-        }
-        else {
-          return this.remoteCall(
-            p.peerId,
-            RemoteMethods.AppAddNewParty,
-            {appId, seed, previousSeed, nonce: nonce.id}
-          )
-        }
-      })
-    )
-
-    return nonce
-  }
-
-  async reshareStep2(newContext: AppContext): Promise<DistributedKey> {
-    const {appId, seed} = newContext
-
-    const party = this.tssPlugin.getAppParty(appId, seed)!
-
-    log(`generating nonce for resharing app[${appId}] tss key`)
-    let nonce = await this.tssPlugin.keyGen({appId, seed}, {
-      id: `resharing-${uuid()}`,
-      partners: _.uniq([
-        this.collateralPlugin.currentNodeInfo!.id,
-        ...party.partners,
-      ]),
-      value: "0x1"
-    });
-    log(`nonce generated for resharing app[${appId}] tss key`)
-
-    return nonce;
   }
 
   /**
@@ -593,11 +546,20 @@ class System extends CallablePlugin {
       throw `App's new context not found.`
 
     const oldContext: AppContext = this.appManager.getAppContext(appId, newContext.previousSeed);
+    if(!oldContext)
+      throw `App's previous context not found.`
 
-    if(!this.appManager.appHasTssKey(appId, newContext.previousSeed))
-      await this.reshareStep1(newContext);
-
-    const nonce: DistributedKey = await this.reshareStep2(newContext);
+    log(`generating nonce for resharing app[${appId}] tss key`)
+    const resharePartners = newContext.party.partners.filter(id => oldContext.party.partners.includes(id))
+    let nonce = await this.tssPlugin.keyGen({appId, seed}, {
+      id: `resharing-${uuid()}`,
+      partners: _.uniq([
+        this.collateralPlugin.currentNodeInfo!.id,
+        ...resharePartners,
+      ]),
+      value: newContext.seed
+    });
+    log(`Nonce generated for resharing app[${appId}] tss key.`)
 
     return {
       id: nonce.id,
