@@ -41,7 +41,7 @@ export async function handler(argv) {
   }
 }
 
-async function deployApp(argv, configs) {
+export async function deployApp(argv, configs) {
   const {app} = argv;
   console.log('retrieving app ID ...')
   const statusResult = await muonCall(configs.url, {
