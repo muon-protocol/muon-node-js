@@ -20,6 +20,7 @@ export default class NetworkIpcPlugin extends BaseNetworkPlugin {
   async onMessageReceived(message, callerInfo){
     const { method, params } = message;
 
+    // @ts-ignore
     if(!method || this.listenerCount(`call/${method}`) <= 0){
       throw `Invalid IPC method. ${method}`;
     }

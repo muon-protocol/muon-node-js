@@ -1,26 +1,29 @@
 import NetworkContentPlugin from "./plugins/content-plugin.js";
-import mongoose from "mongoose"
-import Events from "events-async"
+import mongoose from "mongoose";
+import Events from "events-async";
 import { create } from "./libp2p_bundle.js";
 import { bootstrap } from "@libp2p/bootstrap";
 // import {pubsubPeerDiscovery} from "@libp2p/pubsub-peer-discovery";
 // import { mdns } from '@libp2p/mdns'
-import loadConfigs from "./configurations.js"
-import { createFromJSON } from '@libp2p/peer-id-factory'
-import chalk from "chalk"
-import emoji from "node-emoji"
-import {isPrivate, peerId2Str} from "./utils.js"
-import * as CoreIpc from "../core/ipc.js"
-import { MessagePublisher } from "../common/message-bus/index.js"
+import loadConfigs from "./configurations.js";
+import { createFromJSON } from "@libp2p/peer-id-factory";
+import chalk from "chalk";
+import emoji from "node-emoji";
+import { isPrivate, peerId2Str } from "./utils.js";
+import * as CoreIpc from "../core/ipc.js";
+import { MessagePublisher } from "../common/message-bus/index.js";
 import CollateralPlugin from "./plugins/collateral-info.js";
 import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
 import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
 // import NetworkDHTPlugin from "./plugins/network-dht.js";
-import {logger} from "@libp2p/logger"
-import {findMyIp, parseBool} from "../utils/helpers.js";
-import {muonRouting} from "./muon-routing.js";
+import { logger } from "@libp2p/logger";
+import { findMyIp, parseBool } from "../utils/helpers.js";
+import { muonRouting } from "./muon-routing.js";
+
+import * as NetworkIpc from "../network/ipc.js";
+import { MuonNodeInfo } from "../common/types";
 
 const log = logger("muon:network");
 
@@ -50,66 +53,71 @@ class Network extends Events {
       // mdns({
       //   interval: 60e3
       // }),
-    ]
+    ];
     let bootstrapList: string[] = netConfig.bootstrap ?? [];
     /** exclude self address */
-    bootstrapList = bootstrapList.filter(bs => {
-      let peerId = bs.split('p2p/')[1]
-      return !!peerId && peerId !== process.env.PEER_ID
-    })
-    if(bootstrapList.length>0) {
+    bootstrapList = bootstrapList.filter((bs) => {
+      let peerId = bs.split("p2p/")[1];
+      return !!peerId && peerId !== process.env.PEER_ID;
+    });
+    if (bootstrapList.length > 0) {
       peerDiscovery.push(
         bootstrap({
           // timeout: 5e3,
           list: bootstrapList,
         })
-      )
+      );
     }
 
-    const peerRouters: any[] = []
+    const peerRouters: any[] = [];
 
-    if(Array.isArray(netConfig.routing?.delegate) && netConfig.routing.delegate.length > 0) {
-      let discoveryInterval = 3*60e3
-      if(process.env.DISCOVERY_INTERVAL){
-        if(parseInt(process.env.DISCOVERY_INTERVAL)>=10e3)
-          discoveryInterval = parseInt(process.env.DISCOVERY_INTERVAL)
+    if (
+      Array.isArray(netConfig.routing?.delegate) &&
+      netConfig.routing.delegate.length > 0
+    ) {
+      let discoveryInterval = 3 * 60e3;
+      if (process.env.DISCOVERY_INTERVAL) {
+        if (parseInt(process.env.DISCOVERY_INTERVAL) >= 10e3)
+          discoveryInterval = parseInt(process.env.DISCOVERY_INTERVAL);
       }
       peerRouters.push(
         muonRouting({
           baseUrls: netConfig.routing.delegate,
           discoveryInterval,
         })
-      )
+      );
     }
 
     const announce: string[] = [];
 
     /** disable for devnet */
     let myIp;
-    if(!parseBool(process.env.DISABLE_PUBLIC_IP_ANNOUNCE!)) {
-      log('finding public ip ...')
+    if (!parseBool(process.env.DISABLE_PUBLIC_IP_ANNOUNCE!)) {
+      log("finding public ip ...");
       try {
-        myIp = await findMyIp()
+        myIp = await findMyIp();
         if (!!myIp) {
-          log(`public ip: %s`, myIp)
-          announce.push(`/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`)
-          log(`announce public address: %s`, announce[0])
+          log(`public ip: %s`, myIp);
+          announce.push(
+            `/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`
+          );
+          log(`announce public address: %s`, announce[0]);
         }
       } catch (e) {
-        log.error(`error when loading public ip %s`, e.message)
+        log.error(`error when loading public ip %s`, e.message);
       }
     }
 
     let announceFilter = (multiaddrs) => {
       // remove myIp if a public IP is already in the list
-      let filtered = multiaddrs.filter((m) => !isPrivate(m) &&
-        m.nodeAddress()['address'] != myIp
+      let filtered = multiaddrs.filter(
+        (m) => !isPrivate(m) && m.nodeAddress()["address"] != myIp
       );
-      if(filtered.length == 0){
+      if (filtered.length == 0) {
         return multiaddrs.filter((m) => !isPrivate(m));
       }
       return filtered;
-    }
+    };
 
     if (process.env.DISABLE_ANNOUNCE_FILTER) announceFilter = (mas) => mas;
 
@@ -117,23 +125,30 @@ class Network extends Events {
       peerId,
       addresses: {
         listen: [
-          `/ip4/${configs.host}/tcp/${configs.port}`,
-          // `/ip4/${configs.host}/tcp/${parseInt(configs.port)+10000}/ws`,
-          // `/ip4/${configs.host}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`,
-          // `/ip4/0.0.0.0/tcp/${parseInt(configs.port)+1}/ws`,
+          `/ip4/${configs.host}/tcp/${configs.port}`
         ],
         announceFilter,
-        announce
+        announce,
       },
       peerDiscovery,
       peerRouters,
-      denyInboundEncryptedConnection: (peerId, maConn) => {
-        let peerIdStr = peerId.toString();
-        // TODO: return true if peerId is not a valid network node
-        // The process should be simple. Otherwise it will be pron to 
-        // DDOS attack.
-        return false;
-      }
+      connectionGater: {
+        denyInboundEncryptedConnection: (peerId, maConn) => {
+          let peerIdStr = peerId.toString();
+
+          // deny connection if the node is not a valid
+          // muon node.
+
+          // Note: a node that deactivates will not disconnect right away
+          // and its connection will remain open
+
+          return NetworkIpc.filterNodes({
+            list: [peerIdStr],
+          }).then((peers) => {
+            return peers.length == 0;
+          });
+        },
+      },
       // config: {
       //   peerDiscovery: {
       //     // [Libp2pBundle.Bootstrap.tag]: {
@@ -145,7 +160,10 @@ class Network extends Events {
       // },
     });
     libp2p.addEventListener("peer:connect", this.onPeerConnect.bind(this));
-    libp2p.addEventListener("peer:disconnect", this.onPeerDisconnect.bind(this));
+    libp2p.addEventListener(
+      "peer:disconnect",
+      this.onPeerDisconnect.bind(this)
+    );
 
     // libp2p.addEventListener("peer:discovery", this.onPeerDiscovery.bind(this));
 
@@ -173,9 +191,6 @@ class Network extends Events {
 
     if (this.configs.libp2p.natIp) {
       let { port, natIp } = this.configs.libp2p;
-      // this.libp2p.components.addressManager.addObservedAddr(
-      //   `/ip4/${natIp}/tcp/${port}/p2p/${peerId2Str(this.peerId)}`
-      // );
     }
 
     log(
@@ -188,21 +203,12 @@ class Network extends Events {
         chalk.blue(` Listening on: ${this.configs.libp2p.port}`)
     );
 
-    // if(process.env.VERBOSE) {
     log("====================== Bindings ====================");
     this.libp2p.getMultiaddrs().forEach((ma) => {
       log(ma.toString());
-      // console.log(`${ma.toString()}/p2p/${peerId2Str(this.libp2p.peerId)}`)
     });
     log("====================================================");
-    // }
-
-    // if (this.libp2p.isStarted()) {
     this._onceStarted();
-    // } else {
-    //   // this.libp2p.once('start', this._onceStarted.bind(this))
-    //   this.libp2p.addEventListener('start', this._onceStarted.bind(this))
-    // }
   }
 
   async _onceStarted() {
@@ -227,8 +233,7 @@ class Network extends Events {
     CoreIpc.fireEvent({ type: "peer:discovery", data: peerId2Str(peerId) });
     log("found peer");
     try {
-      // const peerInfo = await this.libp2p.peerRouting.findPeer(peerId);
-      log("discovered peer info %s", peerId2Str(peerId))
+      log("discovered peer info %s", peerId2Str(peerId));
     } catch (e) {
       console.log("Error Muon.onPeerDiscovery", e);
     }
