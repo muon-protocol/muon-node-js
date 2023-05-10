@@ -24,6 +24,7 @@ class AggregatorBus extends MessagePublisher {
 const REQUESTS_PUB_SUB_REDIS = process.env.REQUESTS_PUB_SUB_REDIS;
 const REQUESTS_PUB_SUB_CHANNEL = process.env.REQUESTS_PUB_SUB_CHANNEL;
 let reqAggregatorBus;
+
 /** enable requests PubSub channel to be used in explorer  */
 if(!!REQUESTS_PUB_SUB_CHANNEL) {
   let configs: MessageBusConfigs = {}
