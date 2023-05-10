@@ -52,6 +52,10 @@ export default class CollateralInfoPlugin extends CallablePlugin{
 
     let {nodeManager} = this.network.configs.net;
     log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
+    // Waits a random time(0-5 secs) to avoid calling
+    // RPC nodes by all network nodes at the same time
+    // When the network restarts
+    await timeout(Math.floor(Math.random()*5*1e3));
     await this._loadCollateralInfo();
 
     // @ts-ignore
@@ -143,7 +147,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         }
       }catch (e) {
         log('loading network info failed. %o', e)
-        await timeout(5000)
+        await timeout(Math.floor(Math.random()*1*60*1000)+5000)
       }
     }while(!rawResult)
 

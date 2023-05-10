@@ -209,11 +209,11 @@ async function start() {
           module: (await import("./plugins/explorer.js")).default,
           config: {},
         },
-        {
-          name: "dht",
-          module: (await import("./plugins/dht.js")).default,
-          config: {},
-        },
+        // {
+        //   name: "dht",
+        //   module: (await import("./plugins/dht.js")).default,
+        //   config: {},
+        // },
         {
           name: "system",
           module: (await import("./plugins/system.js")).default,
