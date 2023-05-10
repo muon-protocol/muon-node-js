@@ -36,5 +36,15 @@ To check local devnet open http://localhost:8080/v1/?app=tss&method=test in your
 
 After any changes, you will need to build again.
 
-#############
+### Unit Test
+Test cases for MUON are developed using mocha library. 
+Source files for test cases are located at ./test directory.
+
+To run test cases you should run mocha using command below:
+
+`./node_modules/.bin/mocha`
+
+You can also run a specific test case by adding name of the test case file like this:
+ 
+ `./node_modules/.bin/mocha ./test/deployment.test`
 
