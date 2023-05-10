@@ -9,30 +9,21 @@ type NetworkIpcMessage = {
 }
 
 export default class NetworkIpcPlugin extends BaseNetworkPlugin {
-  /**
-   * @type {QueueConsumer}
-   */
+
   bus: QueueConsumer<NetworkIpcMessage>;
 
   async onStart() {
-    const bus = new QueueConsumer<NetworkIpcMessage>(IPC_CHANNEL);
-    bus.on("message", this.onMessageReceived.bind(this));
-    this.bus = bus
+    this.bus = new QueueConsumer<NetworkIpcMessage>(IPC_CHANNEL);
+    this.bus.on("message", this.onMessageReceived.bind(this));
   }
 
   async onMessageReceived(message, callerInfo){
     const { method, params } = message;
 
-    if(!method)
-      throw "ipc method not defined";
-
+    if(!method || this.listenerCount(`call/${method}`) <= 0){
+      throw `Invalid IPC method. ${method}`;
+    }
     // @ts-ignore
-    if(this.listenerCount(`call/${method}`) > 0){
-      // @ts-ignore
-      return await this.emit(`call/${method}`, params, callerInfo);
-    }
-    else {
-      throw {message: `ipc method "${method}" is not valid`}
-    }
+    return await this.emit(`call/${method}`, params, callerInfo);
   }
 }
