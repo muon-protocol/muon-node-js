@@ -84,7 +84,21 @@ module.exports = {
                 break;
             }
             case Methods.Deploy: {
-                const {appId, seed: {value: seed, nonce, reqId}} = params
+                const {
+                    appId,
+                    seed: {value: seed, nonce, reqId},
+                    nodes,
+                    ttl,
+                    pending
+                } = params
+                if(parseInt(ttl) <= 0)
+                    throw "Invalid app deployment ttl"
+                if(parseInt(pending) <= 0)
+                    throw "Invalid app pending period"
+                for(const id of nodes){
+                    if(parseInt(id) <= 0)
+                        throw `Invalid node ID in nodes list`;
+                }
                 const context = await this.callPlugin('system', "getAppContext", appId, seed)
                 if(!!context) {
                     throw `App already deployed`;
@@ -161,13 +175,20 @@ module.exports = {
                     previousSeed,
                     seed: {value: seed},
                     t=tssConfigs.threshold,
-                    n=tssConfigs.max
+                    n=tssConfigs.max,
+                    nodes,
                 } = params;
 
                 t = Math.max(t, tssConfigs.threshold);
                 /** Choose a few nodes at random to join the party */
-                let selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
-                selectedNodes = selectedNodes.map(({id}) => id)
+                let selectedNodes;
+                if(!!nodes) {
+                    selectedNodes = nodes
+                }
+                else {
+                    selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
+                    selectedNodes = selectedNodes.map(({id}) => id)
+                }
                 let previousNodes;
                 if(method === Methods.TssRotate) {
                     const prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
@@ -244,17 +265,20 @@ module.exports = {
                     appId,
                     seed: {value: seed},
                     t=tssConfigs.threshold,
-                    n=tssConfigs.max
+                    n=tssConfigs.max,
+                    ttl: userDefinedTTL,
+                    pending,
                 } = params
-                const ttl = await this.callPlugin("system", "getAppTTL", appId);
+                const ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
 
                 t = Math.max(t, tssConfigs.threshold);
+                const pendingPeriod = !!pending ? pending : tssConfigs.pendingPeriod
 
                 return {
                     rotationEnabled: true,
                     ttl,
-                    pendingPeriod: tssConfigs.pendingPeriod,
-                    expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
+                    pendingPeriod,
+                    expiration: request.data.timestamp + ttl + pendingPeriod,
                     timestamp: request.data.timestamp,
                     seed,
                     tssThreshold: t,
@@ -270,17 +294,20 @@ module.exports = {
                     previousSeed,
                     seed: {value: seed},
                     t=tssConfigs.threshold,
-                    n=tssConfigs.max
+                    n=tssConfigs.max,
+                    ttl: userDefinedTTL,
+                    pending,
                 } = params
-                const ttl = await this.callPlugin("system", "getAppTTL", appId);
+                const ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
 
                 t = Math.max(t, tssConfigs.threshold);
+                const pendingPeriod = !!pending ? pending : tssConfigs.pendingPeriod
 
                 return {
                     rotationEnabled: true,
                     ttl,
-                    pendingPeriod: tssConfigs.pendingPeriod,
-                    expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
+                    pendingPeriod,
+                    expiration: request.data.timestamp + ttl + pendingPeriod,
                     timestamp: request.data.timestamp,
                     previousSeed,
                     seed,

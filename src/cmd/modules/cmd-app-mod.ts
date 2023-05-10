@@ -49,7 +49,7 @@ export async function handler(argv) {
 }
 
 async function deployApp(argv, configs) {
-  const {app} = argv;
+  const {app, nodes, ttl, pending} = argv;
   console.log('retrieving app ID ...')
   const statusResult = await muonCall(configs.url, {
     app: 'explorer',
@@ -94,7 +94,10 @@ async function deployApp(argv, configs) {
           value: deploymentSeed,
           reqId: randomSeedResponse.result.reqId,
           nonce: randomSeedResponse.result.data.init.nonceAddress,
-        }
+        },
+        nodes: !!nodes ? nodes.split(',') : undefined,
+        ttl,
+        pending,
       }
     })
     expectConfirmed(deployResponse)
@@ -130,7 +133,7 @@ async function deployApp(argv, configs) {
 }
 
 async function reshareApp(argv, configs) {
-  const {app} = argv;
+  const {app, nodes, ttl, pending} = argv;
   console.log('Retrieving app ID ...')
   const statusResult = await muonCall(configs.url, {
     app: 'explorer',
@@ -184,7 +187,10 @@ async function reshareApp(argv, configs) {
           value: reshareSeed,
           reqId: randomSeedResponse.result.reqId,
           nonce: randomSeedResponse.result.data.init.nonceAddress,
-        }
+        },
+        nodes: !!nodes ? nodes.split(',') : undefined,
+        ttl,
+        pending,
       }
     })
     expectConfirmed(reshareResponse)
