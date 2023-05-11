@@ -750,19 +750,25 @@ class BaseAppPlugin extends CallablePlugin {
     // let signature = crypto.sign(resultHash)
 
     let {reqId} = request;
-    let nonce = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
+    let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
     if(!nonce)
       throw `nonce not found for request ${reqId}`
 
     // let tssKey = this.isBuiltInApp ? tssPlugin.tssKey : tssPlugin.getAppTssKey(this.APP_ID);
-    let tssKey = this.getTss(request.deploymentSeed)!;
+    let tssKey: DistributedKey = this.getTss(request.deploymentSeed)!;
     if(!tssKey)
       throw `App TSS key not found`;
 
     let k_i = nonce.share
     let K = nonce.publicKey!;
 
-    await useOneTime("key", K.encode('hex', true), resultHash)
+    /** Storing the TSS key usage for ever. */
+    await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-${this.APP_ID}-tss`)
+    /**
+     Storing the nonce usage for an hour.
+     Each nonce will remain in the memory for 30 minutes. Therefore one hour is reasonable for keeping usage history.
+     */
+    await useOneTime("key", K.encode('hex', true), `app-${this.APP_ID}-nonce-${resultHash}`, 3600)
     // TODO: remove nonce after sign
     let signature = tss.schnorrSign(tssKey.share!, k_i!, K, resultHash)
 

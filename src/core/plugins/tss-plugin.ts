@@ -246,6 +246,7 @@ class TssPlugin extends CallablePlugin {
         publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
       }
       let key = DistributedKey.load(this.tssParty, _key);
+      await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.tssKey = key;
       this.isReady = true
       log('tss ready');
@@ -532,10 +533,12 @@ class TssPlugin extends CallablePlugin {
       list: nonce.partners,
       excludeSelf: true,
     })
+    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-1-tss-recovery`, 3600)
     let tssKey = await this.recoverAppTssKey('1', '1', noncePartners, nonce);
 
     this.tssKey = tssKey
     this.isReady = true;
+    await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-1-tss`)
     this.saveTssConfig(this.tssParty, tssKey)
     CoreIpc.fireEvent({type: "global-tss-key:generate", data: tssKey.toSerializable()});
     log(`${process.pid} tss key recovered`);
@@ -560,6 +563,8 @@ class TssPlugin extends CallablePlugin {
 
     if(partners.length < appParty.t)
       throw {message: "No enough online partners to recover the key."};
+
+    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
 
     let keyResults = await Promise.all(
       partners.map(p => {
@@ -715,6 +720,7 @@ class TssPlugin extends CallablePlugin {
         // console.log(`key save broadcast threshold: ${this.TSS_THRESHOLD} count: ${key.partners.length}`, callResult);
         if (callResult.filter(r => r === true).length+1 < this.TSS_THRESHOLD)
           throw `Tss creation failed.`
+        await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
         this.saveTssConfig(this.tssParty, key)
 
         this.tssKey = key;
@@ -958,7 +964,7 @@ class TssPlugin extends CallablePlugin {
       throw `Cannot use tss key as nonce`;
 
     let nonce = await this.getSharedKey(nonceId);
-    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`)
+    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
     let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
     return {
       id: appTssKey!.id,
@@ -998,12 +1004,13 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.__storeTssKey', data)
     let {party: partyId, key: keyId} = data
     let party = this.getParty(partyId)
-    let key = await this.getSharedKey(keyId);
+    let key: DistributedKey = await this.getSharedKey(keyId);
     if (!party)
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
       throw {message: 'TssPlugin.__storeTssKey: key not found.'};
     if(callerInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
+      await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.saveTssConfig(party, key);
       this.tssKey = key
       this.isReady = true;

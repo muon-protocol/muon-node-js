@@ -134,9 +134,9 @@ class System extends CallablePlugin {
     let maxId = parseInt(availableNodes[availableNodes.length-1].id);
     while(selectedNodes.length != n){
       rndNode = Math.floor(rand.next() * maxId);
-      
+
       // Only active ids will be added to selectedNodes.
-      // The process works fine even if the available 
+      // The process works fine even if the available
       // nodes change during deployment, as long as the
       // updated nodes are not in the selected list.
       if(availableNodesMap[rndNode]){
@@ -390,11 +390,23 @@ class System extends CallablePlugin {
       /** The current node can reshare immediately if it is in the overlap partners. */
       if(overlapPartners.includes(currentNode.id) && this.appManager.appHasTssKey(appId, prevContext.seed)) {
         let reshareKey: DistributedKey = await this.tssPlugin.getSharedKey(reshareKeyId)!
-        await useOneTime("key", reshareKeyId, `app-${appId}-tss`)
+        /**
+         Mark the reshareKey as used for app TSS key.
+         If anyone tries to use this key for a different purpose, it will cause an error.
+         Likewise, if this key has been used for another purpose before, it will throw an error again.
+         */
+        await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-reshare`)
 
         const oldKey: DistributedKey = this.tssPlugin.getAppTssKey(appId, newContext.previousSeed)!
         if (!oldKey)
           throw `The old party's TSS key was not found.`
+        /**
+         Mark the oldKey as used for app TSS key.
+         If anyone tries to use this key for a different purpose, it will cause an error.
+         Likewise, if this key has been used for another purpose before, it will throw an error again.
+         */
+        await useOneTime("key", oldKey.publicKey!.encode('hex', true), `app-${appId}-tss`)
+
 
         const appParty = this.tssPlugin.getAppParty(appId, seed)!
         if (!appParty)
