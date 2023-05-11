@@ -42,19 +42,14 @@ export async function waitToRequestBeAnnounced(apiEndpoint: string, request: any
     if(check?.result?.isValid === false)
       throw `invalid request`
 
-    const t = check?.result?.tss?.t
-    const groupsAnnounced: MapOf<boolean>[] = check?.result?.groupsAnnounced
-    if(!t || !groupsAnnounced[0])
-      continue;
-
-    let numGroupsToCheck = 1;
-    if(configs.checkAllGroups)
-      numGroupsToCheck = groupsAnnounced.length
-
-    confirmed = true;
-    for(let i=0 ; i<numGroupsToCheck && confirmed ; i++) {
-      const announcedCount = Object.values(groupsAnnounced[i]).filter(n => n === true).length;
-      confirmed = announcedCount >= t;
+    if(configs.checkAllGroups) {
+      if(check?.result?.allGroupsAnnounced) {
+        confirmed = true
+      }
+    }
+    else {
+      if(check?.result?.appPartyAnnounced)
+        confirmed = true;
     }
 
     if(!confirmed)

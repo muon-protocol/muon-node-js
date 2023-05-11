@@ -138,6 +138,17 @@ class Explorer extends CallablePlugin {
     }))
     const announceMap: MapOf<boolean> = partners.reduce((obj, {id}, i) => (obj[id]=announced[i], obj), {})
 
+    const groupsAnnouncedPartners = announceGroups.map(group => {
+      return group.map(id => announceMap[id])
+        .filter(announced => announced)
+    })
+
+    const groupAnnounced: boolean[] = groupsAnnouncedPartners
+      .map(g => {
+        /** The group has reached or exceeded the threshold of announced partners ? */
+        return g.filter(a => a).length >= appParty.t
+      })
+
     return {
       isValid,
       tss: {
@@ -145,10 +156,9 @@ class Explorer extends CallablePlugin {
         n: appParty.max
       },
       hasAnnouncement,
-      announceGroups,
-      groupsAnnounced: announceGroups.map(group => {
-        return group.reduce((obj, id) => (obj[id]=announceMap[id], obj), {})
-      })
+      /** The first group is the app party, and the following groups are the ones that the app returns. */
+      appPartyAnnounced: groupAnnounced[0],
+      allGroupsAnnounced: announceGroups.length === groupAnnounced.filter(a => a).length,
     }
   }
 
@@ -170,51 +180,6 @@ class Explorer extends CallablePlugin {
     let contents = await Content.find({}, {reqId: 1, _id: 1}).sort({_id: -1}).limit(count);
 
     return contents.map(c => c.reqId);
-  }
-
-  private async getContextPartnersStatus(context: AppContext, statusCode: number) {
-    const {appId, seed} = context
-    let partnersStatus;
-    if(context && statusCode > 0) {
-      const partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
-        list: context.party?.partners || []
-      })
-      const responses = await Promise.all(
-        partners.map(n => {
-          if(n.wallet === process.env.SIGN_WALLET_ADDRESS)
-            return this.__getAppDeploymentStatus({appId, seed}, this.collateralPlugin.currentNodeInfo!)
-          return this.remoteCall(
-            n.peerId,
-            RemoteMethods.AppDeploymentStatus,
-            {appId, seed},
-            {timeout: 5000}
-          )
-            .catch(e => null)
-        })
-      )
-      partnersStatus = responses.reduce((obj, result, index) => {
-        const node = partners[index]
-        obj[node.id] = result
-        if(node.wallet === process.env.SIGN_WALLET_ADDRESS){
-          this.__loadAppContextAndKey({appId, seed}, this.collateralPlugin.currentNodeInfo!)
-            .catch(e => {
-            })
-        }
-        else {
-          /** call remote node to load app context*/
-          this.remoteCall(
-            node.peerId,
-            RemoteMethods.LoadAppContextAndKey,
-            {appId, seed}
-          )
-            .catch(e => {
-            })
-        }
-
-        return obj
-      }, {})
-    }
-    return partnersStatus;
   }
 
   @gatewayMethod('app')
@@ -247,9 +212,7 @@ class Explorer extends CallablePlugin {
             max: context.party?.max
           },
           publicKey: context.publicKey || null,
-          partners: context.party?.partners,
         },
-        // partnersStatus: await this.getContextPartnersStatus(context[0], statusCode),
       }
     })
 

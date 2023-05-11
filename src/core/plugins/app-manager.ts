@@ -769,6 +769,8 @@ export default class AppManager extends CallablePlugin {
     if(options?.seeds && options.seeds.length > 0){
       contexts = contexts.filter(ctx => options.seeds!.includes(ctx.seed))
     }
+    /** Filter out the contexts where the caller node is not a member. */
+    contexts = contexts.filter(ctx => ctx.party.partners.includes(callerInfo.id));
     return contexts;
   }
 

@@ -57,7 +57,7 @@ export async function getAppContext(appName: string, seed: string) {
  * Return local app context
  * @param appName
  */
-export async function getAppOldestContext(appName: string) {
+export async function getAppOldestContext(appName: string): Promise<AppContext|undefined> {
   return await call(IpcMethods.GetAppOldestContext, {appName})
 }
 
