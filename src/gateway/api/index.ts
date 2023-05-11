@@ -104,6 +104,10 @@ async function callProperNode(requestData: GatewayCallParams) {
 
   let context: any = await CoreIpc.getAppOldestContext(requestData.app);
   if (!context) {
+    const currentNodeInfo: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
+    if(currentNodeInfo!.isDeployer)
+      throw `App is not deployed or expired.`
+
     log("context not found. query the network for context.")
     try {
       const allContexts: any[] = await CoreIpc.queryAppAllContext(requestData.app)
