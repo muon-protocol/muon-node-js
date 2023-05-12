@@ -525,9 +525,18 @@ class NetworkIpcHandler extends CallablePlugin {
         if(!appName)
           throw 'invalid request'
         /** forward request into core to be verified and then be stored */
-        const verified = await CoreIpc.verifyRequestSignature(data.data)
-        if(!verified)
-          throw 'request not verified';
+        
+        // TODO: Uncomment this
+        // Just deployer nodes have access to all appContexts
+        // at the momemnt and monitoring nodes can't verify
+        // the transactions.
+        // It should be changed to let all nodes query the AppContext w/o
+        // the party and get the TSS pubkey and verify the requests
+        
+        //const verified = await CoreIpc.verifyRequestSignature(data.data)
+        
+        //if(!verified)
+        //  throw 'request not verified';
         if(reqAggregatorBus) {
           await reqAggregatorBus.send(data.data);
         }
