@@ -97,7 +97,7 @@ async function deployApp(argv, configs) {
         },
         nodes: !!nodes ? nodes.split(',') : undefined,
         ttl,
-        pending,
+        pendingPeriod: pending,
       }
     })
     expectConfirmed(deployResponse)
@@ -190,7 +190,7 @@ async function reshareApp(argv, configs) {
         },
         nodes: !!nodes ? nodes.split(',') : undefined,
         ttl,
-        pending,
+        pendingPeriod: pending,
       }
     })
     expectConfirmed(reshareResponse)
