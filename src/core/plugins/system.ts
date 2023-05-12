@@ -123,24 +123,34 @@ class System extends CallablePlugin {
     if(availableNodes.length < t){
       throw "Insufficient nodes for subnet creation";
     }
+    if(availableNodes.length < n) {
+      n = availableNodes.length;
+    }
 
     // nodeId => MuonNodeInfo
-    let availableNodesMap = {};
+    let availableNodesMap: MapOf<MuonNodeInfo> = {};
     availableNodes.map(node => availableNodesMap[node.id]=node);
 
     const rand = new Rand(seed);
     let selectedNodes: MuonNodeInfo[] = [], rndNode:number = 0;
 
-    let maxId = parseInt(availableNodes[availableNodes.length-1].id);
-    while(selectedNodes.length != n){
-      rndNode = Math.floor(rand.next() * maxId);
+    /** The available list may not be sorted by id */
+    let maxId: number = availableNodes.reduce((max, n) => Math.max(max, parseInt(n.id)), 0)
+
+    const selectedIds: string[] = []
+    while(selectedIds.length != n){
+      rndNode = Math.floor(rand.next() * maxId) + 1;
 
       // Only active ids will be added to selectedNodes.
       // The process works fine even if the available
       // nodes change during deployment, as long as the
       // updated nodes are not in the selected list.
       if(availableNodesMap[rndNode]){
-        selectedNodes.push(availableNodesMap[rndNode]);
+        const currentId = availableNodesMap[rndNode].id;
+        if(!selectedIds.includes(currentId)) {
+          selectedIds.push(currentId);
+          selectedNodes.push(availableNodesMap[rndNode]);
+        }
       }
     }
     return selectedNodes;
