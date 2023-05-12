@@ -11,7 +11,7 @@ import * as crypto from '../../utils/crypto.js'
 import {logger} from '@libp2p/logger'
 import Ajv from "ajv"
 import {mixGetPost} from "../middlewares.js";
-import {MuonNodeInfo} from "../../common/types";
+import {AppContext, MuonNodeInfo} from "../../common/types";
 import {GatewayCallParams} from "../types";
 
 const log = logger('muon:gateway:api')
@@ -75,21 +75,25 @@ async function getAppTimeout(app) {
   return appTimeouts[app];
 }
 
+async function forwardRequestToADeployer(requestData: GatewayCallParams) {
+  let deployers = (await NetworkIpc.filterNodes({isDeployer: true})).map(p => p.peerId);
+  let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 5000});
+  // @ts-ignore
+  if(!onlineDeployers.length > 0)
+    throw `cannot find any online deployer to forward request`;
+  const randomIndex = Math.floor(Math.random() * onlineDeployers.length);
+  log(`forwarding request to id:%s`, onlineDeployers[randomIndex])
+  const timeout = await getAppTimeout(requestData.app);
+  return await NetworkIpc.forwardRequest(onlineDeployers[randomIndex], requestData, timeout);
+}
+
 async function callProperNode(requestData: GatewayCallParams) {
   /** forward deployment app request to Deployer node */
   if(requestData.app === 'deployment'){
     const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
     if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
       log(`current node is not deployer`)
-      let deployers = (await NetworkIpc.filterNodes({isDeployer: true})).map(p => p.peerId);
-      let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 5000});
-      // @ts-ignore
-      if(!onlineDeployers.length > 0)
-        throw `cannot find any online deployer to forward request`;
-      const randomIndex = Math.floor(Math.random() * onlineDeployers.length);
-      log(`forwarding request to id:%s`, onlineDeployers[randomIndex])
-      const timeout = await getAppTimeout(requestData.app);
-      return await NetworkIpc.forwardRequest(onlineDeployers[randomIndex], requestData, timeout);
+      return forwardRequestToADeployer(requestData);
     }
   }
 
@@ -98,38 +102,33 @@ async function callProperNode(requestData: GatewayCallParams) {
     return await requestQueue.send(requestData)
   }
 
-  let context = await CoreIpc.getAppContext(requestData.app);
+  let context: any = await CoreIpc.getAppOldestContext(requestData.app);
   if (!context) {
+    const currentNodeInfo: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
+    if(currentNodeInfo!.isDeployer)
+      throw `App is not deployed or expired.`
+
     log("context not found. query the network for context.")
     try {
-      context = await CoreIpc.queryAppContext(requestData.app)
+      const allContexts: any[] = await CoreIpc.queryAppAllContext(requestData.app)
+      // if(allContexts.length > 0) {}
+      /** find oldest context */
+      context = allContexts.reduce((oldest: AppContext, ctx: AppContext): AppContext | undefined => {
+        if(!oldest)
+          return ctx;
+        return ((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (oldest.deploymentRequest?.data.timestamp ?? Infinity)) ? ctx : oldest;
+      }, undefined);
     }catch (e) {
       log('query app context failed %o', e)
       throw e;
     }
   }
-  if (!context) {
-    log('app context not found and it throwing error %o', requestData)
-    throw `App not deployed`;
-  }
-  const {partners} = context.party
-  const currentNodeInfo: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
-  if (!!currentNodeInfo && partners.includes(currentNodeInfo.id)) {
+  if (context) {
     return await requestQueue.send(requestData)
-  } else {
-    const randomIndex = Math.floor(Math.random() * partners.length);
-    log(`forwarding request to id:%s`, partners[randomIndex])
-    const timeout = await getAppTimeout(requestData.app);
-    let request = await NetworkIpc.forwardRequest(partners[randomIndex], requestData, timeout);
-    // if(requestData.gwSign){
-    //   const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
-    //   const requestHash = soliditySha3(request.data.signParams)
-    //   if(shieldHash !== requestHash)
-    //     throw `Shield result mismatch.`
-    //   request.gwAddress = process.env.SIGN_WALLET_ADDRESS;
-    //   request.gwSignature = "";
-    // }
-    return request
+  }
+  else {
+    log('app context not found and request will forward to a deployer node. %o', requestData)
+    return forwardRequestToADeployer(requestData);
   }
 }
 

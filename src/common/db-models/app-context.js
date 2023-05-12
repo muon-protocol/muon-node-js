@@ -16,21 +16,39 @@ const TssPublicKeyInfo = mongoose.Schema({
 }, {_id: false})
 
 const modelSchema = mongoose.Schema({
-  version: {type: Number},
   appId: {type: String, required: true},
   appName: {type: String, required: true},
+  previousSeed: {type: String},
   seed: {type: String, required: true},
   isBuiltIn: {type: Boolean, default: false},
   party: {type: TssPartyInfo},
+  /**
+   Is TSS key periodic rotation enabled?
+   If enabled, TSS key will expire and needs to be reshared periodically.
+   */
+  rotationEnabled: {type: Boolean, default: true},
+  /**
+   Amount of time that a Context is valid after creation (in seconds)
+   */
+  ttl: {type: Number},
+  pendingPeriod: {type: Number},
+  /**
+   Party is not valid after this time
+   This time is: CreationTime + TTL + PendingPeriod
+   */
+  expiration:{type: Number},
   deploymentRequest: {type: Object, required: true},
+  keyGenRequest: {type: Object},
   publicKey: {type: TssPublicKeyInfo},
-  deployTime: {type: Date, required: true},
-  reShareTime: {type: Date},
 }, {timestamps: true});
 
 modelSchema.pre('save', function (next) {
   /** force appId to be hex string */
   this.appId = BigInt(this.appId).toString(10);
+  if(this.deploymentRequest.method === 'tss-rotate'){
+    if(!this.previousSeed)
+      throw `Missing previousSeed on context`
+  }
   if(!this.dangerousAllowToSave)
     throw `AppContext save only allowed from NetworkAppManager`
 
@@ -40,7 +58,6 @@ modelSchema.pre('save', function (next) {
 modelSchema.virtual('hash').get(function () {
   return soliditySha3([
     {t: 'uint256', v: this.appId},
-    // {t: 'uint64', v: this.version},
     {t: 'uint256', v: this.seed},
   ])
 });
@@ -48,12 +65,13 @@ modelSchema.virtual('hash').get(function () {
 // modelSchema.index({ owner: 1, version: 1, appId: 1}, { unique: true });
 
 export function hash(context) {
-  return soliditySha3([
-    {t: "uint32", v: context.version},
+  const items = [
+    {t: "uint256", v: context.seed},
     {t: "uint256", v: context.appId},
     {t: "uint32", v: context.party.t},
     ... context.party.partners.map(v => ({t: 'uint64', v}))
-  ])
+  ]
+  return soliditySha3(items)
 }
 
 export default mongoose.model(MODEL_APP_CONTEXT, modelSchema);

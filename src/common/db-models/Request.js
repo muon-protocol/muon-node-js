@@ -7,6 +7,7 @@ const modelSchema = mongoose.Schema({
   app: {type: String, trim: true, required: true},
   appId: {type: String, trim: true},
   method: {type: String, trim: true},
+  deploymentSeed: {type: String, required: true},
   // Number of signature needs to confirm.
   nSign: {type: Number},
   // First node (current node) address.
