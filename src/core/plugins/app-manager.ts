@@ -765,7 +765,7 @@ export default class AppManager extends CallablePlugin {
   @remoteMethod(RemoteMethods.GetAppContext)
   async __getAppContext(data: {appId:string, options: AppContextQueryOptions}, callerInfo): Promise<any[]> {
     const {appId, options} = data;
-    let contexts = this.getAppAllContext(appId, options.includeExpired)
+    let contexts = this.getAppAllContext(appId, options?.includeExpired)
     if(options?.seeds && options.seeds.length > 0){
       contexts = contexts.filter(ctx => options.seeds!.includes(ctx.seed))
     }
