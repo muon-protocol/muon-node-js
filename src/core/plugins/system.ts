@@ -329,7 +329,7 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async appKeyGenConfirmed(request) {
+  async appKeyGenConfirmed(request: AppRequest) {
     const {
       data: {
         params: {appId},
@@ -348,17 +348,37 @@ class System extends CallablePlugin {
     if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
-      /** store tss key */
-      let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
-      await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
-      await this.appManager.saveAppTssConfig({
-        appId: appId,
-        seed,
-        keyGenRequest: request,
-        publicKey: pub2json(key.publicKey!),
-        keyShare: bn2hex(key.share!),
-        expiration,
-      })
+      /** The current node can store the key only when it has participated in key generation. */
+      if(request.data.init.keyGenerators.includes(currentNode.id)) {
+        /** store tss key */
+        let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
+        await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
+        await this.appManager.saveAppTssConfig({
+          appId: appId,
+          seed,
+          keyGenRequest: request,
+          publicKey: pub2json(key.publicKey!),
+          keyShare: bn2hex(key.share!),
+          expiration,
+        })
+      }
+      /** Otherwise, it should recover it's key. */
+      else {
+        for(let numTry = 3 ; numTry > 0 ; numTry--) {
+          /** Wait for a moment in order to let the other nodes get ready. */
+          await timeout(10000);
+          try {
+            const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed);
+            if(recovered) {
+              log(`tss key recovered successfully.`)
+              break;
+            }
+          }
+          catch (e) {
+            log.error('error when recovering tss key. %O', e)
+          }
+        }
+      }
     }
     else {
       await this.appManager.saveAppTssConfig({
@@ -376,7 +396,7 @@ class System extends CallablePlugin {
     const {
       data: {
         params: {appId},
-        init: {id: reshareKeyId},
+        init: {id: reshareKeyId, keyGenerators},
         result: {expiration, seed, publicKey},
       }
     } = request;
@@ -398,7 +418,14 @@ class System extends CallablePlugin {
 
       const overlapPartners = newContext.party.partners.filter(id => prevContext.party.partners.includes(id));
       /** The current node can reshare immediately if it is in the overlap partners. */
-      if(overlapPartners.includes(currentNode.id) && this.appManager.appHasTssKey(appId, prevContext.seed)) {
+      if(
+        /** Node in the overlap party */
+        overlapPartners.includes(currentNode.id)
+        /** Node has the old key */
+        && this.appManager.appHasTssKey(appId, prevContext.seed)
+        /** Node has participated in reshare key generation */
+        && keyGenerators.includes(currentNode.id)
+      ) {
         let reshareKey: DistributedKey = await this.tssPlugin.getSharedKey(reshareKeyId)!
         /**
          Mark the reshareKey as used for app TSS key.
@@ -440,7 +467,7 @@ class System extends CallablePlugin {
         log(`current node is not in the party overlap. it should recover the key.`)
 
         for(let numTry=3 ; numTry > 0 ; numTry--) {
-          await timeout(5000);
+          await timeout(10000);
           try {
             const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed);
             if(recovered) {
