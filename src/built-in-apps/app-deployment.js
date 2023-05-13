@@ -317,10 +317,15 @@ module.exports = {
                     ttl: userDefinedTTL,
                     pendingPeriod: pending,
                 } = params
-                const ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
+
+                const prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
+                if (!prevContext)
+                    throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
+
+                const ttl = !!userDefinedTTL ? userDefinedTTL : prevContext.ttl;
+                const pendingPeriod = !!pending ? pending : prevContext.pendingPeriod;
 
                 t = Math.max(t, tssConfigs.threshold);
-                const pendingPeriod = !!pending ? pending : tssConfigs.pendingPeriod
 
                 return {
                     rotationEnabled: true,
