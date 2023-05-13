@@ -77,14 +77,17 @@ async function getAppTimeout(app) {
 
 async function forwardRequestToADeployer(requestData: GatewayCallParams) {
   let deployers = (await NetworkIpc.filterNodes({isDeployer: true})).map(p => p.peerId);
-  let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 5000});
-  // @ts-ignore
-  if(!onlineDeployers.length > 0)
-    throw `cannot find any online deployer to forward request`;
-  const randomIndex = Math.floor(Math.random() * onlineDeployers.length);
-  log(`forwarding request to id:%s`, onlineDeployers[randomIndex])
+  return forwardRequestToParty(requestData, deployers);
+}
+
+async function forwardRequestToParty(requestData: GatewayCallParams, partners: string[]) {
+  let onlinePartners: string[] = await NetworkIpc.findNOnlinePeer(partners, 2, {timeout: 5000});
+  if(onlinePartners.length < 1)
+    throw `cannot find any online node to forward request`;
+  const randomIndex = Math.floor(Math.random() * onlinePartners.length);
+  log(`forwarding request to id:%s`, onlinePartners[randomIndex])
   const timeout = await getAppTimeout(requestData.app);
-  return await NetworkIpc.forwardRequest(onlineDeployers[randomIndex], requestData, timeout);
+  return await NetworkIpc.forwardRequest(onlinePartners[randomIndex], requestData, timeout);
 }
 
 async function callProperNode(requestData: GatewayCallParams) {
@@ -102,7 +105,9 @@ async function callProperNode(requestData: GatewayCallParams) {
     return await requestQueue.send(requestData)
   }
 
-  let context: any = await CoreIpc.getAppOldestContext(requestData.app);
+  let context: AppContext|undefined = await CoreIpc.getAppOldestContext(requestData.app);
+
+  /** trying to find context */
   if (!context) {
     const currentNodeInfo: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
     if(currentNodeInfo!.isDeployer)
@@ -123,8 +128,20 @@ async function callProperNode(requestData: GatewayCallParams) {
       throw e;
     }
   }
+
   if (context) {
-    return await requestQueue.send(requestData)
+    const currentNode: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
+    if(!currentNode) {
+      throw `Node not added to network.`
+    }
+    else{
+      if(context.party.partners.includes(currentNode.id)) {
+        return await requestQueue.send(requestData)
+      }
+      else {
+        return forwardRequestToParty(requestData, context.party.partners)
+      }
+    }
   }
   else {
     log('app context not found and request will forward to a deployer node. %o', requestData)
