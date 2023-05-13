@@ -1,5 +1,6 @@
 import axios from 'axios'
 import {timeout} from "../utils/helpers.js";
+import {MapOf} from "../common/mpc/types";
 
 export function muonCall(url, request) {
   return axios.post(url, request)
@@ -8,13 +9,13 @@ export function muonCall(url, request) {
 
 export type AnnounceCheckOptions = {
   announceTimeout?: number,
-  checkSecondaryParty?: boolean,
+  checkAllGroups?: boolean,
 }
 
 export async function waitToRequestBeAnnounced(apiEndpoint: string, request: any, options?:AnnounceCheckOptions) {
   const configs = {
     announceTimeout: 3*60e3,
-    checkSecondaryParty: false,
+    checkAllGroups: false,
     ...options
   };
   let confirmed = false;
@@ -41,26 +42,18 @@ export async function waitToRequestBeAnnounced(apiEndpoint: string, request: any
     if(check?.result?.isValid === false)
       throw `invalid request`
 
-    const t = check?.result?.tss?.t
-    const announced = check?.result?.announced?.primary
-    if(!t || !announced)
-      continue;
-
-    //console.log(check?.result?.announced)
-
-    const announcedCount = Object.values(announced).filter(n => n===true).length;
-    if(announcedCount >= t) {
-      confirmed = true;
-      if(configs.checkSecondaryParty){
-        const announced = check?.result?.announced?.secondary
-        if(!!announced && Object.keys(announced).length>0) {
-          const announcedCount = Object.values(announced).filter(n => n===true).length;
-          confirmed = announcedCount >= t || announcedCount === Object.keys(announced).length;
-        }
+    if(configs.checkAllGroups) {
+      if(check?.result?.allGroupsAnnounced) {
+        confirmed = true
       }
     }
-    else
-      console.log(`${announcedCount} of ${t} are announced.`);
+    else {
+      if(check?.result?.appPartyAnnounced)
+        confirmed = true;
+    }
+
+    if(!confirmed)
+      console.log(`not announced yet.`);
   }
   console.log('request confirmed by app party')
 }

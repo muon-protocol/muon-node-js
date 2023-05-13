@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import {PublicKey} from "./tss/types.js";
 import {pub2addr} from "./tss/utils.js";
-import {JsonPublicKey} from "../common/types";
+import {AppDeploymentStatus, JsonPublicKey} from "../common/types";
 import {promisify} from 'util'
 import childProcess from 'node:child_process'
 import {isIP} from 'net'
@@ -155,4 +155,8 @@ export async function getCommitId(): Promise<string> {
   if(stderr)
     throw stderr;
   return stdout.trim();
+}
+
+export function statusCodeToTitle(code: number): AppDeploymentStatus {
+  return ["NEW", "TSS_GROUP_SELECTED", "DEPLOYED", "PENDING", "EXPIRED"][code] as AppDeploymentStatus;
 }

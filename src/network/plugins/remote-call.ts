@@ -46,9 +46,9 @@ class RemoteCall extends BaseNetworkPlugin {
     return this.network.getPlugin('ipc-handler')
   }
 
-  handleCall(callId, method, params, callerInfo, responseStream){
+  handleCall(callId, method, params, callerInfo, options={}, responseStream){
     // @ts-ignore
-    return this.emit(`${method}`, params, callerInfo)
+    return this.emit(`${method}`, params, callerInfo, options)
       .then(result => {
         let response = {
           responseId: callId,
@@ -83,8 +83,8 @@ class RemoteCall extends BaseNetworkPlugin {
       let data = JSON.parse(message)
 
       if('method' in data) {
-        let {callId, method, params={}} = data;
-        return await this.handleCall(callId, method, params, nodeInfo, stream);
+        let {callId, method, params={}, options} = data;
+        return await this.handleCall(callId, method, params, nodeInfo, options, stream);
       }
       else{
         throw {message: `Invalid incoming message`}
@@ -196,7 +196,7 @@ class RemoteCall extends BaseNetworkPlugin {
         throw {message: `Invalid call response.`}
       }
     }catch (e) {
-      log.error("RemoteCall.handleSendResponse failed. err: %O, data: %s", 
+      log.error("RemoteCall.handleSendResponse failed. err: %O, data: %s",
         e, signAndMessage.toString());
     }
   }
@@ -247,7 +247,7 @@ class RemoteCall extends BaseNetworkPlugin {
     };
 
     let callId = uuid();
-    this.send({callId, method, params}, stream, peer)
+    this.send({callId, method, params, options}, stream, peer)
     let resultPromise = new TimeoutPromise(options.timeout, options.timeoutMessage)
 
     callCache.set(callId, {

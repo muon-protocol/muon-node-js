@@ -3,6 +3,7 @@ import { QueueProducer } from '../common/message-bus/index.js'
 import { IPC_CHANNEL } from './plugins/network-ipc-plugin.js'
 import {IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../common/types";
 import {NodeFilterOptions} from "./plugins/collateral-info";
+import {GatewayCallParams} from "../gateway/types";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 
@@ -77,7 +78,7 @@ function findContent(cid: string): Promise<any> {
   return call(IpcMethods.ContentRoutingFind, cid)
 }
 
-function forwardRequest(id, requestData, appTimeout?:number) {
+function forwardRequest(id, requestData: GatewayCallParams, appTimeout?:number) {
   return call(IpcMethods.ForwardGatewayRequest, {id, requestData, appTimeout});
 }
 

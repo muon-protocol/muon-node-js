@@ -11,6 +11,10 @@ import TssPlugin from "./tss-plugin.js";
 import * as SharedMemory from "../../common/shared-memory/index.js";
 import {bn2hex} from "../../utils/tss/utils.js";
 import NodeCache from 'node-cache'
+import {logger} from '@libp2p/logger'
+import {PartyInfo} from "../../common/types";
+
+const log = logger("muon:core:plugins:mpc:network")
 
 const mpcCache = new NodeCache({
   stdTTL: 10 * 60, // Keep MPCs in memory for 10 minutes
@@ -97,9 +101,9 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
             if(mpc.extraParams.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
               return;
 
-            const party = this.tssPlugin.getParty(mpc.extraParams.party);
+            const {appId, seed, isForReshare} = mpc.extraParams.partyInfo as PartyInfo
+            const party = await this.tssPlugin.getAppPartyAsync(appId, seed, isForReshare);
             if(!party) {
-              console.log(`part not found ${mpc.extraParams.party}`)
               throw `party[${mpc.extraParams.party}] not found`
             }
 
@@ -114,6 +118,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
           })
           .catch(e => {
             // TODO
+            log.error("MpcNetwork running mpc failed. %O", e)
           })
       }
     }
@@ -121,33 +126,6 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     if(!mpc)
       throw `pid: [${process.pid}] MPC [${mpcId}] not registered in MPCNetwork`
     return await mpc.getPartnerRoundData(round, callerInfo.id);
-  }
-
-  @gatewayMethod('test')
-  async __testMpc() {
-    const privateKeyToShare = '0x0000000000000000000000000000000000000000000000000000000000000001'
-    /** DistributedKeyGen construction data */
-    const cData = {
-        id: `dkg-${Date.now()}${random()}`,
-        partners: ['1', '2', '3'],
-        t: 2,
-        pk: privateKeyToShare
-      };
-    /** Generate random key */
-    // const mpc = new DistributedKeyGeneration(cData.id, cData.partners, cData.t);
-    /** Share PK between parties */
-    const mpc = new DistributedKeyGeneration(
-      cData.id,
-      this.collateralPlugin.currentNodeInfo!.id,
-      cData.partners,
-      cData.t,
-      cData.pk,
-      {party: this.tssPlugin.tssParty!.id}
-    );
-
-    let result = await mpc.runByNetwork(this);
-    console.log(result.toJson());
-    return result.toJson();
   }
 }
 

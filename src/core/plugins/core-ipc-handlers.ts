@@ -5,15 +5,16 @@ import AppManager from "./app-manager.js";
 import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import {timeout} from '../../utils/helpers.js'
-import {AppRequest} from "../../common/types";
+import {AppContext, AppRequest, JsonPublicKey} from "../../common/types";
 
 export const IpcMethods = {
   ForwardRemoteCall: 'forward-remote-call',
   GetTssKey: 'get-tss-key',
   GetAppId: 'get-app-id',
   GetAppContext: 'get-app-context',
+  GetAppOldestContext: 'get-app-oldest-context',
   GetAppTimeout: 'get-app-timeout',
-  QueryAppContext: 'query-app-context',
+  QueryAppAllContext: 'query-app-all-context',
   IsDeploymentExcerpt: 'is-deployment-excerpt',
   ShieldConfirmedRequest: 'shield-confirmed-request',
   EnsureAppTssKeyExist: 'ensure-app-tss-key-exist',
@@ -65,11 +66,25 @@ class CoreIpcHandlers extends CallablePlugin {
    * @param appName
    */
   @ipcMethod(IpcMethods.GetAppContext)
-  async __getAppContext(appName: string) {
+  async __getAppContext(params: {appName: string, seed: string}) {
+    const {appName, seed} = params
     const appId = await this.muon.getAppIdByName(appName)
     if(appId === '0')
       return null;
-    return await this.appManager.getAppContext(appId)
+    return await this.appManager.getAppContext(appId, seed)
+  }
+
+  /**
+   * Return local app context
+   * @param appName
+   */
+  @ipcMethod(IpcMethods.GetAppOldestContext)
+  async __getAppOldestContext(params: {appName: string}) {
+    const {appName} = params
+    const appId = await this.muon.getAppIdByName(appName)
+    if(appId === '0')
+      return null;
+    return await this.appManager.getAppOldestContext(appId)
   }
 
   /**
@@ -88,11 +103,11 @@ class CoreIpcHandlers extends CallablePlugin {
    * If app context not found locally, it's need to query muon network to find it.
    * @param appName
    */
-  @ipcMethod(IpcMethods.QueryAppContext)
-  async __queryAppContext(appName: string) {
+  @ipcMethod(IpcMethods.QueryAppAllContext)
+  async __queryAppAllContext(appName: string): Promise<AppContext[]> {
     const appId = await this.__onGetAppId({appName})
     if(appId === '0')
-      return null;
+      return [];
     return await this.appManager.queryAndLoadAppContext(appId)
   }
 
@@ -111,17 +126,18 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.EnsureAppTssKeyExist)
-  async __ensureAppTssKeyExist(appId: string) {
+  async __ensureAppTssKeyExist(data: {appId: string, seed: string}) {
+    const {appId, seed} = data;
     console.log(`CoreIpcHandler.__ensureAppTssKeyExist`, {appId})
-    if(this.appManager.appHasTssKey(appId))
+    if(this.appManager.appHasTssKey(appId, seed))
       return true;
-    const tssKey = this.appManager.queryAndLoadAppTssKey(appId);
+    const tssKey:JsonPublicKey|null = await this.appManager.queryAndLoadAppTssKey(appId, seed);
     return !!tssKey;
   }
 
   @ipcMethod(IpcMethods.FindNAvailablePartners)
-  async __findNAvailablePartners(data: {appId: string, searchList: string[], count: number}): Promise<string[]> {
-    return await this.appManager.findNAvailablePartners(data.appId, data.searchList, data.count)
+  async __findNAvailablePartners(data: {appId: string, seed: string, searchList: string[], count: number}): Promise<string[]> {
+    return await this.appManager.findNAvailablePartners(data.appId, data.seed, data.searchList, data.count)
   }
 
   @ipcMethod(IpcMethods.VerifyRequestSignature)

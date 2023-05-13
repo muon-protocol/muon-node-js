@@ -15,7 +15,7 @@ import TssPlugin from "../tss-plugin.js";
 import AppManager from "../app-manager.js";
 import TssParty from "../../../utils/tss/party.js";
 import CollateralInfoPlugin from "../collateral-info.js";
-import {AppRequest, MuonNodeInfo} from "../../../common/types";
+import {AppContext, AppRequest, JsonPublicKey, MuonNodeInfo, MuonSignature} from "../../../common/types";
 import {useOneTime} from "../../../utils/tss/use-one-time.js";
 import chalk from 'chalk'
 import Ajv from "ajv"
@@ -26,6 +26,7 @@ import {PublicKey} from "../../../utils/tss/types";
 import {RedisCache} from "../../../common/redis-cache.js";
 import axios from "axios";
 import {GatewayCallParams} from "../../../gateway/types";
+import {MapOf} from "../../../common/mpc/types";
 
 const {shuffle} = lodash;
 const { omit } = lodash;
@@ -65,7 +66,6 @@ export type AppRequestSignature = {
 const RemoteMethods = {
   WantSign: 'wantSign',
   InformRequestConfirmation: 'InformReqConfirmation',
-  GetTssPublicKey: "get-tss-pub",
 }
 
 @remoteApp
@@ -79,12 +79,15 @@ class BaseAppPlugin extends CallablePlugin {
   onArrive: (request: any) => any;
   onRequest: (request: any) => any;
   signParams: (request: object, result: any) => any[];
-  getConfirmAnnounceList: (request: object) => Promise<string[]>;
+  /** multiple group can be returned in order to check separately in confirmation check */
+  getConfirmAnnounceGroups: (request: object) => Promise<string[][]>;
   onConfirm: (request: object, result: any, signatures: any[]) => void;
   METHOD_PARAMS_SCHEMA: object = {};
   /**=================================*/
   APP_NAME: string | null = null
   REMOTE_CALL_TIMEOUT = 60000
+  /** default value will apply from ./config/global/[default.]net.conf.json {tss.defaultTTL} */
+  TTL: number;
   requestManager = new AppRequestManager();
   /** initialize when loading */
   isBuiltInApp: boolean
@@ -137,9 +140,11 @@ class BaseAppPlugin extends CallablePlugin {
     await this.appManager.waitToLoad();
     await this.collateralPlugin.waitToLoad();
 
-    const appParty = this.tssPlugin.getAppParty(this.APP_ID);
-    if(appParty) {
-      this.log(`App party loaded %s`, appParty.id)
+    for(const seed of this.appManager.getAppSeeds(this.APP_ID)) {
+      const appParty = this.tssPlugin.getAppParty(this.APP_ID, seed);
+      if(appParty) {
+        this.log(`App party loaded %s`, appParty.id)
+      }
     }
   }
 
@@ -170,12 +175,12 @@ class BaseAppPlugin extends CallablePlugin {
     return this.APP_NAME ? super.BROADCAST_CHANNEL : null
   }
 
-  private get appParty(): TssParty | null | undefined {
-    return this.tssPlugin.getAppParty(this.APP_ID);
+  private getParty(seed: string): TssParty | null | undefined {
+    return this.tssPlugin.getAppParty(this.APP_ID, seed);
   }
 
-  private get appTss(): DistributedKey | null {
-    return this.tssPlugin.getAppTssKey(this.APP_ID)
+  private getTss(seed: string): DistributedKey | null {
+    return this.tssPlugin.getAppTssKey(this.APP_ID, seed)
   }
 
   /**
@@ -195,21 +200,29 @@ class BaseAppPlugin extends CallablePlugin {
     this.log(`request arrived %O`, {method, params})
     let t0 = Date.now()
     let startedAt = getTimestamp()
+    let deploymentSeed;
 
     if(this.APP_ID === '1') {
       if (!this.tssPlugin.isReady)
         throw {message: "Deployment tss is not initialized"}
+      /**
+       deployer list load's from contract and has'nt deployment request and seed.
+       default seed for deployment context is `1`
+       */
+      deploymentSeed = "1"
     }
     else{
       if(!this.appManager.appIsDeployed(this.APP_ID))
         throw `App not deployed`;
-      if(!this.appManager.appHasTssKey(this.APP_ID)) {
-        await this.tssPlugin.checkAppTssKeyRecovery(this.APP_ID);
+      const oldestContext: AppContext = this.appManager.getAppOldestContext(this.APP_ID)!
+      if(!this.appManager.appHasTssKey(this.APP_ID, oldestContext.seed)) {
+        await this.tssPlugin.checkAppTssKeyRecovery(this.APP_ID, oldestContext.seed);
         throw `App tss not initialized`
       }
+      deploymentSeed = oldestContext.seed;
     }
 
-    const nSign = this.appParty!.t;
+    const nSign = this.getParty(deploymentSeed)!.t;
 
     if(this.METHOD_PARAMS_SCHEMA){
       if(this.METHOD_PARAMS_SCHEMA[method]){
@@ -237,6 +250,7 @@ class BaseAppPlugin extends CallablePlugin {
       app: this.APP_NAME,
       appId: this.APP_ID,
       method: method,
+      deploymentSeed,
       nSign,
       gwAddress: process.env.SIGN_WALLET_ADDRESS,
       // peerId: process.env.PEER_ID,
@@ -262,10 +276,11 @@ class BaseAppPlugin extends CallablePlugin {
     /** sign mode */
     else{
       let t0 = Date.now(), t1, t2, t3, t4, t5, t6;
-      let appParty = this.appParty!;
+      let appParty = this.getParty(deploymentSeed)!;
       /** find available partners to sign the request */
       const availablePartners = await this.appManager.findOptimalAvailablePartners(
         this.APP_ID,
+        deploymentSeed,
         Math.min(
           Math.ceil(appParty.t*1.5),
           appParty.partners.length,
@@ -292,19 +307,39 @@ class BaseAppPlugin extends CallablePlugin {
         throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
 
       if(this.validateRequest){
+        this.log(`calling validateRequest ...`)
         await this.validateRequest(clone(newRequest))
+        this.log(`calling validateRequest done successfully.`)
       }
       if(this.onArrive){
-        newRequest.data.init = await this.onArrive(clone(newRequest))
+        this.log(`calling onArrive ...`)
+        try {
+          newRequest.data.init = await this.onArrive(clone(newRequest))
+        }
+        catch (e) {
+          this.log.error("error calling onArrive %O", e)
+          throw e;
+        }
+        this.log(`calling onArrive done successfully.`)
       }
 
-      let result = await this.onRequest(clone(newRequest))
+      this.log(`calling onRequest ...`)
+      let result;
+      try {
+        result = await this.onRequest(clone(newRequest))
+      }
+      catch (e) {
+        this.log.error("error calling onRequest %O", e)
+        throw e;
+      }
       this.log(`app result: %O`, result)
       newRequest.data.result = result
 
       let resultHash;
 
+      this.log(`calling signParams ...`)
       const appSignParams = this.signParams(newRequest, result)
+      this.log(`calling signParams done successfully.`)
       const resultHashWithoutSecurityParams = this.hashAppSignParams(newRequest, appSignParams, false);
       newRequest.reqId = this.calculateRequestId(newRequest, resultHashWithoutSecurityParams)
       newRequest.data.signParams = this.appendSecurityParams(newRequest, appSignParams)
@@ -362,7 +397,7 @@ class BaseAppPlugin extends CallablePlugin {
         newRequest['confirmedAt'] = getTimestamp()
       }
 
-      let requestData: {[index: string]: any} = {
+      let requestData: any = {
         confirmed,
         ...omit(newRequest._doc, [
           '__v',
@@ -460,13 +495,15 @@ class BaseAppPlugin extends CallablePlugin {
     return undefined;
   }
 
-  async informRequestConfirmation(request) {
+  async informRequestConfirmation(request: AppRequest) {
+    request = clone(request)
     // await this.onConfirm(request)
     let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
 
-    let announceList = this.appParty!.partners;
-    if(!!this.getConfirmAnnounceList) {
-      let moreAnnounceList = await this.getConfirmAnnounceList(request);
+    let announceList = this.getParty(request.deploymentSeed)!.partners;
+    if(!!this.getConfirmAnnounceGroups) {
+      const announceGroups: string[][] = await this.getConfirmAnnounceGroups(request);
+      const moreAnnounceList: string[] = ([] as string[]).concat(...announceGroups)
       this.log(`custom announce list: %o`, moreAnnounceList)
       if(Array.isArray(moreAnnounceList)) {
         /** ignore if array contains non string item */
@@ -484,7 +521,11 @@ class BaseAppPlugin extends CallablePlugin {
 
     const responses: string[] = await Promise.all(partners.map(async node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return await this.__onRequestConfirmation(request, node)
+        return this.__onRequestConfirmation(request, node)
+          .catch(e => {
+            this.log.error(`informRequestConfirmation error %o`, e)
+            return 'error'
+          })
       }
       else {
         return this.remoteCall(
@@ -494,13 +535,13 @@ class BaseAppPlugin extends CallablePlugin {
           {taskId: `keygen-${nonce.id}`, timeout: 10e3}
         )
           .catch(e => {
-            this.log(`informRequestConfirmation error %o`, e)
+            this.log.error(`informRequestConfirmation error %o`, e)
             return 'error'
           })
       }
     }))
     const successResponses = responses.filter(r => (r !== 'error'))
-    if(successResponses.length < this.appParty!.t)
+    if(successResponses.length < this.getParty(request.deploymentSeed)!.t)
       throw `Error when informing request confirmation.`
   }
 
@@ -515,19 +556,21 @@ class BaseAppPlugin extends CallablePlugin {
     ]);
   }
 
-  async onFirstNodeRequestSucceed(request, availablePartners: string[]) {
+  async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[]) {
     let tssPlugin = this.muon.getPlugin(`tss-plugin`)
-    if(!this.appTss){
-      throw {message: 'App tss is not initialized'};
+    const seed = request.deploymentSeed;
+
+    if(!this.getTss(seed)){
+      throw {message: 'App tss is not initialized', seed};
     }
 
-    let party = this.appParty;
+    let party = this.getParty(seed);
     if(!party)
       throw {message: 'App party is not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     this.log(`generating nonce with ${nonceParticipantsCount} partners.`)
-    let nonce = await tssPlugin.keyGen(party, {
+    let nonce = await tssPlugin.keyGen({appId: this.APP_ID, seed}, {
       id: `nonce-${request.reqId}`,
       partners: availablePartners,
       maxPartners: nonceParticipantsCount
@@ -561,11 +604,11 @@ class BaseAppPlugin extends CallablePlugin {
     return await memory.readLocalMem(`${this.APP_ID}-${key}`);
   }
 
-  async isOtherNodesConfirmed(newRequest) {
+  async isOtherNodesConfirmed(newRequest: AppRequest) {
     let signers = {}
 
-    let party = this.appParty
-    let verifyingPubKey = this.appTss?.publicKey!
+    let party = this.getParty(newRequest.deploymentSeed)
+    let verifyingPubKey = this.getTss(newRequest.deploymentSeed)?.publicKey!
 
     signers = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
 
@@ -591,7 +634,6 @@ class BaseAppPlugin extends CallablePlugin {
         owner: tss.pub2addr(verifyingPubKey),
         ownerPubKey: pub2json(verifyingPubKey, true),
         // signers: signersIndices,
-        timestamp: getTimestamp(),
         signature: bn2hex(aggregatedSign.s),
         // sign: {
         //   s: `0x${aggregatedSign.s.toString(16)}`,
@@ -632,16 +674,21 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async verify(hash: string, signature: string, nonceAddress: string): Promise<boolean> {
-    const signingPubKey = await this.appManager.findTssPublicKey(this.APP_ID);
-    if(!signingPubKey)
+    const signingPubKey: MapOf<PublicKey> = await this.appManager.findAppPublicKeys(this.APP_ID);
+    if(Object.keys(signingPubKey).length < 1)
       throw `app[${this.APP_NAME}] tss publicKey not found`
-    return tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey!);
+    // @ts-ignore
+    for(const publicKey of Object.values(signingPubKey)) {
+      if(tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, publicKey))
+        return true;
+    }
+    return false
   }
 
-  async broadcastNewRequest(request) {
+  async broadcastNewRequest(request: AppRequest) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let nonce: DistributedKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`, 15000)
-    let party = this.appParty;
+    let party = this.getParty(request.deploymentSeed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
     let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: party.partners})
@@ -698,24 +745,30 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async makeSignature(request, result, resultHash): Promise<AppRequestSignature> {
+  async makeSignature(request: AppRequest, result: any, resultHash): Promise<AppRequestSignature> {
     let signTimestamp = getTimestamp()
     // let signature = crypto.sign(resultHash)
 
     let {reqId} = request;
-    let nonce = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
+    let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
     if(!nonce)
       throw `nonce not found for request ${reqId}`
 
     // let tssKey = this.isBuiltInApp ? tssPlugin.tssKey : tssPlugin.getAppTssKey(this.APP_ID);
-    let tssKey = this.appTss!;
+    let tssKey: DistributedKey = this.getTss(request.deploymentSeed)!;
     if(!tssKey)
       throw `App TSS key not found`;
 
     let k_i = nonce.share
     let K = nonce.publicKey!;
 
-    await useOneTime("key", K.encode('hex', true), resultHash)
+    /** Storing the TSS key usage for ever. */
+    await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-${this.APP_ID}-tss`)
+    /**
+     Storing the nonce usage for an hour.
+     Each nonce will remain in the memory for 30 minutes. Therefore one hour is reasonable for keeping usage history.
+     */
+    await useOneTime("key", K.encode('hex', true), `app-${this.APP_ID}-nonce-${resultHash}`, 3600)
     // TODO: remove nonce after sign
     let signature = tss.schnorrSign(tssKey.share!, k_i!, K, resultHash)
 
@@ -885,7 +938,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.WantSign)
-  async __onRemoteWantSign(request, callerInfo) {
+  async __onRemoteWantSign(request: AppRequest, callerInfo) {
     this.log(`remote node [id:${callerInfo.id}] wants signature %o`, request)
     deepFreeze(request);
     /**
@@ -898,13 +951,13 @@ class BaseAppPlugin extends CallablePlugin {
     /**
      * Check to ensure the current node exists in the app party.
      */
-    const context = this.appManager.getAppContext(this.APP_ID)
+    const context = this.appManager.getAppContext(this.APP_ID, request.deploymentSeed)
     if(!context)
       throw `Missing app context`
     const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!
     if(!context.party.partners.includes(currentNodeInfo.id))
       throw `Current node does not exist in the app party`
-    if(!this.appTss)
+    if(!this.getTss(request.deploymentSeed))
       throw `Missing app tss key`
 
     const [result, hash] = await this.preProcessRemoteRequest(request);
@@ -929,7 +982,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.InformRequestConfirmation)
-  async __onRequestConfirmation(request, callerInfo) {
+  async __onRequestConfirmation(request: AppRequest, callerInfo) {
     if(!this.onConfirm)
       return `onConfirm not defined for this app`;
 
@@ -941,24 +994,26 @@ class BaseAppPlugin extends CallablePlugin {
       throw "Only request owner can inform confirmation."
     }
 
+
+    this.log(`verifying confirmed request. %o`, {app: request.app, method: request.method, params: request?.data?.params})
     const isValid = await this.verifyCompletedRequest(request);
     if(!isValid) {
       throw `TSS signature not verified`
     }
 
-    await this.onConfirm(request, request.data.result, request.signatures)
+    this.log('calling onConfirm ...')
+    try {
+      await this.onConfirm(request, request.data.result, request.signatures)
+    }
+    catch (e) {
+      this.log.error("error calling onConfirm %O", e)
+      throw e;
+    }
+    this.log('calling onConfirm done successfully.')
 
     await requestConfirmationCache.set(request.reqId, '1');
 
     return `OK`;
-  }
-
-  @remoteMethod(RemoteMethods.GetTssPublicKey)
-  async __getTssPublicKey(data, callerInfo) {
-    let appContest = this.appManager.getAppContext(this.APP_ID)
-    if(appContest?.publicKey)
-      return appContest.publicKey.encoded
-    throw `missing app tss publicKey`
   }
 }
 

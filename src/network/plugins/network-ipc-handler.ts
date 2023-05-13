@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {PeerInfo} from "@libp2p/interface-peer-info";
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
-import {AppRequest, IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
+import {AppContext, AppRequest, IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
 import CollateralInfoPlugin, {NodeFilterOptions} from "./collateral-info.js";
 import {QueueProducer, MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
 import _ from 'lodash';
@@ -14,6 +14,7 @@ import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
 import {logger} from '@libp2p/logger'
 import {isPrivate} from "../utils.js";
+import {GatewayCallParams} from "../../gateway/types";
 
 class AggregatorBus extends MessagePublisher {
   async send(message:any){
@@ -84,7 +85,7 @@ export const IpcMethods = {
 
 export const RemoteMethods = {
   ExecIpcRemoteCall: "exec-ipc-remote-call",
-  ExecGateWayRequest: 'exec-gateway-request',
+  ForwardGateWayRequest: 'forward-gateway-request',
   AggregateData: "aggregate-data",
 }
 
@@ -320,15 +321,19 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
-  async __forwardGateWayRequest(data: {id: string, requestData: Object, appTimeout: number}) {
-    const nodeInfo = this.collateralPlugin.getNodeInfo(data.id)
+  async __ipcForwardGateWayRequest(data: {id: string, requestData: GatewayCallParams, appTimeout: number}) {
+    const timeout = data.appTimeout || 35000
+    return this.forwardGatewayCallToOtherNode(data.id, data.requestData, timeout);
+  }
+
+  private async forwardGatewayCallToOtherNode(nodeId: string, requestData: GatewayCallParams, timeout?: number) {
+    log(`forwarding the request to the node. %o`, {target: nodeId, requestData})
+    const nodeInfo = this.collateralPlugin.getNodeInfo(nodeId)
     if(!nodeInfo) {
-      throw `Unknown id ${data.id}`
+      throw `Unknown id ${nodeId}`
     }
     const peer = await this.findPeer(nodeInfo.peerId);
-
-    const timeout = data.appTimeout || 35000
-    return await this.remoteCall(peer, RemoteMethods.ExecGateWayRequest, data.requestData, {timeout});
+    return await this.remoteCall(peer, RemoteMethods.ForwardGateWayRequest, requestData, {timeout});
   }
 
   @ipcMethod(IpcMethods.GetCurrentNodeInfo)
@@ -465,9 +470,50 @@ class NetworkIpcHandler extends CallablePlugin {
     return await CoreIpc.forwardRemoteCall(data, _.omit(callerInfo, ['peer']), options);
   }
 
-  @remoteMethod(RemoteMethods.ExecGateWayRequest)
-  async __execGatewayRequest(data, callerInfo) {
-    return await requestQueue.send(data)
+  @remoteMethod(RemoteMethods.ForwardGateWayRequest)
+  async __rcForwardGatewayRequest(requestData: GatewayCallParams, callerInfo, options:{timeout?: number}={}) {
+    let {app} = requestData
+
+    const currentNode: MuonNodeInfo = this.collateralPlugin.currentNodeInfo!;
+    const context: AppContext|undefined = await CoreIpc.getAppOldestContext(app);
+    if(context) {
+      /** When the context exists, the node can either process it or send it to the appropriate node. */
+      if(context.party.partners.includes(currentNode.id)) {
+        /** Process the request */
+        return await requestQueue.send(requestData)
+      }
+      else {
+        /** Forward request to the appropriate node. */
+        const randomIndex = Math.floor(Math.random() * context.party.partners.length);
+        return this.forwardGatewayCallToOtherNode(
+          context.party.partners[randomIndex],
+          requestData,
+          options.timeout,
+        )
+      }
+    }
+    else {
+      if(currentNode.isDeployer) {
+        /**
+         The deployer node should contain all the contexts.
+         If it lacks any context, it means that the context does not exist at all.
+         */
+        throw `App's context not found.`
+      }
+      else {
+        /**
+         If a non-deployer node does not have a context, it should send the request to one of the deployer nodes.
+         The deployer nodes know the members of the app party and can forward the request to the suitable one.
+         */
+        let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(({id}) => id);
+        const randomIndex = Math.floor(Math.random() * deployers.length);
+        return this.forwardGatewayCallToOtherNode(
+          deployers[randomIndex],
+          requestData,
+          options.timeout,
+        )
+      }
+    }
   }
 
   @remoteMethod(RemoteMethods.AggregateData)
@@ -479,9 +525,18 @@ class NetworkIpcHandler extends CallablePlugin {
         if(!appName)
           throw 'invalid request'
         /** forward request into core to be verified and then be stored */
-        const verified = await CoreIpc.verifyRequestSignature(data.data)
-        if(!verified)
-          throw 'request not verified';
+        
+        // TODO: Uncomment this
+        // Just deployer nodes have access to all appContexts
+        // at the momemnt and monitoring nodes can't verify
+        // the transactions.
+        // It should be changed to let all nodes query the AppContext w/o
+        // the party and get the TSS pubkey and verify the requests
+        
+        //const verified = await CoreIpc.verifyRequestSignature(data.data)
+        
+        //if(!verified)
+        //  throw 'request not verified';
         if(reqAggregatorBus) {
           await reqAggregatorBus.send(data.data);
         }
