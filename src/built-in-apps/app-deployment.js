@@ -89,15 +89,17 @@ module.exports = {
                     seed: {value: seed, nonce, reqId},
                     nodes,
                     ttl,
-                    pending
+                    pendingPeriod
                 } = params
-                if(parseInt(ttl) <= 0)
+                if(ttl !== undefined && parseInt(ttl) <= 0)
                     throw "Invalid app deployment ttl"
-                if(parseInt(pending) <= 0)
+                if(pendingPeriod != undefined && parseInt(pendingPeriod) <= 0)
                     throw "Invalid app pending period"
-                for(const id of nodes){
-                    if(parseInt(id) <= 0)
-                        throw `Invalid node ID in nodes list`;
+                if(nodes !== undefined) {
+                    for (const id of nodes) {
+                        if (parseInt(id) <= 0)
+                            throw `Invalid node ID in nodes list`;
+                    }
                 }
                 const context = await this.callPlugin('system', "getAppContext", appId, seed)
                 if(!!context) {
@@ -116,7 +118,24 @@ module.exports = {
                 break;
             }
             case Methods.TssRotate: {
-                const {appId, previousSeed, seed: {value: seed, reqId, nonce}} = params
+                const {
+                    appId,
+                    previousSeed,
+                    seed: {value: seed, reqId, nonce},
+                    nodes,
+                    ttl,
+                    pendingPeriod
+                } = params
+                if(ttl !== undefined && parseInt(ttl) <= 0)
+                    throw "Invalid app deployment ttl"
+                if(pendingPeriod != undefined && parseInt(pendingPeriod) <= 0)
+                    throw "Invalid app pending period"
+                if(nodes !== undefined) {
+                    for (const id of nodes) {
+                        if (parseInt(id) <= 0)
+                            throw `Invalid node ID in nodes list`;
+                    }
+                }
 
                 const oldContext = await this.callPlugin('system', "getAppContext", appId, previousSeed, true)
 
@@ -267,7 +286,7 @@ module.exports = {
                     t=tssConfigs.threshold,
                     n=tssConfigs.max,
                     ttl: userDefinedTTL,
-                    pending,
+                    pendingPeriod: pending,
                 } = params
                 const ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
 
@@ -296,7 +315,7 @@ module.exports = {
                     t=tssConfigs.threshold,
                     n=tssConfigs.max,
                     ttl: userDefinedTTL,
-                    pending,
+                    pendingPeriod: pending,
                 } = params
                 const ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
 
