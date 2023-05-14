@@ -15,7 +15,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
   async onStart() {
     await super.onStart()
 
-    this.network.libp2p.pubsub.addEventListener("message", this.__onBroadcastReceived.bind(this))
+    this.network.libp2p.services.pubsub.addEventListener("message", this.__onBroadcastReceived.bind(this))
   }
 
   async subscribe(channel){
@@ -24,7 +24,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
 
       if(!this.handlerRegistered[channel]) {
         this.handlerRegistered[channel] = true;
-        await this.network.libp2p.pubsub.subscribe(channel)
+        await this.network.libp2p.services.pubsub.subscribe(channel)
       }
     }
   }
@@ -35,7 +35,7 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
       return;
     }
     let dataStr = JSON.stringify(data)
-    this.network.libp2p.pubsub.publish(channel, uint8ArrayFromString(dataStr))
+    this.network.libp2p.services.pubsub.publish(channel, uint8ArrayFromString(dataStr))
   }
 
   // async __onBroadcastReceived({data: rawData, from, topicIDs, ...otherItems}){

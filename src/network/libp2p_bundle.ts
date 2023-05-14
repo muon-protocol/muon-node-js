@@ -23,9 +23,10 @@ const DEFAULT_OPTS = {
   streamMuxers: [
     mplex()
   ],
-  pubsub: gossipsub({
-    allowPublishToZeroPeers: true,
-  }),
+  services: {
+    pubsub: gossipsub()  
+  }
+  
 
   // dht: kadDHT({
   //   kBucketSize: 20,
