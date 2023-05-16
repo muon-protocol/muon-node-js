@@ -224,23 +224,23 @@ class Network extends Events {
     }
   }
 
-  async onPeerDiscovery(evt) {
-    const peer = evt.detail;
-    const peerId = peer.id;
-    this.connectedPeers[peerId2Str(peerId)] = true;
-    // @ts-ignore
-    this.emit("peer:discovery", peerId);
-    CoreIpc.fireEvent({ type: "peer:discovery", data: peerId2Str(peerId) });
-    log("found peer");
-    try {
-      log("discovered peer info %s", peerId2Str(peerId));
-    } catch (e) {
-      console.log("Error Muon.onPeerDiscovery", e);
-    }
-  }
+  // async onPeerDiscovery(evt) {
+  //   const peer = evt.detail;
+  //   const peerId = peer.id;
+  //   this.connectedPeers[peerId2Str(peerId)] = true;
+  //   // @ts-ignore
+  //   this.emit("peer:discovery", peerId);
+  //   CoreIpc.fireEvent({ type: "peer:discovery", data: peerId2Str(peerId) });
+  //   log("found peer");
+  //   try {
+  //     log("discovered peer info %s", peerId2Str(peerId));
+  //   } catch (e) {
+  //     console.log("Error Muon.onPeerDiscovery", e);
+  //   }
+  // }
 
   onPeerConnect(evt) {
-    const connection = evt.detail;
+    const peerId = evt.detail;
     log(
       emoji.get("moon") +
         " " +
@@ -248,20 +248,20 @@ class Network extends Events {
         " " +
         emoji.get("large_blue_circle") +
         " " +
-        chalk.blue(` ${peerId2Str(connection.remotePeer)}`)
+        chalk.blue(` ${peerId2Str(peerId)}`)
     );
-    this.connectedPeers[peerId2Str(connection.remotePeer)] = true;
+    this.connectedPeers[peerId2Str(peerId)] = true;
     // @ts-ignore
-    this.emit("peer:connect", connection.remotePeer);
+    this.emit("peer:connect", peerId);
     CoreIpc.fireEvent({
       type: "peer:connect",
-      data: peerId2Str(connection.remotePeer),
+      data: peerId2Str(peerId),
     });
   }
 
   onPeerDisconnect(evt) {
-    const connection = evt.detail;
-    delete this.connectedPeers[peerId2Str(connection.remotePeer)];
+    const peerId = evt.detail;
+    delete this.connectedPeers[peerId2Str(peerId)];
     log(
       emoji.get("moon") +
         " " +
@@ -269,13 +269,13 @@ class Network extends Events {
         " " +
         emoji.get("large_blue_circle") +
         " " +
-        chalk.red(` ${peerId2Str(connection.remotePeer)}`)
+        chalk.red(` ${peerId2Str(peerId)}`)
     );
     // @ts-ignore
-    this.emit("peer:disconnect", connection.remotePeer);
+    this.emit("peer:disconnect", peerId);
     CoreIpc.fireEvent({
       type: "peer:disconnect",
-      data: peerId2Str(connection.remotePeer),
+      data: peerId2Str(peerId),
     });
   }
 }
