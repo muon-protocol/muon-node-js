@@ -518,6 +518,7 @@ export default class AppManager extends CallablePlugin {
 
   getAppDeploymentStatus(appId: string, seed: string): AppDeploymentStatus {
     let context: AppContext = this.getAppContext(appId, seed);
+    const currentNode = this.nodeManager.currentNodeInfo!;
 
     let status: AppDeploymentStatus = "NEW"
     if (!!context) {
@@ -526,9 +527,13 @@ export default class AppManager extends CallablePlugin {
       if(appId === "1") {
         status = "DEPLOYED";
       }
-      else {
-        if (!!seed && this.appHasTssKey(appId, seed)) {
+      else if(!!seed) {
+        const isInTheParty = context.party.partners.includes(currentNode.id);
+        if((isInTheParty && this.appHasTssKey(appId, seed)) || (!isInTheParty && !!context.publicKey)) {
           status = "DEPLOYED";
+        }
+
+        if (status === "DEPLOYED") {
 
           if (!!context.ttl) {
             const deploymentTime = context.deploymentRequest!.data.timestamp
