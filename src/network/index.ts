@@ -12,7 +12,7 @@ import emoji from "node-emoji";
 import { isPrivate, peerId2Str } from "./utils.js";
 import * as CoreIpc from "../core/ipc.js";
 import { MessagePublisher } from "../common/message-bus/index.js";
-import CollateralPlugin from "./plugins/collateral-info.js";
+import NodeManagerPlugin from "./plugins/node-manager.js";
 import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
@@ -340,7 +340,7 @@ async function start() {
       bootstrap: getLibp2pBootstraps(),
     },
     plugins: {
-      collateral: [CollateralPlugin, {}],
+      "node-manager": [NodeManagerPlugin, {}],
       broadcast: [NetworkBroadcastPlugin, {}],
       content: [NetworkContentPlugin, {}],
       "remote-call": [RemoteCallPlugin, {}],

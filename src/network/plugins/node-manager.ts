@@ -16,7 +16,7 @@ import lodash from "lodash";
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
 const MuonNodesPaginationAbi = require('../../data/MuonNodesPagination-ABI.json')
-const log = logger('muon:network:plugins:collateral')
+const log = logger('muon:network:plugins:node-manager')
 
 
 export type NodeFilterOptions = {
@@ -36,7 +36,7 @@ const RemoteMethods = {
 }
 
 @remoteApp
-export default class CollateralInfoPlugin extends CallablePlugin{
+export default class NodeManagerPlugin extends CallablePlugin{
   networkInfo: NetworkInfo | null = null;
 
   private lastNodesUpdateTime: number;
@@ -45,7 +45,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   /**
    * @type {TimeoutPromise}
    */
-  loading = new TimeoutPromise(0, "collateral loading timed out")
+  loading = new TimeoutPromise(0, "contract loading timed out")
 
   async onInit() {
     await super.onInit()
@@ -56,7 +56,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     // RPC nodes by all network nodes at the same time
     // When the network restarts
     await timeout(Math.floor(Math.random()*5*1e3));
-    await this._loadCollateralInfo();
+    await this._loadContractInfo();
 
     // @ts-ignore
     this.network.on('peer:connect', this.onPeerConnect.bind(this));
@@ -101,7 +101,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     }
   }
 
-  async _loadCollateralInfo(){
+  async _loadContractInfo(){
     let {tss, nodeManager} = this.network.configs.net;
 
     this.networkInfo = {
@@ -122,7 +122,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         .set(n.peerId, n)
     })
 
-    log('Collateral info loaded.');
+    log('contract info loaded.');
 
     // @ts-ignore
     this.emit('loaded');
@@ -329,8 +329,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
         this._nodesMap.delete(n.peerId)
         log(`Node info deleted from chain %o`, n)
         // @ts-ignore
-        this.emit("collateral:node:delete", n)
-        CoreIpc.fireEvent({type: "collateral:node:delete", data: _.omit(n, ['peer'])})
+        this.emit("contract:node:delete", n)
+        CoreIpc.fireEvent({type: "contract:node:delete", data: _.omit(n, ['peer'])})
         deletedNodes[n.id] = true;
         return;
       }
@@ -345,8 +345,8 @@ export default class CollateralInfoPlugin extends CallablePlugin{
           .set(n.peerId, n)
         log(`New node info added to chain %o`, n)
         // @ts-ignore
-        this.emit("collateral:node:add", n)
-        CoreIpc.fireEvent({type: "collateral:node:add", data: n})
+        this.emit("contract:node:add", n)
+        CoreIpc.fireEvent({type: "contract:node:add", data: n})
         addedNodes.push(n);
         return;
       }
@@ -362,9 +362,9 @@ export default class CollateralInfoPlugin extends CallablePlugin{
           .set(n.peerId, n)
         log(`Node info changed on chain %o`, {old: oldNode, new: n})
         // @ts-ignore
-        this.emit("collateral:node:edit", n, oldNode)
+        this.emit("contract:node:edit", n, oldNode)
         CoreIpc.fireEvent({
-          type: "collateral:node:edit",
+          type: "contract:node:edit",
           data: {
             nodeInfo: {...n},
             oldNodeInfo: {...oldNode},
@@ -412,7 +412,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
           log('no change detected.')
       }
       catch (e) {
-        console.log(`Network.CollateralInfoPlugin.watchNodesChange`, e)
+        console.log(`Network.NodeManagerPlugin.watchNodesChange`, e)
       }
     }
   }
@@ -424,7 +424,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
     if(typeof index !== 'string') {
       console.log(`Expected string index but got non-string`, index);
       console.log(stackTrace());
-      throw `muon.network.CollateralPlugin.getNodeInfo Expected string index but got non-string`
+      throw `muon.network.NodeManagerPlugin.getNodeInfo Expected string index but got non-string`
     }
     return this._nodesMap.get(index);
   }

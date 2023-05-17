@@ -4,7 +4,7 @@ import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
 import {uuid} from '../../utils/helpers.js'
 import TimeoutPromise from '../../common/timeout-promise.js'
-import CollateralInfoPlugin from "./collateral-info.js";
+import NodeManagerPlugin from "./node-manager.js";
 import {RemoteMethodOptions} from "../../common/types"
 import NodeCache from 'node-cache'
 import {peerId2Str} from "../utils.js";
@@ -72,10 +72,10 @@ class RemoteCall extends BaseNetworkPlugin {
   }
 
   async handleIncomingMessage(message, stream, peerId){
-    let collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
+    let nodeManager: NodeManagerPlugin = this.network.getPlugin('node-manager');
     try {
       message = message.toString()
-      let nodeInfo = collateralPlugin.getNodeInfo(peerId2Str(peerId))
+      let nodeInfo = nodeManager.getNodeInfo(peerId2Str(peerId))
       if(!nodeInfo){
         throw {message: `Unrecognized sender`}
       }
@@ -166,11 +166,11 @@ class RemoteCall extends BaseNetworkPlugin {
   }
 
   async handleSendResponse(signAndMessage, peerId){
-    let collateralPlugin:CollateralInfoPlugin = this.network.getPlugin('collateral');
+    let nodeManager:NodeManagerPlugin = this.network.getPlugin('node-manager');
     try {
       let message = signAndMessage.toString()
 
-      let nodeInfo = collateralPlugin.getNodeInfo(peerId2Str(peerId))
+      let nodeInfo = nodeManager.getNodeInfo(peerId2Str(peerId))
       if(!nodeInfo){
         throw {message: `Unrecognized receiver.`};
       }

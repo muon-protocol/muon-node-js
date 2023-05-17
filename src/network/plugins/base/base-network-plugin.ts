@@ -1,13 +1,9 @@
-import CollateralInfoPlugin from "../collateral-info.js";
 import {Network} from "../../index.js";
 import NetworkBroadcastPlugin from "../network-broadcast.js";
 import Events from 'events-async'
-import {isPeerId, Libp2pPeer, Libp2pPeerInfo, PeerId} from '../../types.js';
+import {isPeerId, Libp2pPeer, Libp2pPeerInfo} from '../../types.js';
 import {peerIdFromString} from '@libp2p/peer-id'
 import {logger, Logger} from '@libp2p/logger'
-import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string';
-import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
-import {peerId2Str} from "../../utils.js";
 
 export default class BaseNetworkPlugin extends Events {
   network: Network;
@@ -25,7 +21,7 @@ export default class BaseNetworkPlugin extends Events {
    * Runs right after the plugin has been created.
    */
   async onInit(){
-    
+
   }
 
   /**
@@ -38,8 +34,8 @@ export default class BaseNetworkPlugin extends Events {
   /**
    * Returns the PeerInfo object associated with the
    * specified peerId.
-   * First, it looks for the peerId in the local peerStore. 
-   * If it is not found there, then it queries the 
+   * First, it looks for the peerId in the local peerStore.
+   * If it is not found there, then it queries the
    * peerRouting (delegated nodes) for it.
    */
   async findPeer(peerId): Promise<Libp2pPeerInfo|null>{

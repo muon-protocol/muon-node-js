@@ -145,8 +145,8 @@ async function start() {
     muon = new Muon({
       plugins: [
         {
-          name: "collateral",
-          module: (await import("./plugins/collateral-info.js")).default,
+          name: "node-manager",
+          module: (await import("./plugins/node-manager.js")).default,
           config: {},
         },
         {
