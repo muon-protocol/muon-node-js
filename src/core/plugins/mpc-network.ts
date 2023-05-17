@@ -4,7 +4,7 @@ import {IMpcNetwork, PartnerRoundReceive} from "../../common/mpc/types";
 import {MultiPartyComputation} from "../../common/mpc/base.js";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from '../../common/mpc/dist-key.js'
-import CollateralInfoPlugin from "./collateral-info.js";
+import NodeManagerPlugin from "./node-manager.js";
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import * as NetworkIpc from '../../network/ipc.js'
 import TssPlugin from "./tss-plugin.js";
@@ -43,11 +43,11 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
   }
 
   get id() {
-    return this.collateralPlugin.currentNodeInfo!.id;
+    return this.nodeManager.currentNodeInfo!.id;
   }
 
-  private get collateralPlugin(): CollateralInfoPlugin {
-    return this.muon.getPlugin('collateral');
+  private get nodeManager(): NodeManagerPlugin {
+    return this.muon.getPlugin('node-manager');
   }
 
   private get tssPlugin(): TssPlugin {
@@ -66,9 +66,9 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
   }
 
   async askRoundData(fromPartner: string, mpcId: string, round:number, data: any): Promise<PartnerRoundReceive> {
-    let nodeInfo = this.collateralPlugin.getNodeInfo(fromPartner)!
+    let nodeInfo = this.nodeManager.getNodeInfo(fromPartner)!
     if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS) {
-      return this.__askRoundN({mpcId, round, data}, this.collateralPlugin.currentNodeInfo)
+      return this.__askRoundN({mpcId, round, data}, this.nodeManager.currentNodeInfo)
     }
     else {
       return this.remoteCall(

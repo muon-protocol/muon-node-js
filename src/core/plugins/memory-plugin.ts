@@ -27,7 +27,7 @@ import * as crypto from '../../utils/crypto.js'
 import {getTimestamp} from '../../utils/helpers.js'
 import Memory, {types as MemoryTypes} from '../../common/db-models/Memory.js'
 import { remoteApp, broadcastHandler } from './base/app-decorators.js'
-import CollateralInfoPlugin from "./collateral-info.js";
+import NodeManagerPlugin from "./node-manager.js";
 import { createClient, RedisClient } from 'redis'
 import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
@@ -110,7 +110,7 @@ class MemoryPlugin extends CallablePlugin {
   }
 
   checkSignature(memWrite: MemWrite){
-    let collateralPlugin: CollateralInfoPlugin = this.muon.getPlugin('collateral');
+    let nodeManager: NodeManagerPlugin = this.muon.getPlugin('node-manager');
 
     let {signatures} = memWrite;
 
@@ -120,17 +120,17 @@ class MemoryPlugin extends CallablePlugin {
       return false
     }
 
-    let allowedList = collateralPlugin.getAllowedWallets().map(addr => addr.toLowerCase());
+    let allowedList = nodeManager.getAllowedWallets().map(addr => addr.toLowerCase());
 
     switch (memWrite.type) {
       case "app": {
-        if(signatures.length < collateralPlugin.TssThreshold)
+        if(signatures.length < nodeManager.TssThreshold)
           throw "Insufficient MemWrite signature";
         let sigOwners: string[] = signatures.map(sig => crypto.recover(hash, sig).toLowerCase())
         console.log({sigOwners})
         let ownerIsValid: number[] = sigOwners.map(owner => (allowedList.indexOf(owner) >= 0 ? 1 : 0))
         let validCount: number = ownerIsValid.reduce((sum, curr) => (sum + curr), 0)
-        return validCount >= collateralPlugin.TssThreshold;
+        return validCount >= nodeManager.TssThreshold;
       }
       case "node": {
         if(signatures.length !== 1){

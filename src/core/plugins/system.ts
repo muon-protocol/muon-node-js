@@ -1,6 +1,6 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
-import CollateralInfoPlugin from "./collateral-info";
+import NodeManagerPlugin from "./node-manager.js";
 import TssPlugin from "./tss-plugin";
 import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import {soliditySha3} from '../../utils/sha3.js'
@@ -40,8 +40,8 @@ const RemoteMethods = {
 class System extends CallablePlugin {
   APP_NAME = 'system'
 
-  get collateralPlugin(): CollateralInfoPlugin {
-    return this.muon.getPlugin('collateral');
+  get nodeManager(): NodeManagerPlugin {
+    return this.muon.getPlugin('node-manager');
   }
 
   get tssPlugin(): TssPlugin{
@@ -56,7 +56,7 @@ class System extends CallablePlugin {
     const externalOnlineList = this.muon.configs.net.nodes?.onlineList;
     let availableIds: string[] = [];
 
-    const isDeployer: {[index: string]: string} = this.collateralPlugin
+    const isDeployer: {[index: string]: string} = this.nodeManager
       .filterNodes({isDeployer: true})
       .map(node => node.id)
       .reduce((obj, current) => (obj[current]=true, obj), {});
@@ -89,8 +89,8 @@ class System extends CallablePlugin {
       availableIds = availables.map(p => p.id)
     }
 
-    const onlineNodes = this.collateralPlugin.filterNodes({list: availableIds, excludeSelf: true})
-    const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.PEER_ID!)
+    const onlineNodes = this.nodeManager.filterNodes({list: availableIds, excludeSelf: true})
+    const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.PEER_ID!)
     return [
       currentNodeInfo!,
       ...onlineNodes
@@ -177,9 +177,9 @@ class System extends CallablePlugin {
     if(!context)
       throw `App deployment info not found.`
 
-    const generatorInfo = this.collateralPlugin.getNodeInfo(context.party.partners[0])!
+    const generatorInfo = this.nodeManager.getNodeInfo(context.party.partners[0])!
     if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
-      return await this.__generateAppTss({appId, seed}, this.collateralPlugin.currentNodeInfo);
+      return await this.__generateAppTss({appId, seed}, this.nodeManager.currentNodeInfo);
     }
     else {
       // TODO: if partner is not online
@@ -198,9 +198,9 @@ class System extends CallablePlugin {
     if(!newContext)
       throw `App's new context not found.`
 
-    const generatorInfo = this.collateralPlugin.getNodeInfo(newContext.party.partners[0])!
+    const generatorInfo = this.nodeManager.getNodeInfo(newContext.party.partners[0])!
     if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
-      return await this.__startAppTssReshare({appId, seed}, this.collateralPlugin.currentNodeInfo);
+      return await this.__startAppTssReshare({appId, seed}, this.nodeManager.currentNodeInfo);
     }
     else {
       // TODO: if partner is not online
@@ -228,13 +228,13 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId, seed)
     if(!context)
       throw `App deployment info not found.`
-    const appPartners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+    const appPartners: MuonNodeInfo[] = this.nodeManager.filterNodes({
       list: context.party.partners
     })
 
     let responses = await Promise.all(appPartners.map(node => {
-      if(node.id === this.collateralPlugin.currentNodeInfo?.id) {
-        return this.__getAppPublicKey({appId, seed, keyId}, this.collateralPlugin.currentNodeInfo)
+      if(node.id === this.nodeManager.currentNodeInfo?.id) {
+        return this.__getAppPublicKey({appId, seed, keyId}, this.nodeManager.currentNodeInfo)
           .catch(e => {
             log.error(e.message)
             return 'error'
@@ -344,7 +344,7 @@ class System extends CallablePlugin {
       throw `App deployment info not found to process tss KeyGen confirmation.`
     }
 
-    const currentNode = this.collateralPlugin.currentNodeInfo!;
+    const currentNode = this.nodeManager.currentNodeInfo!;
     if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
@@ -407,7 +407,7 @@ class System extends CallablePlugin {
       throw `App new context not found in app reshare confirmation.`
     }
 
-    const currentNode = this.collateralPlugin.currentNodeInfo!;
+    const currentNode = this.nodeManager.currentNodeInfo!;
     if(newContext.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
@@ -515,9 +515,9 @@ class System extends CallablePlugin {
       ...allContexts.map(ctx => ctx.party.partners),
     )
 
-    let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.id)
+    let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.id)
 
-    const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+    const partnersToCall: MuonNodeInfo[] = this.nodeManager.filterNodes({
       list: [
         ...deployers,
         ...appPartners
@@ -526,7 +526,7 @@ class System extends CallablePlugin {
     log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
     await Promise.all(partnersToCall.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__undeployApp({appId, deploymentTimestamp}, this.collateralPlugin.currentNodeInfo)
+        return this.__undeployApp({appId, deploymentTimestamp}, this.nodeManager.currentNodeInfo)
           .catch(e => {
             log.error(`error when undeploy at current node: %O`, e)
             return e?.message || "unknown error occurred"
@@ -587,7 +587,7 @@ class System extends CallablePlugin {
     await this.tssPlugin.createParty({
       id: partyId,
       t: context.party.t,
-      partners: context.party.partners,//.map(wallet => this.collateralPlugin.getNodeInfo(wallet))
+      partners: context.party.partners,//.map(wallet => this.nodeManager.getNodeInfo(wallet))
     });
 
     let key = await this.tssPlugin.keyGen({appId, seed}, {timeout: 65e3, lowerThanHalfN: true})
@@ -618,7 +618,7 @@ class System extends CallablePlugin {
     let nonce = await this.tssPlugin.keyGen({appId, seed}, {
       id: `resharing-${uuid()}`,
       partners: _.uniq([
-        this.collateralPlugin.currentNodeInfo!.id,
+        this.nodeManager.currentNodeInfo!.id,
         ...resharePartners,
       ]),
       value: newContext.seed
@@ -709,7 +709,7 @@ class System extends CallablePlugin {
 
     const oldKeyHoldersId: string[] = nonce.partners
       .filter(id => oldContext.party.partners.includes(id))
-    const oldKeyHolders: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: oldKeyHoldersId})
+    const oldKeyHolders: MuonNodeInfo[] = this.nodeManager.filterNodes({list: oldKeyHoldersId})
     let previousKey: DistributedKey = await this.tssPlugin.recoverAppTssKey(
       appId,
       oldContext.seed,

@@ -2,7 +2,7 @@ import CallablePlugin from './base/callable-plugin.js'
 import {PeerInfo} from "@libp2p/interface-peer-info";
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
 import {AppContext, AppRequest, IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
-import CollateralInfoPlugin, {NodeFilterOptions} from "./collateral-info.js";
+import NodeManagerPlugin, {NodeFilterOptions} from "./node-manager.js";
 import {QueueProducer, MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
@@ -58,7 +58,7 @@ export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetNodesList: "get-nodes-list",
   GetNetworkConfig: "get-net-conf",
-  GetCollateralInfo: "get-collateral-info",
+  GetContractInfo: "get-contract-info",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
   BroadcastToChannel: "broadcast-to-channel",
   // PutDHT: "put-dht",
@@ -109,8 +109,8 @@ class NetworkIpcHandler extends CallablePlugin {
   //   return this.network.getPlugin('dht')
   // }
 
-  get collateralPlugin(): CollateralInfoPlugin {
-    return this.network.getPlugin('collateral');
+  get nodeManager(): NodeManagerPlugin {
+    return this.network.getPlugin('node-manager');
   }
 
   get remoteCallPlugin(): RemoteCall {
@@ -131,14 +131,14 @@ class NetworkIpcHandler extends CallablePlugin {
    */
   @ipcMethod(IpcMethods.FilterNodes)
   async __filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
-    return this.collateralPlugin.filterNodes(filter)
+    return this.nodeManager.filterNodes(filter)
       .map(({id, active, staker, wallet, peerId, isDeployer}) => ({id, active, staker, wallet, peerId, isDeployer}));
   }
 
   @ipcMethod(IpcMethods.GetNodesList)
   async __getNodesList(output: string|string[]) {
     let outProps = Array.isArray(output) ? output : [output]
-    return this.collateralPlugin.filterNodes({}).map(n => _.pick(n, outProps))
+    return this.nodeManager.filterNodes({}).map(n => _.pick(n, outProps))
   }
 
   @ipcMethod(IpcMethods.GetNetworkConfig)
@@ -146,15 +146,14 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.network.configs.net
   }
 
-  @ipcMethod(IpcMethods.GetCollateralInfo)
-  async __onIpcGetCollateralInfo(data = {}, callerInfo) {
-    const collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
+  @ipcMethod(IpcMethods.GetContractInfo)
+  async __onIpcGetContractInfo(data = {}, callerInfo) {
 
-    let {networkInfo} = collateralPlugin;
+    let {networkInfo} = this.nodeManager;
     return {
       contract: this.network.configs.net.nodeManager,
       networkInfo,
-      nodesList: await collateralPlugin.getNodesList(),
+      nodesList: await this.nodeManager.getNodesList(),
     }
   }
 
@@ -328,7 +327,7 @@ class NetworkIpcHandler extends CallablePlugin {
 
   private async forwardGatewayCallToOtherNode(nodeId: string, requestData: GatewayCallParams, timeout?: number) {
     log(`forwarding the request to the node. %o`, {target: nodeId, requestData})
-    const nodeInfo = this.collateralPlugin.getNodeInfo(nodeId)
+    const nodeInfo = this.nodeManager.getNodeInfo(nodeId)
     if(!nodeInfo) {
       throw `Unknown id ${nodeId}`
     }
@@ -338,8 +337,8 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.GetCurrentNodeInfo)
   async __onGetCurrentNodeInfo() {
-    await this.collateralPlugin.waitToLoad();
-    return this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
+    await this.nodeManager.waitToLoad();
+    return this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
   }
 
   @ipcMethod(IpcMethods.AllowRemoteCallByShieldNode)
@@ -350,8 +349,8 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.IsCurrentNodeInNetwork)
   async __isCurrentNodeInNetwork() {
-    await this.collateralPlugin.waitToLoad();
-    const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+    await this.nodeManager.waitToLoad();
+    const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
     return !!currentNodeInfo;
   }
 
@@ -374,12 +373,12 @@ class NetworkIpcHandler extends CallablePlugin {
   @ipcMethod(IpcMethods.FindNOnlinePeer)
   async __findNOnlinePeer(data: {peerIds: string[], count: number, options?: any}) {
     let {peerIds, count, options} = data;
-    return await this.collateralPlugin.findNOnline(peerIds, count, options)
+    return await this.nodeManager.findNOnline(peerIds, count, options)
   }
 
   @ipcMethod(IpcMethods.GetConnectedPeerIds)
   async __getConnectedPeerIds() {
-    return await this.collateralPlugin.getConnectedPeerIds()
+    return await this.nodeManager.getConnectedPeerIds()
   }
 
   @ipcMethod(IpcMethods.GetNodeMultiAddress)
@@ -401,11 +400,11 @@ class NetworkIpcHandler extends CallablePlugin {
   async __sendToAggregatorNode(data: {type: string, data: any}): Promise<string[]> {
     let aggregators = this.network.configs.net.nodes?.aggregators || []
     if(aggregators.length > 0) {
-      const aggregatorsInfo = this.collateralPlugin.filterNodes({list: aggregators});
+      const aggregatorsInfo = this.nodeManager.filterNodes({list: aggregators});
       let responses: (MuonNodeInfo|null)[] = await Promise.all(
         aggregatorsInfo.map(n => {
           if(n.wallet === process.env.SIGN_WALLET_ADDRESS) {
-            return this.__aggregateData(data, this.collateralPlugin.currentNodeInfo!)
+            return this.__aggregateData(data, this.nodeManager.currentNodeInfo!)
               .then(() => n)
               .catch(e => {
                 log.error("SendToAggregatorNode:ex, %O", e);
@@ -474,7 +473,7 @@ class NetworkIpcHandler extends CallablePlugin {
   async __rcForwardGatewayRequest(requestData: GatewayCallParams, callerInfo, options:{timeout?: number}={}) {
     let {app} = requestData
 
-    const currentNode: MuonNodeInfo = this.collateralPlugin.currentNodeInfo!;
+    const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
     const context: AppContext|undefined = await CoreIpc.getAppOldestContext(app);
     if(context) {
       /** When the context exists, the node can either process it or send it to the appropriate node. */
@@ -505,7 +504,7 @@ class NetworkIpcHandler extends CallablePlugin {
          If a non-deployer node does not have a context, it should send the request to one of the deployer nodes.
          The deployer nodes know the members of the app party and can forward the request to the suitable one.
          */
-        let deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(({id}) => id);
+        let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id);
         const randomIndex = Math.floor(Math.random() * deployers.length);
         return this.forwardGatewayCallToOtherNode(
           deployers[randomIndex],
@@ -525,16 +524,16 @@ class NetworkIpcHandler extends CallablePlugin {
         if(!appName)
           throw 'invalid request'
         /** forward request into core to be verified and then be stored */
-        
+
         // TODO: Uncomment this
         // Just deployer nodes have access to all appContexts
         // at the momemnt and monitoring nodes can't verify
         // the transactions.
         // It should be changed to let all nodes query the AppContext w/o
         // the party and get the TSS pubkey and verify the requests
-        
+
         //const verified = await CoreIpc.verifyRequestSignature(data.data)
-        
+
         //if(!verified)
         //  throw 'request not verified';
         if(reqAggregatorBus) {

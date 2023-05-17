@@ -1,6 +1,6 @@
 import Muon from "../../muon";
 import {MuonNodeInfo} from "../../../common/types";
-import CollateralInfoPlugin from "../collateral-info";
+import NodeManagerPlugin from "../node-manager.js";
 import {logger} from '@libp2p/logger'
 import Events from 'events-async'
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
@@ -106,7 +106,7 @@ export default class BasePlugin extends Events{
   }
 
   get currentNodeInfo(): MuonNodeInfo | undefined {
-    const collateral: CollateralInfoPlugin = this.muon.getPlugin('collateral')
-    return collateral.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+    const nodeManager: NodeManagerPlugin = this.muon.getPlugin('node-manager')
+    return nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
   }
 }

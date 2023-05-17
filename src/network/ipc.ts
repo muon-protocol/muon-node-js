@@ -2,7 +2,7 @@ import {NetworkIpcMethod, IpcMethods} from "./plugins/network-ipc-handler.js";
 import { QueueProducer } from '../common/message-bus/index.js'
 import { IPC_CHANNEL } from './plugins/network-ipc-plugin.js'
 import {IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../common/types";
-import {NodeFilterOptions} from "./plugins/collateral-info";
+import {NodeFilterOptions} from "./plugins/node-manager.js";
 import {GatewayCallParams} from "../gateway/types";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
@@ -15,8 +15,8 @@ function getNetworkConfig(options?: IpcCallOptions) {
   return call(IpcMethods.GetNetworkConfig, {} , options);
 }
 
-function getCollateralInfo(options?: IpcCallOptions) {
-  return call(IpcMethods.GetCollateralInfo, {}, options)
+function getContractInfo(options?: IpcCallOptions) {
+  return call(IpcMethods.GetContractInfo, {}, options)
 }
 
 function filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
@@ -127,7 +127,7 @@ function sendToAggregatorNode(type: string, data: any): Promise<string[]> {
 export {
   call,
   getNetworkConfig,
-  getCollateralInfo,
+  getContractInfo,
   filterNodes,
   getNodesList,
   broadcastToChannel,

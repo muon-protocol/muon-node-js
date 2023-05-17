@@ -1,9 +1,7 @@
 import BaseNetworkPlugin from "./base/base-network-plugin.js";
-import CollateralInfoPlugin from "./collateral-info.js";
 import { fromString as uint8ArrayFromString } from "uint8arrays/from-string";
 import { toString as uint8ArrayToString } from "uint8arrays/to-string";
 import {logger} from '@libp2p/logger'
-import { peerId2Str } from "../utils.js";
 import last from "it-last";
 import drain from "it-drain";
 
