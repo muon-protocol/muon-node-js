@@ -204,7 +204,7 @@ async function reshareApp(argv, configs) {
   else {
     console.log("Rotation is not needed for any context.")
     /** If there is no PENDING context, find a context to KeyGen */
-    const groupSelectedContext = contexts.find(ctx => ctx.status === APP_STATUS_TSS_GROUP_SELECTED);
+    const groupSelectedContext = contexts.find(ctx => (ctx.status === APP_STATUS_TSS_GROUP_SELECTED && !!ctx.previousSeed));
     if(!groupSelectedContext) {
       console.log("There is no pending context to reshare it.")
       return;
