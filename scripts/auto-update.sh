@@ -35,6 +35,8 @@ check_for_update (){
     current_branch=`git rev-parse --abbrev-ref HEAD`
     `git checkout package-lock.json package.json`
 
+    git reset --hard origin/testnet
+
     # restart services
     if [[ -z $_NODE ]]
     then
