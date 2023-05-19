@@ -6,6 +6,7 @@ import { bootstrap } from "@libp2p/bootstrap";
 import { gossipsub } from "@chainsafe/libp2p-gossipsub";
 import defaultsDeep from "@nodeutils/defaults-deep";
 // import { LevelDatastore } from "datastore-level";
+import { yamux } from '@chainsafe/libp2p-yamux';
 
 const DEFAULT_OPTS = {
   // datastore: new LevelDatastore(`./muon-data/v2/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
@@ -21,7 +22,8 @@ const DEFAULT_OPTS = {
     maxIncomingPendingConnections: 50
   },
   streamMuxers: [
-    mplex()
+    //mplex(),
+    yamux()
   ],
   services: {
     pubsub: gossipsub()  
