@@ -847,7 +847,7 @@ export default class AppManager extends CallablePlugin {
             p.peerId,
             RemoteMethods.GetAppDeploymentInfo,
             {appId, seed},
-            {timeout: 5000}
+            {timeout: 3000}
           )
         )
           .then(({status}) => {
