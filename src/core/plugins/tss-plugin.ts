@@ -12,7 +12,7 @@ import * as CoreIpc from '../ipc.js'
 import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import TssParty from "../../utils/tss/party.js";
-import {IMpcNetwork} from "../../common/mpc/types";
+import {IMpcNetwork, MapOf} from "../../common/mpc/types";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from "../../common/mpc/dist-key.js";
 import {logger} from '@libp2p/logger'
@@ -604,68 +604,85 @@ class TssPlugin extends CallablePlugin {
     })
   }
 
-  private appTssKeyRecoveryCheckTime = 0;
-  async checkAppTssKeyRecovery(appId: string, seed: string): Promise<boolean> {
-    if(this.appTssKeyRecoveryCheckTime + 5*60e3 < Date.now()){
-      log(`checking to recover app[${appId}] tss key`)
-      this.appTssKeyRecoveryCheckTime = Date.now();
-      try {
-        let context: AppContext = this.appManager.getAppContext(appId, seed);
-        if(!context.keyGenRequest) {
+  private appTssKeyRecoveryCheckTime: MapOf<number> = {};
+
+  /**
+   * Find a list of partners who have the app key and attempt to recover the app key.
+   * @param appId {string} - App ID
+   * @param seed {string} - Apps context identifier.
+   * @param forceRetry {boolean} - By default, this method will cache the result to prevent simultaneous search.
+   * Sometimes it is necessary to retry and ignore the cache.
+   * @return {boolean} - Is App's tss key recovered successfully or not.
+   */
+  async checkAppTssKeyRecovery(appId: string, seed: string, forceRetry:boolean=false): Promise<boolean> {
+    const lastCallTime = this.appTssKeyRecoveryCheckTime[`${appId}-${seed}`] ?? 0;
+    if(!forceRetry && lastCallTime + 5*60e3 > Date.now())
+      return false;
+
+    log(`checking to recover app[${appId}] tss key`)
+    this.appTssKeyRecoveryCheckTime[`${appId}-${seed}`] = Date.now();
+    try {
+      let currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
+      let context: AppContext = this.appManager.getAppContext(appId, seed);
+      if(!context || !context.keyGenRequest) {
+        /** If the current node is not deployer, query deployers to find the context. */
+        if(!currentNode.isDeployer) {
           const contexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId);
           context = contexts.find(ctx => ctx.seed === seed)!
-          if(!contexts || !context.keyGenRequest)
-            throw `app tss is not ready yet`
         }
-        const readyPartners = await this.getTssReadyPartners(appId, seed);
-        if(readyPartners.length >= context.party.t) {
-          log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
-          log(`generating nonce for recovering app[${appId}] tss key`)
-          let nonce = await this.keyGen(
-            {appId, seed},
-            {
-              id: `recovery-${uuid()}`,
-              partners: [
-                this.nodeManager.currentNodeInfo!.id,
-                ...readyPartners.map(p => p.id),
-              ]
-            }
-          );
-          log(`nonce generated for recovering app[${appId}] tss key`)
-          //
-          const noncePartners = this.nodeManager.filterNodes({
-            list: nonce.partners,
-            excludeSelf: true,
-          })
-          let key = await this.recoverAppTssKey(appId, seed, noncePartners, nonce);
-          if(key) {
-            log(`app tss key recovered`)
-            const netConfigs = this.muon.configs.net
-            let expiration: number|undefined;
-            if(context.deploymentRequest && context.ttl) {
-              expiration = context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
-            }
-            await this.appManager.saveAppTssConfig({
-              appId: appId,
-              seed,
-              keyGenRequest: context.keyGenRequest,
-              publicKey: pub2json(key.publicKey!),
-              keyShare: bn2hex(key.share!),
-              expiration
-            })
 
-            return true;
+        if(!context || !context.keyGenRequest)
+          throw `app tss is not ready yet`
+      }
+      const readyPartners: MuonNodeInfo[] = await this.getTssReadyPartners(appId, seed);
+
+      if(readyPartners.length >= context.party.t) {
+        log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
+        log(`generating nonce for recovering app[${appId}] tss key`)
+        let nonce = await this.keyGen(
+          {appId, seed},
+          {
+            id: `recovery-${uuid()}`,
+            partners: [
+              this.nodeManager.currentNodeInfo!.id,
+              ...readyPartners.map(p => p.id),
+            ]
           }
-        }
-        else {
-          log(`app[${appId}] tss is not ready yet`)
-          throw `app tss is not ready yet`;
+        );
+        log(`nonce generated for recovering app[${appId}] tss key`)
+        //
+        const noncePartners = this.nodeManager.filterNodes({
+          list: nonce.partners,
+          excludeSelf: true,
+        })
+        let key = await this.recoverAppTssKey(appId, seed, noncePartners, nonce);
+        if(key) {
+          log(`app tss key recovered`)
+          const netConfigs = this.muon.configs.net
+          let expiration: number|undefined;
+          if(context.deploymentRequest && context.ttl) {
+            expiration = context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
+          }
+          await this.appManager.saveAppTssConfig({
+            appId: appId,
+            seed,
+            keyGenRequest: context.keyGenRequest,
+            publicKey: pub2json(key.publicKey!),
+            keyShare: bn2hex(key.share!),
+            expiration
+          })
+
+          return true;
         }
       }
-      catch (e) {
-        log(`recovering app[${appId}] tss key failed %O`, e);
-        throw e;
+      else {
+        log(`app[${appId}] tss is not ready yet`)
+        throw `app tss is not ready yet`;
       }
+    }
+    catch (e) {
+      log(`recovering app[${appId}] tss key failed %O`, e);
+      throw e;
     }
     return false;
   }

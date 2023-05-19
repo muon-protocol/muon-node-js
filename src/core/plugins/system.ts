@@ -368,7 +368,7 @@ class System extends CallablePlugin {
           /** Wait for a moment in order to let the other nodes get ready. */
           await timeout(10000);
           try {
-            const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed);
+            const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed, true);
             if(recovered) {
               log(`tss key recovered successfully.`)
               break;
@@ -469,7 +469,7 @@ class System extends CallablePlugin {
         for(let numTry=3 ; numTry > 0 ; numTry--) {
           await timeout(10000);
           try {
-            const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed);
+            const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed, true);
             if(recovered) {
               log(`tss key recovered successfully.`)
               break;

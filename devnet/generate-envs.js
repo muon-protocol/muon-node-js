@@ -138,10 +138,12 @@ const createEnv = async () => {
   }
 
   /***** Create Other net.conf.json ******/
+  const defaultNetConfigs = JSON.parse(fs.readFileSync(`${BASE_PATH}/config/global/default.net.conf.json`))
 
   let netConf = JSON.stringify(
     {
       "tss": {
+        ...defaultNetConfigs.tss,
         "threshold": threshold,
         "max": 100
       },
