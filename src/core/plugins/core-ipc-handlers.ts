@@ -137,7 +137,14 @@ class CoreIpcHandlers extends CallablePlugin {
 
   @ipcMethod(IpcMethods.FindNAvailablePartners)
   async __findNAvailablePartners(data: {appId: string, seed: string, searchList: string[], count: number}): Promise<string[]> {
-    return await this.appManager.findNAvailablePartners(data.appId, data.seed, data.searchList, data.count)
+    return await this.appManager.findNAvailablePartners(
+      data.searchList,
+      data.count,
+      {
+        appId: data.appId,
+        seed: data.seed
+      }
+    )
   }
 
   @ipcMethod(IpcMethods.VerifyRequestSignature)

@@ -1,5 +1,5 @@
 import BaseNetworkPlugin from './base/base-network-plugin.js';
-import CollateralInfoPlugin from "./collateral-info.js";
+import NodeManagerPlugin from "./node-manager.js";
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
 import * as CoreIpc from '../../core/ipc.js'
@@ -50,9 +50,9 @@ export default class NetworkBroadcastPlugin extends BaseNetworkPlugin {
     try{
       let strData = uint8ArrayToString(rawData)
       let data = JSON.parse(strData);
-      let collateralPlugin: CollateralInfoPlugin = this.network.getPlugin('collateral');
+      let nodeManager: NodeManagerPlugin = this.network.getPlugin('node-manager');
 
-      let senderInfo = collateralPlugin.getNodeInfo(from);
+      let senderInfo = nodeManager.getNodeInfo(from);
       if(!senderInfo){
         throw {message: `Unrecognized broadcast owner ${from}`, data: strData}
       }

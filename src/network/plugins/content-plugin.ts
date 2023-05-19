@@ -1,5 +1,5 @@
 import BaseNetworkPlugin from './base/base-network-plugin.js';
-import CollateralInfoPlugin from "./collateral-info.js";
+import NodeManagerPlugin from "./node-manager.js";
 import {loadCID} from '../../utils/cid.js'
 import all from 'it-all'
 import {logger} from '@libp2p/logger'
@@ -14,8 +14,8 @@ export default class NetworkContentPlugin extends BaseNetworkPlugin {
     await super.onStart()
   }
 
-  private get collateralPlugin(): CollateralInfoPlugin {
-    return this.network.getPlugin('collateral');
+  private get nodeManager(): NodeManagerPlugin {
+    return this.network.getPlugin('node-manager');
   }
 
   async provide(cids: string | string[]) {

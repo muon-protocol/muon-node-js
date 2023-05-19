@@ -14,7 +14,7 @@ import DistributedKey from "../../../utils/tss/distributed-key.js";
 import TssPlugin from "../tss-plugin.js";
 import AppManager from "../app-manager.js";
 import TssParty from "../../../utils/tss/party.js";
-import CollateralInfoPlugin from "../collateral-info.js";
+import NodeManagerPlugin from "../node-manager.js";
 import {AppContext, AppRequest, JsonPublicKey, MuonNodeInfo, MuonSignature} from "../../../common/types";
 import {useOneTime} from "../../../utils/tss/use-one-time.js";
 import chalk from 'chalk'
@@ -138,7 +138,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     /** load app party on start */
     await this.appManager.waitToLoad();
-    await this.collateralPlugin.waitToLoad();
+    await this.nodeManager.waitToLoad();
 
     for(const seed of this.appManager.getAppSeeds(this.APP_ID)) {
       const appParty = this.tssPlugin.getAppParty(this.APP_ID, seed);
@@ -152,8 +152,8 @@ class BaseAppPlugin extends CallablePlugin {
     return this.muon.getPlugin('tss-plugin');
   }
 
-  get collateralPlugin(): CollateralInfoPlugin{
-    return this.muon.getPlugin('collateral');
+  get nodeManager(): NodeManagerPlugin{
+    return this.muon.getPlugin('node-manager');
   }
 
   get appManager(): AppManager {
@@ -516,7 +516,7 @@ class BaseAppPlugin extends CallablePlugin {
       }
     }
 
-    const partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: announceList})
+    const partners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: announceList})
     this.log(`nodes selected to announce confirmation: %o`, partners.map(p => p.id))
 
     const responses: string[] = await Promise.all(partners.map(async node => {
@@ -620,7 +620,7 @@ class BaseAppPlugin extends CallablePlugin {
       return {s, e};
     })
 
-    const ownersIndex = owners.map(wallet => this.collateralPlugin.getNodeInfo(wallet)!.id);
+    const ownersIndex = owners.map(wallet => this.nodeManager.getNodeInfo(wallet)!.id);
     let aggregatedSign = tss.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
     let resultHash = this.hashAppSignParams(newRequest, newRequest.data.signParams, false)
 
@@ -659,7 +659,7 @@ class BaseAppPlugin extends CallablePlugin {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let nonce = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
 
-    const ownerInfo = this.collateralPlugin.getNodeInfo(owner)
+    const ownerInfo = this.nodeManager.getNodeInfo(owner)
     if(!ownerInfo){
       this.log(`invalid signature owner %s`, owner)
       return false
@@ -691,7 +691,7 @@ class BaseAppPlugin extends CallablePlugin {
     let party = this.getParty(request.deploymentSeed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
-    let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({list: party.partners})
+    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: party.partners})
       .filter((op: MuonNodeInfo) => {
         return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.id)
       })
@@ -954,7 +954,7 @@ class BaseAppPlugin extends CallablePlugin {
     const context = this.appManager.getAppContext(this.APP_ID, request.deploymentSeed)
     if(!context)
       throw `Missing app context`
-    const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!
+    const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)!
     if(!context.party.partners.includes(currentNodeInfo.id))
       throw `Current node does not exist in the app party`
     if(!this.getTss(request.deploymentSeed))

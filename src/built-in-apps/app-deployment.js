@@ -228,12 +228,9 @@ module.exports = {
             case Methods.TssKeyGen: {
                 const { appId, seed } = params
 
-                /** ensure app context to be exist */
-                let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
-                if(!context)
-                    throw {message: `app deployment info not found`, params}
-
                 const {id, publicKey, generators} = await this.callPlugin('system', "generateAppTss", appId, seed)
+
+                let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
 
                 return {
                     id,

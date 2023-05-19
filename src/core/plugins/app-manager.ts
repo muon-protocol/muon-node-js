@@ -11,7 +11,7 @@ import {
 } from "../../common/types";
 import TssPlugin from "./tss-plugin.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
-import CollateralInfoPlugin from "./collateral-info.js";
+import NodeManagerPlugin from "./node-manager.js";
 import * as CoreIpc from "../ipc.js";
 import * as TssModule from '../../utils/tss/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
@@ -29,7 +29,6 @@ const log = logger('muon:core:plugins:app-manager')
 
 const RemoteMethods = {
   GetAppDeploymentInfo: "get-app-deployment-info",
-  AppDeploymentInquiry: "app-deployment-inquiry",
   GetAppContext: "get-app-context",
   GetAppTss: "get-app-tss",
   GetAppPartyLatency: "get-app-latency"
@@ -38,6 +37,17 @@ const RemoteMethods = {
 export type AppContextQueryOptions = {
   seeds?: string[],
   includeExpired?: boolean,
+}
+
+export type FindAvailableNodesOptions = {
+  /** If it is set, target nodes will check the status of this app. */
+  appId?: string,
+  /** If the appId is set, the seed needs to be set. */
+  seed?: string,
+  /** If not enough nodes respond, the query will terminate after this timespan.*/
+  timeout?: number,
+  /** Determine which field of MuonNodeInfo should be returned as the response. The id field is the default value. */
+  return?: string
 }
 
 @remoteApp
@@ -59,8 +69,8 @@ export default class AppManager extends CallablePlugin {
     this.muon.on('app-tss-key:add', this.onAppTssConfigAdd.bind(this))
     this.muon.on('global-tss-key:generate', this.onDeploymentTssKeyGenerate.bind(this));
 
-    this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
-    this.muon.on("collateral:node:delete", this.onNodeDelete.bind(this));
+    this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
+    this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
 
     await this.loadAppsInfo()
   }
@@ -90,14 +100,14 @@ export default class AppManager extends CallablePlugin {
     return this.muon.getPlugin('tss-plugin');
   }
 
-  get collateralPlugin(): CollateralInfoPlugin {
-    return this.muon.getPlugin('collateral');
+  get nodeManager(): NodeManagerPlugin {
+    return this.muon.getPlugin('node-manager');
   }
 
   async loadAppsInfo() {
     log('loading apps info ...')
-    await this.collateralPlugin.waitToLoad();
-    const currentNode = this.collateralPlugin.currentNodeInfo!;
+    await this.nodeManager.waitToLoad();
+    const currentNode = this.nodeManager.currentNodeInfo!;
     let deploymentTssPublicKey: any = undefined;
     if (currentNode && currentNode.isDeployer) {
       // TODO: tssPlugin is not loaded yet, so the tssKey is null.
@@ -116,9 +126,9 @@ export default class AppManager extends CallablePlugin {
           rotationEnabled: false,
           // ttl: 0,
           party: {
-            partners: this.collateralPlugin.filterNodes({isDeployer: true}).map(({id}) => id),
-            t: this.collateralPlugin.TssThreshold,
-            max: this.collateralPlugin.MaxGroupSize
+            partners: this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id),
+            t: this.nodeManager.TssThreshold,
+            max: this.nodeManager.MaxGroupSize
           },
           publicKey: deploymentTssPublicKey,
         },
@@ -307,7 +317,7 @@ export default class AppManager extends CallablePlugin {
     }
 
     /** query only deployer nodes */
-    const deployerNodes: string[] = this.collateralPlugin
+    const deployerNodes: string[] = this.nodeManager
       .filterNodes({
         isDeployer: true,
         excludeSelf: true
@@ -374,7 +384,7 @@ export default class AppManager extends CallablePlugin {
     }
 
     /** refresh result */
-    const appParty: MuonNodeInfo[] = this.collateralPlugin
+    const appParty: MuonNodeInfo[] = this.nodeManager
       .filterNodes({
         list: appContext.party.partners,
         excludeSelf: true
@@ -508,6 +518,7 @@ export default class AppManager extends CallablePlugin {
 
   getAppDeploymentStatus(appId: string, seed: string): AppDeploymentStatus {
     let context: AppContext = this.getAppContext(appId, seed);
+    const currentNode = this.nodeManager.currentNodeInfo!;
 
     let status: AppDeploymentStatus = "NEW"
     if (!!context) {
@@ -516,9 +527,13 @@ export default class AppManager extends CallablePlugin {
       if(appId === "1") {
         status = "DEPLOYED";
       }
-      else {
-        if (!!seed && !!context.publicKey) {
+      else if(!!seed) {
+        const isInTheParty = context.party.partners.includes(currentNode.id);
+        if((isInTheParty && this.appHasTssKey(appId, seed)) || (!isInTheParty && !!context.publicKey)) {
           status = "DEPLOYED";
+        }
+
+        if (status === "DEPLOYED") {
 
           if (!!context.ttl) {
             const deploymentTime = context.deploymentRequest!.data.timestamp
@@ -540,7 +555,7 @@ export default class AppManager extends CallablePlugin {
 
   appHasTssKey(appId: string, seed: string): boolean {
     if (appId == '1') {
-      const nodeInfo = this.collateralPlugin.currentNodeInfo!
+      const nodeInfo = this.nodeManager.currentNodeInfo!
       return nodeInfo?.isDeployer && !!this.tssPlugin.tssKey
     } else {
       return !!this.appTssConfigs[seed];
@@ -556,7 +571,7 @@ export default class AppManager extends CallablePlugin {
   async findAppPublicKeys(appId: string): Promise<MapOf<PublicKey>> {
     if(appId === '1') {
       const deploymentContextSeed = this.appSeeds["1"][0]
-      const currentNode: MuonNodeInfo = this.collateralPlugin.currentNodeInfo!;
+      const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
       if(currentNode.isDeployer) {
         if(this.tssPlugin.tssKey) {
           return {
@@ -571,7 +586,7 @@ export default class AppManager extends CallablePlugin {
         if(!this.deploymentPublicKey && this.publicKeyQueryTime + 2*60e3 < Date.now()) {
           this.publicKeyQueryTime = Date.now();
 
-          const deployers: MuonNodeInfo[] = _.shuffle(this.collateralPlugin.filterNodes({isDeployer: true}));
+          const deployers: MuonNodeInfo[] = _.shuffle(this.nodeManager.filterNodes({isDeployer: true}));
           // @ts-ignore
           const publicKeyStr = await Promise.any(
             deployers.slice(0, 3).map(n => {
@@ -622,19 +637,23 @@ export default class AppManager extends CallablePlugin {
   }
 
   /**
+   * Finds available nodes from a given list. By default, it selects online nodes. Any node that responds will be selected.
+   * If you pass {appId, seed} as the third param, only nodes that have this app's context and tss key will be selected.
    * @param searchList {string[]} - id/wallet/peerId list of nodes to check.
    * @param count {number} - enough count of results to resolve the promise.
-   * @param options
-   * @param options.appId {string} - if has value, the nodes that has ready app tss key, will be selected.
-   * @param options.timeout {number} - times to wait for remote response (in millisecond)
+   * @param options {FindAvailableNodesOptions} - Query options.
+   * @return {string[]} - A list of the selected fields of available nodes (options.return specifies these items).
    */
-  async findNAvailablePartners(appId: string, contextSeed: string, searchList: string[], count: number, options: { timeout?: number, return?: string } = {}): Promise<string[]> {
+  async findNAvailablePartners(searchList: string[], count: number, options: FindAvailableNodesOptions = {}): Promise<string[]> {
     options = {
       timeout: 15000,
       return: 'id',
       ...options
     }
-    let peers = this.collateralPlugin.filterNodes({list: searchList})
+
+    const {appId, seed} = options;
+
+    let peers = this.nodeManager.filterNodes({list: searchList})
     log(`finding ${count} of ${searchList.length} available peer ...`)
     const selfIndex = peers.findIndex(p => p.peerId === process.env.PEER_ID!)
 
@@ -642,8 +661,9 @@ export default class AppManager extends CallablePlugin {
     let n = count;
     if (selfIndex >= 0) {
       peers = peers.filter((_, i) => (i !== selfIndex))
-      const status = this.getAppDeploymentStatus(appId, contextSeed)
-      if (status === 'DEPLOYED')
+      const status = this.getAppDeploymentStatus(appId!, seed!)
+      /** If the appId is not set, being online is enough to be considered as available. */
+      if (!appId || status === 'DEPLOYED')
         responseList.push(this.currentNodeInfo![options!.return!]);
       n--;
     }
@@ -667,12 +687,12 @@ export default class AppManager extends CallablePlugin {
       this.remoteCall(
         peers[i].peerId,
         RemoteMethods.GetAppDeploymentInfo,
-        {appId, seed: contextSeed},
+        {appId, seed},
         {timeout: options!.timeout},
       )
         .then(({status}) => {
           execTimes[i] = Date.now() - startTime
-          if (status === "DEPLOYED") {
+          if (!appId || status === "DEPLOYED") {
             responseList.push(peers[i][options!.return!])
             n--;
           }
@@ -699,18 +719,28 @@ export default class AppManager extends CallablePlugin {
     return resultPromise.promise;
   }
 
-  async findOptimalAvailablePartners(appId: string, contextSeed: string, count: number, options: { timeout?: number, return?: string } = {}): Promise<string[]> {
+  /**
+   * Finds an optimal sub-group of the app's party that has the minimum response latency between all partners.
+   * @param appId {string} - The app whose party we want to find a sub-group of..
+   * @param seed {string} - The seed of the app's context whose sub-group we want to find..
+   * @param count {number} - Sub-group nodes count
+   * @param options
+   * @param options.timeout {number} - Amount of time in ms waiting for a node response.
+   * @param options.return {number} - Determine which field of MuonNodeInfo should be returned as the response. The id field is the default value.
+   * @return {string[]} - A list of the selected fields of available nodes (options.return specifies these items).
+   */
+  async findOptimalAvailablePartners(appId: string, seed: string, count: number, options: { timeout?: number, return?: string } = {}): Promise<string[]> {
     options = {
       //TODO: find N best partners instead of setting timeout
       timeout: 5000,
       return: 'id',
       ...options
     }
-    const context = this.getAppContext(appId, contextSeed)
+    const context = this.getAppContext(appId, seed)
     if (!context)
       throw `app not deployed`;
 
-    let peers = this.collateralPlugin.filterNodes({list: context.party.partners})
+    let peers = this.nodeManager.filterNodes({list: context.party.partners})
     log(`finding ${count} optimal available of ${context.appName} app partners ...`)
 
     let responseTimes = await Promise.all(
@@ -718,12 +748,12 @@ export default class AppManager extends CallablePlugin {
         return (
           p.wallet === process.env.SIGN_WALLET_ADDRESS
           ?
-          this.__getAppPartyLatency({appId, seed: contextSeed}, this.collateralPlugin.currentNodeInfo)
+          this.__getAppPartyLatency({appId, seed: seed}, this.nodeManager.currentNodeInfo)
           :
           this.remoteCall(
             p.peerId,
             RemoteMethods.GetAppPartyLatency,
-            {appId, seed: contextSeed},
+            {appId, seed: seed},
             {timeout: options.timeout}
           )
         )
@@ -756,11 +786,6 @@ export default class AppManager extends CallablePlugin {
     return this.getAppDeploymentInfo(appId, seed);
   }
 
-  @remoteMethod(RemoteMethods.AppDeploymentInquiry)
-  async __appDeploymentInquiry(appId, callerInfo) {
-    return this.appIsDeployed(appId) ? "yes" : 'no';
-  }
-
   /** return App all active context list */
   @remoteMethod(RemoteMethods.GetAppContext)
   async __getAppContext(data: {appId:string, options: AppContextQueryOptions}, callerInfo): Promise<any[]> {
@@ -783,7 +808,7 @@ export default class AppManager extends CallablePlugin {
     let publicKey:JsonPublicKey|null = null;
 
     if(appId === '1') {
-      const currentNode: MuonNodeInfo = this.collateralPlugin.currentNodeInfo!
+      const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!
       publicKey = currentNode.isDeployer ? pub2json(this.tssPlugin.tssKey?.publicKey!) : null
     }
     else {
@@ -809,7 +834,7 @@ export default class AppManager extends CallablePlugin {
     const context = this.getAppContext(appId, seed)
     if (!context)
       throw `app not deployed`
-    const peers = this.collateralPlugin.filterNodes({list: context.party.partners})
+    const peers = this.nodeManager.filterNodes({list: context.party.partners})
     const startTime = Date.now();
     const responses = await Promise.all(
       peers.map(p => {
@@ -822,7 +847,7 @@ export default class AppManager extends CallablePlugin {
             p.peerId,
             RemoteMethods.GetAppDeploymentInfo,
             {appId, seed},
-            {timeout: 5000}
+            {timeout: 3000}
           )
         )
           .then(({status}) => {

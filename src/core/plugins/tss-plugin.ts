@@ -4,15 +4,15 @@ import lodash from 'lodash'
 import * as tssModule from '../../utils/tss/index.js'
 import Web3 from 'web3'
 import {timeout, stackTrace, uuid, pub2json} from '../../utils/helpers.js'
-import {remoteApp, remoteMethod, broadcastHandler} from './base/app-decorators.js'
-import CollateralInfoPlugin from "./collateral-info.js";
+import {remoteApp, remoteMethod} from './base/app-decorators.js'
+import NodeManagerPlugin from "./node-manager.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import * as CoreIpc from '../ipc.js'
 import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import TssParty from "../../utils/tss/party.js";
-import {IMpcNetwork} from "../../common/mpc/types";
+import {IMpcNetwork, MapOf} from "../../common/mpc/types";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from "../../common/mpc/dist-key.js";
 import {logger} from '@libp2p/logger'
@@ -66,17 +66,10 @@ export type KeyGenOptions = {
   lowerThanHalfN?: boolean,
 }
 
-const BroadcastMessage = {
-  WhoIsThere: 'BROADCAST_MSG_WHO_IS_THERE',
-};
-
 const RemoteMethods = {
   recoverMyKey: 'recoverMyKey',
   createParty: 'createParty',
-  keyGenStep1: 'kgs1',
-  keyGenStep2: 'kgs2',
   storeTssKey: 'storeTssKey',
-  iAmHere: "iAmHere",
   checkTssStatus: "checkTssStatus",
 }
 
@@ -95,9 +88,9 @@ class TssPlugin extends CallablePlugin {
   async onStart() {
     super.onStart();
 
-    this.muon.on("collateral:node:add", this.onNodeAdd.bind(this));
-    this.muon.on("collateral:node:edit", this.onNodeEdit.bind(this));
-    this.muon.on("collateral:node:delete", this.onNodeDelete.bind(this));
+    this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
+    this.muon.on("contract:node:edit", this.onNodeEdit.bind(this));
+    this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
 
     this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
     this.muon.on('global-tss-key:generate', this.onTssKeyGenerate.bind(this));
@@ -106,7 +99,7 @@ class TssPlugin extends CallablePlugin {
     // @ts-ignore
     this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
 
-    await this.collateralPlugin.waitToLoad()
+    await this.nodeManager.waitToLoad()
     await this.appManager.waitToLoad();
     this.loadTssInfo();
 
@@ -117,7 +110,7 @@ class TssPlugin extends CallablePlugin {
 
     //await timeout(5000);
 
-    const selfInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
+    const selfInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
     if(!selfInfo) {
       log(`current node not in the network yet.`)
       return;
@@ -146,7 +139,7 @@ class TssPlugin extends CallablePlugin {
     await timeout(5000);
 
     if(nodeInfo.isDeployer !== oldNodeInfo.isDeployer) {
-      const selfInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+      const selfInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
       if(!selfInfo)
         return ;
 
@@ -192,8 +185,8 @@ class TssPlugin extends CallablePlugin {
     return this.muon.configs.net.tss.max;
   }
 
-  private get collateralPlugin(): CollateralInfoPlugin {
-    return this.muon.getPlugin('collateral')
+  private get nodeManager(): NodeManagerPlugin {
+    return this.muon.getPlugin('node-manager')
   }
 
   private get appManager(): AppManager {
@@ -213,12 +206,12 @@ class TssPlugin extends CallablePlugin {
   }
 
   async loadTssInfo() {
-    if(!this.collateralPlugin.networkInfo){
-      throw {message: `TssPlugin.loadTssInfo: collateral plugin not loaded the network info.`}
+    if(!this.nodeManager.networkInfo){
+      throw {message: `TssPlugin.loadTssInfo: NodeManager plugin not loaded the network info.`}
     }
-    let {networkInfo} = this.collateralPlugin;
+    let {networkInfo} = this.nodeManager;
 
-    const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+    const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
 
     /** current node not in the network */
     if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
@@ -260,14 +253,14 @@ class TssPlugin extends CallablePlugin {
       log('waiting for the threshold number of deployers to get online ...')
       let onlineDeployers: string[];
       while (true) {
-        const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId)
+        const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
         onlineDeployers = await NetworkIpc.findNOnlinePeer(
           deployers,
           Math.ceil(this.tssParty.t*1.3),
           {timeout: 5000}
         );
 
-        if(onlineDeployers.length >= this.collateralPlugin.TssThreshold) {
+        if(onlineDeployers.length >= this.nodeManager.TssThreshold) {
           log(`${onlineDeployers.length} number of deployers are now online.`)
           break;
         }
@@ -278,7 +271,7 @@ class TssPlugin extends CallablePlugin {
         await timeout(5000);
       }
 
-      const currentNodeInfo = this.collateralPlugin.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+      const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
       if (currentNodeInfo && currentNodeInfo.id == LEADER_ID && await this.isNeedToCreateKey()) {
         log(`Got permission to create tss key`);
         let key: DistributedKey = await this.tryToCreateTssKey();
@@ -317,7 +310,7 @@ class TssPlugin extends CallablePlugin {
     const context = this.appManager.getAppContext(appId, seed);
     if(!context)
       return []
-    let partners: MuonNodeInfo[] = this.collateralPlugin
+    let partners: MuonNodeInfo[] = this.nodeManager
       .filterNodes({
         list: context.party.partners,
         excludeSelf: true
@@ -445,7 +438,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   async isNeedToCreateKey(){
-    const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId)
+    const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
     const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
       deployers,
       Math.ceil(this.tssParty!.t*1.2),
@@ -467,7 +460,7 @@ class TssPlugin extends CallablePlugin {
     let numReadyNodes: number = isReadyList.reduce((sum, r) => (sum+r), 0);
 
 
-    return numReadyNodes < this.collateralPlugin.TssThreshold;
+    return numReadyNodes < this.nodeManager.TssThreshold;
   }
 
   saveTssConfig(party, key) {
@@ -523,13 +516,13 @@ class TssPlugin extends CallablePlugin {
     let nonce = await this.keyGen({appId: "1", seed: "1"}, {
       id: `recovery-${uuid()}`,
       partners: [
-        this.collateralPlugin.currentNodeInfo!.id,
+        this.nodeManager.currentNodeInfo!.id,
         ...readyPartners.map(p => p.id),
       ]
     });
     log(`nonce generated for recovering global tss key`)
 
-    const noncePartners = this.collateralPlugin.filterNodes({
+    const noncePartners = this.nodeManager.filterNodes({
       list: nonce.partners,
       excludeSelf: true,
     })
@@ -611,74 +604,91 @@ class TssPlugin extends CallablePlugin {
     })
   }
 
-  private appTssKeyRecoveryCheckTime = 0;
-  async checkAppTssKeyRecovery(appId: string, seed: string): Promise<boolean> {
-    if(this.appTssKeyRecoveryCheckTime + 5*60e3 < Date.now()){
-      log(`checking to recover app[${appId}] tss key`)
-      this.appTssKeyRecoveryCheckTime = Date.now();
-      try {
-        let context: AppContext = this.appManager.getAppContext(appId, seed);
-        if(!context.keyGenRequest) {
+  private appTssKeyRecoveryCheckTime: MapOf<number> = {};
+
+  /**
+   * Find a list of partners who have the app key and attempt to recover the app key.
+   * @param appId {string} - App ID
+   * @param seed {string} - Apps context identifier.
+   * @param forceRetry {boolean} - By default, this method will cache the result to prevent simultaneous search.
+   * Sometimes it is necessary to retry and ignore the cache.
+   * @return {boolean} - Is App's tss key recovered successfully or not.
+   */
+  async checkAppTssKeyRecovery(appId: string, seed: string, forceRetry:boolean=false): Promise<boolean> {
+    const lastCallTime = this.appTssKeyRecoveryCheckTime[`${appId}-${seed}`] ?? 0;
+    if(!forceRetry && lastCallTime + 5*60e3 > Date.now())
+      return false;
+
+    log(`checking to recover app[${appId}] tss key`)
+    this.appTssKeyRecoveryCheckTime[`${appId}-${seed}`] = Date.now();
+    try {
+      let currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
+      let context: AppContext = this.appManager.getAppContext(appId, seed);
+      if(!context || !context.keyGenRequest) {
+        /** If the current node is not deployer, query deployers to find the context. */
+        if(!currentNode.isDeployer) {
           const contexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId);
           context = contexts.find(ctx => ctx.seed === seed)!
-          if(!contexts || !context.keyGenRequest)
-            throw `app tss is not ready yet`
         }
-        const readyPartners = await this.getTssReadyPartners(appId, seed);
-        if(readyPartners.length >= context.party.t) {
-          log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
-          log(`generating nonce for recovering app[${appId}] tss key`)
-          let nonce = await this.keyGen(
-            {appId, seed},
-            {
-              id: `recovery-${uuid()}`,
-              partners: [
-                this.collateralPlugin.currentNodeInfo!.id,
-                ...readyPartners.map(p => p.id),
-              ]
-            }
-          );
-          log(`nonce generated for recovering app[${appId}] tss key`)
-          //
-          const noncePartners = this.collateralPlugin.filterNodes({
-            list: nonce.partners,
-            excludeSelf: true,
-          })
-          let key = await this.recoverAppTssKey(appId, seed, noncePartners, nonce);
-          if(key) {
-            log(`app tss key recovered`)
-            const netConfigs = this.muon.configs.net
-            let expiration: number|undefined;
-            if(context.deploymentRequest && context.ttl) {
-              expiration = context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
-            }
-            await this.appManager.saveAppTssConfig({
-              appId: appId,
-              seed,
-              keyGenRequest: context.keyGenRequest,
-              publicKey: pub2json(key.publicKey!),
-              keyShare: bn2hex(key.share!),
-              expiration
-            })
 
-            return true;
+        if(!context || !context.keyGenRequest)
+          throw `app tss is not ready yet`
+      }
+      const readyPartners: MuonNodeInfo[] = await this.getTssReadyPartners(appId, seed);
+
+      if(readyPartners.length >= context.party.t) {
+        log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
+        log(`generating nonce for recovering app[${appId}] tss key`)
+        let nonce = await this.keyGen(
+          {appId, seed},
+          {
+            id: `recovery-${uuid()}`,
+            partners: [
+              this.nodeManager.currentNodeInfo!.id,
+              ...readyPartners.map(p => p.id),
+            ]
           }
-        }
-        else {
-          log(`app[${appId}] tss is not ready yet`)
-          throw `app tss is not ready yet`;
+        );
+        log(`nonce generated for recovering app[${appId}] tss key`)
+        //
+        const noncePartners = this.nodeManager.filterNodes({
+          list: nonce.partners,
+          excludeSelf: true,
+        })
+        let key = await this.recoverAppTssKey(appId, seed, noncePartners, nonce);
+        if(key) {
+          log(`app tss key recovered`)
+          const netConfigs = this.muon.configs.net
+          let expiration: number|undefined;
+          if(context.deploymentRequest && context.ttl) {
+            expiration = context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
+          }
+          await this.appManager.saveAppTssConfig({
+            appId: appId,
+            seed,
+            keyGenRequest: context.keyGenRequest,
+            publicKey: pub2json(key.publicKey!),
+            keyShare: bn2hex(key.share!),
+            expiration
+          })
+
+          return true;
         }
       }
-      catch (e) {
-        log(`recovering app[${appId}] tss key failed %O`, e);
-        throw e;
+      else {
+        log(`app[${appId}] tss is not ready yet`)
+        throw `app tss is not ready yet`;
       }
+    }
+    catch (e) {
+      log(`recovering app[${appId}] tss key failed %O`, e);
+      throw e;
     }
     return false;
   }
 
   async tryToCreateTssKey(): Promise<DistributedKey> {
-    const deployers: string[] = this.collateralPlugin.filterNodes({isDeployer: true}).map(p => p.peerId)
+    const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
     while (!this.isReady) {
       log('tryToCreateTssKey:: tss is not ready. timeout(5000)')
       await timeout(5000);
@@ -701,7 +711,7 @@ class TssPlugin extends CallablePlugin {
           }
         )
 
-        let keyPartners = this.collateralPlugin.filterNodes({list: key.partners, excludeSelf: true})
+        let keyPartners = this.nodeManager.filterNodes({list: key.partners, excludeSelf: true})
         let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
           return this.remoteCall(
             peerId,
@@ -757,7 +767,7 @@ class TssPlugin extends CallablePlugin {
      * filter partners and keep online ones.
      */
     // @ts-ignore
-    const partnersToCall: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+    const partnersToCall: MuonNodeInfo[] = this.nodeManager.filterNodes({
       list: partners,
     })
 
@@ -804,7 +814,7 @@ class TssPlugin extends CallablePlugin {
     if(oPartners)
       candidatePartners = candidatePartners.filter(p => oPartners!.includes(p));
 
-    let partners: MuonNodeInfo[] = this.collateralPlugin.filterNodes({
+    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({
       list: candidatePartners,
     })
 
@@ -834,7 +844,7 @@ class TssPlugin extends CallablePlugin {
          * starter of MPC
          * starter have higher priority than others when selecting MPC fully connected sub set.
          */
-        this.collateralPlugin.currentNodeInfo!.id,
+        this.nodeManager.currentNodeInfo!.id,
         /** partners list */
         partners.map(p => p.id),
         /** DKG threshold */
@@ -874,36 +884,6 @@ class TssPlugin extends CallablePlugin {
 
   getParty(id) {
     return this.parties[id];
-  }
-
-  async handleBroadcastMessage(msg, callerInfo) {
-    let {method, params} = msg;
-    // console.log("TssPlugin.handleBroadcastMessage",msg, {callerInfo})
-    switch (method) {
-      case BroadcastMessage.WhoIsThere: {
-        // console.log(`=========== InformEntrance ${wallet}@${peerId} ===========`)
-        // TODO: is this message from 'wallet'
-        if (!!this.tssParty) {
-          this.remoteCall(
-            callerInfo.peerId,
-            RemoteMethods.iAmHere
-          ).catch(e => {})
-        }
-        break;
-      }
-      default:
-        log(`unknown message %o`, msg);
-    }
-  }
-
-  @broadcastHandler
-  async onBroadcastReceived(data={}, callerInfo) {
-    try {
-      // let data = JSON.parse(uint8ArrayToString(msg.data));
-      await this.handleBroadcastMessage(data, callerInfo)
-    } catch (e) {
-      console.error('TssPlugin.__onBroadcastReceived', e)
-    }
   }
 
   /**==================================
@@ -1022,11 +1002,6 @@ class TssPlugin extends CallablePlugin {
     else{
       throw "Not permitted to create tss key"
     }
-  }
-
-  @remoteMethod(RemoteMethods.iAmHere)
-  async __iAmHere(data={}, callerInfo) {
-    // console.log('TssPlugin.__iAmHere', data)
   }
 
   @remoteMethod(RemoteMethods.checkTssStatus)

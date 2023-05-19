@@ -8,7 +8,7 @@ import {GatewayCallParams} from "../../gateway/types";
 import AppManager from "./app-manager.js";
 import * as NetworkIpc from '../../network/ipc.js'
 import {GlobalBroadcastChannels} from "../../common/contantes.js";
-import CollateralInfoPlugin from "./collateral-info.js";
+import NodeManagerPlugin from "./node-manager.js";
 import {timeout} from '../../utils/helpers.js'
 import {RedisCache} from "../../common/redis-cache.js";
 import BaseAppPlugin from "./base/base-app-plugin";
@@ -40,8 +40,8 @@ class Explorer extends CallablePlugin {
     return this.muon.getPlugin('tss-plugin');
   }
 
-  get collateralPlugin(): CollateralInfoPlugin {
-    return this.muon.getPlugin('collateral');
+  get nodeManager(): NodeManagerPlugin {
+    return this.muon.getPlugin('node-manager');
   }
 
   get healthPlugin(): HealthCheck {
@@ -58,7 +58,7 @@ class Explorer extends CallablePlugin {
     if(!id) {
       throw `id is undefined`
     }
-    let nodeInfo = this.collateralPlugin.getNodeInfo(id)!
+    let nodeInfo = this.nodeManager.getNodeInfo(id)!
     if(!nodeInfo) {
       throw `unknown peer`
     }
@@ -76,20 +76,12 @@ class Explorer extends CallablePlugin {
     }
   }
 
-  // @gatewayMethod("node-peer")
-  // async __nodePeerInfo(data: GetNodeInfo) {
-  //   let {id} = data?.params || {}
-  //   if(!id) {
-  //     throw `id is undefined`
-  //   }
-  //   let nodeInfo = this.collateralPlugin.getNodeInfo(id)!
-  //   if(!nodeInfo) {
-  //     throw `unknown peer`
-  //   }
-  //   return {
-  //     peerInfo: await NetworkIpc.getPeerInfoLight(nodeInfo.peerId)
-  //   }
-  // }
+  @gatewayMethod("test")
+  async __test(data) {
+    let {appId, seed} = data?.params || {}
+    const nodes = ["1", "2","3","4","5","6","7","8","9","10"]
+    return this.appManager.findNAvailablePartners(nodes, 3, {appId, seed})
+  }
 
   /**
    * For all nodes in announce list of app, this function confirms that app.onConfirm has been called on this node.
@@ -122,10 +114,10 @@ class Explorer extends CallablePlugin {
 
     const listToCheck = ([] as string[]).concat(...announceGroups);
 
-    const partners = this.collateralPlugin.filterNodes({list: listToCheck});
+    const partners = this.nodeManager.filterNodes({list: listToCheck});
     const announced: boolean[] = await Promise.all(partners.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__isReqConfirmationAnnounced(reqId, this.collateralPlugin.currentNodeInfo);
+        return this.__isReqConfirmationAnnounced(reqId, this.nodeManager.currentNodeInfo);
       }
       else {
         return this.remoteCall(
@@ -254,7 +246,7 @@ class Explorer extends CallablePlugin {
       if(contexts.length===0)
         return;
       const ctx = contexts.find(ctx => ctx.seed === seed);
-      if(!ctx || !ctx.party.partners.includes(this.collateralPlugin.currentNodeInfo!.id))
+      if(!ctx || !ctx.party.partners.includes(this.nodeManager.currentNodeInfo!.id))
         return;
     }
     if(status !== 'DEPLOYED') {
