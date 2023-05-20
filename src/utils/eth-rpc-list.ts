@@ -192,10 +192,10 @@ const finalRpcList = Object.entries(DefaultRpcList)
     let envRpcList = getEnvProviders(chainId);
     return [
       chainId,
-      lodash.uniq([
+      lodash.uniq(lodash.shuffle([
         ...envRpcList,
         ...defaultList
-      ])
+      ]))
     ]
   })
   // @ts-ignore
