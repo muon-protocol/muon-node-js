@@ -632,7 +632,7 @@ class TssPlugin extends CallablePlugin {
         }
 
         if(!context || !context.keyGenRequest)
-          throw `app tss is not ready yet`
+          throw `app tss is not ready yet (missing context).`
       }
       const readyPartners: MuonNodeInfo[] = await this.getTssReadyPartners(appId, seed);
 
@@ -677,7 +677,7 @@ class TssPlugin extends CallablePlugin {
       }
       else {
         log(`app[${appId}] tss is not ready yet`)
-        throw `app tss is not ready yet`;
+        throw `app tss is not ready yet (no enough ready partners)`;
       }
     }
     catch (e) {
