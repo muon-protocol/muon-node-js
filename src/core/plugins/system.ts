@@ -466,6 +466,14 @@ class System extends CallablePlugin {
       else {
         log(`current node is not in the party overlap. it should recover the key.`)
 
+        await this.appManager.saveAppTssConfig({
+          appId: appId,
+          seed,
+          keyGenRequest: request,
+          publicKey,
+          expiration,
+        })
+
         for(let numTry=3 ; numTry > 0 ; numTry--) {
           await timeout(10000);
           try {
