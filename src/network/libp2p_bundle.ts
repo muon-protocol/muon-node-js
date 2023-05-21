@@ -18,7 +18,8 @@ const DEFAULT_OPTS = {
   connectionManager: {
     maxConnections: 1000,
     minConnections: 0,
-    maxIncomingPendingConnections: 50
+    maxIncomingPendingConnections: 50,
+    dialTimeout: 4 * 1000
   },
   streamMuxers: [
     mplex()
