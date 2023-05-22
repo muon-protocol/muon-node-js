@@ -1,13 +1,12 @@
 import CallablePlugin from './base/callable-plugin.js'
 import Content from '../../common/db-models/Content.js'
-import {remoteApp, remoteMethod, gatewayMethod, globalBroadcastHandler, broadcastHandler} from './base/app-decorators.js'
+import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
 import TssPlugin from "./tss-plugin.js";
 import {AppContext, AppDeploymentStatus, AppRequest, MuonNodeInfo, Override} from "../../common/types";
 import HealthCheck from "./health-check.js";
 import {GatewayCallParams} from "../../gateway/types";
 import AppManager from "./app-manager.js";
 import * as NetworkIpc from '../../network/ipc.js'
-import {GlobalBroadcastChannels} from "../../common/contantes.js";
 import NodeManagerPlugin from "./node-manager.js";
 import {timeout} from '../../utils/helpers.js'
 import {RedisCache} from "../../common/redis-cache.js";
@@ -74,13 +73,6 @@ class Explorer extends CallablePlugin {
       nodeInfo: nodeStatus,
       execTime: Date.now() - startTime,
     }
-  }
-
-  @gatewayMethod("test")
-  async __test(data) {
-    let {appId, seed} = data?.params || {}
-    const nodes = ["1", "2","3","4","5","6","7","8","9","10"]
-    return this.appManager.findNAvailablePartners(nodes, 3, {appId, seed})
   }
 
   /**

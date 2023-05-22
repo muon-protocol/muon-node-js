@@ -25,21 +25,6 @@ const log = logger('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
 
-export type PartyGenOptions = {
-  /**
-   * Party ID
-   */
-  id?: string,
-  /**
-   * Party Threshold
-   */
-  t: number,
-  /**
-   * Exact partners of party
-   */
-  partners?: string[]
-}
-
 export type KeyGenOptions = {
   /**
    key ID
@@ -92,7 +77,6 @@ class TssPlugin extends CallablePlugin {
 
     this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
     this.muon.on('global-tss-key:generate', this.onTssKeyGenerate.bind(this));
-    this.muon.on('party:generate', this.loadParty.bind(this));
 
     // @ts-ignore
     this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
