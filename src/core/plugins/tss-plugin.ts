@@ -784,13 +784,13 @@ class TssPlugin extends CallablePlugin {
       partners: dKey.partners
     })
 
-    await SharedMemory.set(keyGen.extraParams.keyId, key.toSerializable(), 30*60*1000)
+    await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toSerializable()}, 30*60*1000)
     return key;
   }
 
   async getSharedKey(id: string, timeout:number=5000): Promise<DistributedKey> {
-    let key = await SharedMemory.waitAndGet(id, timeout)
-    let party = this.getParty(key.party);
+    let {partyInfo, key} = await SharedMemory.waitAndGet(id, timeout)
+    let party = this.getAppParty(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
     if(!party)
       throw `party [${key.party}] not found`
     return DistributedKey.load(party, key)
