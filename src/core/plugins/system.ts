@@ -402,29 +402,21 @@ class System extends CallablePlugin {
     } = request;
 
     /** check context exist */
-    const newContext = await this.appManager.getAppContext(appId, seed);
-    if(!newContext) {
+    const context = await this.appManager.getAppContext(appId, seed);
+    if(!context) {
       throw `App new context not found in app reshare confirmation.`
     }
 
     const currentNode = this.nodeManager.currentNodeInfo!;
-    if(newContext.party.partners.includes(currentNode.id)) {
+    if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
-      const prevContext = await this.appManager.getAppContextAsync(appId, newContext.previousSeed, true)
-      if(!prevContext) {
-        throw `App previous context not found in app reshare confirmation.`
-      }
-
-      const overlapPartners = newContext.party.partners.filter(id => prevContext.party.partners.includes(id));
       /** The current node can reshare immediately if it is in the overlap partners. */
       if(
-        /** Node in the overlap party */
-        overlapPartners.includes(currentNode.id)
-        /** Node has the old key */
-        && this.appManager.appHasTssKey(appId, prevContext.seed)
         /** Node has participated in reshare key generation */
-        && keyGenerators.includes(currentNode.id)
+        keyGenerators.includes(currentNode.id)
+        /** Node has the old key */
+        && this.appManager.appHasTssKey(appId, context.previousSeed)
       ) {
         let reshareKey: DistributedKey = await this.tssPlugin.getSharedKey(reshareKeyId)!
         /**
@@ -434,7 +426,7 @@ class System extends CallablePlugin {
          */
         await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-reshare`)
 
-        const oldKey: DistributedKey = this.tssPlugin.getAppTssKey(appId, newContext.previousSeed)!
+        const oldKey: DistributedKey = this.tssPlugin.getAppTssKey(appId, context.previousSeed)!
         if (!oldKey)
           throw `The old party's TSS key was not found.`
         /**
@@ -544,7 +536,8 @@ class System extends CallablePlugin {
         return this.remoteCall(
           node.peerId,
           RemoteMethods.Undeploy,
-          {appId, deploymentTimestamp}
+          {appId, deploymentTimestamp},
+          {timeout: 5000},
         )
           .catch(e => {
             log.error(`error when undeploy at ${node.peerId}: %O`, e)
