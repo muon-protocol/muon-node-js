@@ -17,9 +17,10 @@ const DEFAULT_OPTS = {
     noise(),
   ],
   connectionManager: {
-    maxConnections: 1000,
+    maxConnections: 10000, // TODO: set default values
     minConnections: 0,
-    maxIncomingPendingConnections: 50
+    maxIncomingPendingConnections: 500, // TODO: set default values
+    dialTimeout: 4 * 1000
   },
   streamMuxers: [
     //mplex(),
