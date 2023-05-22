@@ -68,7 +68,6 @@ export type KeyGenOptions = {
 
 const RemoteMethods = {
   recoverMyKey: 'recoverMyKey',
-  createParty: 'createParty',
   storeTssKey: 'storeTssKey',
 }
 
@@ -724,54 +723,6 @@ class TssPlugin extends CallablePlugin {
     return this.tssKey!
   }
 
-  async createParty(options: PartyGenOptions) {
-    let {
-      id,
-      t,
-      partners=[]
-    } = options
-
-    if(partners.length === 0)
-      throw `Generating new Party without partners, is not implemented yet.`
-
-    const newParty = {
-      id: id || TssParty.newId(),
-      t,
-      max: partners.length,
-      partners
-    }
-    if(!id || !this.parties[id])
-      CoreIpc.fireEvent({type: "party:generate", data: newParty});
-    /**
-     * filter partners and keep online ones.
-     */
-    // @ts-ignore
-    const partnersToCall: MuonNodeInfo[] = this.nodeManager.filterNodes({
-      list: partners,
-    })
-
-    let callResult = await Promise.all(
-      partnersToCall
-        .map(({peerId, wallet}) => {
-          if(wallet === process.env.SIGN_WALLET_ADDRESS)
-            return true;
-          return this.remoteCall(
-            peerId,
-            RemoteMethods.createParty,
-            newParty, // TODO: send less data. just send id and partners wallet
-            {timeout: 15000}
-          ).catch(e => {
-            console.log("TssPlugin.createParty", e)
-            return 'error'
-          })
-        })
-    )
-    const succeeded = partners.filter((p, i) => callResult[i] !== 'error')
-    if(succeeded.length < newParty.t)
-      throw `Only ${succeeded.length} partners succeeded when creating the party.`
-    return newParty.id;
-  }
-
   /**
    *
    * @param party
@@ -933,18 +884,6 @@ class TssPlugin extends CallablePlugin {
       // distributed key address
       address: tssModule.pub2addr(appTssKey!.publicKey!)
     }
-  }
-
-  @remoteMethod(RemoteMethods.createParty)
-  async __createParty(data: PartyGenOptions, callerInfo) {
-    // console.log('TssPlugin.__createParty', data)
-    if(!data.id || !this.parties[data.id]) {
-      CoreIpc.fireEvent({
-        type: "party:generate",
-        data
-      });
-    }
-    return "OK"
   }
 
   /**

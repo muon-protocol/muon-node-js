@@ -583,14 +583,6 @@ class System extends CallablePlugin {
       throw `App context already has key`
     }
 
-    const partyId = this.tssPlugin.getAppPartyId(context)
-
-    await this.tssPlugin.createParty({
-      id: partyId,
-      t: context.party.t,
-      partners: context.party.partners,//.map(wallet => this.nodeManager.getNodeInfo(wallet))
-    });
-
     let key = await this.tssPlugin.keyGen({appId, seed}, {timeout: 65e3, lowerThanHalfN: true})
 
     return {
