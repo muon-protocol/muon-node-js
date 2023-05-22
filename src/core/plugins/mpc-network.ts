@@ -101,8 +101,8 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
             if(mpc.extraParams.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
               return;
 
-            const {appId, seed, isForReshare} = mpc.extraParams.partyInfo as PartyInfo
-            const party = await this.tssPlugin.getAppPartyAsync(appId, seed, isForReshare);
+            const partyInfo: PartyInfo = mpc.extraParams.partyInfo as PartyInfo
+            const party = await this.tssPlugin.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
             if(!party) {
               throw `party[${mpc.extraParams.party}] not found`
             }
@@ -114,7 +114,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
               partners: mpc.partners
             })
             // console.log(`new distributed key`, key.toSerializable());
-            await SharedMemory.set(mpc.extraParams.keyId, key.toSerializable(), 30*60*1000)
+            await SharedMemory.set(mpc.extraParams.keyId, {partyInfo, key: key.toSerializable()}, 30*60*1000)
           })
           .catch(e => {
             // TODO
