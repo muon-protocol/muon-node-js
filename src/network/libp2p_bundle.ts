@@ -23,8 +23,8 @@ const DEFAULT_OPTS = {
     dialTimeout: 4 * 1000
   },
   streamMuxers: [
-    mplex(),
-    yamux()
+    yamux(),
+    mplex()
   ],
   services: {
     pubsub: gossipsub()  
