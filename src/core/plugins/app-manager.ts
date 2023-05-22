@@ -47,7 +47,9 @@ export type FindAvailableNodesOptions = {
   /** If not enough nodes respond, the query will terminate after this timespan.*/
   timeout?: number,
   /** Determine which field of MuonNodeInfo should be returned as the response. The id field is the default value. */
-  return?: string
+  return?: string,
+  /** ignore self and not include in result */
+  excludeSelf?: boolean
 }
 
 @remoteApp
@@ -525,7 +527,8 @@ export default class AppManager extends CallablePlugin {
       status = "TSS_GROUP_SELECTED";
 
       if(appId === "1") {
-        status = "DEPLOYED";
+        if(this.tssPlugin.isReady)
+          status = "DEPLOYED";
       }
       else if(!!seed) {
         const isInTheParty = context.party.partners.includes(currentNode.id);
@@ -661,10 +664,12 @@ export default class AppManager extends CallablePlugin {
     let n = count;
     if (selfIndex >= 0) {
       peers = peers.filter((_, i) => (i !== selfIndex))
-      const status = this.getAppDeploymentStatus(appId!, seed!)
-      /** If the appId is not set, being online is enough to be considered as available. */
-      if (!appId || status === 'DEPLOYED')
-        responseList.push(this.currentNodeInfo![options!.return!]);
+      if(options.excludeSelf !== true) {
+        const status = this.getAppDeploymentStatus(appId!, seed!)
+        /** If the appId is not set, being online is enough to be considered as available. */
+        if (!appId || status === 'DEPLOYED')
+          responseList.push(this.currentNodeInfo![options!.return!]);
+      }
       n--;
     }
 

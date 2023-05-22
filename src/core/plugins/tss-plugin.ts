@@ -70,7 +70,6 @@ const RemoteMethods = {
   recoverMyKey: 'recoverMyKey',
   createParty: 'createParty',
   storeTssKey: 'storeTssKey',
-  checkTssStatus: "checkTssStatus",
 }
 
 @remoteApp
@@ -284,11 +283,16 @@ class TssPlugin extends CallablePlugin {
           log("waiting for tss, timeout(5000)");
           await timeout(5000);
           const context: AppContext = this.appManager.getAppContext("1", "1")
-          const readyPartners = await this.getTssReadyPartners('1', '1')
+          const readyPartnersId = await this.appManager.findNAvailablePartners(
+            context.party.partners,
+            Math.ceil(context.party.t * 1.2),
+            {appId: "1", seed: "1", excludeSelf: true},
+          )
 
-          if(readyPartners.length >= context.party.t){
+          if(readyPartnersId.length >= context.party.t){
             log(`global tss is ready.`);
             try {
+              const readyPartners = this.nodeManager.filterNodes({list: readyPartnersId});
               await this.tryToRecoverGlobalTssKey(readyPartners!);
             }
             catch (e) {
@@ -301,33 +305,6 @@ class TssPlugin extends CallablePlugin {
         }
       }
     }
-  }
-
-  /**
-   * Query from the network to check that Tss is ready or not
-   */
-  async getTssReadyPartners(appId: string, seed: string): Promise<MuonNodeInfo[]> {
-    const context = this.appManager.getAppContext(appId, seed);
-    if(!context)
-      return []
-    let partners: MuonNodeInfo[] = this.nodeManager
-      .filterNodes({
-        list: context.party.partners,
-        excludeSelf: true
-      });
-
-    let statuses = await Promise.all(partners.map(p => {
-      return this.remoteCall(
-        p.peerId,
-        RemoteMethods.checkTssStatus,
-        {appId, seed}
-      ).catch(e => 'error')
-    }))
-
-    let isReadyArr = statuses.map(s => s.isReady)
-    const readyPartners = partners.filter((p, i) => isReadyArr[i])
-
-    return readyPartners
   }
 
   getAppTssKey(appId: string, seed: string): DistributedKey | null {
@@ -438,29 +415,25 @@ class TssPlugin extends CallablePlugin {
   }
 
   async isNeedToCreateKey(){
+    log("checking for global key creation ...")
     const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
     const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
       deployers,
       Math.ceil(this.tssParty!.t*1.2),
       {timeout: 10000, return: 'peerId'}
     )
-    if(onlineDeployers.length < this.tssParty!.t)
+    if(onlineDeployers.length < this.tssParty!.t) {
+      log("no enough online deployers to check the key creation ...")
       return false;
+    }
 
-    let statuses = await Promise.all(onlineDeployers.map(peerId => {
-      return this.remoteCall(
-        peerId,
-        RemoteMethods.checkTssStatus,
-        {appId: '1', seed: '1'}
-      ).catch(e => 'error')
-    }))
-
-    // TODO: is this ok?
-    let isReadyList: number[] = statuses.map(s => (s.isReady?1:0))
-    let numReadyNodes: number = isReadyList.reduce((sum, r) => (sum+r), 0);
-
-
-    return numReadyNodes < this.nodeManager.TssThreshold;
+    const readyDeployers = await this.appManager.findNAvailablePartners(
+      deployers,
+      this.nodeManager.TssThreshold,
+      {appId: "1", seed: "1"}
+    )
+    log(`there is ${readyDeployers.length} deployers are ready.`)
+    return readyDeployers.length < this.nodeManager.TssThreshold;
   }
 
   saveTssConfig(party, key) {
@@ -634,7 +607,13 @@ class TssPlugin extends CallablePlugin {
         if(!context || !context.keyGenRequest)
           throw `app tss is not ready yet (missing context).`
       }
-      const readyPartners: MuonNodeInfo[] = await this.getTssReadyPartners(appId, seed);
+      const readyPartnersId = await this.appManager.findNAvailablePartners(
+        context.party.partners,
+        Math.ceil(context.party.t * 1.2),
+        {appId, seed, excludeSelf: true}
+      )
+      log(`this nodes are ready to recover App's key: ${readyPartnersId}`)
+      const readyPartners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: readyPartnersId});
 
       if(readyPartners.length >= context.party.t) {
         log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
@@ -1001,22 +980,6 @@ class TssPlugin extends CallablePlugin {
     }
     else{
       throw "Not permitted to create tss key"
-    }
-  }
-
-  @remoteMethod(RemoteMethods.checkTssStatus)
-  async __checkTssStatus(data:{appId: string, seed: string}, callerInfo): Promise<{isReady: boolean, address?: string}> {
-    const {appId, seed} = data
-
-    const appTssKey = this.getAppTssKey(appId, seed)
-
-    if(!appTssKey) {
-      return {isReady: false}
-    }
-
-    return {
-      isReady: !!appTssKey,
-      address: appTssKey?.address,
     }
   }
 }
