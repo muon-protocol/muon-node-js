@@ -23,7 +23,7 @@ const DEFAULT_OPTS = {
     dialTimeout: 4 * 1000
   },
   streamMuxers: [
-    //mplex(),
+    mplex(),
     yamux()
   ],
   services: {
@@ -36,7 +36,7 @@ const DEFAULT_OPTS = {
   //   clientMode: false,
   //   validators: {
   //     muon: async (key, data) => {
-  //       // validate data
+  //       // validate data1111
   //       // throw an err when data is not valid
   //       return;
   //     },
