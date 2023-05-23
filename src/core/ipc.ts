@@ -37,8 +37,8 @@ export function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
   coreGlobalEvents.send(event, options)
 }
 
-export async function forwardRemoteCall(data: any, callerInfo: MuonNodeInfo, options: IpcCallOptions) {
-  return await call(IpcMethods.ForwardRemoteCall, {data, callerInfo}, options);
+export async function execRemoteCall(data: any, callerInfo: MuonNodeInfo, options: IpcCallOptions) {
+  return await call(IpcMethods.ExecRemoteCall, {data, callerInfo}, options);
 }
 
 export async function getAppId(appName: string): Promise<string> {

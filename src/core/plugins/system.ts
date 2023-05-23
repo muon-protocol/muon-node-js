@@ -3,11 +3,9 @@ import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/ap
 import NodeManagerPlugin from "./node-manager.js";
 import TssPlugin from "./tss-plugin";
 import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
-import {soliditySha3} from '../../utils/sha3.js'
 import * as TssModule from '../../utils/tss/index.js'
 import AppContextModel from "../../common/db-models/app-context.js"
 import AppTssConfigModel from "../../common/db-models/app-tss-config.js"
-import * as NetworkIpc from '../../network/ipc.js'
 import DistributedKey from "../../utils/tss/distributed-key.js";
 import AppManager from "./app-manager.js";
 import * as CoreIpc from '../ipc.js'
@@ -18,7 +16,6 @@ import {bn2hex, toBN} from "../../utils/tss/utils.js";
 import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
 import _ from 'lodash'
-import TssParty from "../../utils/tss/party";
 import BaseAppPlugin from "./base/base-app-plugin";
 
 import { createRequire } from "module";
@@ -32,7 +29,6 @@ const RemoteMethods = {
   Undeploy: "undeploy",
   GetAppPublicKey: "getAppPubKey",
   StartAppTssReshare: "startAppTssReshare",
-  AppAddNewParty: "appAddNewParty",
   ReshareAppTss: "reshareAppTss"
 }
 
@@ -677,52 +673,6 @@ class System extends CallablePlugin {
       throw `App tss key not found.`
 
     return "0x" + key.publicKey!.encode("hex", true)
-  }
-
-  @remoteMethod(RemoteMethods.AppAddNewParty)
-  async __addNewPartyToOldParty(data: {appId: string, seed: string, previousSeed: string, nonce: string}, callerInfo) {
-    const {appId, seed, previousSeed, nonce: nonceId} = data
-
-    const nonce = await this.tssPlugin.getSharedKey(nonceId);
-
-    let newContext: AppContext|undefined = this.appManager.getAppContext(appId, seed)
-    if(!newContext) {
-      const allAppContexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId, {seeds: [seed, previousSeed], includeExpired: true})
-      newContext = allAppContexts.find(ctx => ctx.seed === seed);
-
-      if(!newContext)
-      throw `current context not found`
-    }
-    const oldContext: AppContext = this.appManager.getAppContext(appId, newContext.previousSeed)
-    if(!oldContext)
-      throw `previews context not found`
-
-    if(this.appManager.appHasTssKey(appId, oldContext.seed))
-      throw `The app already has a previous party's TSS key.`
-
-    const oldKeyHoldersId: string[] = nonce.partners
-      .filter(id => oldContext.party.partners.includes(id))
-    const oldKeyHolders: MuonNodeInfo[] = this.nodeManager.filterNodes({list: oldKeyHoldersId})
-    let previousKey: DistributedKey = await this.tssPlugin.recoverAppTssKey(
-      appId,
-      oldContext.seed,
-      oldKeyHolders,
-      nonce,
-      newContext.seed
-    )
-
-    const keyGenRequest: AppRequest = oldContext.keyGenRequest as AppRequest
-
-    await this.appManager.saveAppTssConfig({
-      appId,
-      seed: oldContext.seed,
-      keyGenRequest,
-      publicKey: pub2json(previousKey.publicKey!),
-      keyShare: bn2hex(previousKey.share!),
-      expiration: keyGenRequest.data.result.expiration,
-    })
-
-    return previousKey.toSerializable();
   }
 
 }

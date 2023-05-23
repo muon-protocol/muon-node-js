@@ -56,7 +56,6 @@ const tasksCache = new NodeCache({
 
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
-  GetNodesList: "get-nodes-list",
   GetNetworkConfig: "get-net-conf",
   GetContractInfo: "get-contract-info",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
@@ -66,10 +65,9 @@ export const IpcMethods = {
   ReportClusterStatus: "report-cluster-status",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
-  RemoteCall: "remote-call",
+  ForwardCoreRemoteCall: "forward-core-remote-call",
   GetPeerInfo: "GPI",
   //GetPeerInfoLight: "GPILight",
-  GetClosestPeer: "GCPeer",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
   ForwardGatewayRequest: "forward-gateway-request",
@@ -78,13 +76,12 @@ export const IpcMethods = {
   IsCurrentNodeInNetwork: "is-current-node-in-network",
   GetUptime: "get-uptime",
   FindNOnlinePeer: "FNOP",
-  GetConnectedPeerIds: "GCPIDS",
   GetNodeMultiAddress: "GNMA",
   SendToAggregatorNode: "send-to-aggregator-node",
 } as const;
 
 export const RemoteMethods = {
-  ExecIpcRemoteCall: "exec-ipc-remote-call",
+  ExecCoreRemoteCall: "exec-core-remote-call",
   ForwardGateWayRequest: 'forward-gateway-request',
   AggregateData: "aggregate-data",
 }
@@ -122,7 +119,7 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   get RemoteCallExecEndPoint(): string {
-    return this.remoteMethodEndpoint(RemoteMethods.ExecIpcRemoteCall);
+    return this.remoteMethodEndpoint(RemoteMethods.ExecCoreRemoteCall);
   }
 
   /**
@@ -133,12 +130,6 @@ class NetworkIpcHandler extends CallablePlugin {
   async __filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
     return this.nodeManager.filterNodes(filter)
       .map(({id, active, staker, wallet, peerId, isDeployer}) => ({id, active, staker, wallet, peerId, isDeployer}));
-  }
-
-  @ipcMethod(IpcMethods.GetNodesList)
-  async __getNodesList(output: string|string[]) {
-    let outProps = Array.isArray(output) ? output : [output]
-    return this.nodeManager.filterNodes({}).map(n => _.pick(n, outProps))
   }
 
   @ipcMethod(IpcMethods.GetNetworkConfig)
@@ -245,14 +236,14 @@ class NetworkIpcHandler extends CallablePlugin {
    * @returns {Promise<[any]>}
    * @private
    */
-  @ipcMethod(IpcMethods.RemoteCall)
-  async __onRemoteCallRequest(data) {
+  @ipcMethod(IpcMethods.ForwardCoreRemoteCall)
+  async __forwardCoreRemoteCall(data) {
     const peer = await this.findPeer(data?.peer);
     if(!peer) {
       log(`trying to call offline node %o`, data)
       throw `peer not found peerId: ${data?.peer}`
     }
-    return await this.remoteCall(peer, "exec-ipc-remote-call", data, data?.options);
+    return await this.remoteCall(peer, RemoteMethods.ExecCoreRemoteCall, data, data?.options);
   }
 
   @ipcMethod(IpcMethods.GetPeerInfo)
@@ -265,48 +256,6 @@ class NetworkIpcHandler extends CallablePlugin {
       multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
       protocols: peerInfo.protocols
     }
-  }
-
-  // @ipcMethod(IpcMethods.GetPeerInfoLight)
-  // async __getPeerInfoLight(data): Promise<JsonPeerInfo|null> {
-  //   let peerInfo:PeerInfo|null = await this.findPeerLocal(data?.peerId);
-  //   if(!peerInfo)
-  //     return null
-  //   return {
-  //     id: peerInfo.id.toString(),
-  //     multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
-  //     protocols: peerInfo.protocols
-  //   }
-  // }
-
-  @ipcMethod(IpcMethods.GetClosestPeer)
-  async __getClosestPeer(data:{peerId?: string, cid?: string}): Promise<JsonPeerInfo[]> {
-    let {peerId, cid} = data ?? {}
-    if(!!peerId) {
-      /** return all bootstrap nodes info */
-      let bootstrapList: any[] = this.network.configs.net.bootstrap ?? [];
-      bootstrapList = bootstrapList
-        .map(ma => ({
-          peerId: ma.split('p2p/')[1],
-          multiaddr: ma
-        }))
-        /** exclude self address */
-        // .filter(({peerId}) => !!peerId && peerId !== process.env.PEER_ID)
-
-      let peerInfos = await Promise.all(bootstrapList.map(bs => {
-        return this.findPeerLocal(bs.peerId)
-      }))
-      return peerInfos
-        .filter(p => !!p)
-        .map(peerInfo => ({
-            id: peerInfo!.id.toString(),
-            multiaddrs: peerInfo!.multiaddrs.map(ma => ma.toString()),
-            protocols: peerInfo!.protocols
-          })
-        )
-    }
-    /** cid not supported yet */
-    return []
   }
 
   @ipcMethod(IpcMethods.ContentRoutingProvide)
@@ -374,11 +323,6 @@ class NetworkIpcHandler extends CallablePlugin {
   async __findNOnlinePeer(data: {peerIds: string[], count: number, options?: any}) {
     let {peerIds, count, options} = data;
     return await this.nodeManager.findNOnline(peerIds, count, options)
-  }
-
-  @ipcMethod(IpcMethods.GetConnectedPeerIds)
-  async __getConnectedPeerIds() {
-    return await this.nodeManager.getConnectedPeerIds()
   }
 
   @ipcMethod(IpcMethods.GetNodeMultiAddress)
@@ -453,8 +397,8 @@ class NetworkIpcHandler extends CallablePlugin {
    * @returns {Promise<*>}
    * @private
    */
-  @remoteMethod(RemoteMethods.ExecIpcRemoteCall)
-  async __onIpcRemoteCallExec(data, callerInfo) {
+  @remoteMethod(RemoteMethods.ExecCoreRemoteCall)
+  async __execCoreRemoteCall(data, callerInfo) {
     let taskId, options: IpcCallOptions = {};
     if (data?.options?.taskId) {
       taskId = data?.options.taskId;
@@ -466,7 +410,7 @@ class NetworkIpcHandler extends CallablePlugin {
       }
     }
     // @ts-ignore
-    return await CoreIpc.forwardRemoteCall(data, _.omit(callerInfo, ['peer']), options);
+    return await CoreIpc.execRemoteCall(data, _.omit(callerInfo, ['peer']), options);
   }
 
   @remoteMethod(RemoteMethods.ForwardGateWayRequest)

@@ -10,7 +10,7 @@ const router = Router();
 const reports:{[index: string]: any} = {
 }
 
-const wallets = {
+const nodes = {
   timestamp: 0,
   list: {}
 }
@@ -34,16 +34,16 @@ router.use('/report', asyncHandler(async (req, res, next) => {
   }
 
   /** refresh wallet list */
-  if(Date.now() - wallets.timestamp > 60e3) {
-    const list = await NetworkIpc.getNodesList(['id', 'wallet'], {timeout: 1000});
-    wallets.timestamp = Date.now()
-    wallets.list = list.reduce((obj, n) => (obj[n.wallet]=n, obj), {})
+  if(Date.now() - nodes.timestamp > 60e3) {
+    const list = await NetworkIpc.filterNodes({}, {timeout: 1000});
+    nodes.timestamp = Date.now()
+    nodes.list = list.reduce((obj, n) => (obj[n.wallet]=n, obj), {})
   }
 
-  if(!wallets.list[wallet])
+  if(!nodes.list[wallet])
     throw `unknown node wallet`
 
-  const nodeId = wallets.list[wallet].id
+  const nodeId = nodes.list[wallet].id
 
   reports[nodeId] = {
     timestamp,
@@ -57,8 +57,8 @@ router.use('/query', mixGetPost, asyncHandler(async (req, res, next) => {
   // @ts-ignore
   let {id} = req.mixed
 
-  if(wallets.list[id]) {
-    id = wallets.list[id].id;
+  if(nodes.list[id]) {
+    id = nodes.list[id].id;
   }
 
   res.json(reports[id] || null)
