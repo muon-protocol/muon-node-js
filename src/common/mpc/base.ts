@@ -188,7 +188,7 @@ export class MultiPartyComputation {
     return this.roundsOutput[round].store;
   }
 
-  private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any) {
+  private async tryToGetRoundData(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any) {
     const roundTitle = this.rounds[roundIndex];
     let result: any = await network.askRoundData(from, this.id, roundIndex, dataToSend);
     if(this.RoundValidations[roundTitle] && !this.RoundValidations[roundTitle](result)){
@@ -238,7 +238,7 @@ export class MultiPartyComputation {
         this.log(`mpc[${this.id}].${currentRound} collecting round data`)
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
             qualifiedPartners.map(partner => {
-              return this.tryToGetRoundDate(network, partner, r, dataToSend)
+              return this.tryToGetRoundData(network, partner, r, dataToSend)
                 .catch(e => {
                   this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
                   return null

@@ -344,7 +344,7 @@ module.exports = {
                 /** ensure app context to be exist */
                 let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
                 if(!context)
-                    throw `app deployment info not found`
+                    throw `The app's deployment info was not found`
 
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
                 const ttl = await this.callPlugin("system", "getAppTTL", appId);
@@ -352,9 +352,6 @@ module.exports = {
                 if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
                     throw `deployed partners mismatched with key-gen partners`
                 }
-
-                if(!context)
-                    throw `app previous deployment info not found`
 
                 /** ensure a random key already generated */
                 let publicKey;

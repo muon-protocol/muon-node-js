@@ -919,17 +919,18 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   /**
-   * App will be run again and the result will be checked to be correct.
    * All signatures will be checked to be matched with the result.
    * @param request {AppRequest} - confirmed app request
    * @param validation {boolean} - if false, request validation will not be checked.
    */
-  async verifyCompletedRequest(request, validation:boolean=true): Promise<boolean> {
+  async verifyCompletedRequest(request: AppRequest, validation:boolean=true): Promise<boolean> {
+    const {result} = request.data;
 
-    const [result, hash] = await this.preProcessRemoteRequest(request, validation);
+    const signParams = this.signParams(request, result)
+    const hash = this.hashAppSignParams(request, signParams)
 
     for(let i=0 ; i<request.signatures.length ; i++) {
-      if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
+      if(!await this.verify(hash!, request.signatures[i].signature, request.data.init.nonceAddress)) {
         return false
       }
     }

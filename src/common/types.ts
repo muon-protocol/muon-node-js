@@ -91,9 +91,8 @@ export type MuonSignature = {
     ownerPublicKey: {
         x: string,
         yParity: '0' | '1',
-        timestamp: number,
-        signature: string,
-    }
+    },
+    signature: string,
 }
 
 export type AppRequest = {
