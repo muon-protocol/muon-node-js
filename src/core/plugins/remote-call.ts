@@ -27,7 +27,7 @@ export default class RemoteCall extends BasePlugin {
    */
 
   call(peer, method, params, options={}){
-    return NetworkIpc.forwardRemoteCall(peer, method, params, options)
+    return NetworkIpc.forwardCoreRemoteCall(peer, method, params, options)
   }
 
   on(method, handler, options) {

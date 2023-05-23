@@ -65,7 +65,7 @@ export const IpcMethods = {
   ReportClusterStatus: "report-cluster-status",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
-  RemoteCall: "remote-call",
+  ForwardCoreRemoteCall: "forward-core-remote-call",
   GetPeerInfo: "GPI",
   //GetPeerInfoLight: "GPILight",
   ContentRoutingProvide: "content-routing-provide",
@@ -81,7 +81,7 @@ export const IpcMethods = {
 } as const;
 
 export const RemoteMethods = {
-  ExecIpcRemoteCall: "exec-ipc-remote-call",
+  ExecCoreRemoteCall: "exec-core-remote-call",
   ForwardGateWayRequest: 'forward-gateway-request',
   AggregateData: "aggregate-data",
 }
@@ -119,7 +119,7 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   get RemoteCallExecEndPoint(): string {
-    return this.remoteMethodEndpoint(RemoteMethods.ExecIpcRemoteCall);
+    return this.remoteMethodEndpoint(RemoteMethods.ExecCoreRemoteCall);
   }
 
   /**
@@ -236,14 +236,14 @@ class NetworkIpcHandler extends CallablePlugin {
    * @returns {Promise<[any]>}
    * @private
    */
-  @ipcMethod(IpcMethods.RemoteCall)
-  async __onRemoteCallRequest(data) {
+  @ipcMethod(IpcMethods.ForwardCoreRemoteCall)
+  async __forwardCoreRemoteCall(data) {
     const peer = await this.findPeer(data?.peer);
     if(!peer) {
       log(`trying to call offline node %o`, data)
       throw `peer not found peerId: ${data?.peer}`
     }
-    return await this.remoteCall(peer, "exec-ipc-remote-call", data, data?.options);
+    return await this.remoteCall(peer, RemoteMethods.ExecCoreRemoteCall, data, data?.options);
   }
 
   @ipcMethod(IpcMethods.GetPeerInfo)
@@ -397,8 +397,8 @@ class NetworkIpcHandler extends CallablePlugin {
    * @returns {Promise<*>}
    * @private
    */
-  @remoteMethod(RemoteMethods.ExecIpcRemoteCall)
-  async __onIpcRemoteCallExec(data, callerInfo) {
+  @remoteMethod(RemoteMethods.ExecCoreRemoteCall)
+  async __execCoreRemoteCall(data, callerInfo) {
     let taskId, options: IpcCallOptions = {};
     if (data?.options?.taskId) {
       taskId = data?.options.taskId;
@@ -410,7 +410,7 @@ class NetworkIpcHandler extends CallablePlugin {
       }
     }
     // @ts-ignore
-    return await CoreIpc.forwardRemoteCall(data, _.omit(callerInfo, ['peer']), options);
+    return await CoreIpc.execRemoteCall(data, _.omit(callerInfo, ['peer']), options);
   }
 
   @remoteMethod(RemoteMethods.ForwardGateWayRequest)

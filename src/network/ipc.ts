@@ -35,8 +35,8 @@ function broadcastToChannel(channel, message) {
 //   return call(IpcMethods.GetDHT, {key})
 // }
 
-function forwardRemoteCall(peer, method, params, options) {
-  return call(IpcMethods.RemoteCall, {peer, method, params, options})
+function forwardCoreRemoteCall(peer, method, params, options) {
+  return call(IpcMethods.ForwardCoreRemoteCall, {peer, method, params, options})
 }
 
 function getPeerInfo(peerId: string): Promise<JsonPeerInfo|null> {
@@ -112,7 +112,7 @@ export {
   getContractInfo,
   filterNodes,
   broadcastToChannel,
-  forwardRemoteCall,
+  forwardCoreRemoteCall,
   getPeerInfo,
   reportClusterStatus,
   assignTask,

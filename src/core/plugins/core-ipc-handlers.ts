@@ -8,7 +8,7 @@ import {timeout} from '../../utils/helpers.js'
 import {AppContext, AppRequest, JsonPublicKey} from "../../common/types";
 
 export const IpcMethods = {
-  ForwardRemoteCall: 'forward-remote-call',
+  ExecRemoteCall: 'exec-remote-call',
   GetTssKey: 'get-tss-key',
   GetAppId: 'get-app-id',
   GetAppContext: 'get-app-context',
@@ -39,8 +39,8 @@ class CoreIpcHandlers extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
-  @ipcMethod(IpcMethods.ForwardRemoteCall)
-  async __onRemoteCallForward({data, callerInfo}) {
+  @ipcMethod(IpcMethods.ExecRemoteCall)
+  async __execRemoteCall({data, callerInfo}) {
     // console.log(`CoreIpcHandlers.__onRemoteCallForward`, data, callerInfo)
     const {method, params, options} = data;
     if(this.remoteCallPlugin.listenerCount(method) < 1){
