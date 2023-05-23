@@ -190,7 +190,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   }
 
   private async paginateAndGetInfo(paginationAddress:string, nodeManagerAddress: string, network: string) {
-    const itemPerPage = 1500;
+    const itemPerPage = 1200;
     const lastNodeIdStr: string = await eth.call(nodeManagerAddress, 'lastNodeId', [], NodeManagerAbi, network)
     const lastNodeId = parseInt(lastNodeIdStr)
 
@@ -216,7 +216,7 @@ export default class CollateralInfoPlugin extends CallablePlugin{
   }
 
   async paginateAndGetEditedNodes(paginationAddress:string, nodeManagerAddress: string, network: string, timestamp: number) {
-    const itemPerPage = 1500;
+    const itemPerPage = 1200;
     const lastNodeId: number = parseInt(await eth.call(nodeManagerAddress, 'lastNodeId', [], NodeManagerAbi, network))
 
     const pagesToRequest = new Array(Math.ceil(lastNodeId / itemPerPage)).fill(0).map((_,i) => i)

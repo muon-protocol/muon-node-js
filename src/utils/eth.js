@@ -114,6 +114,7 @@ async function wrappedCall(network, web3ApiCall, args=[]) {
     if(
       errorMessage.includes('CONNECTION ERROR')
       || errorMessage.includes("Invalid JSON RPC response")
+      || errorMessage.includes("not authorized")
       || errorMessage.includes("we can't execute this request")
       || errorMessage.includes("Returned error: execution aborted")
       || errorMessage.includes("Returned error: Internal error")

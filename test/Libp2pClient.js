@@ -63,7 +63,8 @@ const libp2pClient = await
 createLibp2p({
     peerId,
     addresses: {
-        listen: ['/ip4/0.0.0.0/tcp/0']
+        listen: ['/ip4/0.0.0.0/tcp/0'],
+        // announceFilter: (mas) => []
     },
     transports: [tcp()],
     connectionEncryption: [noise()],
@@ -99,7 +100,7 @@ export async function call(request) {
         if (request.id)
             nodeInfo = await getNodeInfo("id", request.id);
         if (!nodeInfo)
-            throw "node info not found";
+            throw Error("node info not found");
         ma = `/ip4/${nodeInfo.ip}/tcp/${nodeInfo.networkingPort}`;
     } else {
         //default

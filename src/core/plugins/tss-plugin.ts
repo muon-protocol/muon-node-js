@@ -9,7 +9,7 @@ import CollateralInfoPlugin from "./collateral-info.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import * as CoreIpc from '../ipc.js'
-import {MuonNodeInfo} from "../../common/types";
+import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import TssParty from "../../utils/tss/party.js";
 import {IMpcNetwork} from "../../common/mpc/types";
@@ -86,7 +86,11 @@ class TssPlugin extends CallablePlugin {
   parties:{[index: string]: TssParty} = {}
   tssKey: DistributedKey | null = null;
   tssParty: TssParty | null = null;
-  appTss:{[index: string]: DistributedKey} = {}
+  /**
+   map appId and seed to App TSS key
+   example: appTss[appId][seed] = DistributedKey
+   */
+  appTss:{[index: string]: {[index: string]: DistributedKey}} = {}
 
   async onStart() {
     super.onStart();
@@ -103,6 +107,7 @@ class TssPlugin extends CallablePlugin {
     this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
 
     await this.collateralPlugin.waitToLoad()
+    await this.appManager.waitToLoad();
     this.loadTssInfo();
 
   }
@@ -223,17 +228,7 @@ class TssPlugin extends CallablePlugin {
 
     //TODO: handle {isValid: false};
 
-    let party = TssParty.load({
-      id: 'deployers-party',
-      t: networkInfo.tssThreshold,
-      max: networkInfo.maxGroupSize,
-      partners: this.collateralPlugin.filterNodes({
-        isDeployer: true
-      })
-        .map(n => n.id)
-    });
-    this.parties[party.id] = party
-    this.tssParty = party;
+    this.tssParty = this.getAppParty("1", "1")!;
     log(`tss party loaded.`)
 
     // @ts-ignore
@@ -251,6 +246,7 @@ class TssPlugin extends CallablePlugin {
         publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
       }
       let key = DistributedKey.load(this.tssParty, _key);
+      await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.tssKey = key;
       this.isReady = true
       log('tss ready');
@@ -294,9 +290,10 @@ class TssPlugin extends CallablePlugin {
         while (!this.isReady) {
           log("waiting for tss, timeout(5000)");
           await timeout(5000);
-          const {isReady, readyPartners} = await this.queryTssIsReady('1')
+          const context: AppContext = this.appManager.getAppContext("1", "1")
+          const readyPartners = await this.getTssReadyPartners('1', '1')
 
-          if(isReady){
+          if(readyPartners.length >= context.party.t){
             log(`global tss is ready.`);
             try {
               await this.tryToRecoverGlobalTssKey(readyPartners!);
@@ -316,92 +313,132 @@ class TssPlugin extends CallablePlugin {
   /**
    * Query from the network to check that Tss is ready or not
    */
-  private async queryTssIsReady(appId: string): Promise<{isReady: boolean, readyPartners?: MuonNodeInfo[]}> {
-    const appParty:TssParty|undefined = this.getAppParty(appId);
-    if(!appParty)
-      return {isReady: false}
-    let onlinePartners: MuonNodeInfo[] = this.collateralPlugin
+  async getTssReadyPartners(appId: string, seed: string): Promise<MuonNodeInfo[]> {
+    const context = this.appManager.getAppContext(appId, seed);
+    if(!context)
+      return []
+    let partners: MuonNodeInfo[] = this.collateralPlugin
       .filterNodes({
-        list: appParty.partners,
+        list: context.party.partners,
         excludeSelf: true
       });
 
-    let statuses = await Promise.all(onlinePartners.map(p => {
+    let statuses = await Promise.all(partners.map(p => {
       return this.remoteCall(
         p.peerId,
         RemoteMethods.checkTssStatus,
-        {appId}
+        {appId, seed}
       ).catch(e => 'error')
     }))
 
     let isReadyArr = statuses.map(s => s.isReady)
-    const readyPartners = onlinePartners.filter((p, i) => isReadyArr[i])
+    const readyPartners = partners.filter((p, i) => isReadyArr[i])
 
-    return {
-      isReady: readyPartners.length >= appParty.t,
-      readyPartners,
-    };
+    return readyPartners
   }
 
-  appHasTssKey(appId: string): boolean {
-    return !!this.appTss[appId]
-  }
-
-  getAppTssKey(appId: string): DistributedKey | null {
+  getAppTssKey(appId: string, seed: string): DistributedKey | null {
     if(appId == '1') {
       return this.tssKey;
     }
     if(!this.appTss[appId]) {
-      const context = this.appManager.getAppContext(appId)
-      if(!context)
+      this.appTss[appId] = {}
+    }
+    if(!this.appTss[appId][seed]) {
+      const context = this.appManager.getAppContext(appId, seed)
+      if (!context)
         return null
-      const _key = this.appManager.getAppTssKey(appId)
-      if(!_key)
+      const _key = this.appManager.getAppTssKey(appId, seed)
+      if (!_key)
         return null
-      let party = this.getAppParty(appId)
+      let party = this.getAppParty(appId, seed)
       const key = DistributedKey.load(party, {
         id: `app-${appId}`,
         share: _key.keyShare,
         publicKey: _key.publicKey.encoded,
         partners: context.party.partners
       })
-      this.appTss[appId] = key;
+      this.appTss[appId][seed] = key;
     }
-    return this.appTss[appId];
+    return this.appTss[appId][seed];
   }
 
-  private async onAppContextDelete(data: {appId: string, contexts: any[]}) {
-    let {appId, contexts} = data
+  private async onAppContextDelete(data: {contexts: any[]}) {
+    let {contexts} = data
     for(const context of contexts) {
-      const partyId = this.getAppPartyId(appId, context.version);
+      const {appId, seed} = context
+      const partyId = this.getAppPartyId(context);
       delete this.parties[partyId]
+      if(!!this.appTss[appId])
+        delete this.appTss[appId][seed]
     }
-    delete this.appTss[appId]
   }
 
   async onAppTssDelete(appId, appTssConfig) {
     log(`AppTss delete from db %s %o`, appId, appTssConfig)
-    delete this.appTss[appId]
+    const {seed} = appTssConfig
+    if(!!this.appTss[appId])
+      delete this.appTss[appId][seed]
   }
 
-  getAppPartyId(appId, version) {
-    return `app-${appId}-${version}-party`;
+  getAppPartyId(context, isForReshare:boolean=false) {
+    const {seed, previousSeed} = context
+    return isForReshare ? `app-${seed}-${previousSeed}-party` : `app-${seed}-party`;
   }
 
-  getAppParty(appId: string) {
-    const _context = this.appManager.getAppContext(appId)
+  getAppParty(appId: string, seed: string, isForReshare:boolean=false): TssParty|undefined {
+    const _context:AppContext = this.appManager.getAppContext(appId, seed)
     /** is app deployed? return if not. */
     if(!_context)
       return undefined;
 
-    const partyId = this.getAppPartyId(appId, _context.version);
+    const partyId = this.getAppPartyId(_context, isForReshare);
 
     if(!this.parties[partyId]) {
+      let partners = _context.party.partners
+      if(isForReshare){
+        const previousContext: AppContext = this.appManager.getAppContext(appId, _context.previousSeed)
+        if(!previousContext)
+          return undefined;
+        partners = lodash.uniq([
+          ..._context.party.partners,
+          ...previousContext.party.partners
+        ])
+      }
       this.loadParty({
         id: partyId,
         t: _context.party.t,
         max: _context.party.max,
-        partners: _context.party.partners
+        partners
+      })
+    }
+    return this.parties[partyId];
+  }
+
+  async getAppPartyAsync(appId: string, seed: string, isForReshare:boolean=false) {
+    const _context:AppContext|undefined = await this.appManager.getAppContextAsync(appId, seed, true)
+    /** is app deployed? return if not. */
+    if(!_context)
+      return undefined;
+
+    const partyId = this.getAppPartyId(_context, isForReshare);
+
+    if(!this.parties[partyId]) {
+      let partners = _context.party.partners
+      if(isForReshare){
+        const previousContext: AppContext|undefined = await this.appManager.getAppContextAsync(appId, _context.previousSeed, true)
+        if(!previousContext)
+          return undefined;
+        partners = lodash.uniq([
+          ..._context.party.partners,
+          ...previousContext.party.partners
+        ])
+      }
+      this.loadParty({
+        id: partyId,
+        t: _context.party.t,
+        max: _context.party.max,
+        partners
       })
     }
     return this.parties[partyId];
@@ -421,7 +458,7 @@ class TssPlugin extends CallablePlugin {
       return this.remoteCall(
         peerId,
         RemoteMethods.checkTssStatus,
-        {appId: '1'}
+        {appId: '1', seed: '1'}
       ).catch(e => 'error')
     }))
 
@@ -431,19 +468,6 @@ class TssPlugin extends CallablePlugin {
 
 
     return numReadyNodes < this.collateralPlugin.TssThreshold;
-  }
-
-  async tryToFindOthers(numTry=1) {
-    for (let i = 0 ; i < numTry ; i++) {
-      this.broadcast({
-        method: BroadcastMessage.WhoIsThere,
-        params: {
-          peerId: process.env.PEER_ID,
-        }
-      })
-      log("tryToFindOthers timeout(5000)")
-      await timeout(5000)
-    }
   }
 
   saveTssConfig(party, key) {
@@ -493,19 +517,46 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
-  async tryToRecoverGlobalTssKey(partners: MuonNodeInfo[]){
-    let tssKey = await this.recoverAppTssKey('1', partners);
+  private async tryToRecoverGlobalTssKey(readyPartners: MuonNodeInfo[]){
+    log(`generating nonce for recovering global tss key`)
+
+    let nonce = await this.keyGen({appId: "1", seed: "1"}, {
+      id: `recovery-${uuid()}`,
+      partners: [
+        this.collateralPlugin.currentNodeInfo!.id,
+        ...readyPartners.map(p => p.id),
+      ]
+    });
+    log(`nonce generated for recovering global tss key`)
+
+    const noncePartners = this.collateralPlugin.filterNodes({
+      list: nonce.partners,
+      excludeSelf: true,
+    })
+    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-1-tss-recovery`, 3600)
+    let tssKey = await this.recoverAppTssKey('1', '1', noncePartners, nonce);
 
     this.tssKey = tssKey
     this.isReady = true;
+    await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-1-tss`)
     this.saveTssConfig(this.tssParty, tssKey)
     CoreIpc.fireEvent({type: "global-tss-key:generate", data: tssKey.toSerializable()});
     log(`${process.pid} tss key recovered`);
     return true;
   }
 
-  private async recoverAppTssKey(appId: string, partners: MuonNodeInfo[]): Promise<DistributedKey> {
-    let appParty = this.getAppParty(appId);
+  /**
+   * Recover share of App's TSS key.
+   * In general, only party partners are allowed to recover their own key share, but when the party rotates, a new party is allowed too.
+   *
+   * @param appId {string} - Which app is needs to be recovered.
+   * @param seed {string} - Which context of app needs to be recovered.
+   * @param partners {string[]} - List of partners that helps to the key be recovered.
+   * @param nonce {string} - ID of nonce that will be used for recovery.
+   * @param newSeed {string} - Deployment seed of App's new context. A new context will be generated by deployers when the old context is about to expire..
+   */
+  async recoverAppTssKey(appId: string, seed: string, partners: MuonNodeInfo[], nonce: DistributedKey, newSeed?: string): Promise<DistributedKey> {
+    let appParty = this.getAppParty(appId, seed);
 
     if(!appParty)
       throw `AppParty does not exist for recovering the key.`
@@ -513,38 +564,25 @@ class TssPlugin extends CallablePlugin {
     if(partners.length < appParty.t)
       throw {message: "No enough online partners to recover the key."};
 
-    log(`generating nonce for recovering app[${appId}] tss key`)
-    let nonce = await this.keyGen(appParty, {
-      id: `recovery-${uuid()}`,
-      partners: [
-        this.collateralPlugin.currentNodeInfo!.id,
-        ...partners.map(p => p.id),
-      ]
-    });
-    log(`nonce generated for recovering app[${appId}] tss key`)
-
-    const noncePartners = this.collateralPlugin.filterNodes({
-      list: nonce.partners,
-      excludeSelf: true,
-    })
+    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
 
     let keyResults = await Promise.all(
-      noncePartners.map(p => {
+      partners.map(p => {
           return this.remoteCall(
             // online partners
             p.peerId,
             RemoteMethods.recoverMyKey,
-            {nonce: nonce.id, appId},
+            {nonce: nonce.id, appId, seed, newSeed},
             {taskId: nonce.id}
           ).catch(e => {
-            console.log(`TssPlugin.tryToRecoverGlobalTssKey ERROR:`, e)
+            log.error(`getting key recovery share error:`, e)
             return null
           })
         }
       )
     )
 
-    let shares = noncePartners
+    let shares = partners
       .map((p, j) => {
           if (!keyResults[j])
             return null
@@ -574,25 +612,56 @@ class TssPlugin extends CallablePlugin {
   }
 
   private appTssKeyRecoveryCheckTime = 0;
-  async checkAppTssKeyRecovery(appId: string) {
+  async checkAppTssKeyRecovery(appId: string, seed: string): Promise<boolean> {
     if(this.appTssKeyRecoveryCheckTime + 5*60e3 < Date.now()){
       log(`checking to recover app[${appId}] tss key`)
       this.appTssKeyRecoveryCheckTime = Date.now();
       try {
-        const {isReady, readyPartners} = await this.queryTssIsReady(appId);
-        if(isReady) {
+        let context: AppContext = this.appManager.getAppContext(appId, seed);
+        if(!context.keyGenRequest) {
+          const contexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId);
+          context = contexts.find(ctx => ctx.seed === seed)!
+          if(!contexts || !context.keyGenRequest)
+            throw `app tss is not ready yet`
+        }
+        const readyPartners = await this.getTssReadyPartners(appId, seed);
+        if(readyPartners.length >= context.party.t) {
           log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
-          let key = await this.recoverAppTssKey(appId, readyPartners!);
+          log(`generating nonce for recovering app[${appId}] tss key`)
+          let nonce = await this.keyGen(
+            {appId, seed},
+            {
+              id: `recovery-${uuid()}`,
+              partners: [
+                this.collateralPlugin.currentNodeInfo!.id,
+                ...readyPartners.map(p => p.id),
+              ]
+            }
+          );
+          log(`nonce generated for recovering app[${appId}] tss key`)
+          //
+          const noncePartners = this.collateralPlugin.filterNodes({
+            list: nonce.partners,
+            excludeSelf: true,
+          })
+          let key = await this.recoverAppTssKey(appId, seed, noncePartners, nonce);
           if(key) {
             log(`app tss key recovered`)
-            const context = this.appManager.getAppContext(appId);
+            const netConfigs = this.muon.configs.net
+            let expiration: number|undefined;
+            if(context.deploymentRequest && context.ttl) {
+              expiration = context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
+            }
             await this.appManager.saveAppTssConfig({
-              version: context.version,
               appId: appId,
-              context: context._id,
+              seed,
+              keyGenRequest: context.keyGenRequest,
               publicKey: pub2json(key.publicKey!),
               keyShare: bn2hex(key.share!),
+              expiration
             })
+
+            return true;
           }
         }
         else {
@@ -605,6 +674,7 @@ class TssPlugin extends CallablePlugin {
         throw e;
       }
     }
+    return false;
   }
 
   async tryToCreateTssKey(): Promise<DistributedKey> {
@@ -623,10 +693,13 @@ class TssPlugin extends CallablePlugin {
           continue;
         }
         log(`Deployers %o are available to create global tss`, onlineDeployers)
-        let key: DistributedKey = await this.keyGen(this.tssParty, {
-          partners: onlineDeployers,
-          lowerThanHalfN: true
-        })
+        let key: DistributedKey = await this.keyGen(
+          {appId: "1", seed: "1"},
+          {
+            partners: onlineDeployers,
+            lowerThanHalfN: true
+          }
+        )
 
         let keyPartners = this.collateralPlugin.filterNodes({list: key.partners, excludeSelf: true})
         let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
@@ -647,6 +720,7 @@ class TssPlugin extends CallablePlugin {
         // console.log(`key save broadcast threshold: ${this.TSS_THRESHOLD} count: ${key.partners.length}`, callResult);
         if (callResult.filter(r => r === true).length+1 < this.TSS_THRESHOLD)
           throw `Tss creation failed.`
+        await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
         this.saveTssConfig(this.tssParty, key)
 
         this.tssKey = key;
@@ -717,9 +791,14 @@ class TssPlugin extends CallablePlugin {
    * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
    * @returns {Promise<DistributedKey>}
    */
-  async keyGen(party, options: KeyGenOptions={}): Promise<DistributedKey> {
+  async keyGen(partyInfo: PartyInfo, options: KeyGenOptions={}): Promise<DistributedKey> {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, partners: oPartners, maxPartners, timeout=60000, value} = options;
+
+    const party = this.getAppParty(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare)
+
+    if(!party)
+      throw {message: `party not found`, partyInfo}
 
     let candidatePartners = party.partners;
     if(oPartners)
@@ -764,7 +843,7 @@ class TssPlugin extends CallablePlugin {
         options.value,
         /** extra values usable in DKG */
         {
-          party: party.id,
+          partyInfo,
           keyId,
           lowerThanHalfN: options.lowerThanHalfN,
         }
@@ -847,19 +926,34 @@ class TssPlugin extends CallablePlugin {
    * @private
    */
   @remoteMethod(RemoteMethods.recoverMyKey)
-  async __recoverMyKey(data: {nonce: string, appId: string}, callerInfo: MuonNodeInfo) {
+  async __recoverMyKey(data: {nonce: string, appId: string, seed: string, newSeed?: string}, callerInfo: MuonNodeInfo) {
     // TODO: can malicious user use a nonce twice?
-    const {nonce: nonceId, appId} = data;
+    const {nonce: nonceId, appId, seed, newSeed} = data;
+    let newContext: AppContext, isInNewContext: boolean = false;
+
+    if(newSeed) {
+      newContext = this.appManager.getAppContext(appId, newSeed);
+      if(!newContext) {
+        const contexts = await this.appManager.queryAndLoadAppContext(appId, {seeds: [newSeed]})
+        newContext = contexts[0]
+        if(!newContext)
+          throw `New context not found to allow key recovery`
+      }
+      if(!newContext.party.partners.includes(callerInfo.id))
+        throw `New party does not include current node.`
+
+      isInNewContext = true;
+    }
 
     // console.log('TssPlugin.__recoverMyKey', data, callerInfo.wallet)
-    const appParty = this.getAppParty(appId)
+    const appParty = this.getAppParty(appId, seed)
     if(!appParty)
       throw `Missing app Party.`
 
-    if(!appParty.partners.includes(callerInfo.id))
-      throw `Only party partners can can request to recover the key`
+    if(!appParty.partners.includes(callerInfo.id) && !isInNewContext)
+      throw `Only partners can can request to recover the key`
 
-    const appTssKey = this.getAppTssKey(appId)
+    const appTssKey = this.getAppTssKey(appId, seed)
 
     // if(!this.tssKey || !this.tssParty){
     if(!appTssKey){
@@ -870,7 +964,7 @@ class TssPlugin extends CallablePlugin {
       throw `Cannot use tss key as nonce`;
 
     let nonce = await this.getSharedKey(nonceId);
-    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`)
+    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
     let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
     return {
       id: appTssKey!.id,
@@ -910,12 +1004,13 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.__storeTssKey', data)
     let {party: partyId, key: keyId} = data
     let party = this.getParty(partyId)
-    let key = await this.getSharedKey(keyId);
+    let key: DistributedKey = await this.getSharedKey(keyId);
     if (!party)
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
       throw {message: 'TssPlugin.__storeTssKey: key not found.'};
     if(callerInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
+      await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.saveTssConfig(party, key);
       this.tssKey = key
       this.isReady = true;
@@ -935,10 +1030,10 @@ class TssPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.checkTssStatus)
-  async __checkTssStatus(data:{appId: string}, callerInfo): Promise<{isReady: boolean, address?: string}> {
-    const {appId} = data
+  async __checkTssStatus(data:{appId: string, seed: string}, callerInfo): Promise<{isReady: boolean, address?: string}> {
+    const {appId, seed} = data
 
-    const appTssKey = this.getAppTssKey(appId)
+    const appTssKey = this.getAppTssKey(appId, seed)
 
     if(!appTssKey) {
       return {isReady: false}

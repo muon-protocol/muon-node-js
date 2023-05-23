@@ -39,7 +39,9 @@ export type MuonConfigs = {
   net: {
     tss: {
       threshold: number,
-      max: number
+      max: number,
+      defaultTTL: number,
+      pendingPeriod: number,
     },
     nodeManager: {
       network: string,
