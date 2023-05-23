@@ -19,12 +19,8 @@ function getContractInfo(options?: IpcCallOptions) {
   return call(IpcMethods.GetContractInfo, {}, options)
 }
 
-function filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
-  return call(IpcMethods.FilterNodes, filter);
-}
-
-function getNodesList(output: string|string[] = ['id','wallet','peerId'], options?: IpcCallOptions): Promise<any[]> {
-  return call(IpcMethods.GetNodesList, output, options)
+function filterNodes(filter: NodeFilterOptions, callOptions?: IpcCallOptions): Promise<MuonNodeInfo[]> {
+  return call(IpcMethods.FilterNodes, filter, callOptions);
 }
 
 function broadcastToChannel(channel, message) {
@@ -46,16 +42,6 @@ function forwardRemoteCall(peer, method, params, options) {
 function getPeerInfo(peerId: string): Promise<JsonPeerInfo|null> {
   // @ts-ignore
   return call(IpcMethods.GetPeerInfo, {peerId})
-}
-
-// function getPeerInfoLight(peerId: string): JsonPeerInfo|null {
-//   // @ts-ignore
-//   return call(IpcMethods.GetPeerInfoLight, {peerId})
-// }
-
-function getClosestPeer(peerId: string, cid: string): JsonPeerInfo|null {
-  // @ts-ignore
-  return call(IpcMethods.GetClosestPeer, {peerId, cid})
 }
 
 function reportClusterStatus(pid, status) {
@@ -106,10 +92,6 @@ function findNOnlinePeer(peerIds: string[], count: number, options?: {timeout?: 
   return call(IpcMethods.FindNOnlinePeer, {peerIds, count, options})
 }
 
-function getConnectedPeerIds(): Promise<string[]> {
-  return call(IpcMethods.GetConnectedPeerIds)
-}
-
 function getNodeMultiAddress(options?: IpcCallOptions): Promise<string[]> {
   return call(IpcMethods.GetNodeMultiAddress, {} , options)
 }
@@ -129,12 +111,9 @@ export {
   getNetworkConfig,
   getContractInfo,
   filterNodes,
-  getNodesList,
   broadcastToChannel,
   forwardRemoteCall,
   getPeerInfo,
-  // getPeerInfoLight,
-  getClosestPeer,
   reportClusterStatus,
   assignTask,
   askClusterPermission,
@@ -147,7 +126,6 @@ export {
   subscribeToBroadcastChannel,
   getUptime,
   findNOnlinePeer,
-  getConnectedPeerIds,
   getNodeMultiAddress,
   sendToAggregatorNode,
   // putDHT,

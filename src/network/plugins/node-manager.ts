@@ -461,16 +461,6 @@ export default class NodeManagerPlugin extends CallablePlugin{
     return this.loading.isFulfilled;
   }
 
-  getConnectedPeerIds(): string[] {
-    let list = this.network.libp2p.connectionManager.getConnections()
-      .filter(cnn => cnn.stat.status === 'OPEN')
-    let uniqueList = {}
-    list.forEach(cnn => {
-      uniqueList[cnn.remotePeer.toString()] = true
-    })
-    return Object.keys(uniqueList);
-  }
-
   filterNodes(options: NodeFilterOptions): MuonNodeInfo[] {
     let result: MuonNodeInfo[]
     if(options.list) {

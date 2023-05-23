@@ -56,7 +56,6 @@ const tasksCache = new NodeCache({
 
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
-  GetNodesList: "get-nodes-list",
   GetNetworkConfig: "get-net-conf",
   GetContractInfo: "get-contract-info",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
@@ -69,7 +68,6 @@ export const IpcMethods = {
   RemoteCall: "remote-call",
   GetPeerInfo: "GPI",
   //GetPeerInfoLight: "GPILight",
-  GetClosestPeer: "GCPeer",
   ContentRoutingProvide: "content-routing-provide",
   ContentRoutingFind: "content-routing-find",
   ForwardGatewayRequest: "forward-gateway-request",
@@ -78,7 +76,6 @@ export const IpcMethods = {
   IsCurrentNodeInNetwork: "is-current-node-in-network",
   GetUptime: "get-uptime",
   FindNOnlinePeer: "FNOP",
-  GetConnectedPeerIds: "GCPIDS",
   GetNodeMultiAddress: "GNMA",
   SendToAggregatorNode: "send-to-aggregator-node",
 } as const;
@@ -133,12 +130,6 @@ class NetworkIpcHandler extends CallablePlugin {
   async __filterNodes(filter: NodeFilterOptions): Promise<MuonNodeInfo[]> {
     return this.nodeManager.filterNodes(filter)
       .map(({id, active, staker, wallet, peerId, isDeployer}) => ({id, active, staker, wallet, peerId, isDeployer}));
-  }
-
-  @ipcMethod(IpcMethods.GetNodesList)
-  async __getNodesList(output: string|string[]) {
-    let outProps = Array.isArray(output) ? output : [output]
-    return this.nodeManager.filterNodes({}).map(n => _.pick(n, outProps))
   }
 
   @ipcMethod(IpcMethods.GetNetworkConfig)
@@ -267,48 +258,6 @@ class NetworkIpcHandler extends CallablePlugin {
     }
   }
 
-  // @ipcMethod(IpcMethods.GetPeerInfoLight)
-  // async __getPeerInfoLight(data): Promise<JsonPeerInfo|null> {
-  //   let peerInfo:PeerInfo|null = await this.findPeerLocal(data?.peerId);
-  //   if(!peerInfo)
-  //     return null
-  //   return {
-  //     id: peerInfo.id.toString(),
-  //     multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
-  //     protocols: peerInfo.protocols
-  //   }
-  // }
-
-  @ipcMethod(IpcMethods.GetClosestPeer)
-  async __getClosestPeer(data:{peerId?: string, cid?: string}): Promise<JsonPeerInfo[]> {
-    let {peerId, cid} = data ?? {}
-    if(!!peerId) {
-      /** return all bootstrap nodes info */
-      let bootstrapList: any[] = this.network.configs.net.bootstrap ?? [];
-      bootstrapList = bootstrapList
-        .map(ma => ({
-          peerId: ma.split('p2p/')[1],
-          multiaddr: ma
-        }))
-        /** exclude self address */
-        // .filter(({peerId}) => !!peerId && peerId !== process.env.PEER_ID)
-
-      let peerInfos = await Promise.all(bootstrapList.map(bs => {
-        return this.findPeerLocal(bs.peerId)
-      }))
-      return peerInfos
-        .filter(p => !!p)
-        .map(peerInfo => ({
-            id: peerInfo!.id.toString(),
-            multiaddrs: peerInfo!.multiaddrs.map(ma => ma.toString()),
-            protocols: peerInfo!.protocols
-          })
-        )
-    }
-    /** cid not supported yet */
-    return []
-  }
-
   @ipcMethod(IpcMethods.ContentRoutingProvide)
   async __contentRoutingProvide(cids: string | string[], callerInfo) {
     await this.contentPlugin.provide(cids);
@@ -374,11 +323,6 @@ class NetworkIpcHandler extends CallablePlugin {
   async __findNOnlinePeer(data: {peerIds: string[], count: number, options?: any}) {
     let {peerIds, count, options} = data;
     return await this.nodeManager.findNOnline(peerIds, count, options)
-  }
-
-  @ipcMethod(IpcMethods.GetConnectedPeerIds)
-  async __getConnectedPeerIds() {
-    return await this.nodeManager.getConnectedPeerIds()
   }
 
   @ipcMethod(IpcMethods.GetNodeMultiAddress)
