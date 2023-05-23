@@ -216,7 +216,8 @@ class BaseAppPlugin extends CallablePlugin {
         throw `App not deployed`;
       const oldestContext: AppContext = this.appManager.getAppOldestContext(this.APP_ID)!
       if(!this.appManager.appHasTssKey(this.APP_ID, oldestContext.seed)) {
-        await this.tssPlugin.checkAppTssKeyRecovery(this.APP_ID, oldestContext.seed);
+        this.tssPlugin.checkAppTssKeyRecovery(this.APP_ID, oldestContext.seed)
+          .catch(e => {})
         throw `App tss not initialized`
       }
       deploymentSeed = oldestContext.seed;
