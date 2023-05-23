@@ -123,11 +123,11 @@ export class MuonRouting implements PeerRouting, Startable {
     log("findPeer starts: %p", id);
 
     options.timeout = options.timeout ?? FINDPEER_DEFAULT_TIMEOUT;
-    options.signal = anySignal(
-      [this.abortController.signal].concat(
-        options.signal != null ? [options.signal] : []
-      )
-    );
+    // options.signal = anySignal(
+    //   [this.abortController.signal].concat(
+    //     options.signal != null ? [options.signal] : []
+    //   )
+    // );
 
     const onStart = defer();
     const onFinish = defer();
@@ -180,7 +180,8 @@ export class MuonRouting implements PeerRouting, Startable {
   }
 
   /**
-   * Attempts to find the closest peers on the network
+   * Attempts to find the closest peers
+    on the network
    * to the given key.
    */
   async *getClosestPeers(
