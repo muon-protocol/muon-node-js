@@ -1,6 +1,6 @@
 import CallablePlugin from './callable-plugin.js'
 import Request from '../../../common/db-models/Request.js'
-import {getTimestamp, pub2json, timeout} from '../../../utils/helpers.js'
+import {getTimestamp, pub2json} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
 import {muonSha3, soliditySha3} from '../../../utils/sha3.js'
 import * as tss from '../../../utils/tss/index.js'
@@ -15,7 +15,7 @@ import TssPlugin from "../tss-plugin.js";
 import AppManager from "../app-manager.js";
 import TssParty from "../../../utils/tss/party.js";
 import NodeManagerPlugin from "../node-manager.js";
-import {AppContext, AppRequest, JsonPublicKey, MuonNodeInfo, MuonSignature} from "../../../common/types";
+import {AppContext, AppRequest, MuonNodeInfo} from "../../../common/types";
 import {useOneTime} from "../../../utils/tss/use-one-time.js";
 import chalk from 'chalk'
 import Ajv from "ajv"
@@ -28,11 +28,9 @@ import axios from "axios";
 import {GatewayCallParams} from "../../../gateway/types";
 import {MapOf} from "../../../common/mpc/types";
 
-const {shuffle} = lodash;
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
 const ajv = new Ajv()
-const web3 = new Web3();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
 
@@ -45,10 +43,6 @@ export type AppRequestSignature = {
    * Ethereum address of collateral wallet
    */
   owner: string,
-  /**
-   * Public key of nodes TSS shared
-   */
-  pubKey: string,
   /**
    * request timestamp
    */
@@ -782,7 +776,6 @@ class BaseAppPlugin extends CallablePlugin {
       // node stake wallet address
       owner: process.env.SIGN_WALLET_ADDRESS,
       // tss shared public key
-      pubKey: tssKey.sharePubKey!,
       timestamp: signTimestamp,
       result,
       signature:`${bn2hex(signature.s)},${bn2hex(signature.e)}`

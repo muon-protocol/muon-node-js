@@ -107,12 +107,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
               throw `party[${mpc.extraParams.party}] not found`
             }
 
-            let key = DistributedKey.load(party, {
-              id: mpc.extraParams.keyId,
-              share: bn2hex(dKey.share),
-              publicKey: dKey.publicKey,
-              partners: mpc.partners
-            })
+            let key = new DistributedKey(party, mpc.extraParams.keyId, dKey)
             // console.log(`new distributed key`, key.toSerializable());
             await SharedMemory.set(mpc.extraParams.keyId, {partyInfo, key: key.toSerializable()}, 30*60*1000)
           })

@@ -215,12 +215,17 @@ class TssPlugin extends CallablePlugin {
     let tssConfig = this.getTssConfig();
 
     if(tssConfig && tssConfig.party.t == networkInfo.tssThreshold){
-      let _key = {
-        ...tssConfig.key,
-        share: toBN(tssConfig.key.share),
-        publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
-      }
-      let key = DistributedKey.load(this.tssParty, _key);
+      let key = new DistributedKey(
+        this.tssParty,
+        tssConfig.key.id,
+        DistKey.fromJson({
+          index: this.nodeManager.currentNodeInfo!.id,
+          share: tssConfig.key.share,
+          address: tssConfig.key.address,
+          publicKey: tssConfig.key.publicKey,
+          partners: this.tssParty.partners,
+      })
+      );
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.tssKey = key;
       this.isReady = true
@@ -305,12 +310,17 @@ class TssPlugin extends CallablePlugin {
       if (!_key)
         return null
       let party = this.getAppParty(appId, seed)
-      const key = DistributedKey.load(party, {
-        id: `app-${appId}`,
-        share: _key.keyShare,
-        publicKey: _key.publicKey.encoded,
-        partners: context.party.partners
-      })
+      const key = new DistributedKey(
+        party,
+        `app-${appId}`,
+        DistKey.fromJson({
+          index: this.appManager.currentNodeInfo!.id,
+          share: _key.keyShare,
+          address: tssModule.pub2addr(tssModule.keyFromPublic(_key.publicKey.encoded)),
+          publicKey: _key.publicKey.encoded,
+          partners: context.party.partners
+        })
+      )
       this.appTss[appId][seed] = key;
     }
     return this.appTss[appId][seed];
@@ -461,7 +471,17 @@ class TssPlugin extends CallablePlugin {
 
   async onTssKeyGenerate(tssKey) {
     if(!this.isReady) {
-      this.tssKey = DistributedKey.load(this.tssParty, tssKey);
+      this.tssKey = new DistributedKey(
+        this.tssParty,
+        tssKey.id,
+        DistKey.fromJson({
+          index: this.nodeManager.currentNodeInfo!.id,
+          share: tssKey.share,
+          address: tssKey.address,
+          publicKey: tssKey.publicKey,
+          partners: this.tssParty!.partners,
+        })
+      );
       this.isReady = true;
     }
   }
@@ -551,13 +571,17 @@ class TssPlugin extends CallablePlugin {
     let reconstructed = tssModule.reconstructKey(shares, appParty.t, myIndex)
     let myKey = reconstructed.sub(nonce.share!).umod(tssModule.curve.n!)
 
-    return DistributedKey.load(appParty, {
-      id: keyResults[0].id,
-      i: myIndex,
-      share: myKey,
-      publicKey: tssModule.keyFromPublic(keyResults[0].publicKey),
-      address: keyResults[0].address,
-    })
+    return new DistributedKey(
+      appParty,
+      keyResults[0].id,
+      DistKey.fromJson({
+        index: this.currentNodeInfo!.id,
+        share: bn2hex(myKey),
+        address: keyResults[0].address,
+        publicKey: keyResults[0].publicKey,
+        partners: appParty.partners
+      })
+    )
   }
 
   private appTssKeyRecoveryCheckTime: MapOf<number> = {};
@@ -776,13 +800,7 @@ class TssPlugin extends CallablePlugin {
     }
     while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
 
-    // @ts-ignore
-    let key = DistributedKey.load(party, {
-      id: keyGen.extraParams.keyId!,
-      share: bn2hex(dKey.share),
-      publicKey: dKey.publicKey,
-      partners: dKey.partners
-    })
+    let key = new DistributedKey(party, keyGen.extraParams.keyId!, dKey)
 
     await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toSerializable()}, 30*60*1000)
     return key;
@@ -793,7 +811,19 @@ class TssPlugin extends CallablePlugin {
     let party = this.getAppParty(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
     if(!party)
       throw `party [${key.party}] not found`
-    return DistributedKey.load(party, key)
+
+    const publicKey = tssModule.keyFromPublic(key.publicKey)
+    return new DistributedKey(
+      party,
+      key.id,
+      DistKey.fromJson({
+        index: this.currentNodeInfo!.id,
+        share: key.share,
+        publicKey: key.publicKey,
+        address: tssModule.pub2addr(publicKey),
+        partners: key.partners,
+      })
+    )
   }
 
   getParty(id) {
