@@ -877,7 +877,7 @@ class TssPlugin extends CallablePlugin {
     if(!appParty.partners.includes(callerInfo.id) && !isInNewContext)
       throw `Only partners can can request to recover the key`
 
-    const appTssKey = this.getAppTssKey(appId, seed)
+    const appTssKey: AppTssKey|null = this.getAppTssKey(appId, seed)
 
     // if(!this.tssKey || !this.tssParty){
     if(!appTssKey){
@@ -887,7 +887,7 @@ class TssPlugin extends CallablePlugin {
     if (nonceId === appTssKey!.id)
       throw `Cannot use tss key as nonce`;
 
-    let nonce = await this.getSharedKey(nonceId);
+    let nonce: AppTssKey = await this.getSharedKey(nonceId);
     await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
     let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
     return {

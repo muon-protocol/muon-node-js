@@ -210,12 +210,12 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async getAppTss(appId) {
+  async getAppTss(appId): Promise<AppTssKey> {
     const context = await AppContextModel.findOne({appId}).exec();
     if(!context)
       throw `App deployment info not found.`
     const id = this.getAppTssKeyId(appId, context.seed)
-    let key = await this.tssPlugin.getSharedKey(id)
+    let key: AppTssKey = await this.tssPlugin.getSharedKey(id)
     return key
   }
 
@@ -659,7 +659,7 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId, seed)
     if(!context)
       throw `App deployment info not found.`
-    let key = await this.tssPlugin.getSharedKey(keyId)
+    let key: AppTssKey = await this.tssPlugin.getSharedKey(keyId)
     // let key = await this.tssPlugin.getAppTssKey(appId, seed)
     if(!key)
       throw `App tss key not found.`

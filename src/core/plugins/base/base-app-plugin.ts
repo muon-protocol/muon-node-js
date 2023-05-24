@@ -378,7 +378,7 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`confirmation done with %s`, confirmed)
       t5 = Date.now()
 
-      let nonce = await this.tssPlugin.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
+      let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
       this.log(`request signed with %o`, nonce.partners);
       this.log('request time parts %O',{
         "find online nodes": t1-t0,
@@ -652,7 +652,7 @@ class BaseAppPlugin extends CallablePlugin {
     // let sig = {s, e}
     //
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
+    let nonce: AppTssKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
 
     const ownerInfo = this.nodeManager.getNodeInfo(owner)
     if(!ownerInfo){

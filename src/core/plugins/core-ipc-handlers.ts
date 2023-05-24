@@ -6,6 +6,7 @@ import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import {timeout} from '../../utils/helpers.js'
 import {AppContext, AppRequest, JsonPublicKey} from "../../common/types";
+import AppTssKey from "../../utils/tss/app-tss-key";
 
 export const IpcMethods = {
   ExecRemoteCall: 'exec-remote-call',
@@ -51,7 +52,7 @@ class CoreIpcHandlers extends CallablePlugin {
 
   @ipcMethod(IpcMethods.GetTssKey)
   async __onGetTssKeyRequest(data: {keyId: string}, callerInfo) {
-    let key = await this.muon.getPlugin('tss-plugin').getSharedKey(data.keyId)
+    let key: AppTssKey = await this.muon.getPlugin('tss-plugin').getSharedKey(data.keyId)
     return key.toSerializable();
   }
 
