@@ -10,7 +10,7 @@ import AppRequestManager from './app-request-manager.js'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators.js'
 import MemoryPlugin, {MemWriteOptions} from '../memory-plugin.js'
 import { isArrowFn, deepFreeze } from '../../../utils/helpers.js'
-import DistributedKey from "../../../utils/tss/distributed-key.js";
+import AppTssKey from "../../../utils/tss/app-tss-key.js";
 import TssPlugin from "../tss-plugin.js";
 import AppManager from "../app-manager.js";
 import TssParty from "../../../utils/tss/party.js";
@@ -173,7 +173,7 @@ class BaseAppPlugin extends CallablePlugin {
     return this.tssPlugin.getAppParty(this.APP_ID, seed);
   }
 
-  private getTss(seed: string): DistributedKey | null {
+  private getTss(seed: string): AppTssKey | null {
     return this.tssPlugin.getAppTssKey(this.APP_ID, seed)
   }
 
@@ -493,7 +493,7 @@ class BaseAppPlugin extends CallablePlugin {
   async informRequestConfirmation(request: AppRequest) {
     request = clone(request)
     // await this.onConfirm(request)
-    let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
+    let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
 
     let announceList = this.getParty(request.deploymentSeed)!.partners;
     if(!!this.getConfirmAnnounceGroups) {
@@ -682,7 +682,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async broadcastNewRequest(request: AppRequest) {
     let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce: DistributedKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`, 15000)
+    let nonce: AppTssKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`, 15000)
     let party = this.getParty(request.deploymentSeed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
@@ -745,12 +745,12 @@ class BaseAppPlugin extends CallablePlugin {
     // let signature = crypto.sign(resultHash)
 
     let {reqId} = request;
-    let nonce: DistributedKey = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
+    let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
     if(!nonce)
       throw `nonce not found for request ${reqId}`
 
     // let tssKey = this.isBuiltInApp ? tssPlugin.tssKey : tssPlugin.getAppTssKey(this.APP_ID);
-    let tssKey: DistributedKey = this.getTss(request.deploymentSeed)!;
+    let tssKey: AppTssKey = this.getTss(request.deploymentSeed)!;
     if(!tssKey)
       throw `App TSS key not found`;
 

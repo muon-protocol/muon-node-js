@@ -5,7 +5,7 @@ import {MultiPartyComputation} from "../../common/mpc/base.js";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from '../../common/mpc/dist-key.js'
 import NodeManagerPlugin from "./node-manager.js";
-import DistributedKey from "../../utils/tss/distributed-key.js";
+import AppTssKey from "../../utils/tss/app-tss-key.js";
 import * as NetworkIpc from '../../network/ipc.js'
 import TssPlugin from "./tss-plugin.js";
 import * as SharedMemory from "../../common/shared-memory/index.js";
@@ -107,7 +107,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
               throw `party[${mpc.extraParams.party}] not found`
             }
 
-            let key = new DistributedKey(party, mpc.extraParams.keyId, dKey)
+            let key = new AppTssKey(party, mpc.extraParams.keyId, dKey)
             // console.log(`new distributed key`, key.toSerializable());
             await SharedMemory.set(mpc.extraParams.keyId, {partyInfo, key: key.toSerializable()}, 30*60*1000)
           })

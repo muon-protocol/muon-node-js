@@ -1,8 +1,6 @@
 import Party from './party.js'
 import BN from 'bn.js';
 import { PublicKey } from './types'
-import * as tss from './index.js'
-import Web3 from 'web3'
 import {DistKey} from "../../common/mpc/dist-key.js";
 
 const random = () => Math.floor(Math.random()*9999999)
@@ -11,7 +9,7 @@ const random = () => Math.floor(Math.random()*9999999)
  * A wrapper around MPC DistKey
  * Since MPC DistKey does not contain id and party information, this wrapper adds them.
  */
-export default class DistributedKey {
+export default class AppTssKey {
   /**
    * id of key
    * @type {string}

@@ -6,7 +6,7 @@ import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} 
 import * as TssModule from '../../utils/tss/index.js'
 import AppContextModel from "../../common/db-models/app-context.js"
 import AppTssConfigModel from "../../common/db-models/app-tss-config.js"
-import DistributedKey from "../../utils/tss/distributed-key.js";
+import AppTssKey from "../../utils/tss/app-tss-key.js";
 import AppManager from "./app-manager.js";
 import * as CoreIpc from '../ipc.js'
 import {useOneTime} from "../../utils/tss/use-one-time.js";
@@ -275,14 +275,6 @@ class System extends CallablePlugin {
     return pub2json(publicKey)
   }
 
-  @appApiMethod({})
-  async getDistributedKey(keyId) {
-    let key = await this.tssPlugin.getSharedKey(keyId)
-    if(!key)
-      throw `Distributed key not found.`
-    return key
-  }
-
   async writeAppContextIntoDb(request, result) {
     let {method} = request
     let {appId} = request.data.params
@@ -347,7 +339,7 @@ class System extends CallablePlugin {
       /** The current node can store the key only when it has participated in key generation. */
       if(request.data.init.keyGenerators.includes(currentNode.id)) {
         /** store tss key */
-        let key: DistributedKey = await this.tssPlugin.getSharedKey(keyId)!
+        let key: AppTssKey = await this.tssPlugin.getSharedKey(keyId)!
         await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
         await this.appManager.saveAppTssConfig({
           appId: appId,
@@ -414,7 +406,7 @@ class System extends CallablePlugin {
         /** Node has the old key */
         && this.appManager.appHasTssKey(appId, context.previousSeed)
       ) {
-        let reshareKey: DistributedKey = await this.tssPlugin.getSharedKey(reshareKeyId)!
+        let reshareKey: AppTssKey = await this.tssPlugin.getSharedKey(reshareKeyId)!
         /**
          Mark the reshareKey as used for app TSS key.
          If anyone tries to use this key for a different purpose, it will cause an error.
@@ -422,7 +414,7 @@ class System extends CallablePlugin {
          */
         await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-reshare`)
 
-        const oldKey: DistributedKey = this.tssPlugin.getAppTssKey(appId, context.previousSeed)!
+        const oldKey: AppTssKey = this.tssPlugin.getAppTssKey(appId, context.previousSeed)!
         if (!oldKey)
           throw `The old party's TSS key was not found.`
         /**
