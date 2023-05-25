@@ -8,6 +8,7 @@
 
 import TimeoutPromise from '../../../common/timeout-promise.js'
 import NodeCache from 'node-cache'
+import {MapOf} from "../../../common/mpc/types";
 
 const requestCache = new NodeCache({
   /**
@@ -28,7 +29,7 @@ type CacheItem = {
   partnerCount: number,
   requestTimeout: number,
   request: object,
-  signatures: object,
+  signatures: MapOf<string>,
   errors: object,
   promise: TimeoutPromise,
 }
@@ -80,7 +81,7 @@ export default class AppRequestManager{
     return !!item ? item.request : undefined
   }
 
-  addSignature(reqId, owner, sign){
+  addSignature(reqId: string, owner: string, sign: string){
     let item: CacheItem | undefined = this.getItem(reqId);
     if(item && item.signatures[owner] === undefined){
       item.signatures[owner] = sign
@@ -141,7 +142,7 @@ export default class AppRequestManager{
     return remainingPartners < needMoreSignature || failedCount >= 2;
   }
 
-  onRequestSignFullFilled(reqId){
+  onRequestSignFullFilled(reqId): Promise<MapOf<string>>{
     let item = this.getItem(reqId);
     if(!item)
       return Promise.reject({message: "RequestManager: request not added to RequestManager"})

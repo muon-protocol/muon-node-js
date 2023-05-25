@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin.js'
-import AppTssKey from "../../utils/tss/app-tss-key.js";
+import AppTssKey, {AppTssKeyJson} from "../../utils/tss/app-tss-key.js";
 import lodash from 'lodash'
 import * as tssModule from '../../utils/tss/index.js'
 import Web3 from 'web3'
@@ -215,16 +215,16 @@ class TssPlugin extends CallablePlugin {
     let tssConfig = this.getTssConfig();
 
     if(tssConfig && tssConfig.party.t == networkInfo.tssThreshold){
-      let key = new AppTssKey(
+      let key = AppTssKey.fromJson(
         this.tssParty,
-        tssConfig.key.id,
-        DistKey.fromJson({
-          index: this.nodeManager.currentNodeInfo!.id,
+        this.nodeManager.currentNodeInfo!.id,
+        {
+          id: tssConfig.key.id,
           share: tssConfig.key.share,
-          address: tssConfig.key.address,
           publicKey: tssConfig.key.publicKey,
           partners: this.tssParty.partners,
-      })
+          // polynomial: tssConfig.polynomial,
+        }
       );
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.tssKey = key;
@@ -306,20 +306,25 @@ class TssPlugin extends CallablePlugin {
       const context = this.appManager.getAppContext(appId, seed)
       if (!context)
         return null
+
       const _key = this.appManager.getAppTssKey(appId, seed)
       if (!_key)
         return null
+
       let party = this.getAppParty(appId, seed)
-      const key = new AppTssKey(
+      if(!party)
+        return null;
+
+      const key = AppTssKey.fromJson(
         party,
-        `app-${appId}`,
-        DistKey.fromJson({
-          index: this.appManager.currentNodeInfo!.id,
+        this.appManager.currentNodeInfo!.id,
+        {
+          id: `app-${appId}`,
           share: _key.keyShare,
-          address: tssModule.pub2addr(tssModule.keyFromPublic(_key.publicKey.encoded)),
           publicKey: _key.publicKey.encoded,
-          partners: context.party.partners
-        })
+          partners: context.party.partners,
+          polynomial: _key.polynomial,
+        }
       )
       this.appTss[appId][seed] = key;
     }
@@ -471,17 +476,7 @@ class TssPlugin extends CallablePlugin {
 
   async onTssKeyGenerate(tssKey) {
     if(!this.isReady) {
-      this.tssKey = new AppTssKey(
-        this.tssParty,
-        tssKey.id,
-        DistKey.fromJson({
-          index: this.nodeManager.currentNodeInfo!.id,
-          share: tssKey.share,
-          address: tssKey.address,
-          publicKey: tssKey.publicKey,
-          partners: this.tssParty!.partners,
-        })
-      );
+      this.tssKey = AppTssKey.fromJson(this.tssParty!, this.nodeManager.currentNodeInfo!.id, tssKey);
       this.isReady = true;
     }
   }
@@ -509,7 +504,7 @@ class TssPlugin extends CallablePlugin {
     this.isReady = true;
     await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-1-tss`)
     this.saveTssConfig(this.tssParty, tssKey)
-    CoreIpc.fireEvent({type: "global-tss-key:generate", data: tssKey.toSerializable()});
+    CoreIpc.fireEvent({type: "global-tss-key:generate", data: tssKey.toJson()});
     log(`${process.pid} tss key recovered`);
     return true;
   }
@@ -571,16 +566,16 @@ class TssPlugin extends CallablePlugin {
     let reconstructed = tssModule.reconstructKey(shares, appParty.t, myIndex)
     let myKey = reconstructed.sub(nonce.share!).umod(tssModule.curve.n!)
 
-    return new AppTssKey(
+    return AppTssKey.fromJson(
       appParty,
-      keyResults[0].id,
-      DistKey.fromJson({
-        index: this.currentNodeInfo!.id,
+      this.currentNodeInfo!.id,
+      {
+        id: keyResults[0].id,
         share: bn2hex(myKey),
-        address: keyResults[0].address,
         publicKey: keyResults[0].publicKey,
-        partners: appParty.partners
-      })
+        partners: appParty.partners,
+        polynomial: keyResults[0].polynomial,
+      }
     )
   }
 
@@ -721,7 +716,7 @@ class TssPlugin extends CallablePlugin {
 
         this.tssKey = key;
         this.isReady = true;
-        CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toSerializable()});
+        CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toJson()});
         log('tss ready.')
       } catch (e) {
         log('error when trying to create tss key %o %o', e, e.stack);
@@ -802,7 +797,7 @@ class TssPlugin extends CallablePlugin {
 
     let key = new AppTssKey(party, keyGen.extraParams.keyId!, dKey)
 
-    await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toSerializable()}, 30*60*1000)
+    await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
     return key;
   }
 
@@ -812,18 +807,7 @@ class TssPlugin extends CallablePlugin {
     if(!party)
       throw `party [${key.party}] not found`
 
-    const publicKey = tssModule.keyFromPublic(key.publicKey)
-    return new AppTssKey(
-      party,
-      key.id,
-      DistKey.fromJson({
-        index: this.currentNodeInfo!.id,
-        share: key.share,
-        publicKey: key.publicKey,
-        address: tssModule.pub2addr(publicKey),
-        partners: key.partners,
-      })
-    )
+    return AppTssKey.fromJson(party, this.currentNodeInfo!.id, key)
   }
 
   getParty(id) {
@@ -890,13 +874,17 @@ class TssPlugin extends CallablePlugin {
     let nonce: AppTssKey = await this.getSharedKey(nonceId);
     await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
     let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
+
+    const appTssKeyJson: AppTssKeyJson = appTssKey.toJson();
     return {
       id: appTssKey!.id,
       recoveryShare: `0x${keyPart.toString(16, 64)}`,
       // distributed key public
       publicKey: `${appTssKey!.publicKey!.encode('hex', true)}`,
       // distributed key address
-      address: tssModule.pub2addr(appTssKey!.publicKey!)
+      address: tssModule.pub2addr(appTssKey!.publicKey!),
+
+      polynomial: appTssKeyJson.polynomial
     }
   }
 
@@ -926,7 +914,7 @@ class TssPlugin extends CallablePlugin {
       this.saveTssConfig(party, key);
       this.tssKey = key
       this.isReady = true;
-      CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toSerializable()});
+      CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toJson()});
       log('save done')
       // CoreIpc.fireEvent({type: "tss:generate", })
       return true;

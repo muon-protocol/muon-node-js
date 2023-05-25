@@ -108,8 +108,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
             }
 
             let key = new AppTssKey(party, mpc.extraParams.keyId, dKey)
-            // console.log(`new distributed key`, key.toSerializable());
-            await SharedMemory.set(mpc.extraParams.keyId, {partyInfo, key: key.toSerializable()}, 30*60*1000)
+            await SharedMemory.set(mpc.extraParams.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
           })
           .catch(e => {
             // TODO

@@ -27,35 +27,13 @@ import {RedisCache} from "../../../common/redis-cache.js";
 import axios from "axios";
 import {GatewayCallParams} from "../../../gateway/types";
 import {MapOf} from "../../../common/mpc/types";
+import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
 const ajv = new Ajv()
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
-
-export type AppRequestSignature = {
-  /**
-   * Request hash
-   */
-  request: string,
-  /**
-   * Ethereum address of collateral wallet
-   */
-  owner: string,
-  /**
-   * request timestamp
-   */
-  timestamp: number,
-  /**
-   * result of request
-   */
-  result: any,
-  /**
-   * Schnorr signature of request, signed by TSS share
-   */
-  signature: string
-}
 
 const RemoteMethods = {
   WantSign: 'wantSign',
@@ -357,8 +335,8 @@ class BaseAppPlugin extends CallablePlugin {
 
         // await newRequest.save()
 
-        let sign = await this.makeSignature(newRequest, result, resultHash)
-        this.requestManager.addSignature(newRequest.reqId, sign.owner, sign);
+        let sign: string = await this.makeSignature(newRequest, result, resultHash)
+        this.requestManager.addSignature(newRequest.reqId, process.env.SIGN_WALLET_ADDRESS!, sign);
         // new Signature(sign).save()
 
         const fee = await this.spendRequestFee(newRequest);
@@ -610,10 +588,7 @@ class BaseAppPlugin extends CallablePlugin {
     let owners = Object.keys(signers)
     let allSignatures = owners.map(w => signers[w]);
 
-    let schnorrSigns = allSignatures.map(({signature}) => {
-      let [s, e] = signature.split(',').map(toBN);
-      return {s, e};
-    })
+    let schnorrSigns = allSignatures.map(signature => splitSignature(signature))
 
     const ownersIndex = owners.map(wallet => this.nodeManager.getNodeInfo(wallet)!.id);
     let aggregatedSign = tss.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
@@ -638,18 +613,16 @@ class BaseAppPlugin extends CallablePlugin {
     ]
   }
 
-  async recoverSignature(request, sign) {
+  async recoverSignature(request: AppRequest, owner: string, signature: string) {
     let tt0 = Date.now();
-    let {owner, pubKey: pubKeyStr} = sign;
-    let pubKey = tss.keyFromPublic(pubKeyStr);
+    const appTssKey = this.getTss(request.deploymentSeed)!
     // TODO: need to recheck
     // if(owner !== tss.pub2addr(pubKey)) {
     //   console.log({owner, pubKeyStr,})
     //   throw {message: 'Sign recovery error: invalid pubKey address'}
     // }
 
-    let [s, e] = sign.signature.split(',').map(toBN)
-    // let sig = {s, e}
+    let {s, e} = splitSignature(signature)
     //
     let tssPlugin = this.muon.getPlugin('tss-plugin');
     let nonce: AppTssKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
@@ -659,7 +632,7 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`invalid signature owner %s`, owner)
       return false
     }
-    let Z_i = pubKey;
+    let Z_i = appTssKey.getPubKey(ownerInfo!.id);
     let K_i = nonce.getPubKey(ownerInfo!.id);
 
     const eInv = e.invm(tss.curve.n!)
@@ -704,7 +677,7 @@ class BaseAppPlugin extends CallablePlugin {
             taskId: `keygen-${nonce.id}`
           }
         )
-        .then(data => this.__onRemoteSignTheRequest(data, null, node))
+        .then(sign => this.__onRemoteSignTheRequest({reqId: request.reqId, sign}, null, node))
         .catch(e => {
           this.log.error('asking signature for request failed %O', e)
           return this.__onRemoteSignTheRequest(null, {
@@ -740,10 +713,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async makeSignature(request: AppRequest, result: any, resultHash): Promise<AppRequestSignature> {
-    let signTimestamp = getTimestamp()
-    // let signature = crypto.sign(resultHash)
-
+  async makeSignature(request: AppRequest, result: any, resultHash): Promise<string> {
     let {reqId} = request;
     let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
     if(!nonce)
@@ -771,18 +741,10 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
     }
 
-    return {
-      request: request.reqId,
-      // node stake wallet address
-      owner: process.env.SIGN_WALLET_ADDRESS,
-      // tss shared public key
-      timestamp: signTimestamp,
-      result,
-      signature:`${bn2hex(signature.s)},${bn2hex(signature.e)}`
-    }
+    return stringifySignature(signature);
   }
 
-  async __onRemoteSignTheRequest(data: {sign: AppRequestSignature} | null, error, remoteNode: MuonNodeInfo) {
+  async __onRemoteSignTheRequest(data: {reqId: string, sign: string} | null, error, remoteNode: MuonNodeInfo) {
     if(error){
       this.log.error(`node ${remoteNode.id} unable to sign the request. %O`, error)
       let {request: reqId, ...otherParts} = error;
@@ -794,9 +756,9 @@ class BaseAppPlugin extends CallablePlugin {
     }
     try {
       this.log(`node ${remoteNode.id} signed the request.`)
-      let {sign} = data!;
+      let {reqId, sign} = data!;
       // let request = await Request.findOne({_id: sign.request})
-      let request = this.requestManager.getRequest(sign.request)
+      let request = this.requestManager.getRequest(reqId)
       if (request) {
         // TODO: check response similarity
         // let signer = await this.recoverSignature(request, sign)
@@ -814,7 +776,7 @@ class BaseAppPlugin extends CallablePlugin {
         // }
       }
       else{
-        console.log(`BaseAppPlugin.__onRemoteSignTheRequest >> Request not found id:${sign.request}`)
+        console.log(`BaseAppPlugin.__onRemoteSignTheRequest >> Request not found id:${reqId}`)
       }
     }
     catch (e) {
@@ -972,8 +934,7 @@ class BaseAppPlugin extends CallablePlugin {
       await useOneTime('fee', signature, request.reqId);
     }
 
-    let sign = await this.makeSignature(request, result, hash)
-    return { sign }
+    return this.makeSignature(request, result, hash)
   }
 
   @remoteMethod(RemoteMethods.InformRequestConfirmation)
