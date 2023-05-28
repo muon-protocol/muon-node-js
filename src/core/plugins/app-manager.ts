@@ -213,7 +213,7 @@ export default class AppManager extends CallablePlugin {
     }
 
     // @ts-ignore
-    const {appId, seed, keyGenRequest, publicKey} = appTssConfig;
+    const {appId, seed, keyGenRequest, publicKey, polynomial} = appTssConfig;
     const context = await AppContextModel.findOne({seed}).exec();
 
     if(context.appId !== appId) {
@@ -224,6 +224,7 @@ export default class AppManager extends CallablePlugin {
     // @ts-ignore
     context.keyGenRequest = keyGenRequest
     context.publicKey = publicKey
+    context.polynomial = polynomial
     context.dangerousAllowToSave = true
     await context.save();
     CoreIpc.fireEvent({

@@ -354,13 +354,17 @@ module.exports = {
                 }
 
                 /** ensure a random key already generated */
-                let publicKey;
+                let publicKey, oldPolynomial, polynomial;
                 if(method === Methods.TssKeyGen) {
-                    publicKey = await this.callPlugin('system', "findAndGetAppPublicKey", appId, seed, init.id)
+                    const tssPublicInfo = await this.callPlugin('system', "findAndGetAppTssPublicInfo", appId, seed, init.id);
+                    ({publicKey, polynomial}=tssPublicInfo)
                 }
                 else {
                     const oldContext = await this.callPlugin("system", "getAppContext", appId, context.previousSeed, true)
                     publicKey = oldContext.publicKey;
+                    oldPolynomial = oldContext.polynomial;
+                    const tssPublicInfo = await this.callPlugin('system', "findAndGetAppTssPublicInfo", appId, seed, init.id);
+                    polynomial = tssPublicInfo.polynomial
                 }
 
                 if(!publicKey)
@@ -371,7 +375,10 @@ module.exports = {
                     ttl,
                     expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
                     seed: context.seed,
-                    publicKey
+                    publicKey,
+                    /** only when resharing the App'a key */
+                    oldPolynomial,
+                    polynomial,
                 }
             }
             default:
@@ -407,18 +414,29 @@ module.exports = {
                     {t: 'uint64', v: result.timestamp},
                     ...(request.method === Methods.TssRotate ? [{t: 'uint256', v: previousSeed}] : []),
                     {t: 'uint256', v: seed},
-                    ...result.selectedNodes.map(v => ({t: 'uint64', v}))
+                    ...result.selectedNodes.map(v => ({t: 'uint64', v})),
                 ]
             }
             case Methods.TssKeyGen:
             case Methods.TssReshare: {
                 const {appId} = request.data.params
+                let polynomialParams = []
+                if(result.polynomial) {
+                    polynomialParams = result.polynomial.Fx.map(v => ({t: 'bytes',v}))
+                }
+                if(result.oldPolynomial) {
+                    polynomialParams = [
+                      ...polynomialParams,
+                      ...result.oldPolynomial.Fx.map(v => ({t: 'bytes',v})),
+                    ]
+                }
                 return [
                     {t: "bool", v: request.data.result.rotationEnabled},
                     {t: "uint64", v: request.data.result.ttl},
                     {t: "uint64", v: request.data.result.expiration},
                     {t: "string", v: request.data.result.seed},
-                    {t: 'address', v:request.data.result.publicKey.address}
+                    {t: 'address', v:request.data.result.publicKey.address},
+                    ...polynomialParams,
                 ]
             }
             default:

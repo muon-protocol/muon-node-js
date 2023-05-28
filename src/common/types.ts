@@ -174,6 +174,18 @@ export type AppTssConfig = {
     publicKey: JsonPublicKey,
     keyShare?: string,
     expiration?: number,
+    polynomial?: {
+        t: number,
+        Fx: string[]
+    }
+}
+
+export type AppTssPublicInfo = {
+    publicKey: string,
+    polynomial?: {
+        t: number,
+        Fx: string[]
+    }
 }
 
 export type PartyInfo = {

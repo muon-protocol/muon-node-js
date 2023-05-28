@@ -3,7 +3,7 @@ import Request from '../../../common/db-models/Request.js'
 import {getTimestamp, pub2json} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
 import {muonSha3, soliditySha3} from '../../../utils/sha3.js'
-import * as tss from '../../../utils/tss/index.js'
+import * as TssModule from '../../../utils/tss/index.js'
 import Web3 from 'web3'
 import lodash from 'lodash'
 import AppRequestManager from './app-request-manager.js'
@@ -548,12 +548,12 @@ class BaseAppPlugin extends CallablePlugin {
       partners: availablePartners,
       maxPartners: nonceParticipantsCount
     })
-    this.log(`nonce generation has ben completed with address %s.`, tss.pub2addr(nonce.publicKey))
+    this.log(`nonce generation has ben completed with address %s.`, TssModule.pub2addr(nonce.publicKey))
 
     // let sign = tssPlugin.sign(null, party);
     return {
       // noncePub: nonce.publicKey.encode('hex'),
-      nonceAddress: tss.pub2addr(nonce.publicKey),
+      nonceAddress: TssModule.pub2addr(nonce.publicKey),
     }
   }
 
@@ -591,17 +591,17 @@ class BaseAppPlugin extends CallablePlugin {
     let schnorrSigns = allSignatures.map(signature => splitSignature(signature))
 
     const ownersIndex = owners.map(wallet => this.nodeManager.getNodeInfo(wallet)!.id);
-    let aggregatedSign = tss.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
+    let aggregatedSign = TssModule.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
     let resultHash = this.hashAppSignParams(newRequest, newRequest.data.signParams, false)
 
     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
-    let confirmed = tss.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
+    let confirmed = TssModule.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
     // TODO: check and detect nodes misbehavior if request not confirmed
 
     return [
       confirmed,
       confirmed ? [{
-        owner: tss.pub2addr(verifyingPubKey),
+        owner: TssModule.pub2addr(verifyingPubKey),
         ownerPubKey: pub2json(verifyingPubKey, true),
         // signers: signersIndices,
         signature: bn2hex(aggregatedSign.s),
@@ -617,7 +617,7 @@ class BaseAppPlugin extends CallablePlugin {
     let tt0 = Date.now();
     const appTssKey = this.getTss(request.deploymentSeed)!
     // TODO: need to recheck
-    // if(owner !== tss.pub2addr(pubKey)) {
+    // if(owner !== TssModule.pub2addr(pubKey)) {
     //   console.log({owner, pubKeyStr,})
     //   throw {message: 'Sign recovery error: invalid pubKey address'}
     // }
@@ -635,9 +635,9 @@ class BaseAppPlugin extends CallablePlugin {
     let Z_i = appTssKey.getPubKey(ownerInfo!.id);
     let K_i = nonce.getPubKey(ownerInfo!.id);
 
-    const eInv = e.invm(tss.curve.n!)
-    let p1 = tss.pointAdd(K_i, Z_i.mul(eInv)).encode('hex', true)
-    let p2 = tss.curve.g.multiply(s).encode("hex", true);
+    const eInv = e.invm(TssModule.curve.n!)
+    let p1 = TssModule.pointAdd(K_i, Z_i.mul(eInv)).encode('hex', true)
+    let p2 = TssModule.curve.g.multiply(s).encode("hex", true);
     return p1 === p2 ? owner : null;
   }
 
@@ -647,7 +647,7 @@ class BaseAppPlugin extends CallablePlugin {
       throw `app[${this.APP_NAME}] tss publicKey not found`
     // @ts-ignore
     for(const publicKey of Object.values(signingPubKey)) {
-      if(tss.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, publicKey))
+      if(TssModule.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, publicKey))
         return true;
     }
     return false
@@ -735,7 +735,7 @@ class BaseAppPlugin extends CallablePlugin {
      */
     await useOneTime("key", K.encode('hex', true), `app-${this.APP_ID}-nonce-${resultHash}`, 3600)
     // TODO: remove nonce after sign
-    let signature = tss.schnorrSign(tssKey.share!, k_i!, K, resultHash)
+    let signature = TssModule.schnorrSign(tssKey.share!, k_i!, K, resultHash)
 
     if(!process.env.SIGN_WALLET_ADDRESS){
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
@@ -758,10 +758,10 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`node ${remoteNode.id} signed the request.`)
       let {reqId, sign} = data!;
       // let request = await Request.findOne({_id: sign.request})
-      let request = this.requestManager.getRequest(reqId)
+      let request:AppRequest = this.requestManager.getRequest(reqId) as AppRequest
       if (request) {
         // TODO: check response similarity
-        // let signer = await this.recoverSignature(request, sign)
+        // let signer = await this.recoverSignature(request, remoteNode.wallet, sign)
         // if (signer && signer === sign.owner) {
           // @ts-ignore
           this.requestManager.addSignature(request.reqId, remoteNode.wallet, sign)

@@ -58,6 +58,10 @@ export default class AppTssKey {
     return this.distKey.publicKey
   }
 
+  get polynomial() {
+    return this.distKey.polynomial;
+  }
+
   get partners(): string[] {
     return this.distKey.partners;
   }
@@ -102,12 +106,5 @@ export default class AppTssKey {
       this.partnersPubKey[idx] = this.distKey!.getPublicKey(idx);
     }
     return this.partnersPubKey[idx]
-  }
-
-  /**
-   Old version of keys was not storing polynomial info
-   */
-  hasPolynomialInfo() {
-    return !!this.distKey.polynomial
   }
 }
