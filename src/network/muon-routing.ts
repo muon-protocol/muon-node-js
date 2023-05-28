@@ -16,6 +16,7 @@ import { parseBool, timeout } from "../utils/helpers.js";
 import * as crypto from "../utils/crypto.js";
 import { muonSha3 } from "../utils/sha3.js";
 import { isPrivate } from "./utils.js";
+import _ from 'lodash';
 
 const log = logger("muon:network:routing");
 
@@ -30,7 +31,7 @@ export type MuonRoutingInit = {
 
   /**
    Discovery interval.
-   
+
    Default: 300000 (every 5 minutes)
    */
   discoveryInterval?: number;
@@ -140,20 +141,27 @@ export class MuonRouting implements PeerRouting, Startable {
     try {
       await onStart.promise;
 
-      const randomIndex = Math.floor(Math.random() * this.apis.length);
-      log(
-        `Calling delegate server %o ...`,
-        this.apis[randomIndex].defaults.baseURL
-      );
-      let result = await this.apis[randomIndex]
-        .post(
-          "/findpeer",
-          { id: `${id}` },
-          {
-            timeout: options.timeout,
-          }
-        )
-        .then(({ data }) => data);
+      const randomIndexs = _.shuffle(_.range(this.apis.length)).slice(0,2);
+      const apis = randomIndexs.map(i => this.apis[i])
+      log(`Calling delegate server %o ...`, apis.map(api => api.defaults.baseURL));
+      // @ts-ignore
+      let result = await Promise.any(
+        apis.map(api => {
+          return api.post(
+            "/findpeer",
+            {id: `${id}`},
+            {
+              timeout: options.timeout,
+            }
+          )
+            .then(({data}) => {
+              if(!data?.peerInfo)
+                throw `Peer ${id} not found`
+              return data
+            })
+        })
+      )
+        .catch(e => ({}))
 
       log(`Delegate server response %O`, result);
       let info = result?.peerInfo;
