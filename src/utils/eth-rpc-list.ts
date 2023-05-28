@@ -95,14 +95,15 @@ const DefaultRpcList = {
 
   /** BSC testnet */
   97: [
+    "https://bsc-testnet.publicnode.com",
     "https://rpc.ankr.com/bsc_testnet_chapel",
     "https://data-seed-prebsc-1-s1.binance.org:8545",
     "https://data-seed-prebsc-1-s2.binance.org:8545",
     "https://data-seed-prebsc-2-s1.binance.org:8545",
     "https://data-seed-prebsc-2-s2.binance.org:8545",
-    "https://bsc-testnet.public.blastapi.io",
+    // "https://bsc-testnet.public.blastapi.io",
     "https://data-seed-prebsc-1-s3.binance.org:8545",
-    "https://data-seed-prebsc-1-s3.binance.org:8545"
+    "https://data-seed-prebsc-2-s3.binance.org:8545"
   ],
 
   /**  */
@@ -191,10 +192,10 @@ const finalRpcList = Object.entries(DefaultRpcList)
     let envRpcList = getEnvProviders(chainId);
     return [
       chainId,
-      lodash.uniq([
+      lodash.uniq(lodash.shuffle([
         ...envRpcList,
         ...defaultList
-      ])
+      ]))
     ]
   })
   // @ts-ignore

@@ -6,6 +6,7 @@ import { bootstrap } from "@libp2p/bootstrap";
 import { gossipsub } from "@chainsafe/libp2p-gossipsub";
 import defaultsDeep from "@nodeutils/defaults-deep";
 // import { LevelDatastore } from "datastore-level";
+import { yamux } from '@chainsafe/libp2p-yamux';
 
 const DEFAULT_OPTS = {
   // datastore: new LevelDatastore(`./muon-data/v2/${process.env.SIGN_WALLET_ADDRESS!.substr(-20)}/`),
@@ -16,23 +17,26 @@ const DEFAULT_OPTS = {
     noise(),
   ],
   connectionManager: {
-    maxConnections: 1000,
+    maxConnections: 10000, // TODO: set default values
     minConnections: 0,
-    maxIncomingPendingConnections: 50
+    maxIncomingPendingConnections: 500, // TODO: set default values
+    dialTimeout: 10 * 1000
   },
   streamMuxers: [
+    yamux(),
     mplex()
   ],
-  pubsub: gossipsub({
-    allowPublishToZeroPeers: true,
-  }),
+  services: {
+    pubsub: gossipsub()  
+  }
+  
 
   // dht: kadDHT({
   //   kBucketSize: 20,
   //   clientMode: false,
   //   validators: {
   //     muon: async (key, data) => {
-  //       // validate data
+  //       // validate data1111
   //       // throw an err when data is not valid
   //       return;
   //     },
