@@ -97,7 +97,7 @@ module.exports = {
                     throw "Invalid app pending period"
                 if(nodes !== undefined) {
                     for (const id of nodes) {
-                        if (parseInt(id) <= 0)
+                        if (!(parseInt(id) > 0))
                             throw `Invalid node ID in nodes list`;
                     }
                 }
@@ -132,7 +132,7 @@ module.exports = {
                     throw "Invalid app pending period"
                 if(nodes !== undefined) {
                     for (const id of nodes) {
-                        if (parseInt(id) <= 0)
+                        if (!(parseInt(id) > 0))
                             throw `Invalid node ID in nodes list`;
                     }
                 }
