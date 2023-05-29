@@ -223,7 +223,7 @@ class TssPlugin extends CallablePlugin {
           share: tssConfig.key.share,
           publicKey: tssConfig.key.publicKey,
           partners: this.tssParty.partners,
-          // polynomial: tssConfig.polynomial,
+          polynomial: tssConfig.key.polynomial,
         }
       );
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
@@ -448,7 +448,9 @@ class TssPlugin extends CallablePlugin {
         // public of tss key
         publicKey: `${key.publicKey.encode('hex', true)}`,
         // distributed key address
-        address: tssModule.pub2addr(key.publicKey)
+        address: tssModule.pub2addr(key.publicKey),
+        // tss key's polynomial info
+        ...(!!key.polynomial ? {polynomial: key.toJson().polynomial} : {}),
       }
     }
 
