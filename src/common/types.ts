@@ -1,5 +1,6 @@
 import {GlobalBroadcastChannels} from "./contantes";
 import BN from 'bn.js'
+import {PublicKey} from "../utils/tss/types";
 
 export type JsonPeerInfo = {
     id: string;
@@ -164,7 +165,18 @@ export type AppContext = {
     expiration?: number,
     deploymentRequest?: AppRequest,
     keyGenRequest?: AppRequest,
-    publicKey?: JsonPublicKey
+    publicKey?: JsonPublicKey,
+    polynomial?: PolynomialInfoJson
+}
+
+export type PolynomialInfo = {
+    t: number,
+    Fx: PublicKey[]
+}
+
+export type PolynomialInfoJson = {
+    t: number,
+    Fx: string[]
 }
 
 export type AppTssConfig = {
@@ -174,18 +186,12 @@ export type AppTssConfig = {
     publicKey: JsonPublicKey,
     keyShare?: string,
     expiration?: number,
-    polynomial?: {
-        t: number,
-        Fx: string[]
-    }
+    polynomial?: PolynomialInfoJson
 }
 
 export type AppTssPublicInfo = {
     publicKey: string,
-    polynomial?: {
-        t: number,
-        Fx: string[]
-    }
+    polynomial?: PolynomialInfoJson
 }
 
 export type PartyInfo = {
@@ -193,3 +199,5 @@ export type PartyInfo = {
     seed: string,
     isForReshare?: boolean
 }
+
+export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] }

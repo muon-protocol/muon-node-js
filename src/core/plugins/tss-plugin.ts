@@ -641,8 +641,18 @@ class TssPlugin extends CallablePlugin {
           log(`app tss key recovered`)
           const netConfigs = this.muon.configs.net
           let expiration: number|undefined;
+          let polynomial: any;
           if(context.deploymentRequest && context.ttl) {
             expiration = context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
+          }
+          if(context.keyGenRequest) {
+            polynomial = context.keyGenRequest.data.result.polynomial
+            if(context.keyGenRequest.data.result.oldPolynomial) {
+              polynomial = this.appManager.mergeResharePolynomial(
+                context.keyGenRequest.data.result.oldPolynomial,
+                context.keyGenRequest.data.result.polynomial,
+                seed)
+            }
           }
           await this.appManager.saveAppTssConfig({
             appId: appId,
@@ -650,6 +660,7 @@ class TssPlugin extends CallablePlugin {
             keyGenRequest: context.keyGenRequest,
             publicKey: pub2json(key.publicKey!),
             keyShare: bn2hex(key.share!),
+            polynomial,
             expiration
           })
 

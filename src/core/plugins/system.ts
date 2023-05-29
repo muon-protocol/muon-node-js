@@ -401,21 +401,7 @@ class System extends CallablePlugin {
     }
 
     /** calculate new polynomial */
-    let Fx: string[] = resharePolynomial.Fx.map((p,i) => {
-      let a = TssModule.keyFromPublic(p);
-      let b = TssModule.keyFromPublic(oldPolynomial.Fx[i]);
-      let result = a.add(b)
-      if(i === 0) {
-        let diff = TssModule.keyFromPrivate(toBN(seed).neg()).getPublic()
-        result = result.add(diff)
-      }
-      return result
-    })
-      .map(p => p.encode('hex', true));
-    const polynomial = {
-      t: context.party.t,
-      Fx
-    }
+    const polynomial = this.appManager.mergeResharePolynomial(oldPolynomial, resharePolynomial, seed);
 
     const currentNode = this.nodeManager.currentNodeInfo!;
     if(context.party.partners.includes(currentNode.id)) {

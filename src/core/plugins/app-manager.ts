@@ -7,7 +7,7 @@ import {
   AppDeploymentStatus,
   AppTssConfig,
   JsonPublicKey,
-  MuonNodeInfo
+  MuonNodeInfo, PolynomialInfoJson, WithRequired
 } from "../../common/types";
 import TssPlugin from "./tss-plugin.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
@@ -24,6 +24,7 @@ import {findMinFullyConnectedSubGraph} from "../../common/graph-utils/index.js";
 import {PublicKey} from "../../utils/tss/types";
 import {aesDecrypt, isAesEncrypted} from "../../utils/crypto.js";
 import {MapOf} from "../../common/mpc/types";
+import {toBN} from "../../utils/tss/utils.js";
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -196,7 +197,7 @@ export default class AppManager extends CallablePlugin {
     }
   }
 
-  async saveAppTssConfig(appTssConfig: AppTssConfig) {
+  async saveAppTssConfig(appTssConfig: WithRequired<AppTssConfig, "polynomial">) {
     // @ts-ignore
     if (appTssConfig.keyShare) {
       let newConfig = new AppTssConfigModel(appTssConfig)
@@ -475,6 +476,23 @@ export default class AppManager extends CallablePlugin {
 
   getAppContext(appId: string, seed: string) {
     return this.appContexts[seed];
+  }
+
+  mergeResharePolynomial(oldPoly: PolynomialInfoJson, resharePoly: PolynomialInfoJson, seed: string): PolynomialInfoJson {
+    return {
+      t: oldPoly.t,
+      Fx: resharePoly.Fx.map((p,i) => {
+        let a = TssModule.keyFromPublic(p);
+        let b = TssModule.keyFromPublic(oldPoly.Fx[i]);
+        let result = a.add(b)
+        if(i === 0) {
+          let diff = TssModule.keyFromPrivate(toBN(seed).neg()).getPublic()
+          result = result.add(diff)
+        }
+        return result
+      })
+        .map(p => p.encode('hex', true))
+    }
   }
 
   async getAppContextAsync(appId: string, seed: string, tryFromNetwork:boolean=false): Promise<AppContext|undefined> {
