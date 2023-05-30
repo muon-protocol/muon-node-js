@@ -12,7 +12,7 @@ export type DistKeyJson = {
   address: string,
   publicKey: string,
   partners: string[],
-  curve: {
+  polynomial?: {
     t: number,
     Fx: string[]
   }
@@ -24,18 +24,18 @@ export class DistKey {
   address: string;
   publicKey: PublicKey;
   partners: string[];
-  curve: {
+  polynomial?: {
     t: number,
     Fx: PublicKey[]
   };
 
-  constructor(index: string, share: BN, address: string, publicKey : PublicKey, partners: string[], curve: {t: number, Fx: PublicKey[]}) {
+  constructor(index: string, share: BN, address: string, publicKey : PublicKey, partners: string[], polynomial?: {t: number, Fx: PublicKey[]}) {
     this.index = index;
     this.share = share;
     this.address = address;
     this.publicKey = publicKey;
     this.partners = partners,
-      this.curve = curve;
+      this.polynomial = polynomial;
   }
 
   /**
@@ -44,8 +44,10 @@ export class DistKey {
    * @param idx {string | BN} - index of participant
    * @returns PublicKey
    */
-  getPublicKey(idx: number | string): PublicKey{
-    return TssModule.calcPolyPoint(idx, this.curve.Fx)
+  getPublicKey(idx: number | string): PublicKey | null{
+    if(!this.polynomial)
+      return null;
+    return TssModule.calcPolyPoint(idx, this.polynomial.Fx)
   }
 
   publicKeyLargerThanHalfN() {
@@ -59,9 +61,9 @@ export class DistKey {
       address: this.address,
       publicKey: this.publicKey.encode('hex', true),
       partners: this.partners,
-      curve: {
-        t: this.curve.t,
-        Fx: this.curve.Fx.map(p => p.encode('hex', true))
+      polynomial: !this.polynomial ? undefined : {
+        t: this.polynomial.t,
+        Fx: this.polynomial.Fx.map(p => p.encode('hex', true))
       }
     }
   }
@@ -77,9 +79,9 @@ export class DistKey {
       address,
       publicKey,
       key.partners,
-      {
-        t: key.curve.t,
-        Fx: key.curve.Fx.map(p => TssModule.keyFromPublic(p))
+      !key.polynomial ? undefined : {
+        t: key.polynomial.t,
+        Fx: key.polynomial.Fx.map(p => TssModule.keyFromPublic(p))
       },
     );
   }

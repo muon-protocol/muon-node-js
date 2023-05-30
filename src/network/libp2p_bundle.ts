@@ -27,9 +27,9 @@ const DEFAULT_OPTS = {
     mplex()
   ],
   services: {
-    pubsub: gossipsub()  
+    pubsub: gossipsub({allowPublishToZeroPeers: true})
   }
-  
+
 
   // dht: kadDHT({
   //   kBucketSize: 20,
