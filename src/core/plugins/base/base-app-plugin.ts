@@ -36,7 +36,7 @@ const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
 
 const RemoteMethods = {
-  WantSign: 'wantSign',
+  AskSignature: 'AskSign',
   InformRequestConfirmation: 'InformReqConfirmation',
 }
 
@@ -166,7 +166,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @gatewayMethod("default")
-  async __onRequestArrived(callParams: GatewayCallParams) {
+  async __defaultRequestHandler(callParams: GatewayCallParams) {
     const {method, params, mode, callId: gatewayCallId, gwSign, fee: feeParams} = callParams;
 
     this.log(`request arrived %O`, {method, params})
@@ -670,7 +670,7 @@ class BaseAppPlugin extends CallablePlugin {
     partners.map(async node => {
       return this.remoteCall(
           node.peerId,
-          RemoteMethods.WantSign,
+          RemoteMethods.AskSignature,
           request,
           {
             timeout: this.REMOTE_CALL_TIMEOUT,
@@ -894,8 +894,8 @@ class BaseAppPlugin extends CallablePlugin {
     return true;
   }
 
-  @remoteMethod(RemoteMethods.WantSign)
-  async __onRemoteWantSign(request: AppRequest, callerInfo) {
+  @remoteMethod(RemoteMethods.AskSignature)
+  async __askSignature(request: AppRequest, callerInfo) {
     this.log(`remote node [id:${callerInfo.id}] wants signature %o`, request)
     deepFreeze(request);
     /**

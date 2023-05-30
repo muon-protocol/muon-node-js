@@ -70,7 +70,7 @@ export default class AppManager extends CallablePlugin {
     this.muon.on('app-context:update', this.onAppContextUpdate.bind(this))
     this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
     this.muon.on('app-tss-key:add', this.onAppTssConfigAdd.bind(this))
-    this.muon.on('global-tss-key:generate', this.onDeploymentTssKeyGenerate.bind(this));
+    this.muon.on('deployment-tss-key:generate', this.onDeploymentTssKeyGenerate.bind(this));
 
     this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
     this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
