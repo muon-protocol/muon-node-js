@@ -745,7 +745,7 @@ export default class AppManager extends CallablePlugin {
    * @param options.return {number} - Determine which field of MuonNodeInfo should be returned as the response. The id field is the default value.
    * @return {string[]} - A list of the selected fields of available nodes (options.return specifies these items).
    */
-  async findOptimalAvailablePartners(appId: string, seed: string, count: number, options: { timeout?: number, return?: string } = {}): Promise<string[]> {
+  async findOptimalAvailablePartners(appId: string, seed: string, count: number, options: { timeout?: number, return?: string } = {}) {
     options = {
       //TODO: find N best partners instead of setting timeout
       timeout: 12000,
@@ -790,7 +790,11 @@ export default class AppManager extends CallablePlugin {
       }
     }
     const minGraph = findMinFullyConnectedSubGraph(graph, count);
-    return Object.keys(minGraph)
+    return {
+      availables: Object.keys(minGraph),
+      graph,
+      minGraph
+    }
   }
 
   /**
