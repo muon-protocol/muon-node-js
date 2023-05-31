@@ -403,8 +403,6 @@ class BaseAppPlugin extends CallablePlugin {
 
         /** send request data to aggregator nodes */
         this.log('sending request to aggregator nodes ...')
-        console.log("***5");
-        console.log(JSON.stringify(requestData,null,4));
         requestData.signatures.forEach(signature=>{
           console.log(signature.execData);
         })
@@ -419,6 +417,12 @@ class BaseAppPlugin extends CallablePlugin {
         /** store data locally */
         newRequest.save()
       }
+
+      //omit execData
+      for (let i = 0; i < requestData.signatures.length; i++) {
+        requestData.signatures[i] = omit(requestData.signatures[i], ['execData'])
+      }
+
 
       return requestData
     }
