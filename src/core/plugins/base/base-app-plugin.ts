@@ -34,7 +34,13 @@ const {utils: {toBN}} = Web3
 const ajv = new Ajv()
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
-
+export type AppRequestSignature = {
+  /**
+   * Schnorr signature of request, signed by TSS share
+   */
+  signature: string,
+  execData: object
+}
 const RemoteMethods = {
   WantSign: 'wantSign',
   InformRequestConfirmation: 'InformReqConfirmation',
@@ -335,7 +341,7 @@ class BaseAppPlugin extends CallablePlugin {
 
         // await newRequest.save()
 
-        let sign: string = await this.makeSignature(newRequest, result, resultHash)
+        let sign: AppRequestSignature = await this.makeSignature(newRequest, result, resultHash)
         this.requestManager.addSignature(newRequest.reqId, process.env.SIGN_WALLET_ADDRESS!, sign);
         // new Signature(sign).save()
 
@@ -397,6 +403,11 @@ class BaseAppPlugin extends CallablePlugin {
 
         /** send request data to aggregator nodes */
         this.log('sending request to aggregator nodes ...')
+        console.log("***5");
+        console.log(JSON.stringify(requestData,null,4));
+        requestData.signatures.forEach(signature=>{
+          console.log(signature.execData);
+        })
         NetworkIpc.sendToAggregatorNode("AppRequest", requestData)
           .then(aggregatorNodeIdList => {
             this.log(`request sent to aggregator nodes: %o`, aggregatorNodeIdList)
@@ -585,10 +596,12 @@ class BaseAppPlugin extends CallablePlugin {
 
     signers = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
 
+
     let owners = Object.keys(signers)
     let allSignatures = owners.map(w => signers[w]);
+    let execData = owners.map(w => signers[w].execData);
 
-    let schnorrSigns = allSignatures.map(signature => splitSignature(signature))
+    let schnorrSigns = allSignatures.map(signature => splitSignature(signature.signature))
 
     const ownersIndex = owners.map(wallet => this.nodeManager.getNodeInfo(wallet)!.id);
     let aggregatedSign = TssModule.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
@@ -605,6 +618,7 @@ class BaseAppPlugin extends CallablePlugin {
         ownerPubKey: pub2json(verifyingPubKey, true),
         // signers: signersIndices,
         signature: bn2hex(aggregatedSign.s),
+        execData: execData
         // sign: {
         //   s: `0x${aggregatedSign.s.toString(16)}`,
         //   e: `0x${aggregatedSign.e.toString(16)}`
@@ -713,7 +727,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async makeSignature(request: AppRequest, result: any, resultHash): Promise<string> {
+  async makeSignature(request: AppRequest, result: any, resultHash): Promise<AppRequestSignature> {
     let {reqId} = request;
     let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
     if(!nonce)
@@ -741,10 +755,13 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
     }
 
-    return stringifySignature(signature);
+    return {
+      signature: stringifySignature(signature),
+      execData: nonce.distKey.execData
+    };
   }
 
-  async __onRemoteSignTheRequest(data: {reqId: string, sign: string} | null, error, remoteNode: MuonNodeInfo) {
+  async __onRemoteSignTheRequest(data: {reqId: string, sign: AppRequestSignature} | null, error, remoteNode: MuonNodeInfo) {
     if(error){
       this.log.error(`node ${remoteNode.id} unable to sign the request. %O`, error)
       let {request: reqId, ...otherParts} = error;

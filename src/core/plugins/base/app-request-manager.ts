@@ -81,7 +81,7 @@ export default class AppRequestManager{
     return !!item ? item.request : undefined
   }
 
-  addSignature(reqId: string, owner: string, sign: string){
+  addSignature(reqId: string, owner: string, sign){
     let item: CacheItem | undefined = this.getItem(reqId);
     if(item && item.signatures[owner] === undefined){
       item.signatures[owner] = sign
