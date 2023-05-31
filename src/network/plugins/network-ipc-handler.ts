@@ -425,9 +425,10 @@ class NetworkIpcHandler extends CallablePlugin {
       }
       else {
         /** Forward request to the appropriate node. */
-        const randomIndex = Math.floor(Math.random() * context.party.partners.length);
+        const onlines: string[] = await this.nodeManager.findNOnline(context.party.partners, 2, {timeout: 5000});
+        const randomIndex = Math.floor(Math.random() * onlines.length);
         return this.forwardGatewayCallToOtherNode(
-          context.party.partners[randomIndex],
+          onlines[randomIndex],
           requestData,
           options.timeout,
         )
@@ -447,9 +448,10 @@ class NetworkIpcHandler extends CallablePlugin {
          The deployer nodes know the members of the app party and can forward the request to the suitable one.
          */
         let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id);
-        const randomIndex = Math.floor(Math.random() * deployers.length);
+        const onlines: string[] = await this.nodeManager.findNOnline(deployers, 2, {timeout: 5000});
+        const randomIndex = Math.floor(Math.random() * onlines.length);
         return this.forwardGatewayCallToOtherNode(
-          deployers[randomIndex],
+          onlines[randomIndex],
           requestData,
           options.timeout,
         )
