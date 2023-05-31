@@ -1,5 +1,3 @@
-const getKeys = obj => Object.keys(obj);
-const getVals = obj => Object.values(obj);
 const avg = arr => {
   let sum = 0
   for(let i=0 ; i<arr.length ; i++)
@@ -27,7 +25,7 @@ export function toUnweightedGraph(graph: WeightedGraph): UnweightedGraph {
 function isGraphFullyConnected(graph: WeightedGraph): boolean {
   const nodes = Object.keys(graph)
   for(const [node, conns] of Object.entries(graph)) {
-    if(getKeys(conns).length !== nodes.length)
+    if(Object.keys(conns).length !== nodes.length)
       return false
   }
   return true;
@@ -49,33 +47,46 @@ export function getFullyConnectedSubGraph(inputGraph: WeightedGraph) {
     return {}
   }
 
-  /** remove Unidirectional edges */
+  /** fill the one-way missed times */
+  let nodesList = Object.keys(graph);
+  for(const [src, connections] of Object.entries(graph)) {
+    for(const dest of nodesList) {
+      if(connections[dest]===undefined && !!graph[dest][src])
+        connections[dest] = graph[dest][src]
+    }
+  }
+
+  /** remove redundant nodes */
   for(const [src, connections] of Object.entries(graph)) {
     for(const [dest, weight] of Object.entries(connections)) {
-      if(graph[dest]===undefined || graph[dest][src]===undefined)
+      if(graph[dest]===undefined)
         delete connections[dest];
-      if(getKeys(connections).length === 0)
-        delete graph[src];
     }
+    if(Object.keys(connections).length === 0)
+      delete graph[src];
   }
 
   /**
    * sort nodes order by connections|weight|ID
    * nodes with larger amounts of connections or lower ID have more priority to be selected.
    */
-  let sortedNodes = Object.entries(graph)
-    .sort(([key1, conn1], [key2, conn2]) => {
-      return (
-        /** more connections has more priority */
-        getKeys(conn1).length > getKeys(conn2).length
-        /** lower connection weight has more priority */
-        // @ts-ignore
-        || Math.max(...getVals(conn1)) < Math.max(...getVals(conn2))
-        /** lower ID has more priority */
-        || parseInt(key1) < parseInt(key2)
-      ) ? 1 : -1
+  let sortedNodes = Object.keys(graph)
+    .sort((a, b) => {
+      /** more connections has more priority */
+      if(Object.keys(graph[a]).length > Object.keys(graph[b]).length)
+        return 1
+      if(Object.keys(graph[b]).length > Object.keys(graph[a]).length)
+        return -1
+
+      /** lower connection weight has more priority */
+      if(Math.max(...Object.values(graph[a])) < Math.max(...Object.values(graph[b])))
+        return 1
+      if(Math.max(...Object.values(graph[b])) < Math.max(...Object.values(graph[a])))
+        return -1
+
+      /** lower ID has more priority */
+      return parseInt(a) < parseInt(b) ? 1 : -1
     })
-    .map(entry => entry[0])
 
   /** remove low priority nodes one by one, in order to graph be fully connected. */
   for(let i=0 ; i<sortedNodes.length && !isGraphFullyConnected(graph) ; i++) {
@@ -86,22 +97,23 @@ export function getFullyConnectedSubGraph(inputGraph: WeightedGraph) {
 
 export function findMinFullyConnectedSubGraph(inputGraph: WeightedGraph, n: number): WeightedGraph {
   const graph = getFullyConnectedSubGraph(inputGraph)
-  const numNodesToDelete = Math.max(getKeys(graph).length - n, 0);
+  const numNodesToDelete = Math.max(Object.keys(graph).length - n, 0);
 
   /**
    * sort nodes order by weight|ID
    * nodes with larger weight of connections or lower ID have more priority to be selected.
    */
-  let sortedNodes = Object.entries(graph)
-    .sort(([key1, conn1], [key2, conn2]) => {
-      return (
-        /** lower connection weight has more priority */
-        // @ts-ignore
-        // Math.max(...getVals(conn1)) < Math.max(...getVals(conn2))
-        avg(getVals(conn1)) < avg(getVals(conn2))
-        /** lower ID has more priority */
-        || parseInt(key1) < parseInt(key2)
-      ) ? 1 : -1
+  let sortedNodes = Object.keys(graph)
+    .sort((a, b) => {
+      /** lower connection weight has more priority */
+      if(avg(Object.values(graph[a])) < avg(Object.values(graph[b])))
+        return 1
+      if(avg(Object.values(graph[b])) < avg(Object.values(graph[a])))
+        return -1
+
+
+      /** lower ID has more priority */
+      return parseInt(a) < parseInt(b) ? 1 : -1
     })
     .map(entry => entry[0])
 
