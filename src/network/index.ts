@@ -3,27 +3,20 @@ import mongoose from "mongoose";
 import Events from "events-async";
 import { create } from "./libp2p_bundle.js";
 import { bootstrap } from "@libp2p/bootstrap";
-// import {pubsubPeerDiscovery} from "@libp2p/pubsub-peer-discovery";
-// import { mdns } from '@libp2p/mdns'
 import loadConfigs from "./configurations.js";
 import { createFromJSON } from "@libp2p/peer-id-factory";
-import chalk from "chalk";
-import emoji from "node-emoji";
 import { isPrivate, peerId2Str } from "./utils.js";
-import * as CoreIpc from "../core/ipc.js";
 import { MessagePublisher } from "../common/message-bus/index.js";
 import NodeManagerPlugin from "./plugins/node-manager.js";
 import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
 import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
-// import NetworkDHTPlugin from "./plugins/network-dht.js";
 import { logger } from "@libp2p/logger";
 import { findMyIp, parseBool } from "../utils/helpers.js";
 import { muonRouting } from "./muon-routing.js";
 
 import * as NetworkIpc from "../network/ipc.js";
-import { MuonNodeInfo } from "../common/types";
 
 const log = logger("muon:network");
 
@@ -32,15 +25,10 @@ class Network extends Events {
   libp2p;
   peerId;
   _plugins = {};
-  private connectedPeers: { [index: string]: boolean } = {};
 
   constructor(configs) {
     super();
     this.configs = configs;
-  }
-
-  getConnectedPeers(): { [index: string]: boolean } {
-    return this.connectedPeers;
   }
 
   async _initializeLibp2p() {
@@ -159,13 +147,6 @@ class Network extends Events {
       //   },
       // },
     });
-    libp2p.addEventListener("peer:connect", this.onPeerConnect.bind(this));
-    libp2p.addEventListener(
-      "peer:disconnect",
-      this.onPeerDisconnect.bind(this)
-    );
-
-    // libp2p.addEventListener("peer:discovery", this.onPeerDiscovery.bind(this));
 
     this.peerId = peerId;
     this.libp2p = libp2p;
@@ -193,15 +174,7 @@ class Network extends Events {
       let { port, natIp } = this.configs.libp2p;
     }
 
-    log(
-      emoji.get("moon") +
-        " " +
-        chalk.blue(" Node ready ") +
-        " " +
-        emoji.get("headphones") +
-        " " +
-        chalk.blue(` Listening on: ${this.configs.libp2p.port}`)
-    );
+    log(`Node ready Listening on: ${this.configs.libp2p.port}`);
 
     log("====================== Bindings ====================");
     this.libp2p.getMultiaddrs().forEach((ma) => {
@@ -222,61 +195,6 @@ class Network extends Events {
         console.error(`network: plugins start error`, e);
       });
     }
-  }
-
-  // async onPeerDiscovery(evt) {
-  //   const peer = evt.detail;
-  //   const peerId = peer.id;
-  //   this.connectedPeers[peerId2Str(peerId)] = true;
-  //   // @ts-ignore
-  //   this.emit("peer:discovery", peerId);
-  //   CoreIpc.fireEvent({ type: "peer:discovery", data: peerId2Str(peerId) });
-  //   log("found peer");
-  //   try {
-  //     log("discovered peer info %s", peerId2Str(peerId));
-  //   } catch (e) {
-  //     console.log("Error Muon.onPeerDiscovery", e);
-  //   }
-  // }
-
-  onPeerConnect(evt) {
-    const peerId = evt.detail;
-    log(
-      emoji.get("moon") +
-        " " +
-        chalk.blue(" Node connected to ") +
-        " " +
-        emoji.get("large_blue_circle") +
-        " " +
-        chalk.blue(` ${peerId2Str(peerId)}`)
-    );
-    this.connectedPeers[peerId2Str(peerId)] = true;
-    // @ts-ignore
-    this.emit("peer:connect", peerId);
-    CoreIpc.fireEvent({
-      type: "peer:connect",
-      data: peerId2Str(peerId),
-    });
-  }
-
-  onPeerDisconnect(evt) {
-    const peerId = evt.detail;
-    delete this.connectedPeers[peerId2Str(peerId)];
-    log(
-      emoji.get("moon") +
-        " " +
-        chalk.red(" Node disconnected") +
-        " " +
-        emoji.get("large_blue_circle") +
-        " " +
-        chalk.red(` ${peerId2Str(peerId)}`)
-    );
-    // @ts-ignore
-    this.emit("peer:disconnect", peerId);
-    CoreIpc.fireEvent({
-      type: "peer:disconnect",
-      data: peerId2Str(peerId),
-    });
   }
 }
 

@@ -53,7 +53,7 @@ export type KeyGenOptions = {
 
 const RemoteMethods = {
   recoverMyKey: 'recoverMyKey',
-  storeTssKey: 'storeTssKey',
+  storeDeploymentTssKey: 'storeDeploymentTssKey',
 }
 
 @remoteApp
@@ -76,14 +76,14 @@ class TssPlugin extends CallablePlugin {
     this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
 
     this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
-    this.muon.on('global-tss-key:generate', this.onTssKeyGenerate.bind(this));
+    this.muon.on('deployment-tss-key:generate', this.onDeploymentTssKeyGenerate.bind(this));
 
     // @ts-ignore
     this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
 
     await this.nodeManager.waitToLoad()
     await this.appManager.waitToLoad();
-    this.loadTssInfo();
+    this.loadDeploymentTss();
 
   }
 
@@ -100,7 +100,7 @@ class TssPlugin extends CallablePlugin {
 
     if(selfInfo.id === nodeInfo.id){
       log(`current node added to the network and loading tss info.`)
-      this.loadTssInfo()
+      this.loadDeploymentTss()
     }
     else {
       if(nodeInfo.isDeployer) {
@@ -127,7 +127,7 @@ class TssPlugin extends CallablePlugin {
 
       if(nodeInfo.isDeployer) {
         if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
-          await this.loadTssInfo()
+          await this.loadDeploymentTss()
         }
         else {
           if(nodeInfo.isDeployer)
@@ -175,7 +175,7 @@ class TssPlugin extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
-  getTssConfig(){
+  getDeploymentTssConfig(){
     let {tss: tssConfig} = this.muon.configs;
     if(!tssConfig)
       return null;
@@ -187,9 +187,9 @@ class TssPlugin extends CallablePlugin {
     return tssConfig;
   }
 
-  async loadTssInfo() {
+  async loadDeploymentTss() {
     if(!this.nodeManager.networkInfo){
-      throw {message: `TssPlugin.loadTssInfo: NodeManager plugin not loaded the network info.`}
+      throw {message: `TssPlugin.loadDeploymentTss: NodeManager plugin not loaded the network info.`}
     }
     let {networkInfo} = this.nodeManager;
 
@@ -199,7 +199,7 @@ class TssPlugin extends CallablePlugin {
     if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
       return;
     }
-    log(`loading global tss info ...`)
+    log(`loading deployment tss info ...`)
 
     //TODO: handle {isValid: false};
 
@@ -212,7 +212,7 @@ class TssPlugin extends CallablePlugin {
     // this.tryToFindOthers(3);
 
     // validate tssConfig
-    let tssConfig = this.getTssConfig();
+    let tssConfig = this.getDeploymentTssConfig();
 
     if(tssConfig && tssConfig.party.t == networkInfo.tssThreshold){
       let key = AppTssKey.fromJson(
@@ -229,11 +229,15 @@ class TssPlugin extends CallablePlugin {
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.tssKey = key;
       this.isReady = true
-      log('tss ready');
+      log('deployment tss is ready.');
     }
     else{
-      /** only one process allowed to create or recover Tss Key */
-      let permitted = await NetworkIpc.askClusterPermission('tss-key-creation', 20000)
+      /**
+       A core process is responsible for creating or recovering the Tss Key.
+       However, sometimes (when cluster mode is enabled) there are multiple core processes running simultaneously, which can cause problems.
+       Therefore, only one core process should be allowed to handle the Tss Key at a time.
+       */
+      let permitted = await NetworkIpc.askClusterPermission('deployment-tss-key-creation', 20000)
       if(!permitted)
         return;
 
@@ -261,11 +265,11 @@ class TssPlugin extends CallablePlugin {
       const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
       if (currentNodeInfo && currentNodeInfo.id == LEADER_ID && await this.isNeedToCreateKey()) {
         log(`Got permission to create tss key`);
-        let key: AppTssKey = await this.tryToCreateTssKey();
+        let key: AppTssKey = await this.tryToCreateDeploymentTssKey();
         log(`TSS key generated with ${key.partners.length} partners`);
       }
       else{
-        log(`trying to recover global tss key... timeout(6000)`)
+        log(`trying to recover deployment tss key... timeout(6000)`)
 
         while (!this.isReady) {
           log("waiting for tss, timeout(5000)");
@@ -278,17 +282,17 @@ class TssPlugin extends CallablePlugin {
           )
 
           if(readyPartnersId.length >= context.party.t){
-            log(`global tss is ready.`);
+            log(`deployment tss is ready.`);
             try {
               const readyPartners = this.nodeManager.filterNodes({list: readyPartnersId});
-              await this.tryToRecoverGlobalTssKey(readyPartners!);
+              await this.tryToRecoverDeploymentTssKey(readyPartners!);
             }
             catch (e) {
               log(`Error when trying to recover tss key`);
             }
           }
           else {
-            log(`global tss is not ready.`);
+            log(`deployment tss is not ready.`);
           }
         }
       }
@@ -413,7 +417,7 @@ class TssPlugin extends CallablePlugin {
   }
 
   async isNeedToCreateKey(){
-    log("checking for global key creation ...")
+    log("checking for deployment key creation ...")
     const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
     const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
       deployers,
@@ -476,15 +480,15 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
-  async onTssKeyGenerate(tssKey) {
+  async onDeploymentTssKeyGenerate(tssKey) {
     if(!this.isReady) {
       this.tssKey = AppTssKey.fromJson(this.tssParty!, this.nodeManager.currentNodeInfo!.id, tssKey);
       this.isReady = true;
     }
   }
 
-  private async tryToRecoverGlobalTssKey(readyPartners: MuonNodeInfo[]){
-    log(`generating nonce for recovering global tss key`)
+  private async tryToRecoverDeploymentTssKey(readyPartners: MuonNodeInfo[]){
+    log(`generating nonce for recovering deployment tss key`)
 
     let nonce = await this.keyGen({appId: "1", seed: "1"}, {
       id: `recovery-${uuid()}`,
@@ -493,7 +497,7 @@ class TssPlugin extends CallablePlugin {
         ...readyPartners.map(p => p.id),
       ]
     });
-    log(`nonce generated for recovering global tss key`)
+    log(`nonce generated for recovering deployment tss key`)
 
     const noncePartners = this.nodeManager.filterNodes({
       list: nonce.partners,
@@ -506,8 +510,8 @@ class TssPlugin extends CallablePlugin {
     this.isReady = true;
     await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-1-tss`)
     this.saveTssConfig(this.tssParty, tssKey)
-    CoreIpc.fireEvent({type: "global-tss-key:generate", data: tssKey.toJson()});
-    log(`${process.pid} tss key recovered`);
+    CoreIpc.fireEvent({type: "deployment-tss-key:generate", data: tssKey.toJson()});
+    log(`pid:${process.pid} tss key recovered`);
     return true;
   }
 
@@ -599,14 +603,10 @@ class TssPlugin extends CallablePlugin {
     log(`checking to recover app[${appId}] tss key`)
     this.appTssKeyRecoveryCheckTime[`${appId}-${seed}`] = Date.now();
     try {
-      let currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
       let context: AppContext = this.appManager.getAppContext(appId, seed);
       if(!context || !context.keyGenRequest) {
-        /** If the current node is not deployer, query deployers to find the context. */
-        if(!currentNode.isDeployer) {
-          const contexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId);
-          context = contexts.find(ctx => ctx.seed === seed)!
-        }
+        const contexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId);
+        context = contexts.find(ctx => ctx.seed === seed)!
 
         if(!context || !context.keyGenRequest)
           throw `app tss is not ready yet (missing context).`
@@ -681,10 +681,10 @@ class TssPlugin extends CallablePlugin {
     return false;
   }
 
-  async tryToCreateTssKey(): Promise<AppTssKey> {
+  async tryToCreateDeploymentTssKey(): Promise<AppTssKey> {
     const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
     while (!this.isReady) {
-      log('tryToCreateTssKey:: tss is not ready. timeout(5000)')
+      log('deployment tss is not ready. timeout(5000)')
       await timeout(5000);
       try {
         const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
@@ -693,10 +693,10 @@ class TssPlugin extends CallablePlugin {
           {timeout: 10000}
         )
         if(onlineDeployers.length < this.tssParty!.t) {
-          log(`Its need ${this.tssParty!.t} deployer to create global tss but only ${onlineDeployers.length} are available`)
+          log(`Its need ${this.tssParty!.t} deployer to create deployment tss but only ${onlineDeployers.length} are available`)
           continue;
         }
-        log(`Deployers %o are available to create global tss`, onlineDeployers)
+        log(`Deployers %o are available to create deployment tss`, onlineDeployers)
         let key: AppTssKey = await this.keyGen(
           {appId: "1", seed: "1"},
           {
@@ -709,7 +709,7 @@ class TssPlugin extends CallablePlugin {
         let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
           return this.remoteCall(
             peerId,
-            RemoteMethods.storeTssKey,
+            RemoteMethods.storeDeploymentTssKey,
             {
               party: this.tssParty!.id,
               key: key.id,
@@ -717,7 +717,7 @@ class TssPlugin extends CallablePlugin {
             {timeout: 120e3}
             // {taskId: `keygen-${key.id}`}
           ).catch(e=>{
-            console.log("RC.storeTssKey", e);
+            console.log("RemoteCall.storeDeploymentTssKey", e);
             return false
           });
         }))
@@ -729,7 +729,7 @@ class TssPlugin extends CallablePlugin {
 
         this.tssKey = key;
         this.isReady = true;
-        CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toJson()});
+        CoreIpc.fireEvent({type: "deployment-tss-key:generate", data: key.toJson()});
         log('tss ready.')
       } catch (e) {
         log('error when trying to create tss key %o %o', e, e.stack);
@@ -911,23 +911,22 @@ class TssPlugin extends CallablePlugin {
    * @returns {Promise<boolean>}
    * @private
    */
-  @remoteMethod(RemoteMethods.storeTssKey)
-  async __storeTssKey(data: {party: string, key: string}, callerInfo) {
+  @remoteMethod(RemoteMethods.storeDeploymentTssKey)
+  async __storeDeploymentTssKey(data: {party: string, key: string}, callerInfo) {
     // TODO: problem condition: request arrive when tss is ready
-    // console.log('TssPlugin.__storeTssKey', data)
     let {party: partyId, key: keyId} = data
     let party = this.getParty(partyId)
     let key: AppTssKey = await this.getSharedKey(keyId);
     if (!party)
-      throw {message: 'TssPlugin.__storeTssKey: party not found.'}
+      throw {message: 'TssPlugin.storeDeploymentTssKey: party not found.'}
     if (!key)
-      throw {message: 'TssPlugin.__storeTssKey: key not found.'};
+      throw {message: 'TssPlugin.storeDeploymentTssKey: key not found.'};
     if(callerInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.saveTssConfig(party, key);
       this.tssKey = key
       this.isReady = true;
-      CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toJson()});
+      CoreIpc.fireEvent({type: "deployment-tss-key:generate", data: key.toJson()});
       log('save done')
       // CoreIpc.fireEvent({type: "tss:generate", })
       return true;

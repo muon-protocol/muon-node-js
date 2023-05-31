@@ -68,7 +68,7 @@ export type AppDeploymentInfo = {
     deployed: boolean,
     /** deployment status*/
     status: AppDeploymentStatus,
-    /** reqId of confirmed deployment request signed by global tss group */
+    /** reqId of confirmed deployment request signed by deployment tss group */
     reqId?: string,
     /** hash of context */
     contextHash?: string,

@@ -57,9 +57,6 @@ export default class NodeManagerPlugin extends CallablePlugin{
     // When the network restarts
     await timeout(Math.floor(Math.random()*5*1e3));
     await this._loadContractInfo();
-
-    // @ts-ignore
-    this.network.on('peer:connect', this.onPeerConnect.bind(this));
   }
 
   async onStart() {
@@ -69,19 +66,6 @@ export default class NodeManagerPlugin extends CallablePlugin{
   private getNodeId(peerId): string {
     const id = this.getNodeInfo(peerId2Str(peerId))?.id || 'unknown'
     return `[${id}]:${peerId2Str(peerId)}`
-  }
-
-  async onPeerConnect(peerId) {
-    log(chalk.green(`peer connected ${this.getNodeId(peerId)}`))
-    await this.waitToLoad();
-
-    const peerInfo: MuonNodeInfo|undefined = this.getNodeInfo(peerId2Str(peerId));
-    if(!peerInfo){
-      log(`unknown peer connect ${peerId2Str(peerId)}`)
-      return;
-    }
-
-    await timeout(5000);
   }
 
   private updateNodeInfo(index: string, dataToMerge: object) {
