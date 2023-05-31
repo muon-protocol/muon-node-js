@@ -312,14 +312,6 @@ export default class AppManager extends CallablePlugin {
       includeExpired
     } = options
 
-    /** Ignore query if found local. */
-    const localContexts = this.getAppAllContext(appId);
-    const localSeeds: string[] = localContexts.map(({seed}) => seed);
-    if(localContexts.length > 0) {
-      if(seeds.length > 0 && !seeds.find(seed => !localSeeds.includes(seed)))
-        return localContexts;
-    }
-
     /** query only deployer nodes */
     const deployerNodes: string[] = this.nodeManager
       .filterNodes({

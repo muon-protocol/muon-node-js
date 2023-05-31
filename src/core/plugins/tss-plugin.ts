@@ -603,14 +603,10 @@ class TssPlugin extends CallablePlugin {
     log(`checking to recover app[${appId}] tss key`)
     this.appTssKeyRecoveryCheckTime[`${appId}-${seed}`] = Date.now();
     try {
-      let currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
       let context: AppContext = this.appManager.getAppContext(appId, seed);
       if(!context || !context.keyGenRequest) {
-        /** If the current node is not deployer, query deployers to find the context. */
-        if(!currentNode.isDeployer) {
-          const contexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId);
-          context = contexts.find(ctx => ctx.seed === seed)!
-        }
+        const contexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId);
+        context = contexts.find(ctx => ctx.seed === seed)!
 
         if(!context || !context.keyGenRequest)
           throw `app tss is not ready yet (missing context).`
