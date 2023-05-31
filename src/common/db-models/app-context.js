@@ -15,6 +15,12 @@ const TssPublicKeyInfo = mongoose.Schema({
   yParity: {type: Number, enum: [0, 1], required: true},
 }, {_id: false})
 
+const TssPolynomialInfo = mongoose.Schema({
+  t: {type: Number, required: true},
+  Fx: {type: [String], required: true},
+},{_id: false})
+
+
 const modelSchema = mongoose.Schema({
   appId: {type: String, required: true},
   appName: {type: String, required: true},
@@ -40,6 +46,7 @@ const modelSchema = mongoose.Schema({
   deploymentRequest: {type: Object, required: true},
   keyGenRequest: {type: Object},
   publicKey: {type: TssPublicKeyInfo},
+  polynomial: {type: TssPolynomialInfo}
 }, {timestamps: true});
 
 modelSchema.pre('save', function (next) {

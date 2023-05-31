@@ -9,12 +9,18 @@ const TssPublicKeyInfo = mongoose.Schema({
   yParity: {type: Number, enum: [0, 1], required: true},
 },{_id: false})
 
+const TssPolynomialInfo = mongoose.Schema({
+  t: {type: Number, required: true},
+  Fx: {type: [String], required: true},
+},{_id: false})
+
 const modelSchema = mongoose.Schema({
   appId: {type: String, required: true},
   seed: {type: String, required: true},
   keyGenRequest: {type: Object, required: true},
   publicKey: {type: TssPublicKeyInfo, required: true},
   keyShare: {type: String},
+  polynomial: {type: TssPolynomialInfo},
   expiration: {type: Number},
 }, {timestamps: true});
 

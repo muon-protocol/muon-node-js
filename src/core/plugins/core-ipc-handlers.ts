@@ -1,15 +1,13 @@
 import CallablePlugin from './base/callable-plugin.js'
-import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
+import {remoteApp, ipcMethod} from './base/app-decorators.js'
 import System from "./system.js";
 import AppManager from "./app-manager.js";
 import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
-import {timeout} from '../../utils/helpers.js'
 import {AppContext, AppRequest, JsonPublicKey} from "../../common/types";
 
 export const IpcMethods = {
   ExecRemoteCall: 'exec-remote-call',
-  GetTssKey: 'get-tss-key',
   GetAppId: 'get-app-id',
   GetAppContext: 'get-app-context',
   GetAppOldestContext: 'get-app-oldest-context',
@@ -47,12 +45,6 @@ class CoreIpcHandlers extends CallablePlugin {
       throw `Remote method [${method}] handler not defined`
     }
     return await this.remoteCallPlugin.handleCall(undefined, method, params, callerInfo, null)
-  }
-
-  @ipcMethod(IpcMethods.GetTssKey)
-  async __onGetTssKeyRequest(data: {keyId: string}, callerInfo) {
-    let key = await this.muon.getPlugin('tss-plugin').getSharedKey(data.keyId)
-    return key.toSerializable();
   }
 
   @ipcMethod(IpcMethods.GetAppId)

@@ -299,7 +299,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       totalFx[0],
       qualified,
       {
-        t: 2,
+        t: this.t,
         Fx: totalFx
       }
     )

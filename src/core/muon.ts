@@ -11,7 +11,7 @@ import * as NetworkIpc from '../network/ipc.js'
 import MuonBasePlugin from './plugins/base/base-plugin.js';
 import BaseAppPlugin from "./plugins/base/base-app-plugin.js";
 import BasePlugin from "./plugins/base/base-plugin.js";
-import {Constructor} from "../common/types";
+import {Constructor, PolynomialInfoJson} from "../common/types";
 
 export type MuonPluginConfigs = any
 
@@ -33,7 +33,8 @@ export type MuonConfigs = {
       id: string,
       share: string,
       publicKey: string,
-      address: string
+      address: string,
+      polynomial?: PolynomialInfoJson
     }
   },
   net: {

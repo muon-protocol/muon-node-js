@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin.js'
-import DistributedKey from "../../utils/tss/distributed-key.js";
+import AppTssKey, {AppTssKeyJson} from "../../utils/tss/app-tss-key.js";
 import lodash from 'lodash'
 import * as tssModule from '../../utils/tss/index.js'
 import Web3 from 'web3'
@@ -60,13 +60,13 @@ const RemoteMethods = {
 class TssPlugin extends CallablePlugin {
   isReady = false
   parties:{[index: string]: TssParty} = {}
-  tssKey: DistributedKey | null = null;
+  tssKey: AppTssKey | null = null;
   tssParty: TssParty | null = null;
   /**
    map appId and seed to App TSS key
-   example: appTss[appId][seed] = DistributedKey
+   example: appTss[appId][seed] = AppTssKey
    */
-  appTss:{[index: string]: {[index: string]: DistributedKey}} = {}
+  appTss:{[index: string]: {[index: string]: AppTssKey}} = {}
 
   async onStart() {
     super.onStart();
@@ -215,12 +215,17 @@ class TssPlugin extends CallablePlugin {
     let tssConfig = this.getTssConfig();
 
     if(tssConfig && tssConfig.party.t == networkInfo.tssThreshold){
-      let _key = {
-        ...tssConfig.key,
-        share: toBN(tssConfig.key.share),
-        publicKey: tssModule.keyFromPublic(tssConfig.key.publicKey)
-      }
-      let key = DistributedKey.load(this.tssParty, _key);
+      let key = AppTssKey.fromJson(
+        this.tssParty,
+        this.nodeManager.currentNodeInfo!.id,
+        {
+          id: tssConfig.key.id,
+          share: tssConfig.key.share,
+          publicKey: tssConfig.key.publicKey,
+          partners: this.tssParty.partners,
+          polynomial: tssConfig.key.polynomial,
+        }
+      );
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.tssKey = key;
       this.isReady = true
@@ -256,7 +261,7 @@ class TssPlugin extends CallablePlugin {
       const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
       if (currentNodeInfo && currentNodeInfo.id == LEADER_ID && await this.isNeedToCreateKey()) {
         log(`Got permission to create tss key`);
-        let key: DistributedKey = await this.tryToCreateTssKey();
+        let key: AppTssKey = await this.tryToCreateTssKey();
         log(`TSS key generated with ${key.partners.length} partners`);
       }
       else{
@@ -290,7 +295,7 @@ class TssPlugin extends CallablePlugin {
     }
   }
 
-  getAppTssKey(appId: string, seed: string): DistributedKey | null {
+  getAppTssKey(appId: string, seed: string): AppTssKey | null {
     if(appId == '1') {
       return this.tssKey;
     }
@@ -301,16 +306,26 @@ class TssPlugin extends CallablePlugin {
       const context = this.appManager.getAppContext(appId, seed)
       if (!context)
         return null
+
       const _key = this.appManager.getAppTssKey(appId, seed)
       if (!_key)
         return null
+
       let party = this.getAppParty(appId, seed)
-      const key = DistributedKey.load(party, {
-        id: `app-${appId}`,
-        share: _key.keyShare,
-        publicKey: _key.publicKey.encoded,
-        partners: context.party.partners
-      })
+      if(!party)
+        return null;
+
+      const key = AppTssKey.fromJson(
+        party,
+        this.appManager.currentNodeInfo!.id,
+        {
+          id: `app-${appId}`,
+          share: _key.keyShare,
+          publicKey: _key.publicKey.encoded,
+          partners: context.party.partners,
+          polynomial: _key.polynomial,
+        }
+      )
       this.appTss[appId][seed] = key;
     }
     return this.appTss[appId][seed];
@@ -428,12 +443,14 @@ class TssPlugin extends CallablePlugin {
       },
       key: {
         id: key.id,
-        // shared part of distributedKey
+        // shared part of tss key
         share: `0x${key.share.toString(16)}`,
-        // distributedKey public
+        // public of tss key
         publicKey: `${key.publicKey.encode('hex', true)}`,
         // distributed key address
-        address: tssModule.pub2addr(key.publicKey)
+        address: tssModule.pub2addr(key.publicKey),
+        // tss key's polynomial info
+        ...(!!key.polynomial ? {polynomial: key.toJson().polynomial} : {}),
       }
     }
 
@@ -461,7 +478,7 @@ class TssPlugin extends CallablePlugin {
 
   async onTssKeyGenerate(tssKey) {
     if(!this.isReady) {
-      this.tssKey = DistributedKey.load(this.tssParty, tssKey);
+      this.tssKey = AppTssKey.fromJson(this.tssParty!, this.nodeManager.currentNodeInfo!.id, tssKey);
       this.isReady = true;
     }
   }
@@ -489,7 +506,7 @@ class TssPlugin extends CallablePlugin {
     this.isReady = true;
     await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-1-tss`)
     this.saveTssConfig(this.tssParty, tssKey)
-    CoreIpc.fireEvent({type: "global-tss-key:generate", data: tssKey.toSerializable()});
+    CoreIpc.fireEvent({type: "global-tss-key:generate", data: tssKey.toJson()});
     log(`${process.pid} tss key recovered`);
     return true;
   }
@@ -504,7 +521,7 @@ class TssPlugin extends CallablePlugin {
    * @param nonce {string} - ID of nonce that will be used for recovery.
    * @param newSeed {string} - Deployment seed of App's new context. A new context will be generated by deployers when the old context is about to expire..
    */
-  async recoverAppTssKey(appId: string, seed: string, partners: MuonNodeInfo[], nonce: DistributedKey, newSeed?: string): Promise<DistributedKey> {
+  async recoverAppTssKey(appId: string, seed: string, partners: MuonNodeInfo[], nonce: AppTssKey, newSeed?: string): Promise<AppTssKey> {
     let appParty = this.getAppParty(appId, seed);
 
     if(!appParty)
@@ -551,13 +568,17 @@ class TssPlugin extends CallablePlugin {
     let reconstructed = tssModule.reconstructKey(shares, appParty.t, myIndex)
     let myKey = reconstructed.sub(nonce.share!).umod(tssModule.curve.n!)
 
-    return DistributedKey.load(appParty, {
-      id: keyResults[0].id,
-      i: myIndex,
-      share: myKey,
-      publicKey: tssModule.keyFromPublic(keyResults[0].publicKey),
-      address: keyResults[0].address,
-    })
+    return AppTssKey.fromJson(
+      appParty,
+      this.currentNodeInfo!.id,
+      {
+        id: keyResults[0].id,
+        share: bn2hex(myKey),
+        publicKey: keyResults[0].publicKey,
+        partners: appParty.partners,
+        polynomial: keyResults[0].polynomial,
+      }
+    )
   }
 
   private appTssKeyRecoveryCheckTime: MapOf<number> = {};
@@ -622,8 +643,18 @@ class TssPlugin extends CallablePlugin {
           log(`app tss key recovered`)
           const netConfigs = this.muon.configs.net
           let expiration: number|undefined;
+          let polynomial: any;
           if(context.deploymentRequest && context.ttl) {
             expiration = context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
+          }
+          if(context.keyGenRequest) {
+            polynomial = context.keyGenRequest.data.result.polynomial
+            if(context.keyGenRequest.data.result.oldPolynomial) {
+              polynomial = this.appManager.mergeResharePolynomial(
+                context.keyGenRequest.data.result.oldPolynomial,
+                context.keyGenRequest.data.result.polynomial,
+                seed)
+            }
           }
           await this.appManager.saveAppTssConfig({
             appId: appId,
@@ -631,6 +662,7 @@ class TssPlugin extends CallablePlugin {
             keyGenRequest: context.keyGenRequest,
             publicKey: pub2json(key.publicKey!),
             keyShare: bn2hex(key.share!),
+            polynomial,
             expiration
           })
 
@@ -649,7 +681,7 @@ class TssPlugin extends CallablePlugin {
     return false;
   }
 
-  async tryToCreateTssKey(): Promise<DistributedKey> {
+  async tryToCreateTssKey(): Promise<AppTssKey> {
     const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
     while (!this.isReady) {
       log('tryToCreateTssKey:: tss is not ready. timeout(5000)')
@@ -665,7 +697,7 @@ class TssPlugin extends CallablePlugin {
           continue;
         }
         log(`Deployers %o are available to create global tss`, onlineDeployers)
-        let key: DistributedKey = await this.keyGen(
+        let key: AppTssKey = await this.keyGen(
           {appId: "1", seed: "1"},
           {
             partners: onlineDeployers,
@@ -697,7 +729,7 @@ class TssPlugin extends CallablePlugin {
 
         this.tssKey = key;
         this.isReady = true;
-        CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toSerializable()});
+        CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toJson()});
         log('tss ready.')
       } catch (e) {
         log('error when trying to create tss key %o %o', e, e.stack);
@@ -713,9 +745,9 @@ class TssPlugin extends CallablePlugin {
    * @param options
    * @param options.id: create key with specific id
    * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
-   * @returns {Promise<DistributedKey>}
+   * @returns {Promise<AppTssKey>}
    */
-  async keyGen(partyInfo: PartyInfo, options: KeyGenOptions={}): Promise<DistributedKey> {
+  async keyGen(partyInfo: PartyInfo, options: KeyGenOptions={}): Promise<AppTssKey> {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, partners: oPartners, maxPartners, timeout=60000, value} = options;
 
@@ -776,24 +808,19 @@ class TssPlugin extends CallablePlugin {
     }
     while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
 
-    // @ts-ignore
-    let key = DistributedKey.load(party, {
-      id: keyGen.extraParams.keyId!,
-      share: bn2hex(dKey.share),
-      publicKey: dKey.publicKey,
-      partners: dKey.partners
-    })
+    let key = new AppTssKey(party, keyGen.extraParams.keyId!, dKey)
 
-    await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toSerializable()}, 30*60*1000)
+    await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
     return key;
   }
 
-  async getSharedKey(id: string, timeout:number=5000): Promise<DistributedKey> {
+  async getSharedKey(id: string, timeout:number=5000): Promise<AppTssKey> {
     let {partyInfo, key} = await SharedMemory.waitAndGet(id, timeout)
     let party = this.getAppParty(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
     if(!party)
       throw `party [${key.party}] not found`
-    return DistributedKey.load(party, key)
+
+    return AppTssKey.fromJson(party, this.currentNodeInfo!.id, key)
   }
 
   getParty(id) {
@@ -808,7 +835,7 @@ class TssPlugin extends CallablePlugin {
 
   /**
    * Each node can request other nodes to recover its own key.
-   * This process will be done after creating a DistributedKey as a nonce.
+   * This process will be done after creating a AppTssKey as a nonce.
    *
    * @param data: Key recovery info
    * @param data.nonce: Nonce id that crated for key recovery
@@ -847,7 +874,7 @@ class TssPlugin extends CallablePlugin {
     if(!appParty.partners.includes(callerInfo.id) && !isInNewContext)
       throw `Only partners can can request to recover the key`
 
-    const appTssKey = this.getAppTssKey(appId, seed)
+    const appTssKey: AppTssKey|null = this.getAppTssKey(appId, seed)
 
     // if(!this.tssKey || !this.tssParty){
     if(!appTssKey){
@@ -857,16 +884,20 @@ class TssPlugin extends CallablePlugin {
     if (nonceId === appTssKey!.id)
       throw `Cannot use tss key as nonce`;
 
-    let nonce = await this.getSharedKey(nonceId);
+    let nonce: AppTssKey = await this.getSharedKey(nonceId);
     await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
     let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
+
+    const appTssKeyJson: AppTssKeyJson = appTssKey.toJson();
     return {
       id: appTssKey!.id,
       recoveryShare: `0x${keyPart.toString(16, 64)}`,
-      // distributedKey public
+      // distributed key public
       publicKey: `${appTssKey!.publicKey!.encode('hex', true)}`,
       // distributed key address
-      address: tssModule.pub2addr(appTssKey!.publicKey!)
+      address: tssModule.pub2addr(appTssKey!.publicKey!),
+
+      polynomial: appTssKeyJson.polynomial
     }
   }
 
@@ -886,7 +917,7 @@ class TssPlugin extends CallablePlugin {
     // console.log('TssPlugin.__storeTssKey', data)
     let {party: partyId, key: keyId} = data
     let party = this.getParty(partyId)
-    let key: DistributedKey = await this.getSharedKey(keyId);
+    let key: AppTssKey = await this.getSharedKey(keyId);
     if (!party)
       throw {message: 'TssPlugin.__storeTssKey: party not found.'}
     if (!key)
@@ -896,7 +927,7 @@ class TssPlugin extends CallablePlugin {
       this.saveTssConfig(party, key);
       this.tssKey = key
       this.isReady = true;
-      CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toSerializable()});
+      CoreIpc.fireEvent({type: "global-tss-key:generate", data: key.toJson()});
       log('save done')
       // CoreIpc.fireEvent({type: "tss:generate", })
       return true;
