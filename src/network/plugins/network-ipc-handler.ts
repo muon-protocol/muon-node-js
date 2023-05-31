@@ -286,7 +286,6 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.GetCurrentNodeInfo)
   async __onGetCurrentNodeInfo() {
-    await this.nodeManager.waitToLoad();
     return this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
   }
 
@@ -298,7 +297,6 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.IsCurrentNodeInNetwork)
   async __isCurrentNodeInNetwork() {
-    await this.nodeManager.waitToLoad();
     const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
     return !!currentNodeInfo;
   }

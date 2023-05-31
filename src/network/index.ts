@@ -5,15 +5,15 @@ import { create } from "./libp2p_bundle.js";
 import { bootstrap } from "@libp2p/bootstrap";
 import loadConfigs from "./configurations.js";
 import { createFromJSON } from "@libp2p/peer-id-factory";
-import { isPrivate, peerId2Str } from "./utils.js";
+import {isPrivate, peerId2Str, tryAndGetNodeManagerData} from "./utils.js";
 import { MessagePublisher } from "../common/message-bus/index.js";
-import NodeManagerPlugin from "./plugins/node-manager.js";
+import NodeManagerPlugin, {NodeManagerPluginConfigs} from "./plugins/node-manager.js";
 import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
 import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
 import { logger } from "@libp2p/logger";
-import { findMyIp, parseBool } from "../utils/helpers.js";
+import {findMyIp, parseBool, timeout} from "../utils/helpers.js";
 import { muonRouting } from "./muon-routing.js";
 
 import * as NetworkIpc from "../network/ipc.js";
@@ -235,6 +235,16 @@ async function start() {
 
   let { net, tss } = await loadConfigs();
 
+  // Waits a random time(0-5 secs) to avoid calling
+  // RPC nodes by all network nodes at the same time
+  // When the network restarts
+  await timeout(Math.floor(Math.random()*5e3));
+
+  log(`loading NodeManager data from ${net.nodeManager.address} on the network ${net.nodeManager.network}`)
+  let nodeManagerData = await tryAndGetNodeManagerData(net.nodeManager);
+  const maxId: number = nodeManagerData.nodes.reduce((max, n) => Math.max(max, parseInt(n.id)), 0);
+  log(`${nodeManagerData.nodes.length} node info loaded. max id: ${maxId}`)
+
   if (!process.env.PEER_PORT) {
     throw { message: "peer listening port should be defined in .env file" };
   }
@@ -258,7 +268,12 @@ async function start() {
       bootstrap: getLibp2pBootstraps(),
     },
     plugins: {
-      "node-manager": [NodeManagerPlugin, {}],
+      "node-manager": [
+        NodeManagerPlugin,
+        {
+          initialNodeManagerData: nodeManagerData
+        } as NodeManagerPluginConfigs
+      ],
       broadcast: [NetworkBroadcastPlugin, {}],
       content: [NetworkContentPlugin, {}],
       "remote-call": [RemoteCallPlugin, {}],
