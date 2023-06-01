@@ -200,4 +200,33 @@ export type PartyInfo = {
     isForReshare?: boolean
 }
 
+export type NodeManagerConfigs = {
+    /** The NodeManager contract address */
+    address: string,
+    /** The network that node manager deployed on */
+    network: string,
+    /** The Pagination contract address */
+    pagination: string
+}
+
+export type NodeManagerDataRaw = {
+    _lastUpdateTime: string,
+    _nodes: {
+        id: string,
+        nodeAddress: string,
+        stakerAddress: string,
+        peerId: string,
+        active: boolean,
+        startTime: number,
+        endTime: number,
+        lastEditTime: number,
+        isDeployer: boolean,
+    }[]
+}
+
+export type NodeManagerData = {
+    lastUpdateTime: number,
+    nodes: MuonNodeInfo[]
+}
+
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] }

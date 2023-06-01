@@ -2,20 +2,18 @@ import CallablePlugin from './base/callable-plugin.js'
 import TimeoutPromise from '../../common/timeout-promise.js'
 import * as eth from '../../utils/eth.js'
 import {stackTrace, timeout} from '../../utils/helpers.js'
-import {MuonNodeInfo} from "../../common/types";
+import {MuonNodeInfo, NodeManagerData} from "../../common/types";
 import * as CoreIpc from '../../core/ipc.js'
 import _ from 'lodash'
-import chalk from 'chalk'
 import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
-import {peerId2Str} from "../utils.js";
+import {tryAndGetNodeManagerChanges} from "../utils.js";
 import {remoteApp, remoteMethod} from "./base/app-decorators.js";
-import { peerIdFromString } from '@libp2p/peer-id'
 import lodash from "lodash";
+import {Network} from "../index";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
-const MuonNodesPaginationAbi = require('../../data/MuonNodesPagination-ABI.json')
 const log = logger('muon:network:plugins:node-manager')
 
 
@@ -35,6 +33,10 @@ const RemoteMethods = {
   CheckOnline: 'CKON',
 }
 
+export type NodeManagerPluginConfigs = {
+  initialNodeManagerData: NodeManagerData
+}
+
 @remoteApp
 export default class NodeManagerPlugin extends CallablePlugin{
   networkInfo: NetworkInfo | null = null;
@@ -42,30 +44,40 @@ export default class NodeManagerPlugin extends CallablePlugin{
   private lastNodesUpdateTime: number;
   private _nodesList: MuonNodeInfo[];
   private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
-  /**
-   * @type {TimeoutPromise}
-   */
-  loading = new TimeoutPromise(0, "contract loading timed out")
+
+  constructor(network: Network, configs: NodeManagerPluginConfigs) {
+    super(network, configs);
+  }
 
   async onInit() {
     await super.onInit()
 
     let {nodeManager} = this.network.configs.net;
-    log(`Loading network info from ${nodeManager.address} on the network ${nodeManager.network} ...`)
-    // Waits a random time(0-5 secs) to avoid calling
-    // RPC nodes by all network nodes at the same time
-    // When the network restarts
-    await timeout(Math.floor(Math.random()*5*1e3));
-    await this._loadContractInfo();
+
+    let {tss} = this.network.configs.net;
+
+    this.networkInfo = {
+      tssThreshold: parseInt(tss.threshold),
+      minGroupSize: parseInt(tss.min || tss.threshold),
+      maxGroupSize: parseInt(tss.max)
+    }
+
+    let {lastUpdateTime, nodes} = (this.configs as NodeManagerPluginConfigs).initialNodeManagerData;
+
+    this.lastNodesUpdateTime = lastUpdateTime;
+    this.watchNodesChange(nodeManager)
+
+    this._nodesList = nodes;
+    nodes.forEach(n => {
+      this._nodesMap
+        .set(n.id, n)
+        .set(n.wallet, n)
+        .set(n.peerId, n)
+    })
   }
 
   async onStart() {
     await super.onStart()
-  }
-
-  private getNodeId(peerId): string {
-    const id = this.getNodeInfo(peerId2Str(peerId))?.id || 'unknown'
-    return `[${id}]:${peerId2Str(peerId)}`
   }
 
   private updateNodeInfo(index: string, dataToMerge: object) {
@@ -85,195 +97,6 @@ export default class NodeManagerPlugin extends CallablePlugin{
     }
   }
 
-  async _loadContractInfo(){
-    let {tss, nodeManager} = this.network.configs.net;
-
-    this.networkInfo = {
-      tssThreshold: parseInt(tss.threshold),
-      minGroupSize: parseInt(tss.min || tss.threshold),
-      maxGroupSize: parseInt(tss.max)
-    }
-
-    let {lastUpdateTime, allNodes} = await this.loadNetworkInfo(nodeManager);
-    this.lastNodesUpdateTime = lastUpdateTime;
-    this.watchNodesChange(nodeManager)
-
-    this._nodesList = allNodes;
-    allNodes.forEach(n => {
-      this._nodesMap
-        .set(n.id, n)
-        .set(n.wallet, n)
-        .set(n.peerId, n)
-    })
-
-    log('contract info loaded.');
-
-    // @ts-ignore
-    this.emit('loaded');
-    this.loading.resolve(true);
-  }
-
-  async loadNetworkInfo(nodeManagerInfo): Promise<{lastUpdateTime: number, allNodes: MuonNodeInfo[]}>{
-    const {address, network, pagination: paginationContractAddress} = nodeManagerInfo;
-
-    let rawResult;
-    do {
-      try {
-        if(!!paginationContractAddress) {
-          rawResult = await this.paginateAndGetInfo(
-            paginationContractAddress,
-            address,
-            network
-          )
-        }
-        else {
-          rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
-        }
-      }catch (e) {
-        log('loading network info failed. %o', e)
-        await timeout(Math.floor(Math.random()*1*60*1000)+5000)
-      }
-    }while(!rawResult)
-
-    let allNodes = rawResult._nodes
-      .filter(item => {
-        if (!item.active)
-          return false;
-        try {
-          peerIdFromString(item.peerId)
-          return true
-        }
-        catch (e) {
-          return false;
-        }
-      })
-      .map((item): MuonNodeInfo => ({
-        id: BigInt(item.id).toString(),
-        active: true,
-        staker: item.stakerAddress,
-        wallet: item.nodeAddress,
-        peerId: item.peerId,
-        isDeployer: item.isDeployer,
-      }))
-
-    let exist = {};
-    allNodes = allNodes.filter(p => {
-      if(exist[p.wallet] || exist[p.peerId])
-        return false;
-
-      exist[p.peerId] = true
-      exist[p.wallet] = true
-
-      return true
-    })
-
-    return {
-      lastUpdateTime: parseInt(rawResult._lastUpdateTime),
-      allNodes
-    }
-  }
-
-  private async paginateAndGetInfo(paginationAddress:string, nodeManagerAddress: string, network: string) {
-    const itemPerPage = 1200;
-    const lastNodeIdStr: string = await eth.call(nodeManagerAddress, 'lastNodeId', [], NodeManagerAbi, network)
-    const lastNodeId = parseInt(lastNodeIdStr)
-
-    const pagesToRequest = new Array(Math.ceil(lastNodeId / itemPerPage)).fill(0).map((_,i) => i)
-    log(`loading nodes info: size: ${itemPerPage}, pages: [${pagesToRequest.join(',')}]`)
-
-    const pagesData = await Promise.all(pagesToRequest.map(page => {
-      const startIndex = page*itemPerPage + 1;
-      const endIndex = Math.min(startIndex+itemPerPage-1, lastNodeId)
-      return eth.call(
-        paginationAddress,
-        'getAllNodes',
-        [`0x${startIndex.toString(16)}`,`0x${endIndex.toString(16)}`],
-        MuonNodesPaginationAbi,
-        network
-      )
-    }))
-
-    return {
-      _lastUpdateTime: await eth.call(nodeManagerAddress, 'lastUpdateTime', [], NodeManagerAbi, network),
-      _nodes: [].concat(...pagesData)
-    }
-  }
-
-  async paginateAndGetEditedNodes(paginationAddress:string, nodeManagerAddress: string, network: string, timestamp: number) {
-    const itemPerPage = 1200;
-    const lastNodeId: number = parseInt(await eth.call(nodeManagerAddress, 'lastNodeId', [], NodeManagerAbi, network))
-
-    const pagesToRequest = new Array(Math.ceil(lastNodeId / itemPerPage)).fill(0).map((_,i) => i)
-    log(`loading node changes: size: ${itemPerPage}, pages: [${pagesToRequest.join(',')}]`)
-
-    const pagesData = await Promise.all(pagesToRequest.map(page => {
-      const startIndex = page*itemPerPage + 1;
-      const endIndex = Math.min(startIndex+itemPerPage-1, lastNodeId)
-      return eth.call(
-        paginationAddress,
-        'getEditedNodes',
-        [
-          `0x${timestamp.toString(16)}`,
-          `0x${startIndex.toString(16)}`,
-          `0x${endIndex.toString(16)}`
-        ],
-        MuonNodesPaginationAbi,
-        network
-      )
-    }))
-
-    // @ts-ignore
-    const _nodes = [].concat(...pagesData).filter(node => parseInt(node.id)>0)
-
-    return {
-      // @ts-ignore
-      _lastUpdateTime: _nodes.reduce((max, node) => Math.max(max, parseInt(node.lastEditTime)), 0),
-      _nodes
-    }
-  }
-
-  async loadNetworkChanges(nodeManagerInfo): Promise<{lastUpdateTime: number, allNodes: MuonNodeInfo[]}> {
-    const {address, network, pagination: paginationContractAddress} = nodeManagerInfo;
-    const fromTimestamp = this.lastNodesUpdateTime;
-
-    let rawResult;
-    do {
-      try {
-        if(!!paginationContractAddress) {
-          rawResult = await this.paginateAndGetEditedNodes(
-            paginationContractAddress,
-            address,
-            network,
-            fromTimestamp
-          )
-        }
-        else {
-          rawResult = await eth.call(address, 'info', [], NodeManagerAbi, network)
-          rawResult._nodes = rawResult._nodes
-            .filter(item => item.lastEditTime > fromTimestamp)
-        }
-      }catch (e) {
-        log('loading network info failed. %o', e)
-        await timeout(5000)
-      }
-    }while(!rawResult)
-
-    const allNodes = rawResult._nodes
-      .map((item): MuonNodeInfo => ({
-        id: BigInt(item.id).toString(),
-        active: item.active,
-        staker: item.stakerAddress,
-        wallet: item.nodeAddress,
-        peerId: item.peerId,
-        isDeployer: item.isDeployer,
-      }))
-
-    return {
-      lastUpdateTime: parseInt(rawResult._lastUpdateTime),
-      allNodes
-    };
-  }
-
   /**
    * All events that changes the lastUpdateTime:
    *
@@ -288,9 +111,9 @@ export default class NodeManagerPlugin extends CallablePlugin{
     log(`nodes list updating ...`)
     let {nodeManager} = this.network.configs.net;
 
-    let {lastUpdateTime, allNodes: changes} = await this.loadNetworkChanges(nodeManager);
+    let {lastUpdateTime, nodes: changes} = await tryAndGetNodeManagerChanges(nodeManager, this.lastNodesUpdateTime);
     this.lastNodesUpdateTime = lastUpdateTime;
-    log(`contract data changed: ${changes.length} nodes`)
+    log(`NodeManager data changed: ${changes.length} nodes`)
 
     const addedNodes: any[] = []
     const deletedNodes = {}
@@ -413,36 +236,12 @@ export default class NodeManagerPlugin extends CallablePlugin{
     return this._nodesMap.get(index);
   }
 
-  get TssThreshold(): number{
-    if(!!this.networkInfo)
-      return this.networkInfo?.tssThreshold
-    else
-      return Infinity;
-  }
-
   get currentNodeInfo(): MuonNodeInfo | undefined {
     return this.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
   }
 
-  get MinGroupSize(){
-    return this.networkInfo?.minGroupSize;
-  }
-
-  get MaxGroupSize(){
-    return this.networkInfo?.maxGroupSize;
-  }
-
   async getNodesList(): Promise<MuonNodeInfo[]> {
-    await this.waitToLoad();
     return this._nodesList;
-  }
-
-  waitToLoad(){
-    return this.loading.promise;
-  }
-
-  isLoaded(): boolean{
-    return this.loading.isFulfilled;
   }
 
   filterNodes(options: NodeFilterOptions): MuonNodeInfo[] {

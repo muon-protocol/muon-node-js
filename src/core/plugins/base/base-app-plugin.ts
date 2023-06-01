@@ -28,6 +28,7 @@ import axios from "axios";
 import {GatewayCallParams} from "../../../gateway/types";
 import {MapOf} from "../../../common/mpc/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
+import {reportInsufficientPartners} from "../../../common/analitics-reporter.js";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
@@ -251,13 +252,14 @@ class BaseAppPlugin extends CallablePlugin {
       let t0 = Date.now(), t1, t2, t3, t4, t5, t6;
       let appParty = this.getParty(deploymentSeed)!;
       /** find available partners to sign the request */
-      const availablePartners = await this.appManager.findOptimalAvailablePartners(
+      const availableCount = Math.min(
+        Math.ceil(appParty.t*1.5),
+        appParty.partners.length,
+      );
+      const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
         this.APP_ID,
         deploymentSeed,
-        Math.min(
-          Math.ceil(appParty.t*1.5),
-          appParty.partners.length,
-        ),
+        availableCount,
       );
       // const availablePartners: string[] = await this.appManager.findNAvailablePartners(
       //   this.APP_ID,
@@ -276,8 +278,12 @@ class BaseAppPlugin extends CallablePlugin {
 
       t1 = Date.now();
       this.log(`partners:[%o] are available to sign the request`, availablePartners)
-      if(availablePartners.length < appParty.t)
+      if(availablePartners.length < appParty.t) {
+        /** send analytic data to server */
+        reportInsufficientPartners({graph, minGraph, count: availableCount})
+          .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
         throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+      }
 
       if(this.validateRequest){
         this.log(`calling validateRequest ...`)
