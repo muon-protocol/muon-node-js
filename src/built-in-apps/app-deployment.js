@@ -32,9 +32,135 @@ function shuffleNodes(nodes, seed) {
     return sorted.map(({id}) => id)
 }
 
+const pattern_id = "^[1-9][0-9]*$";
+const schema_uint32 = {
+    type: 'string',
+    pattern: "^0x[0-9A-Fa-f]{1,64}$"
+};
+const schema_app_id = {
+    type: "string",
+    pattern: pattern_id,
+    errorMessage: {
+        pattern: "appId must be an string contains only digits."
+    }
+}
+const schema_eth_Address = {
+    type: 'string',
+    pattern: "^0x[0-9A-Fa-f]{40}$",
+    errorMessage: {
+        pattern: "wrong ethereum address."
+    }
+}
+
+const schema_verifiable_seed = {
+    type: "object",
+    properties: {
+        value: schema_uint32,
+        reqId: schema_uint32,
+        nonce: schema_eth_Address,
+    },
+    required: ["value", "reqId", "nonce"],
+}
+
+const METHOD_PARAMS_SCHEMA = {
+    [Methods.Check]:{
+        type: 'object',
+        properties: {
+            appId: schema_app_id,
+        },
+        required: ["appId"]
+    },
+    [Methods.RandomSeed]:{
+      type: 'object',
+      properties: {
+          appId: schema_app_id,
+          previousSeed: schema_uint32
+      },
+      required: ["appId"]
+    },
+    [Methods.Deploy]: {
+        type: "object",
+        properties: {
+            appId: schema_app_id,
+            seed: schema_verifiable_seed,
+            nodes: {
+                type: "array",
+                items: {
+                    type: "string",
+                    pattern: pattern_id,
+                    errorMessage: {
+                      type: "nodes list item must be string",
+                    }
+                },
+                errorMessage: {
+                  type: "nodes list must be string array"
+                }
+            },
+            t: {type: "integer", minimum: 2},
+            n: {type: "integer", minimum: 2},
+            ttl: {
+              type: "integer",
+              minimum: 10,
+              errorMessage: {
+                type: "ttl is not integer value.",
+                minimum: "ttl is lower than minimum."
+              }
+            },
+            pendingPeriod: {
+                type: "integer",
+                minimum: 1
+            },
+        },
+        required: ["appId", "seed"]
+    },
+    [Methods.TssKeyGen]: {
+        type: "object",
+        properties: {
+            appId: schema_app_id,
+            seed: schema_uint32,
+        },
+        required: ["appId", "seed"]
+    },
+    [Methods.TssRotate]: {
+        type: "object",
+        properties: {
+            appId: schema_app_id,
+            seed: schema_verifiable_seed,
+            previousSeed: schema_uint32,
+            nodes: {
+                type: "array",
+                items: {
+                    type: "string",
+                    pattern: pattern_id,
+                    errorMessage: {
+                        type: "nodes list item must be string",
+                    }
+                },
+                errorMessage: {
+                    type: "nodes list must be string array"
+                }
+            },
+            n: {type: "integer", minimum: 2},
+            ttl: {type: "integer", minimum: 10},
+            pendingPeriod: {type: "integer", minimum: 1},
+        },
+        required: ["appId", "seed"],
+        additionalProperties: false,
+    },
+    [Methods.TssReshare]: {
+        type: "object",
+        properties: {
+            appId: schema_app_id,
+            seed: schema_uint32,
+        },
+        required: ["appId", "seed"]
+    },
+}
+
 module.exports = {
     APP_NAME: "deployment",
     REMOTE_CALL_TIMEOUT: 120e3,
+    METHOD_PARAMS_SCHEMA,
     APP_ID: 1,
     owners,
 
@@ -87,20 +213,7 @@ module.exports = {
                 const {
                     appId,
                     seed: {value: seed, nonce, reqId},
-                    nodes,
-                    ttl,
-                    pendingPeriod
                 } = params
-                if(ttl !== undefined && parseInt(ttl) <= 0)
-                    throw "Invalid app deployment ttl"
-                if(pendingPeriod != undefined && parseInt(pendingPeriod) <= 0)
-                    throw "Invalid app pending period"
-                if(nodes !== undefined) {
-                    for (const id of nodes) {
-                        if (!(parseInt(id) > 0))
-                            throw `Invalid node ID in nodes list`;
-                    }
-                }
                 const context = await this.callPlugin('system', "getAppContext", appId, seed)
                 if(!!context) {
                     throw `App already deployed`;
@@ -122,20 +235,7 @@ module.exports = {
                     appId,
                     previousSeed,
                     seed: {value: seed, reqId, nonce},
-                    nodes,
-                    ttl,
-                    pendingPeriod
                 } = params
-                if(ttl !== undefined && parseInt(ttl) <= 0)
-                    throw "Invalid app deployment ttl"
-                if(pendingPeriod != undefined && parseInt(pendingPeriod) <= 0)
-                    throw "Invalid app pending period"
-                if(nodes !== undefined) {
-                    for (const id of nodes) {
-                        if (!(parseInt(id) > 0))
-                            throw `Invalid node ID in nodes list`;
-                    }
-                }
 
                 const oldContext = await this.callPlugin('system', "getAppContext", appId, previousSeed, true)
 
@@ -199,6 +299,17 @@ module.exports = {
                 } = params;
 
                 t = Math.max(t, tssConfigs.threshold);
+
+                let prevContext;
+                if(method === Methods.TssRotate) {
+                    prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
+                    if (!prevContext)
+                        throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
+
+                    /** threshold will not change when rotating the party */
+                    t = prevContext.party.t
+                }
+
                 /** Choose a few nodes at random to join the party */
                 let selectedNodes;
                 if(!!nodes) {
@@ -210,9 +321,6 @@ module.exports = {
                 }
                 let previousNodes;
                 if(method === Methods.TssRotate) {
-                    const prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
-                    if (!prevContext)
-                        throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
                     previousNodes = prevContext.party.partners
                     /** Pick some nodes to retain in the new party */
                     const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
@@ -322,7 +430,8 @@ module.exports = {
                 const ttl = !!userDefinedTTL ? userDefinedTTL : prevContext.ttl;
                 const pendingPeriod = !!pending ? pending : prevContext.pendingPeriod;
 
-                t = Math.max(t, tssConfigs.threshold);
+                /** TSS threshold will not change when rotating the app party */
+                t = prevContext.party.t;
 
                 return {
                     rotationEnabled: true,
@@ -346,8 +455,7 @@ module.exports = {
                 if(!context)
                     throw `The app's deployment info was not found`
 
-                const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const ttl = await this.callPlugin("system", "getAppTTL", appId);
+                const {ttl, pendingPeriod} = context;
 
                 if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
                     throw `deployed partners mismatched with key-gen partners`
@@ -373,7 +481,7 @@ module.exports = {
                 return {
                     rotationEnabled: true,
                     ttl,
-                    expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
+                    expiration: request.data.timestamp + ttl + pendingPeriod,
                     seed: context.seed,
                     publicKey,
                     /** only when resharing the App'a key */

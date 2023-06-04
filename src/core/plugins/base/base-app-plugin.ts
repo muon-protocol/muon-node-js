@@ -32,7 +32,7 @@ import {reportInsufficientPartners} from "../../../common/analitics-reporter.js"
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
-const ajv = new Ajv()
+const ajv = new Ajv({strict: false})
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
 

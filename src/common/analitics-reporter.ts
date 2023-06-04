@@ -7,8 +7,8 @@ import {logger} from "@libp2p/logger"
 const log = logger('muon:analytic:reporter')
 
 const BaseUrls = [
-  // "https://testnet.muon.net",
-  "http://localhost:8000",
+  "https://testnet.muon.net",
+  // "http://localhost:8000",
 ]
 
 const axiosConfigs: AxiosRequestConfig = {
