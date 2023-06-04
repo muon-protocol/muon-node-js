@@ -951,6 +951,8 @@ class TssPlugin extends CallablePlugin {
    */
   @remoteMethod(RemoteMethods.loadExecData)
   async __loadExecData(data, callerInfo) {
+    if(!callerInfo.isDeployer)
+      return "Only deployers are allowed to call this method";
     let execData = await execDataStorage.get(data.keyId);
     if (execData)
       execData = JSON.parse(execData);
