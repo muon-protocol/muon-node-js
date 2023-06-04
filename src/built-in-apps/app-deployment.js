@@ -455,8 +455,7 @@ module.exports = {
                 if(!context)
                     throw `The app's deployment info was not found`
 
-                const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const ttl = await this.callPlugin("system", "getAppTTL", appId);
+                const {ttl, pendingPeriod} = context;
 
                 if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
                     throw `deployed partners mismatched with key-gen partners`
@@ -482,7 +481,7 @@ module.exports = {
                 return {
                     rotationEnabled: true,
                     ttl,
-                    expiration: request.data.timestamp + ttl + tssConfigs.pendingPeriod,
+                    expiration: request.data.timestamp + ttl + pendingPeriod,
                     seed: context.seed,
                     publicKey,
                     /** only when resharing the App'a key */
