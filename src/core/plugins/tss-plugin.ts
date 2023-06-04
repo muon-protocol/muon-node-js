@@ -2,6 +2,7 @@ import CallablePlugin from './base/callable-plugin.js'
 import AppTssKey, {AppTssKeyJson} from "../../utils/tss/app-tss-key.js";
 import lodash from 'lodash'
 import * as tssModule from '../../utils/tss/index.js'
+import * as execDataStorage from '../../utils/tss/exec-data-storage.js'
 import Web3 from 'web3'
 import {timeout, stackTrace, uuid, pub2json} from '../../utils/helpers.js'
 import {remoteApp, remoteMethod} from './base/app-decorators.js'
@@ -54,6 +55,7 @@ export type KeyGenOptions = {
 const RemoteMethods = {
   recoverMyKey: 'recoverMyKey',
   storeTssKey: 'storeTssKey',
+  loadExecData: 'loadExecData',
 }
 
 @remoteApp
@@ -811,6 +813,7 @@ class TssPlugin extends CallablePlugin {
     let key = new AppTssKey(party, keyGen.extraParams.keyId!, dKey)
 
     await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+    execDataStorage.set(key.id, key.distKey.execData);
     return key;
   }
 
@@ -935,6 +938,23 @@ class TssPlugin extends CallablePlugin {
     else{
       throw "Not permitted to create tss key"
     }
+  }
+  /**
+   * Node with ID:[1] inform other nodes that tss creation completed.
+   *
+   * @param data
+   * @param callerInfo: caller node information
+   * @param callerInfo.wallet: collateral wallet of caller node
+   * @param callerInfo.peerId: PeerID of caller node
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  @remoteMethod(RemoteMethods.loadExecData)
+  async __loadExecData(data, callerInfo) {
+    let execData = await execDataStorage.get(data.keyId);
+    if (execData)
+      execData = JSON.parse(execData);
+    return execData;
   }
 }
 

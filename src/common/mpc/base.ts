@@ -5,7 +5,6 @@ import lodash from 'lodash'
 import * as PromiseLibs from '../promise-libs.js'
 import {timeout} from "../../utils/helpers.js";
 import { logger, Logger } from '@libp2p/logger'
-import * as NetworkIpc from "../../network/ipc.js";
 
 const {countBy} = lodash;
 const random = () => Math.floor(Math.random()*9999999)
@@ -202,9 +201,8 @@ export class MultiPartyComputation {
   }
 
   private async process(network: IMpcNetwork, timeout: number) {
-    const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
     let execData = {
-      nodeId: currentNodeInfo!.id,
+      networkId: network!.id,
       init: Date.now()
     };
     this.log = logger(`muon:common:mpc:${this.ConstructorName}`);

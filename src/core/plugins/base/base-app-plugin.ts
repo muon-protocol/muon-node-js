@@ -401,11 +401,13 @@ class BaseAppPlugin extends CallablePlugin {
             })
         }
 
+        //omit execData
+        for (let i = 0; i < requestData.signatures.length; i++) {
+          requestData.signatures[i] = omit(requestData.signatures[i], ['execData'])
+        }
+
         /** send request data to aggregator nodes */
         this.log('sending request to aggregator nodes ...')
-        requestData.signatures.forEach(signature=>{
-          console.log(signature.execData);
-        })
         NetworkIpc.sendToAggregatorNode("AppRequest", requestData)
           .then(aggregatorNodeIdList => {
             this.log(`request sent to aggregator nodes: %o`, aggregatorNodeIdList)
@@ -418,10 +420,7 @@ class BaseAppPlugin extends CallablePlugin {
         newRequest.save()
       }
 
-      //omit execData
-      for (let i = 0; i < requestData.signatures.length; i++) {
-        requestData.signatures[i] = omit(requestData.signatures[i], ['execData'])
-      }
+
 
 
       return requestData
