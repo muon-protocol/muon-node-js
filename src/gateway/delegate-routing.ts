@@ -7,6 +7,7 @@ import * as crypto from "../utils/crypto.js";
 import { MuonNodeInfo } from "../common/types";
 import asyncHandler from "express-async-handler";
 import _ from "lodash";
+import { multiaddr } from "@multiformats/multiaddr";
 
 const router = Router();
 const log = logger("muon:gateway:routing");
@@ -49,33 +50,9 @@ router.use(
   })
 );
 
-router.use(
-  "/query",
-  mixGetPost,
-  asyncHandler(async (req, res, next) => {
-    // @ts-ignore
-    const { peerId, cid } = req.mixed;
-    if (!peerId && !cid) throw `Missing parameter: 'peerId' / 'cid'`;
-
-    res.json({
-      list: [],
-    });
-  })
-);
-
 function mergeRoutingData(routingData: RoutingData) {
   let { id } = routingData;
-  if (!onlines[id]) {
-    onlines[id] = routingData;
-  } else {
-    const oldRoutingData = onlines[id];
-    const multiaddrs = [
-      ...oldRoutingData.peerInfo.multiaddrs,
-      ...routingData.peerInfo.multiaddrs,
-    ].filter((ma) => !!ma);
-    oldRoutingData.peerInfo.multiaddrs = _.uniq(multiaddrs);
-    oldRoutingData.timestamp = routingData.timestamp;
-  }
+  onlines[id] = routingData;
 }
 
 /**
@@ -92,11 +69,16 @@ router.use(
     if (!gatewayPort || !timestamp || !peerInfo || !signature)
       throw `Missing parameters`;
 
-    if (
-      !peerInfo?.multiaddrs ||
-      !Array.isArray(peerInfo.multiaddrs) ||
-      peerInfo.multiaddrs.length === 0
-    )
+    let discoveryTimestampValidation = 10 * 60 * 1000;
+    if (process.env.DISCOVERY_VALID_TIMESTAMP)
+      discoveryTimestampValidation = parseInt(process.env.DISCOVERY_VALID_TIMESTAMP);
+    let diff = Date.now() - timestamp;
+    if (diff < 0)
+      throw `Discovery timestamp cannot be future time`;
+    if (diff > discoveryTimestampValidation)
+      throw `Discovery timestamp is too old`;
+
+    if (!validateMultiaddrs(peerInfo?.multiaddrs))
       throw `Invalid multiaddrs`;
 
     let realPeerInfo: MuonNodeInfo[] = await NetworkIpc.filterNodes({
@@ -130,6 +112,25 @@ router.use(
     });
   })
 );
+
+function validateMultiaddrs(multiaddrs) {
+  if (!multiaddrs)
+    return false;
+  if (!Array.isArray(multiaddrs))
+    return false;
+  if (multiaddrs.length === 0)
+    return false;
+
+  for (let i = 0; i < multiaddrs.length; i++) {
+    try {
+      multiaddr(multiaddrs[i]);
+    } catch (e) {
+      return false;
+    }
+  }
+  return true;
+}
+
 
 /**
  Lists online nodes filtered by online duration.
