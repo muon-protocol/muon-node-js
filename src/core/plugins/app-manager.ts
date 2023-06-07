@@ -66,11 +66,11 @@ export default class AppManager extends CallablePlugin {
   async onStart() {
     await super.onStart()
 
-    this.muon.on('app-context:add', this.onAppContextAdd.bind(this))
-    this.muon.on('app-context:update', this.onAppContextUpdate.bind(this))
-    this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
-    this.muon.on('app-tss-key:add', this.onAppTssConfigAdd.bind(this))
-    this.muon.on('deployment-tss-key:generate', this.onDeploymentTssKeyGenerate.bind(this));
+    this.muon.on("app-context:add", this.onAppContextAdd.bind(this))
+    this.muon.on("app-context:update", this.onAppContextUpdate.bind(this))
+    this.muon.on("app-context:delete", this.onAppContextDelete.bind(this))
+    this.muon.on("app-tss-key:add", this.onAppTssConfigAdd.bind(this))
+    this.muon.on("deployment-tss-key:generate", this.onDeploymentTssKeyGenerate.bind(this));
 
     this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
     this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
@@ -119,7 +119,7 @@ export default class AppManager extends CallablePlugin {
       }
     }
     try {
-      const allAppContexts = [
+      const allAppContexts: AppContext[] = [
         /** deployment app context */
         {
           appId: '1',
@@ -146,6 +146,9 @@ export default class AppManager extends CallablePlugin {
           this.appSeeds[appId] = [seed]
         else
           this.appSeeds[appId].push(seed);
+        if(ac.party.partners.includes(currentNode.id) && (!ac.expiration || Date.now() < ac.expiration*1000)) {
+          NetworkIpc.addContextToLatencyCheck(ac).catch(e => {})
+        }
       })
       log('apps contexts loaded.')
 
@@ -181,6 +184,7 @@ export default class AppManager extends CallablePlugin {
       oldDoc.dangerousAllowToSave = true
       await oldDoc.save()
       CoreIpc.fireEvent({type: "app-context:update", data: context})
+      NetworkIpc.fireEvent({type: "app-context:update", data: context})
       return oldDoc
     }
     else {
@@ -192,6 +196,7 @@ export default class AppManager extends CallablePlugin {
       newContext.dangerousAllowToSave = true
       await newContext.save()
       CoreIpc.fireEvent({type: "app-context:add", data: context})
+      NetworkIpc.fireEvent({type: "app-context:add", data: context})
 
       return newContext;
     }
@@ -207,10 +212,7 @@ export default class AppManager extends CallablePlugin {
        */
       newConfig.dangerousAllowToSave = true
       await newConfig.save()
-      CoreIpc.fireEvent({
-        type: "app-tss-key:add",
-        data: newConfig
-      })
+      CoreIpc.fireEvent({type: "app-tss-key:add", data: newConfig})
     }
 
     // @ts-ignore
@@ -228,10 +230,8 @@ export default class AppManager extends CallablePlugin {
     context.polynomial = polynomial
     context.dangerousAllowToSave = true
     await context.save();
-    CoreIpc.fireEvent({
-      type: "app-context:update",
-      data: context,
-    })
+    CoreIpc.fireEvent({type: "app-context:update", data: context,})
+    NetworkIpc.fireEvent({type: "app-context:update", data: context,})
   }
 
   private async onAppContextAdd(doc) {
@@ -853,31 +853,14 @@ export default class AppManager extends CallablePlugin {
       throw `appId not defined`;
     const context = this.getAppContext(appId, seed)
     if (!context)
-      throw `app not deployed`
-    const peers = this.nodeManager.filterNodes({list: context.party.partners})
-    const startTime = Date.now();
-    const responses = await Promise.all(
-      peers.map(p => {
-        return (
-          p.wallet === process.env.SIGN_WALLET_ADDRESS
-          ?
-          this.__getAppDeploymentInfo({appId, seed})
-          :
-          this.remoteCall(
-            p.peerId,
-            RemoteMethods.GetAppDeploymentInfo,
-            {appId, seed},
-            {timeout: 6000}
-          )
-        )
-          .then(({status}) => {
-            if (status !== 'DEPLOYED' && status !== "PENDING")
-              return null;
-            return Date.now() - startTime
-          })
-          .catch(e => null)
-      })
-    )
-    return responses.reduce((obj, r, i) => (obj[peers[i].id]=r, obj), {});
+      throw `App not deployed`
+
+    let deploymentStatus = this.getAppDeploymentInfo(appId, seed);
+    if((["DEPLOYED", "PENDING"] as AppDeploymentStatus[]).includes(deploymentStatus.status)) {
+      return await NetworkIpc.getAppLatency(appId, seed)
+    }
+    else
+      throw `App not deployed`
+
   }
 }

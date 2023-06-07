@@ -6,7 +6,7 @@ const log = logger('muon:network:plugins:callable')
 
 export default class CallablePlugin extends BaseNetworkPlugin {
 
-  remoteCall(peer, methodName, data, options?: RemoteCallOptions){
+  remoteCall(peer, methodName, data?, options?: RemoteCallOptions){
     let remoteCall: RemoteCallPlugin = this.network.getPlugin('remote-call')
     let remoteMethodEndpoint = this.remoteMethodEndpoint(methodName)
     if(Array.isArray(peer)){

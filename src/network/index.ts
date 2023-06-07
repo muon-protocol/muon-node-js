@@ -8,6 +8,7 @@ import { createFromJSON } from "@libp2p/peer-id-factory";
 import {isPrivate, peerId2Str, tryAndGetNodeManagerData} from "./utils.js";
 import { MessagePublisher } from "../common/message-bus/index.js";
 import NodeManagerPlugin, {NodeManagerPluginConfigs} from "./plugins/node-manager.js";
+import LatencyCheckPlugin from "./plugins/latency-check.js";
 import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
@@ -17,6 +18,9 @@ import {findMyIp, parseBool, timeout} from "../utils/helpers.js";
 import { muonRouting } from "./muon-routing.js";
 
 import * as NetworkIpc from "../network/ipc.js";
+import MessageSubscriber from "../common/message-bus/msg-subscriber.js";
+import {GLOBAL_EVENT_CHANNEL} from "../network/ipc.js";
+import {CoreGlobalEvent} from "../core/ipc";
 
 const log = logger("muon:network");
 
@@ -25,6 +29,8 @@ class Network extends Events {
   libp2p;
   peerId;
   _plugins = {};
+  on: (eventName: string, listener) => void;
+  globalEventBus: MessageSubscriber = new MessageSubscriber(GLOBAL_EVENT_CHANNEL);
 
   constructor(configs) {
     super();
@@ -181,7 +187,18 @@ class Network extends Events {
       log(ma.toString());
     });
     log("====================================================");
+
+    // @ts-ignore
+    this.globalEventBus.on("message", this.onGlobalEventReceived.bind(this));
     this._onceStarted();
+  }
+
+  async onGlobalEventReceived(event: CoreGlobalEvent, info) {
+    // console.log(`[${process.pid}] core.Muon.onGlobalEventReceived`, event)
+    try {
+      // @ts-ignore
+      await this.emit(event.type, event.data, info);
+    }catch (e) {}
   }
 
   async _onceStarted() {
@@ -274,6 +291,7 @@ async function start() {
           initialNodeManagerData: nodeManagerData
         } as NodeManagerPluginConfigs
       ],
+      "latency": [LatencyCheckPlugin, {}],
       broadcast: [NetworkBroadcastPlugin, {}],
       content: [NetworkContentPlugin, {}],
       "remote-call": [RemoteCallPlugin, {}],
