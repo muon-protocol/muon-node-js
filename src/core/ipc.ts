@@ -1,4 +1,4 @@
-import {AppContext, AppRequest, IpcCallOptions, MuonNodeInfo} from "../common/types";
+import {AppContext, AppDeploymentInfo, AppRequest, IpcCallOptions, MuonNodeInfo} from "../common/types";
 import { QueueProducer, MessagePublisher } from '../common/message-bus/index.js'
 import { BROADCAST_CHANNEL } from './plugins/broadcast.js'
 import { IPC_CHANNEL } from './plugins/core-ipc-plugin.js'
@@ -95,4 +95,8 @@ export async function findNAvailablePartners(appId: string, seed: string, search
 
 export async function verifyRequestSignature(request: AppRequest) {
   return call(IpcMethods.VerifyRequestSignature, request);
+}
+
+export async function getAppDeploymentInfo(appId: string, seed: string): Promise<AppDeploymentInfo> {
+  return call(IpcMethods.GetAppDeploymentInfo, {appId, seed});
 }

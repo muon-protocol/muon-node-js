@@ -1,23 +1,24 @@
-import CallablePlugin from './base/callable-plugin.js'
-import {remoteApp, ipcMethod} from './base/app-decorators.js'
+import CallablePlugin from "./base/callable-plugin.js"
+import {remoteApp, ipcMethod} from "./base/app-decorators.js"
 import System from "./system.js";
 import AppManager from "./app-manager.js";
 import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
-import {AppContext, AppRequest, JsonPublicKey} from "../../common/types";
+import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey} from "../../common/types";
 
 export const IpcMethods = {
-  ExecRemoteCall: 'exec-remote-call',
-  GetAppId: 'get-app-id',
-  GetAppContext: 'get-app-context',
-  GetAppOldestContext: 'get-app-oldest-context',
-  GetAppTimeout: 'get-app-timeout',
-  QueryAppAllContext: 'query-app-all-context',
-  IsDeploymentExcerpt: 'is-deployment-excerpt',
-  ShieldConfirmedRequest: 'shield-confirmed-request',
-  EnsureAppTssKeyExist: 'ensure-app-tss-key-exist',
-  FindNAvailablePartners: 'find-n-available-partner',
-  VerifyRequestSignature: 'verify-req-sign',
+  ExecRemoteCall: "exec-remote-call",
+  GetAppId: "get-app-id",
+  GetAppContext: "get-app-context",
+  GetAppOldestContext: "get-app-oldest-context",
+  GetAppDeploymentInfo: "get-app-deployment-info",
+  GetAppTimeout: "get-app-timeout",
+  QueryAppAllContext: "query-app-all-context",
+  IsDeploymentExcerpt: "is-deployment-excerpt",
+  ShieldConfirmedRequest: "shield-confirmed-request",
+  EnsureAppTssKeyExist: "ensure-app-tss-key-exist",
+  FindNAvailablePartners: "find-n-available-partner",
+  VerifyRequestSignature: "verify-req-sign",
 } as const;
 type IpcKeys = keyof typeof IpcMethods;
 export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
@@ -26,15 +27,15 @@ export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
 class CoreIpcHandlers extends CallablePlugin {
 
   get remoteCallPlugin() {
-    return this.muon.getPlugin('remote-call');
+    return this.muon.getPlugin("remote-call");
   }
 
   get systemPlugin(): System {
-    return this.muon.getPlugin('system');
+    return this.muon.getPlugin("system");
   }
 
   get appManager(): AppManager {
-    return this.muon.getPlugin('app-manager');
+    return this.muon.getPlugin("app-manager");
   }
 
   @ipcMethod(IpcMethods.ExecRemoteCall)
@@ -61,7 +62,7 @@ class CoreIpcHandlers extends CallablePlugin {
   async __getAppContext(params: {appName: string, seed: string}) {
     const {appName, seed} = params
     const appId = await this.muon.getAppIdByName(appName)
-    if(appId === '0')
+    if(appId === "0")
       return null;
     return await this.appManager.getAppContext(appId, seed)
   }
@@ -74,7 +75,7 @@ class CoreIpcHandlers extends CallablePlugin {
   async __getAppOldestContext(params: {appName: string}) {
     const {appName} = params
     const appId = await this.muon.getAppIdByName(appName)
-    if(appId === '0')
+    if(appId === "0")
       return null;
     return await this.appManager.getAppOldestContext(appId)
   }
@@ -98,15 +99,15 @@ class CoreIpcHandlers extends CallablePlugin {
   @ipcMethod(IpcMethods.QueryAppAllContext)
   async __queryAppAllContext(appName: string): Promise<AppContext[]> {
     const appId = await this.__onGetAppId({appName})
-    if(appId === '0')
+    if(appId === "0")
       return [];
     return await this.appManager.queryAndLoadAppContext(appId)
   }
 
   @ipcMethod(IpcMethods.IsDeploymentExcerpt)
   async __isDeploymentExcerpt(data: {appName: string, method: string}) {
-    const gp: GatewayInterface = this.muon.getPlugin('gateway-interface')
-    return gp.getActualHandlerMethod(data.appName, data.method) !== 'default'
+    const gp: GatewayInterface = this.muon.getPlugin("gateway-interface")
+    return gp.getActualHandlerMethod(data.appName, data.method) !== "default"
   }
 
   @ipcMethod(IpcMethods.ShieldConfirmedRequest)
@@ -146,6 +147,12 @@ class CoreIpcHandlers extends CallablePlugin {
     if(!app)
       throw `app not found`
     return app.verifyRequestSignature(request);
+  }
+
+  @ipcMethod(IpcMethods.GetAppDeploymentInfo)
+  async __getAppDeploymentInfo(data: {appId: string, seed: string}): Promise<AppDeploymentInfo> {
+    const {appId, seed} = data
+    return this.appManager.getAppDeploymentInfo(appId, seed)
   }
 }
 
