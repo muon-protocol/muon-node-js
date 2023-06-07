@@ -13,6 +13,7 @@ import {promisify} from 'util'
 import childProcess from 'node:child_process'
 import {isIP} from 'net'
 import isIpPrivate from 'private-ip'
+import {loadGlobalConfigs} from "../common/configurations.js";
 const toBN = Web3.utils.toBN;
 const exec = promisify(childProcess.exec);
 
@@ -122,6 +123,7 @@ export function pub2json(pubkey: PublicKey, minimal: boolean=false): JsonPublicK
 }
 
 export async function findMyIp(): Promise<string> {
+
   const checkValidIp = str => {
     if(!isIP(str))
       throw `input is not ip`
@@ -129,8 +131,24 @@ export async function findMyIp(): Promise<string> {
       throw `input is private ip`
     return str
   }
+
+  let configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json')
+  let bootstrapIp = configs.bootstrap[0].split("/")[2];
+
+  let findIpURL = `http://${bootstrapIp}:8000/find-ip`;
+  let muonIp = await axios.get(findIpURL)
+    .then(({data}) => {
+      return data.ip_addr
+    })
+    .then(checkValidIp)
+    .then(ip => ({success: true, ip}))
+    .catch(e => ({success: false, ip: null}));
+
+  if(muonIp.success)
+    return muonIp.ip;
+
   // @ts-ignore
-  let ip = await Promise.any([
+   let ip = await Promise.any([
     axios.get('https://ifconfig.me/all.json')
       .then(({data}) => data.ip_addr)
       .then(checkValidIp),
@@ -149,6 +167,8 @@ export async function findMyIp(): Promise<string> {
   ])
   return ip;
 }
+
+
 
 export async function getCommitId(): Promise<string> {
   const {stdout, stderr} = await exec('git rev-parse HEAD');
