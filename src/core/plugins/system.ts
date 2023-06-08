@@ -16,6 +16,7 @@ import AppTssConfigModel from "../../common/db-models/app-tss-config.js"
 import AppTssKey from "../../utils/tss/app-tss-key.js";
 import AppManager from "./app-manager.js";
 import * as CoreIpc from '../ipc.js'
+import * as NetworkIpc from '../../network/ipc.js'
 import {useOneTime} from "../../utils/tss/use-one-time.js";
 import {logger} from '@libp2p/logger'
 import {pub2json, timeout, uuid} from '../../utils/helpers.js'
@@ -660,7 +661,8 @@ class System extends CallablePlugin {
       ]
     });
     log(`deleting app from memory of all cluster %s`, appId)
-    CoreIpc.fireEvent({type: 'app-context:delete', data: {contexts: deleteContextList}})
+    CoreIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
+    NetworkIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
   }
 
   @remoteMethod(RemoteMethods.GetAppPublicKey)

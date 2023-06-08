@@ -15,6 +15,7 @@ import * as CoreIpc from '../../core/ipc.js'
 import {logger} from '@libp2p/logger'
 import {isPrivate} from "../utils.js";
 import {GatewayCallParams} from "../../gateway/types";
+import LatencyCheckPlugin from "./latency-check.js";
 
 class AggregatorBus extends MessagePublisher {
   async send(message:any){
@@ -78,6 +79,8 @@ export const IpcMethods = {
   FindNOnlinePeer: "FNOP",
   GetNodeMultiAddress: "GNMA",
   SendToAggregatorNode: "send-to-aggregator-node",
+  AddContextToLatencyCheck: "add-context-to-latency-check",
+  GetAppLatency: "get-app-latency",
 } as const;
 
 export const RemoteMethods = {
@@ -116,6 +119,10 @@ class NetworkIpcHandler extends CallablePlugin {
 
   get contentPlugin(): NetworkContentPlugin {
     return this.network.getPlugin('content');
+  }
+
+  get latencyCheckPlugin(): LatencyCheckPlugin {
+    return this.network.getPlugin('latency');
   }
 
   get RemoteCallExecEndPoint(): string {
@@ -376,6 +383,17 @@ class NetworkIpcHandler extends CallablePlugin {
       return responses.filter(n => !!n).map(n => n!.id)
     }
     return []
+  }
+
+  @ipcMethod(IpcMethods.AddContextToLatencyCheck)
+  async __addContextToLatencyCheck(context: AppContext) {
+    return this.latencyCheckPlugin.initAppContext(context);
+  }
+
+  @ipcMethod(IpcMethods.GetAppLatency)
+  async __getAppLatency(data: {appId: string, seed: string}) {
+    const {appId, seed} = data;
+    return this.latencyCheckPlugin.getAppLatency(appId, seed)
   }
 
   /** ==================== remote methods ===========================*/
