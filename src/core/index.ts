@@ -224,6 +224,11 @@ async function start() {
           module: (await import("./plugins/mpc-network.js")).default,
           config: {},
         },
+        {
+          name: "db-synchronizer",
+          module: (await import("./plugins/db-synchronizer.js")).default,
+          config: {},
+        },
         ...(await getEnvPlugins()),
         ...getCustomApps(),
         ...getGeneralApps(),

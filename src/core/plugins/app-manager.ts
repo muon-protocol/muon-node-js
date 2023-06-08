@@ -567,6 +567,17 @@ export default class AppManager extends CallablePlugin {
     return status;
   }
 
+  hasContext(ctx: AppContext): boolean {
+    let existingCtx: AppContext = this.appContexts[ctx.seed];
+    if(!existingCtx)
+      return false;
+    return (
+      (!ctx.keyGenRequest && !existingCtx.keyGenRequest)
+      ||
+      (ctx.keyGenRequest?.data.result.seed === existingCtx.keyGenRequest?.data.result.seed)
+    )
+  }
+
   appHasTssKey(appId: string, seed: string): boolean {
     if (appId == '1') {
       const nodeInfo = this.nodeManager.currentNodeInfo!
@@ -795,6 +806,17 @@ export default class AppManager extends CallablePlugin {
       graph,
       minGraph
     }
+  }
+
+  /**
+   @return {AppContext[]} - returns all contexts that include the input node.
+   */
+  getNodeAllContexts(node: MuonNodeInfo): AppContext[] {
+    const currentTime = getTimestamp()
+    return Object.values(this.appContexts)
+      .filter((ctx:AppContext) => {
+        return (!ctx.expiration || ctx.expiration > currentTime) && ctx.party.partners.includes(node.id)
+      })
   }
 
   /**
