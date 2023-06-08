@@ -22,7 +22,6 @@ export function call(method: NetworkIpcMethod, params?, options?: IpcCallOptions
 }
 
 export function fireEvent(event: NetworkGlobalEvent, options: MessageOptions={}) {
-  console.log(`firing network event: ${event.type}`)
   networkGlobalEvents.send(event, options).catch(e => console.log(e))
 }
 
@@ -103,8 +102,8 @@ export function getUptime(options?: IpcCallOptions) {
   return call(IpcMethods.GetUptime, {} , options)
 }
 
-export function findNOnlinePeer(peerIds: string[], count: number, options?: {timeout?: number, return?: string}): Promise<string[]> {
-  return call(IpcMethods.FindNOnlinePeer, {peerIds, count, options})
+export function findNOnlinePeer(searchList: string[], count: number, options?: {timeout?: number, return?: string}): Promise<string[]> {
+  return call(IpcMethods.FindNOnlinePeer, {searchList, count, options})
 }
 
 export function getNodeMultiAddress(options?: IpcCallOptions): Promise<string[]> {

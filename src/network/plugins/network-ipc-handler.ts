@@ -325,9 +325,9 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.FindNOnlinePeer)
-  async __findNOnlinePeer(data: {peerIds: string[], count: number, options?: any}) {
-    let {peerIds, count, options} = data;
-    return await this.nodeManager.findNOnline(peerIds, count, options)
+  async __findNOnlinePeer(data: {searchList: string[], count: number, options?: any}) {
+    let {searchList, count, options} = data;
+    return await this.nodeManager.findNOnline(searchList, count, options)
   }
 
   @ipcMethod(IpcMethods.GetNodeMultiAddress)
