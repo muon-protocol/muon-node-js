@@ -155,7 +155,7 @@ export default class LatencyCheckPlugin extends CallablePlugin {
       return {}
     return context.party.partners
       .reduce((obj, id) => {
-        if(!!this.latency[id])
+        if(this.latency[id] !== undefined && this.latency[id] !== null)
           obj[id] = this.latency[id]
         return obj;
       }, {});
