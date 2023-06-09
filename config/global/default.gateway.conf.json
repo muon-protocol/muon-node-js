@@ -8,7 +8,7 @@
       "delegate": true,
       "mine": true,
       "crashReport": true,
-      "findIp": true
+      "ifconfig": true
     }
   }
 }

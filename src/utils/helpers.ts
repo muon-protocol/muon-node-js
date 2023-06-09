@@ -135,14 +135,15 @@ export async function findMyIp(): Promise<string> {
   let configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json')
   let bootstrapIp = configs.bootstrap[0].split("/")[2];
 
-  let findIpURL = `http://${bootstrapIp}:8000/find-ip`;
-  let muonIp = await axios.get(findIpURL)
+  let ifconfigURL = `http://${bootstrapIp}:8000/ifconfig`;
+  let muonIp = await axios.get(ifconfigURL)
     .then(({data}) => {
       return data.ip_addr
     })
     .then(checkValidIp)
     .then(ip => ({success: true, ip}))
     .catch(e => ({success: false, ip: null}));
+
 
   if(muonIp.success)
     return muonIp.ip;

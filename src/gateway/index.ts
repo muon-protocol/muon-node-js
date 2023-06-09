@@ -5,7 +5,7 @@ import mongoose from 'mongoose'
 import api from './api/index.js'
 import status from './status.js'
 import mine from './mine.js'
-import findIp from './find-ip.js'
+import ifconfig from './ifconfig.js'
 import analitics from './analytics/index.js'
 import delegate from './delegate-routing.js'
 import {logger} from '@libp2p/logger'
@@ -48,8 +48,8 @@ async function start() {
     app.use('/mine', mine)
   if(configs.routes.enable.crashReport)
     app.use('/analytics', analitics)
-  if(configs.routes.enable.findIp)
-    app.use('/find-ip', findIp)
+  if(configs.routes.enable.ifconfig)
+    app.use('/ifconfig', ifconfig)
 
   /**
    Error handler

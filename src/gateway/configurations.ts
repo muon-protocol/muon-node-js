@@ -11,7 +11,7 @@ export type GatewayGlobalConfigs = {
       delegate: boolean,
       mine: boolean,
       crashReport: boolean,
-      findIp: boolean,
+      ifconfig: boolean,
     }
   }
 }
@@ -41,7 +41,7 @@ export function load(): GatewayGlobalConfigs{
     configs.routes.enable.crashReport = parseBool(process.env.gateway_routes_enable_crash_report)
 
   if(!!process.env.gateway_routes_enable_find_ip)
-    configs.routes.enable.findIp = parseBool(process.env.gateway_routes_enable_find_ip)
+    configs.routes.enable.ifconfig = parseBool(process.env.gateway_routes_enable_find_ip)
 
   return configs as GatewayGlobalConfigs;
 }
