@@ -130,7 +130,11 @@ export async function findMyIp(): Promise<string> {
     if(isIpPrivate(str))
       throw `input is private ip`
     return str
-  }
+  };
+
+  const envIp = process.env.PUBLIC_IP;
+  if (checkValidIp(envIp))
+    return envIp!;
 
   let configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json')
   let bootstrapIp = configs.bootstrap[0].split("/")[2];
