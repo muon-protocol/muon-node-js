@@ -81,6 +81,7 @@ export const IpcMethods = {
   SendToAggregatorNode: "send-to-aggregator-node",
   AddContextToLatencyCheck: "add-context-to-latency-check",
   GetAppLatency: "get-app-latency",
+  IsNodeOnline: "is-node-online",
 } as const;
 
 export const RemoteMethods = {
@@ -394,6 +395,11 @@ class NetworkIpcHandler extends CallablePlugin {
   async __getAppLatency(data: {appId: string, seed: string}) {
     const {appId, seed} = data;
     return this.latencyCheckPlugin.getAppLatency(appId, seed)
+  }
+
+  @ipcMethod(IpcMethods.IsNodeOnline)
+  async __isNodeOnline(node: string) {
+    return this.nodeManager.isNodeOnline(node);
   }
 
   /** ==================== remote methods ===========================*/

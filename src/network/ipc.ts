@@ -127,3 +127,7 @@ export function addContextToLatencyCheck(context: AppContext) {
 export function getAppLatency(appId: string, seed: string): Promise<MapOf<number>> {
   return call(IpcMethods.GetAppLatency, {appId, seed});
 }
+
+export function isNodeOnline(node: string): Promise<boolean> {
+  return call(IpcMethods.IsNodeOnline, node);
+}

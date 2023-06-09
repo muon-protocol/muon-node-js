@@ -180,7 +180,12 @@ class System extends CallablePlugin {
     if(!context)
       throw `App deployment info not found.`
 
-    const generatorInfo = this.nodeManager.getNodeInfo(context.party.partners[0])!
+    const generatorId = await this.getFirstOnlinePartner(appId, seed);
+    if(!generatorId)
+      throw `key-gen starter node not online`
+
+    const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
+
     if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
       return await this.__generateAppTss({appId, seed}, this.nodeManager.currentNodeInfo);
     }
@@ -201,7 +206,12 @@ class System extends CallablePlugin {
     if(!newContext)
       throw `App's new context not found.`
 
-    const generatorInfo = this.nodeManager.getNodeInfo(newContext.party.partners[0])!
+    const generatorId = await this.getFirstOnlinePartner(appId, seed);
+    if(!generatorId)
+      throw `key-gen starter node not online`
+
+    const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
+
     if(generatorInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
       return this.__startAppTssReshare({appId, seed}, this.nodeManager.currentNodeInfo);
     }
@@ -555,6 +565,21 @@ class System extends CallablePlugin {
   @appApiMethod({})
   async getAppContext(appId, seed, tryFromNetwork:boolean=false) {
     return this.appManager.getAppContextAsync(appId, seed, tryFromNetwork)
+  }
+
+  @appApiMethod()
+  async getFirstOnlinePartner(appId: string, seed: string): Promise<string | undefined> {
+    const context = this.appManager.getAppContext(appId, seed)
+    if(!context)
+      throw `context not found`
+    const currentNode = this.nodeManager.currentNodeInfo!;
+    for(const id of context.party.partners) {
+      const isOnline = id === currentNode.id || (await NetworkIpc.isNodeOnline(id))
+      if(isOnline) {
+        return id
+      }
+    }
+    return undefined;
   }
 
   @appApiMethod({})
