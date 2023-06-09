@@ -48,20 +48,8 @@ export default class BaseNetworkPlugin extends Events {
       }
     }
     try {
-      let peer = await this.network.libp2p.peerStore.get(peerId)
+      let peer: Libp2pPeer = await this.network.libp2p.peerStore.get(peerId)
         .catch(e => null)
-      console.log("***peer");
-      console.log(peer);
-      console.log(peer.metadata);
-      const uint8Array = peer.metadata.timestamp; // Example Uint8Array representing a timestamp
-
-      const timestamp = uint8Array[0] |
-        (uint8Array[1] << 8) |
-        (uint8Array[2] << 16) |
-        (uint8Array[3] << 24);
-
-      console.log(timestamp);
-
       if(peer && peer.addresses.length) {
         this.defaultLogger(`peer found local %p`, peerId)
         return {
@@ -72,7 +60,7 @@ export default class BaseNetworkPlugin extends Events {
       }
       this.defaultLogger(`peer not found local %p`, peerId)
       let routingPeer = await this.network.libp2p.peerRouting.findPeer(peerId);
-      
+
       // There is a bug on libp2p 0.45.x
       // When a node dial another node, peer.addresses does not
       // save correctly on peerStore.
@@ -82,13 +70,8 @@ export default class BaseNetworkPlugin extends Events {
       // peerStore
       if(peer && !peer.addresses.length){
         try{
-          console.log("***********************patch");
-          const timestamp = Date.now();
           this.network.libp2p.peerStore.patch(peerId, {
-            multiaddrs: routingPeer.multiaddrs.map(x => multiaddr(x)),
-            metadata: {
-              timestamp: new Uint8Array([timestamp & 0xFF, (timestamp >> 8) & 0xFF, (timestamp >> 16) & 0xFF, (timestamp >> 24) & 0xFF])
-            }
+            multiaddrs: routingPeer.multiaddrs.map(x => multiaddr(x))
           });
         }catch(e){
           this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
