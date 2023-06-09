@@ -8,6 +8,7 @@ import { MuonNodeInfo } from "../common/types";
 import asyncHandler from "express-async-handler";
 import _ from "lodash";
 import { multiaddr } from "@multiformats/multiaddr";
+import {loadGlobalConfigs} from "../common/configurations.js";
 
 const router = Router();
 const log = logger("muon:gateway:routing");
@@ -69,9 +70,9 @@ router.use(
     if (!gatewayPort || !timestamp || !peerInfo || !signature)
       throw `Missing parameters`;
 
-    let discoveryTimestampValidation = 10 * 60 * 1000;
-    if (process.env.DISCOVERY_VALID_TIMESTAMP)
-      discoveryTimestampValidation = parseInt(process.env.DISCOVERY_VALID_TIMESTAMP);
+
+    const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
+    const discoveryTimestampValidation = parseInt(configs.discoveryValidTimestamp);
     let diff = Date.now() - timestamp;
     if (diff < 0)
       throw `Discovery timestamp cannot be future time`;
