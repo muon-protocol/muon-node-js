@@ -34,5 +34,11 @@
     "signers": [
       "0xdc8Df2877338c89Adb26a8b0A63Cf601B2E73184"
     ]
+  },
+  "synchronizer": {
+    "monitor": {
+      "startDelay": 600e3,
+      "interval": 3600e3
+    }
   }
 }

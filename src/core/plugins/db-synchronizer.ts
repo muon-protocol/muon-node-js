@@ -9,7 +9,7 @@ import TssPlugin from "./tss-plugin.js";
 import {timeout} from "../../utils/helpers.js";
 import {logger} from '@libp2p/logger'
 
-const CONCURRENT_TSS_RECOVERY = 2;
+const CONCURRENT_TSS_RECOVERY = 5;
 const log = logger("muon:core:plugins:synchronizer")
 
 const RemoteMethods = {
@@ -32,6 +32,8 @@ export default class DbSynchronizer extends CallablePlugin {
   async onStart(): Promise<void> {
     await super.onStart();
     log('onStart done.')
+
+    this.startMonitoring().catch(e => {});
   }
 
   private get nodeManager(): NodeManagerPlugin {
@@ -46,9 +48,25 @@ export default class DbSynchronizer extends CallablePlugin {
     return this.muon.getPlugin('tss-plugin')
   }
 
+  private async startMonitoring() {
+    const {monitor: {startDelay, interval}} = this.muon.configs.net.synchronizer;
+    log(`monitor start %o`, {startDelay, interval})
+
+    await timeout(startDelay);
+    while (true) {
+      await this.syncContextsAndKeys()
+
+      await timeout(interval);
+    }
+  }
+
   @gatewayMethod("sync-db")
   async __syncDatabase() {
-    log(`sync signal arrived ...`)
+    await this.syncContextsAndKeys()
+  }
+
+  private async syncContextsAndKeys() {
+    log(`syncing contexts and keys ...`)
     let deployers: string[] = this.nodeManager
       .filterNodes({isDeployer: true})
       .map(({id}) => id)
@@ -68,6 +86,9 @@ export default class DbSynchronizer extends CallablePlugin {
     })
 
     log(`there is ${contextToSave.length} missing contexts: %o`, contextToSave.map(ctx => ctx.seed))
+
+    if(contextToSave.length === 0)
+      return ;
 
     /** save all new contexts */
     for(const ctx of contextToSave) {
