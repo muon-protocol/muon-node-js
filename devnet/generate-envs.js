@@ -44,6 +44,7 @@ REDIS_HOST = localhost
 REDIS_PORT = 6379
 
 GATEWAY_HOST = 0.0.0.0
+PUBLIC_IP = 127.0.0.1
 GATEWAY_PORT = ${data.gatewayPort}
 
 CONFIG_BASE_PATH = ${data.configPath}
@@ -154,6 +155,9 @@ const createEnv = async () => {
       "routing": {
         "delegate": [
           `http://127.0.0.1:${baseGatewayPort}/delegate`
+        ],
+        "ifconfig":[
+          `http://127.0.0.1:${baseGatewayPort}/ifconfig`
         ]
       },
       "bootstrap": [
