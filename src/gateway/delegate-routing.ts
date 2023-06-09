@@ -6,8 +6,8 @@ import { muonSha3 } from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
 import { MuonNodeInfo } from "../common/types";
 import asyncHandler from "express-async-handler";
-import _ from "lodash";
-import { multiaddr } from "@multiformats/multiaddr";
+import {validateMultiaddrs} from "../network/utils.js";
+
 import {loadGlobalConfigs} from "../common/configurations.js";
 
 const router = Router();
@@ -114,23 +114,7 @@ router.use(
   })
 );
 
-function validateMultiaddrs(multiaddrs) {
-  if (!multiaddrs)
-    return false;
-  if (!Array.isArray(multiaddrs))
-    return false;
-  if (multiaddrs.length === 0)
-    return false;
 
-  for (let i = 0; i < multiaddrs.length; i++) {
-    try {
-      multiaddr(multiaddrs[i]);
-    } catch (e) {
-      return false;
-    }
-  }
-  return true;
-}
 
 
 /**
