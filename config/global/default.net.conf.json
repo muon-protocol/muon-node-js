@@ -42,5 +42,5 @@
       "0xdc8Df2877338c89Adb26a8b0A63Cf601B2E73184"
     ]
   },
-  "discoveryValidTimestamp": 30000
+  "discoveryValidPeriod": 30000
 }

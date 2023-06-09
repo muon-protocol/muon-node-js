@@ -72,7 +72,7 @@ router.use(
 
 
     const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
-    const discoveryTimestampValidation = parseInt(configs.discoveryValidTimestamp);
+    const discoveryTimestampValidation = parseInt(configs.discoveryValidPeriod);
     let diff = Date.now() - timestamp;
     if (diff < 0)
       throw `Discovery timestamp cannot be future time`;
