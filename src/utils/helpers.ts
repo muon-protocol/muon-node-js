@@ -133,43 +133,21 @@ export async function findMyIp(): Promise<string> {
   };
 
   const envIp = process.env.PUBLIC_IP;
-  if (checkValidIp(envIp))
+  if (envIp)
     return envIp!;
 
-  let configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json')
-  let bootstrapIp = configs.bootstrap[0].split("/")[2];
-
-  let ifconfigURL = `http://${bootstrapIp}:8000/ifconfig`;
-  let muonIp = await axios.get(ifconfigURL)
-    .then(({data}) => {
-      return data.ip_addr
-    })
-    .then(checkValidIp)
-    .then(ip => ({success: true, ip}))
-    .catch(e => ({success: false, ip: null}));
-
-
-  if(muonIp.success)
-    return muonIp.ip;
-
+  let configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
+  let ifconfigURLs = configs.routing.ifconfig;
   // @ts-ignore
-   let ip = await Promise.any([
-    axios.get('https://ifconfig.me/all.json')
-      .then(({data}) => data.ip_addr)
-      .then(checkValidIp),
-    axios.get('https://ipinfo.io/ip', {responseType: "text"})
-      .then(({data}) => data)
-      .then(checkValidIp),
-    axios.get('http://api.ipify.org/', {responseType: "text"})
-      .then(({data}) => data)
-      .then(checkValidIp),
-    axios.get('https://ident.me/', {responseType: "text"})
-      .then(({data}) => data)
-      .then(checkValidIp),
-    axios.get('https://ipecho.net/plain', {responseType: "text"})
-      .then(({data}) => data)
-      .then(checkValidIp),
-  ])
+  let ip = await Promise.any(ifconfigURLs.map(ifconfigURL => {
+      return axios.get(ifconfigURL)
+        .then(({data}) => {
+          data.ip_addr;
+        })
+        .then(checkValidIp)
+    })
+  );
+
   return ip;
 }
 

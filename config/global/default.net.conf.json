@@ -17,6 +17,13 @@
       "http://194.195.211.27:8080/delegate",
       "http://209.250.252.247:8080/delegate",
       "http://188.166.73.132:8000/delegate"
+    ],
+    "ifconfig":[
+      "http://104.131.177.195:8080/ifconfig",
+      "http://3.130.24.220:8080/ifconfig",
+      "http://194.195.211.27:8080/ifconfig",
+      "http://209.250.252.247:8080/ifconfig",
+      "http://188.166.73.132:8000/ifconfig"
     ]
   },
   "nodes": {
