@@ -23,7 +23,8 @@
       "http://3.130.24.220:8080/ifconfig",
       "http://194.195.211.27:8080/ifconfig",
       "http://209.250.252.247:8080/ifconfig",
-      "http://188.166.73.132:8000/ifconfig"
+      "http://188.166.73.132:8000/ifconfig",
+      "https://ifconfig.me/all.json"
     ]
   },
   "nodes": {
