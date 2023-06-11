@@ -60,7 +60,7 @@ export default class BaseNetworkPlugin extends Events {
       }
       this.defaultLogger(`peer not found local %p`, peerId)
       let routingPeer = await this.network.libp2p.peerRouting.findPeer(peerId);
-      
+
       // There is a bug on libp2p 0.45.x
       // When a node dial another node, peer.addresses does not
       // save correctly on peerStore.
@@ -82,31 +82,7 @@ export default class BaseNetworkPlugin extends Events {
     catch (e) {
       // TODO: what to do?
       // this.defaultLogger("%o", e)
-      console.log('MUON_PEER_NOT_FOUND', peerId)
-      return null;
-    }
-  }
-
-  async findPeerLocal(peerId): Promise<Libp2pPeerInfo|null>{
-    if(!isPeerId(peerId)) {
-      try {
-        peerId = peerIdFromString(peerId)
-      }catch (e) {
-        throw `Invalid string PeedID [${peerId}]: ${e.message}`;
-      }
-    }
-    try {
-      let ret = await this.network.libp2p.peerStore.get(peerId)
-      return {
-        id: ret.id,
-        multiaddrs: ret.addresses.map(x => x.multiaddr),
-        protocols: []
-      }
-    }
-    catch (e) {
-      // TODO: what to do?
-      // this.defaultLogger("%o", e)
-      console.log('MUON_PEER_NOT_FOUND', peerId)
+      this.defaultLogger('MUON_PEER_NOT_FOUND %o', peerId)
       return null;
     }
   }

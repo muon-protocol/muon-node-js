@@ -11,7 +11,7 @@ import * as NetworkIpc from '../network/ipc.js'
 import MuonBasePlugin from './plugins/base/base-plugin.js';
 import BaseAppPlugin from "./plugins/base/base-app-plugin.js";
 import BasePlugin from "./plugins/base/base-plugin.js";
-import {Constructor, PolynomialInfoJson} from "../common/types";
+import {Constructor, DeploymentTssConfigs, NetConfigs, PolynomialInfoJson} from "../common/types";
 
 export type MuonPluginConfigs = any
 
@@ -23,43 +23,8 @@ export type MuonPlugin = {
 
 export type MuonConfigs = {
   plugins: MuonPlugin[],
-  tss: {
-    party: {
-      id: string,
-      t: number,
-      max: number
-    },
-    key: {
-      id: string,
-      share: string,
-      publicKey: string,
-      address: string,
-      polynomial?: PolynomialInfoJson
-    }
-  },
-  net: {
-    tss: {
-      threshold: number,
-      max: number,
-      defaultTTL: number,
-      pendingPeriod: number,
-    },
-    nodeManager: {
-      network: string,
-      address: string
-    },
-    "routing": {
-      "delegate": string[]
-    },
-    "nodes"?: {
-      "onlineList"?: string,
-    },
-    bootstrap: string[],
-    fee?: {
-      endpoint: string,
-      signers: string[]
-    }
-  },
+  tss: DeploymentTssConfigs,
+  net: NetConfigs,
 }
 
 export default class Muon extends Events {

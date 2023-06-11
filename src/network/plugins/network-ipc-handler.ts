@@ -81,6 +81,7 @@ export const IpcMethods = {
   SendToAggregatorNode: "send-to-aggregator-node",
   AddContextToLatencyCheck: "add-context-to-latency-check",
   GetAppLatency: "get-app-latency",
+  IsNodeOnline: "is-node-online",
 } as const;
 
 export const RemoteMethods = {
@@ -325,9 +326,9 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.FindNOnlinePeer)
-  async __findNOnlinePeer(data: {peerIds: string[], count: number, options?: any}) {
-    let {peerIds, count, options} = data;
-    return await this.nodeManager.findNOnline(peerIds, count, options)
+  async __findNOnlinePeer(data: {searchList: string[], count: number, options?: any}) {
+    let {searchList, count, options} = data;
+    return await this.nodeManager.findNOnline(searchList, count, options)
   }
 
   @ipcMethod(IpcMethods.GetNodeMultiAddress)
@@ -394,6 +395,11 @@ class NetworkIpcHandler extends CallablePlugin {
   async __getAppLatency(data: {appId: string, seed: string}) {
     const {appId, seed} = data;
     return this.latencyCheckPlugin.getAppLatency(appId, seed)
+  }
+
+  @ipcMethod(IpcMethods.IsNodeOnline)
+  async __isNodeOnline(node: string) {
+    return this.nodeManager.isNodeOnline(node);
   }
 
   /** ==================== remote methods ===========================*/
