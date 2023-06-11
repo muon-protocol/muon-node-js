@@ -529,6 +529,32 @@ export default class AppManager extends CallablePlugin {
       }, null)
   }
 
+  /**
+   * Return all expired context of all Apps. useful for context pruning process.
+   */
+  getAllExpiredContexts(): AppContext[] {
+    let currentTime = getTimestamp();
+    return Object.values(this.appContexts)
+      .filter(ctx => {
+        return ctx.expiration < currentTime;
+      })
+  }
+
+  /**
+   * This method returns an object that maps a context seed to the next rotated context seed.
+   */
+  getContextRotateMap(): MapOf<string> {
+    return Object.values(this.appContexts)
+      .reduce((obj, ctx: AppContext) => {
+        let {seed, previousSeed} = ctx
+        if(obj[seed] === undefined)
+          obj[seed] = null
+        if(previousSeed)
+          obj[previousSeed] = seed;
+        return obj;
+      }, {})
+  }
+
   getAppDeploymentStatus(appId: string, seed: string): AppDeploymentStatus {
     let context: AppContext = this.getAppContext(appId, seed);
     const currentNode = this.nodeManager.currentNodeInfo!;
@@ -565,6 +591,26 @@ export default class AppManager extends CallablePlugin {
     }
 
     return status;
+  }
+
+  getLastContextTime(): number {
+    return Object.values(this.appContexts).reduce((max, ctx) => {
+      return Math.max(max, ctx.deploymentRequest?.data.timestamp || 0)
+    }, 0);
+  }
+
+  /** Find all the contexts that include the current node and lack a key. */
+  contextsWithoutKey(): AppContext[] {
+    const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
+
+    const hasKey: MapOf<boolean> = Object.keys(this.appTssConfigs)
+      .reduce((obj, seed) => (obj[seed]=true, obj), {});
+    return Object.keys(this.appContexts)
+      /** Remove the contexts that have a key */
+      .filter(seed => !hasKey[seed])
+      .map(seed => this.appContexts[seed])
+      /** Remove the deployment context */
+      .filter(ctx => ctx.party.partners.includes(currentNode.id) && ctx.appId !== '1')
   }
 
   hasContext(ctx: AppContext): boolean {
