@@ -78,3 +78,60 @@ export function count(n: number, list: Promise<any>[], options:Options={}): Prom
     return resultPromise.promise;
   })()
 }
+
+
+/**
+  * A method that takes an array of promises, a number n and a timeout as arguments
+  * and returns a single promise that resolves if n promises resolve within the timeout
+  * and rejects if n promises cannot be resolved within the timeout
+*/
+export function resolveN<T>( n: number, promises: Promise<T>[],resolveAnyway: boolean=false): Promise<(T|undefined)[]> {
+  /** Check if the arguments are valid */
+  if (!Array.isArray(promises) || promises.length === 0) {
+    throw new Error("Invalid promises array");
+  }
+  if (typeof n !== "number" || n < 1 || n > promises.length) {
+    throw new Error("Invalid n value");
+  }
+
+  /** Create a counter for resolved and rejected promises */
+  let resolved = 0;
+  let rejected = 0;
+  let finished = 0;
+
+  /** Create an array to store the resolved values */
+  let values: T[] = new Array(promises.length).fill(undefined);
+
+  /** Create a new promise to return */
+  return new Promise((resolve, reject) => {
+    /** Loop through the promises array */
+    for (let [i, promise] of promises.entries()) {
+      /** Handle each promise */
+      promise.then((value) => {
+          /** If the promise resolves, increment the resolved counter and push the value to the values array */
+          resolved++;
+          values[i] = value;
+          /** If the resolved counter reaches n, clear the timer and resolve the returned promise with the values array */
+          if (resolved >= n) {
+            resolve(values);
+          }
+        })
+        .catch((error) => {
+            /** If the promise rejects, increment the rejected counter */
+            rejected++;
+          /**
+           If the rejected counter reaches the limit where n promises cannot be resolved, reject the returned promise with an error message
+           If resolveAnyway is set, wait to all promise finalize and then resolve.
+           */
+            if (!resolveAnyway && rejected > promises.length - n) {
+              reject(new Error("Cannot resolve " + n + " promises"));
+            }
+          })
+        .finally(() => {
+          finished++;
+          if(resolveAnyway && finished === promises.length)
+            resolve(values);
+        })
+    }
+  });
+}
