@@ -13,6 +13,7 @@ import Ajv from "ajv"
 import {mixGetPost} from "../middlewares.js";
 import {AppContext, MuonNodeInfo} from "../../common/types";
 import {GatewayCallParams} from "../types";
+import _ from 'lodash'
 
 const log = logger('muon:gateway:api')
 const ajv = new Ajv({coerceTypes: true})
@@ -76,18 +77,20 @@ async function getAppTimeout(app) {
 }
 
 async function forwardRequestToADeployer(requestData: GatewayCallParams) {
-  let deployers = (await NetworkIpc.filterNodes({isDeployer: true})).map(p => p.peerId);
-  return forwardRequestToParty(requestData, deployers);
+  let context: AppContext = (await CoreIpc.getAppOldestContext("deployment"))!;
+  return forwardRequestToParty(requestData, context);
 }
 
-async function forwardRequestToParty(requestData: GatewayCallParams, partners: string[]) {
-  let onlinePartners: string[] = await NetworkIpc.findNOnlinePeer(partners, 2, {timeout: 5000});
-  if(onlinePartners.length < 1)
+async function forwardRequestToParty(requestData: GatewayCallParams, context: AppContext) {
+  const n = context.party.partners.length;
+  const candidatePartners = _.shuffle(context.party.partners).slice(0, Math.ceil(n/2));
+  const onlinePartner = (await NetworkIpc.findNOnlinePeer(candidatePartners, 1, {timeout: 5000}))[0];
+
+  if(!onlinePartner)
     throw `cannot find any online node to forward request`;
-  const randomIndex = Math.floor(Math.random() * onlinePartners.length);
-  log(`forwarding request to id:%s`, onlinePartners[randomIndex])
+  log(`forwarding request to id:%s`, onlinePartner)
   const timeout = await getAppTimeout(requestData.app);
-  return await NetworkIpc.forwardRequest(onlinePartners[randomIndex], requestData, timeout);
+  return await NetworkIpc.forwardRequest(onlinePartner, requestData, timeout);
 }
 
 async function callProperNode(requestData: GatewayCallParams) {
@@ -139,7 +142,7 @@ async function callProperNode(requestData: GatewayCallParams) {
         return await requestQueue.send(requestData)
       }
       else {
-        return forwardRequestToParty(requestData, context.party.partners)
+        return forwardRequestToParty(requestData, context)
       }
     }
   }
