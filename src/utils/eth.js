@@ -117,6 +117,7 @@ async function wrappedCall(network, web3ApiCall, args=[]) {
       || errorMessage.includes("not authorized")
       || errorMessage.includes("we can't execute this request")
       || errorMessage.includes("Returned error:")
+      || errorMessage.includes("Returned values aren't valid")
     ) {
       const chainId = getNetworkId(network);
       console.log(`error on web3 call`, {chainId}, e.message)

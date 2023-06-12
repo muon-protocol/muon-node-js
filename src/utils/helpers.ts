@@ -13,6 +13,7 @@ import {promisify} from 'util'
 import childProcess from 'node:child_process'
 import {isIP} from 'net'
 import isIpPrivate from 'private-ip'
+import {loadGlobalConfigs} from "../common/configurations.js";
 const toBN = Web3.utils.toBN;
 const exec = promisify(childProcess.exec);
 
@@ -122,31 +123,31 @@ export function pub2json(pubkey: PublicKey, minimal: boolean=false): JsonPublicK
 }
 
 export async function findMyIp(): Promise<string> {
+
   const checkValidIp = str => {
     if(!isIP(str))
       throw `input is not ip`
     if(isIpPrivate(str))
       throw `input is private ip`
     return str
-  }
+  };
+
+  const envIp = process.env.PUBLIC_IP;
+  if (envIp)
+    return envIp!;
+
+  let configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
+  let ifconfigURLs = configs.routing.ifconfig;
   // @ts-ignore
-  let ip = await Promise.any([
-    axios.get('https://ifconfig.me/all.json')
-      .then(({data}) => data.ip_addr)
-      .then(checkValidIp),
-    axios.get('https://ipinfo.io/ip', {responseType: "text"})
-      .then(({data}) => data)
-      .then(checkValidIp),
-    axios.get('http://api.ipify.org/', {responseType: "text"})
-      .then(({data}) => data)
-      .then(checkValidIp),
-    axios.get('https://ident.me/', {responseType: "text"})
-      .then(({data}) => data)
-      .then(checkValidIp),
-    axios.get('https://ipecho.net/plain', {responseType: "text"})
-      .then(({data}) => data)
-      .then(checkValidIp),
-  ])
+  let ip = await Promise.any(ifconfigURLs.map(ifconfigURL => {
+      return axios.get(ifconfigURL)
+        .then(({data}) => {
+          return data.ip_addr;
+        })
+        .then(checkValidIp)
+    })
+  );
+
   return ip;
 }
 

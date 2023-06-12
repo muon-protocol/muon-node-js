@@ -6,7 +6,9 @@ import { muonSha3 } from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
 import { MuonNodeInfo } from "../common/types";
 import asyncHandler from "express-async-handler";
-import _ from "lodash";
+import {validateMultiaddrs} from "../network/utils.js";
+
+import {loadGlobalConfigs} from "../common/configurations.js";
 
 const router = Router();
 const log = logger("muon:gateway:routing");
@@ -43,39 +45,17 @@ router.use(
 
     const peerInfo = peerInfos[0];
 
-    res.json({
-      peerInfo: onlines[peerInfo.id]?.peerInfo,
-    });
-  })
-);
 
-router.use(
-  "/query",
-  mixGetPost,
-  asyncHandler(async (req, res, next) => {
-    // @ts-ignore
-    const { peerId, cid } = req.mixed;
-    if (!peerId && !cid) throw `Missing parameter: 'peerId' / 'cid'`;
 
     res.json({
-      list: [],
+      peerInfo: onlines[peerInfo.id]?.peerInfo
     });
   })
 );
 
 function mergeRoutingData(routingData: RoutingData) {
   let { id } = routingData;
-  if (!onlines[id]) {
-    onlines[id] = routingData;
-  } else {
-    const oldRoutingData = onlines[id];
-    const multiaddrs = [
-      ...oldRoutingData.peerInfo.multiaddrs,
-      ...routingData.peerInfo.multiaddrs,
-    ].filter((ma) => !!ma);
-    oldRoutingData.peerInfo.multiaddrs = _.uniq(multiaddrs);
-    oldRoutingData.timestamp = routingData.timestamp;
-  }
+  onlines[id] = routingData;
 }
 
 /**
@@ -92,11 +72,16 @@ router.use(
     if (!gatewayPort || !timestamp || !peerInfo || !signature)
       throw `Missing parameters`;
 
-    if (
-      !peerInfo?.multiaddrs ||
-      !Array.isArray(peerInfo.multiaddrs) ||
-      peerInfo.multiaddrs.length === 0
-    )
+
+    const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
+    const discoveryTimestampValidation = parseInt(configs.discoveryValidPeriod);
+    let diff = Date.now() - timestamp;
+    if (diff < 0)
+      throw `Discovery timestamp cannot be future time`;
+    if (diff > discoveryTimestampValidation)
+      throw `Discovery timestamp is too old`;
+
+    if (!validateMultiaddrs(peerInfo?.multiaddrs))
       throw `Invalid multiaddrs`;
 
     let realPeerInfo: MuonNodeInfo[] = await NetworkIpc.filterNodes({
@@ -130,6 +115,9 @@ router.use(
     });
   })
 );
+
+
+
 
 /**
  Lists online nodes filtered by online duration.

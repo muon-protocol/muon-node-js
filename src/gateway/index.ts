@@ -5,6 +5,7 @@ import mongoose from 'mongoose'
 import api from './api/index.js'
 import status from './status.js'
 import mine from './mine.js'
+import ifconfig from './ifconfig.js'
 import analytics from './analytics/index.js'
 import delegate from './delegate-routing.js'
 import network from './network.js'
@@ -50,6 +51,8 @@ async function start() {
     app.use('/mine', mine)
   if(configs.routes.enable.crashReport)
     app.use('/analytics', analytics)
+  if(configs.routes.enable.ifconfig)
+    app.use('/ifconfig', ifconfig)
 
   /**
    Error handler
