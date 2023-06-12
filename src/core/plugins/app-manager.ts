@@ -63,6 +63,11 @@ export default class AppManager extends CallablePlugin {
   private appTssConfigs: { [index: string]: any } = {}
   private loading: TimeoutPromise = new TimeoutPromise();
   private deploymentPublicKey: PublicKey | null = null;
+  /**
+   Map each nodeId to last context timestamp that the node included.
+   nodeId => timestamp
+   */
+  private nodesLastTimestamp: MapOf<number> = {}
 
   async onStart() {
     await super.onStart()
@@ -140,16 +145,18 @@ export default class AppManager extends CallablePlugin {
         ...await AppContextModel.find({})
       ]
 
-      allAppContexts.forEach(ac => {
-        const {appId, seed} = ac;
-        this.appContexts[seed] = ac;
+      allAppContexts.forEach(ctx => {
+        const {appId, seed} = ctx;
+        this.appContexts[seed] = ctx;
         if(this.appSeeds[appId] === undefined)
           this.appSeeds[appId] = [seed]
         else
           this.appSeeds[appId].push(seed);
-        if(ac.party.partners.includes(currentNode.id) && (!ac.expiration || Date.now() < ac.expiration*1000)) {
-          NetworkIpc.addContextToLatencyCheck(ac).catch(e => {})
+        if(ctx.party.partners.includes(currentNode.id) && (!ctx.expiration || Date.now() < ctx.expiration*1000)) {
+          NetworkIpc.addContextToLatencyCheck(ctx).catch(e => {})
         }
+
+        this.updateNodesLastTimestamp(ctx);
       })
       log('apps contexts loaded.')
 
@@ -169,6 +176,22 @@ export default class AppManager extends CallablePlugin {
     catch (e) {
       console.error(`core.AppManager.loadAppsInfo`, e);
     }
+  }
+
+  private updateNodesLastTimestamp(ctx: AppContext) {
+    const {deploymentRequest} = ctx;
+    if(deploymentRequest) {
+      const deployTime: number = deploymentRequest.data.timestamp;
+      for (const node of ctx.party.partners) {
+        if (this.nodesLastTimestamp[node] === undefined || this.nodesLastTimestamp[node] < deployTime) {
+          this.nodesLastTimestamp[node] = deployTime;
+        }
+      }
+    }
+  }
+
+  getNodeLastTimestamp(node: MuonNodeInfo): number|undefined {
+    return this.nodesLastTimestamp[node.id];
   }
 
   async onDeploymentTssKeyGenerate(tssKey) {
@@ -235,14 +258,16 @@ export default class AppManager extends CallablePlugin {
     NetworkIpc.fireEvent({type: "app-context:update", data: context,})
   }
 
-  private async onAppContextAdd(doc) {
-    log(`app context add %o`, doc)
-    const {appId, seed} = doc;
-    this.appContexts[seed] = doc;
+  private async onAppContextAdd(ctx: AppContext) {
+    log(`app context add %o`, ctx)
+    const {appId, seed} = ctx;
+    this.appContexts[seed] = ctx;
     this.appSeeds[appId] = _.uniq([
       ...this.getAppSeeds(appId),
       seed
     ]) as string[]
+
+    this.updateNodesLastTimestamp(ctx);
   }
 
   private async onAppContextUpdate(doc) {

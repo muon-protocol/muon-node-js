@@ -7,6 +7,7 @@ export type GatewayGlobalConfigs = {
   routes: {
     enable: {
       api: boolean,
+      network: boolean,
       status: boolean,
       delegate: boolean,
       mine: boolean,

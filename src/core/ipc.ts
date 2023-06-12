@@ -100,3 +100,7 @@ export async function verifyRequestSignature(request: AppRequest) {
 export async function getAppDeploymentInfo(appId: string, seed: string): Promise<AppDeploymentInfo> {
   return call(IpcMethods.GetAppDeploymentInfo, {appId, seed});
 }
+
+export async function getNodeLastContextTime(node: string): Promise<number|undefined> {
+  return call(IpcMethods.GetNodeLastContextTime, node);
+}
