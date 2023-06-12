@@ -24,6 +24,7 @@
       "http://194.195.211.27:8080/ifconfig",
       "http://209.250.252.247:8080/ifconfig",
       "http://188.166.73.132:8000/ifconfig",
+      "https://ifconfig.muon.net/",
       "https://ifconfig.me/all.json"
     ]
   },
