@@ -207,11 +207,13 @@ export default class DbSynchronizer extends CallablePlugin {
         seedsToCheck.push(seed);
     }
     log(`there is ${seedsToCheck.length} context than is not rotated.`)
-    const seedsRotated: boolean[] = await this.isSeedsRotated(seedsToCheck);
-    for(const [i, seed] of seedsToCheck.entries()) {
-      /** If a rotated version found on deployers, this context should be remover. */
-      if(seedsRotated[i])
-        seedsToDelete.push(seed);
+    if(seedsToCheck.length > 0) {
+      const seedsRotated: boolean[] = await this.isSeedsRotated(seedsToCheck);
+      for (const [i, seed] of seedsToCheck.entries()) {
+        /** If a rotated version found on deployers, this context should be remover. */
+        if (seedsRotated[i])
+          seedsToDelete.push(seed);
+      }
     }
 
     await AppContextModel.deleteMany({
