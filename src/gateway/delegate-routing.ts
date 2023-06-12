@@ -45,10 +45,16 @@ router.use(
 
     const peerInfo = peerInfos[0];
 
-
+    let discoveryInterval = 3 * 60e3;
+    if (process.env.DISCOVERY_INTERVAL)
+      discoveryInterval = parseInt(process.env.DISCOVERY_INTERVAL);
+    const peerInfoTTL = discoveryInterval * 4;
+    const onlinePeer = onlines[peerInfo.id];
+    if (onlinePeer && Date.now() - onlinePeer.timestamp > peerInfoTTL)
+      throw `PeerId '${id}' deprecated`;
 
     res.json({
-      peerInfo: onlines[peerInfo.id]?.peerInfo
+      peerInfo: onlinePeer?.peerInfo
     });
   })
 );
