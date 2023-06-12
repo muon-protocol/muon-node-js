@@ -16,7 +16,8 @@ export type AppTssKeyJson = {
   polynomial?: {
     t: number,
     Fx: string[]
-  }
+  },
+  execData?: object
 }
 
 /**
@@ -34,7 +35,7 @@ export default class AppTssKey {
    */
   party: Party | null = null;
 
-  private distKey: DistKey;
+  public distKey: DistKey;
 
   private partnersPubKey = {}
 
@@ -76,7 +77,8 @@ export default class AppTssKey {
       polynomial: !this.distKey.polynomial ? undefined : {
         t: this.distKey.polynomial.t,
         Fx: this.distKey.polynomial.Fx.map(p => p.encode('hex', true))
-      }
+      },
+      execData: this.distKey.execData
     }
   }
 
@@ -91,6 +93,7 @@ export default class AppTssKey {
         address: tssModule.pub2addr(tssModule.keyFromPublic(key.publicKey)),
         partners: key.partners,
         polynomial: key.polynomial,
+        execData: key.execData,
       })
     )
   }

@@ -254,7 +254,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     return {store, send, broadcast, qualifieds: newQualified}
   }
 
-  onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId: string, qualified: string[]): any {
+  onComplete(roundsArrivedMessages: MapOf<MapOf<{ send: any, broadcast: any }>>, networkId: string, qualified: string[], execData: any): any {
     // console.log(`mpc complete`, roundsArrivedMessages)
     const r1Msgs = this.getRoundReceives('round1')
     const r2Msgs = this.getRoundReceives('round2')
@@ -301,7 +301,8 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       {
         t: this.t,
         Fx: totalFx
-      }
+      },
+      execData
     )
   }
 }

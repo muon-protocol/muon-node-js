@@ -201,6 +201,10 @@ export class MultiPartyComputation {
   }
 
   private async process(network: IMpcNetwork, timeout: number) {
+    let execData = {
+      networkId: network!.id,
+      init: Date.now()
+    };
     this.log = logger(`muon:common:mpc:${this.ConstructorName}`);
     try {
       /** Some partners may be excluded during the MPC process. */
@@ -210,6 +214,9 @@ export class MultiPartyComputation {
       for (let r = 0; r < this.rounds.length; r++) {
         Object.freeze(qualifiedPartners);
         const roundStartTime = Date.now();
+        execData["round " + r] = {
+          computation: {start: Date.now()}
+        };
 
         const currentRound = this.rounds[r], previousRound = r>0 ? this.rounds[r-1] : null;
         this.log(`processing round mpc[${this.id}].${currentRound} ...`)
@@ -230,6 +237,7 @@ export class MultiPartyComputation {
         this.roundsOutput[currentRound] = await this.processRound(r, inputs, broadcasts, network.id, qualifiedPartners);
         this.log(`round executed [${network.id}].mpc[${this.id}].${currentRound}`)
         this.roundsPromise.resolve(r, true);
+        execData["round " + r]["computation"]["end"] = Date.now();
 
         /** Gather other partners data */
         const dataToSend = {
@@ -238,10 +246,17 @@ export class MultiPartyComputation {
         this.log(`mpc[${this.id}].${currentRound} collecting round data`)
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
             qualifiedPartners.map(partner => {
+              const start = Date.now();
               return this.tryToGetRoundData(network, partner, r, dataToSend)
                 .catch(e => {
                   this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
                   return null
+                })
+                .finally(()=>{
+                  execData["round " + r]["request node " + partner] = {
+                    start: start,
+                    end: Date.now()
+                  }
                 })
             })
           )
@@ -266,8 +281,9 @@ export class MultiPartyComputation {
         }
       }
 
+
       this.log(`MPC[${this.id}] all rounds done.`)
-      const result = this.onComplete(this.roundsArrivedMessages, network.id, qualifiedPartners);
+      const result = this.onComplete(this.roundsArrivedMessages, network.id, qualifiedPartners, execData);
       this.roundsPromise.resolve(this.rounds.length, result);
     }
     catch (e) {
@@ -276,7 +292,9 @@ export class MultiPartyComputation {
     }
   }
 
-  onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId: string, partners: string[]): any { return "" }
+  onComplete(roundsArrivedMessages: MapOf<MapOf<{ send: any, broadcast: any }>>, networkId: string, partners: string[], execData: any): any {
+    return ""
+  }
 
   async processRound(roundIndex: number, input: MapOf<any>, broadcast: MapOf<any>, networkId: string, partners: string[]):
     Promise<RoundOutput<any, any>> {

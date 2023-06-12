@@ -15,7 +15,8 @@ export type DistKeyJson = {
   polynomial?: {
     t: number,
     Fx: string[]
-  }
+  },
+  execData?: object
 }
 
 export class DistKey {
@@ -28,14 +29,16 @@ export class DistKey {
     t: number,
     Fx: PublicKey[]
   };
+  execData:object;
 
-  constructor(index: string, share: BN, address: string, publicKey : PublicKey, partners: string[], polynomial?: {t: number, Fx: PublicKey[]}) {
+  constructor(index: string, share: BN, address: string, publicKey: PublicKey, partners: string[], polynomial?: { t: number, Fx: PublicKey[] }, execData?: any) {
     this.index = index;
     this.share = share;
     this.address = address;
     this.publicKey = publicKey;
-    this.partners = partners,
-      this.polynomial = polynomial;
+    this.partners = partners;
+    this.polynomial = polynomial;
+    this.execData = execData;
   }
 
   /**
@@ -64,7 +67,8 @@ export class DistKey {
       polynomial: !this.polynomial ? undefined : {
         t: this.polynomial.t,
         Fx: this.polynomial.Fx.map(p => p.encode('hex', true))
-      }
+      },
+      execData: this.execData
     }
   }
 
@@ -83,6 +87,7 @@ export class DistKey {
         t: key.polynomial.t,
         Fx: key.polynomial.Fx.map(p => TssModule.keyFromPublic(p))
       },
+      key.execData
     );
   }
 }
