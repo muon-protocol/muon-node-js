@@ -49,7 +49,6 @@
       "startDelay": 600e3,
       "interval": 3600e3
     }
-  }
   },
   "discoveryValidPeriod": 30000
 }
