@@ -7,6 +7,8 @@ import {createRequire} from "module";
 import {MuonNodeInfo, NodeManagerConfigs, NodeManagerData, NodeManagerDataRaw} from "../common/types";
 import {peerIdFromString} from "@libp2p/peer-id";
 import {timeout} from "../utils/helpers.js";
+import _ from "lodash";
+import { multiaddr } from "@multiformats/multiaddr";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../data/NodeManager-ABI.json')
@@ -194,4 +196,22 @@ async function paginateAndGetNodeManagerChanges(paginationAddress:string, nodeMa
     _lastUpdateTime: _nodes.reduce((max, node) => Math.max(max, parseInt(node.lastEditTime)), 0),
     _nodes
   }
+}
+
+export function validateMultiaddrs(multiaddrs) {
+  if (!multiaddrs)
+    return false;
+  if (!Array.isArray(multiaddrs))
+    return false;
+  if (multiaddrs.length === 0)
+    return false;
+
+  for (let i = 0; i < multiaddrs.length; i++) {
+    try {
+      multiaddr(multiaddrs[i]);
+    } catch (e) {
+      return false;
+    }
+  }
+  return true;
 }
