@@ -45,8 +45,14 @@ router.use(
 
     const peerInfo = peerInfos[0];
 
+
+    const peerInfoTTL = 5 * 60 * 1000;
+    const onlinePeer = onlines[peerInfo.id];
+    if (onlinePeer && Date.now() - onlinePeer.timestamp > peerInfoTTL)
+      throw `PeerId '${id}' deprecated`;
+
     res.json({
-      peerInfo: onlines[peerInfo.id]?.peerInfo,
+      peerInfo: onlinePeer?.peerInfo,
     });
   })
 );
