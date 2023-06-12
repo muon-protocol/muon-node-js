@@ -142,7 +142,7 @@ export async function findMyIp(): Promise<string> {
   let ip = await Promise.any(ifconfigURLs.map(ifconfigURL => {
       return axios.get(ifconfigURL)
         .then(({data}) => {
-          data.ip_addr;
+          return data.ip_addr;
         })
         .then(checkValidIp)
     })
@@ -150,8 +150,6 @@ export async function findMyIp(): Promise<string> {
 
   return ip;
 }
-
-
 
 export async function getCommitId(): Promise<string> {
   const {stdout, stderr} = await exec('git rev-parse HEAD');
