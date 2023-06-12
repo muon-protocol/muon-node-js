@@ -206,7 +206,52 @@ export type NodeManagerConfigs = {
     /** The network that node manager deployed on */
     network: string,
     /** The Pagination contract address */
-    pagination: string
+    pagination?: string
+}
+
+export type NetConfigs = {
+    tss: {
+        threshold: number,
+        max: number,
+        defaultTTL: number,
+        pendingPeriod: number,
+    },
+    nodeManager: NodeManagerConfigs,
+    "routing": {
+        "delegate": string[]
+    },
+    "nodes"?: {
+        "onlineList"?: string,
+    },
+    bootstrap: string[],
+    fee?: {
+        endpoint: string,
+        signers: string[]
+    },
+    synchronizer: {
+        "monitor": {
+            "startDelay": number,
+            "interval": number
+        }
+    }
+}
+
+export type DeploymentTssConfigs = {
+    party: {
+        id: string
+        t: number,
+        max: number
+    },
+    key: {
+        id: string,
+        share: string,
+        publicKey: string,
+        address: string,
+        polynomial?: {
+            t: number,
+            Fx: string[]
+        }
+    }
 }
 
 export type NodeManagerDataRaw = {

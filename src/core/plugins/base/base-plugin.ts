@@ -27,7 +27,7 @@ export default class BasePlugin extends Events{
   }
 
   /**
-   * This method will call immediately after Muon start.
+   * This method will be called immediately after Muon starts.
    * @returns {Promise<void>}
    */
   async onStart(){

@@ -323,6 +323,18 @@ export default class NodeManagerPlugin extends CallablePlugin{
     return resultPromise.promise;
   }
 
+  async isNodeOnline(node: string): Promise<boolean> {
+    let nodeInfo: MuonNodeInfo = this.getNodeInfo(node)!;
+    if(!nodeInfo)
+      return false;
+    const peer = await this.findPeer(nodeInfo.peerId);
+    if(!peer)
+      return false;
+    const response = await this.remoteCall(peer, RemoteMethods.CheckOnline, {}, {timeout: 3000})
+      .catch(e => 'error')
+    return response === "OK"
+  }
+
   @remoteMethod(RemoteMethods.CheckOnline)
   async __checkOnline(): Promise<string> {
     return "OK";
