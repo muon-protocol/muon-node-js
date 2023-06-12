@@ -25,6 +25,7 @@ import {PublicKey} from "../../utils/tss/types";
 import {aesDecrypt, isAesEncrypted} from "../../utils/crypto.js";
 import {MapOf} from "../../common/mpc/types";
 import {toBN} from "../../utils/tss/utils.js";
+import * as PromiseLib from "../../common/promise-libs.js"
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -602,6 +603,7 @@ export default class AppManager extends CallablePlugin {
   /** Find all the contexts that include the current node and lack a key. */
   contextsWithoutKey(): AppContext[] {
     const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
+    const pastTenMinutes: number = getTimestamp() - 10*60;
 
     const hasKey: MapOf<boolean> = Object.keys(this.appTssConfigs)
       .reduce((obj, seed) => (obj[seed]=true, obj), {});
@@ -609,8 +611,13 @@ export default class AppManager extends CallablePlugin {
       /** Remove the contexts that have a key */
       .filter(seed => !hasKey[seed])
       .map(seed => this.appContexts[seed])
-      /** Remove the deployment context */
-      .filter(ctx => ctx.party.partners.includes(currentNode.id) && ctx.appId !== '1')
+      .filter(ctx => {
+        return ctx.party.partners.includes(currentNode.id)
+          /** Remove new contexts. */
+          && ctx.deploymentRequest.data.timestamp < pastTenMinutes
+          /** Remove the deployment context */
+          && ctx.appId !== '1'
+      })
   }
 
   hasContext(ctx: AppContext): boolean {
@@ -816,7 +823,8 @@ export default class AppManager extends CallablePlugin {
     let peers = this.nodeManager.filterNodes({list: context.party.partners})
     log(`finding ${count} optimal available of ${context.appName} app partners ...`)
 
-    let responseTimes = await Promise.all(
+    let responseTimes = await PromiseLib.resolveN(
+      count,
       peers.map(p => {
         return (
           p.wallet === process.env.SIGN_WALLET_ADDRESS
@@ -830,16 +838,16 @@ export default class AppManager extends CallablePlugin {
             {timeout: options.timeout}
           )
         )
-          .catch(e => null)
-      })
+      }),
+      true
     )
     responseTimes = responseTimes.reduce((obj, r, i) => (obj[peers[i].id]=r, obj), {});
     const graph = {}
     for(const [receiver, times] of Object.entries(responseTimes)) {
-      if(times === null)
+      if(!times)
         continue;
       for(const [sender, time] of Object.entries(times)) {
-        if(time === null)
+        if(typeof time !== 'number')
           continue ;
         if(!graph[sender])
           graph[sender] = {}
