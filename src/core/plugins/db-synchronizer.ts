@@ -4,14 +4,18 @@ import CallablePlugin from "./base/callable-plugin.js";
 import AppManager from "./app-manager.js";
 import NodeManagerPlugin from "./node-manager.js";
 import * as NetworkIpc from "../../network/ipc.js";
-import {AppContext, MuonNodeInfo} from "../../common/types";
+import {AppContext, MuonNodeInfo, NetConfigs} from "../../common/types";
 import TssPlugin from "./tss-plugin.js";
-import {timeout} from "../../utils/helpers.js";
+import {getTimestamp, timeout} from "../../utils/helpers.js";
 import {logger} from '@libp2p/logger'
 import {MapOf} from "../../common/mpc/types";
 import AppContextModel from "../../common/db-models/app-context.js";
 import AppTssConfigModel from "../../common/db-models/app-tss-config.js";
 import * as CoreIpc from "../ipc.js";
+import axios, {AxiosInstance} from "axios";
+import _ from 'lodash';
+import {muonSha3} from "../../utils/sha3.js";
+import * as crypto from "../../utils/crypto.js";
 
 const CONCURRENT_TSS_RECOVERY = 5;
 const log = logger("muon:core:plugins:synchronizer")
@@ -25,6 +29,7 @@ const RemoteMethods = {
 export default class DbSynchronizer extends CallablePlugin {
   APP_NAME='synchronizer'
   private readonly recoveryQueue: PQueue;
+  private readonly apis: AxiosInstance[];
 
   constructor(muon, configs) {
     super(muon, configs)
@@ -32,6 +37,15 @@ export default class DbSynchronizer extends CallablePlugin {
     this.recoveryQueue = new PQueue({
       concurrency: CONCURRENT_TSS_RECOVERY,
     });
+
+    const netConfigs: NetConfigs = muon.configs.net as NetConfigs;
+    this.apis = netConfigs.synchronizer.monitor.providers.map((baseUrl) =>
+      axios.create({
+        baseURL: baseUrl,
+        responseType: "json",
+        timeout: 5000,
+      })
+    );
   }
 
   async onStart(): Promise<void> {
@@ -85,24 +99,28 @@ export default class DbSynchronizer extends CallablePlugin {
       .filterNodes({isDeployer: true, excludeSelf: true})
       .map(({id}) => id)
 
+    let contextToSave:AppContext[] = [];
     const fromTimestamp: number = this.appManager.getLastContextTime()
 
-    let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 4000, return: "peerId"})
-    log(`query deployers for missing contexts %o`, {onlineDeployers, fromTimestamp})
-    // @ts-ignore
-    let allContexts: AppContext[] = await Promise.any(
-      onlineDeployers.map(deployer => {
-        return this.remoteCall(
-          deployer,
-          RemoteMethods.GetAllContexts,
-          {fromTimestamp}
-        )
-      })
-    )
+    const isNewContext:boolean = await this.checkNewContext(fromTimestamp);
+    if(isNewContext) {
+      let onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployers, 2, {timeout: 4000, return: "peerId"})
+      log(`query deployers for missing contexts %o`, {onlineDeployers, fromTimestamp})
+      // @ts-ignore
+      let allContexts: AppContext[] = await Promise.any(
+        onlineDeployers.map(deployer => {
+          return this.remoteCall(
+            deployer,
+            RemoteMethods.GetAllContexts,
+            {fromTimestamp}
+          )
+        })
+      )
 
-    let contextToSave: AppContext[] = allContexts.filter(ctx => {
-      return !this.appManager.hasContext(ctx)
-    })
+      contextToSave = allContexts.filter(ctx => {
+        return !this.appManager.hasContext(ctx)
+      })
+    }
 
     log(`there is ${contextToSave.length} missing contexts: %o`, contextToSave.map(ctx => ctx.seed))
 
@@ -127,6 +145,39 @@ export default class DbSynchronizer extends CallablePlugin {
       return this.recoveryQueue.add(() => this.tryTssRecovery(ctx))
     }))
     log(`all ${contextToSave.length+contextsWithoutKey.length} tss key recovery done.`)
+  }
+
+  private async checkNewContext(lastContextTimestamp: number): Promise<boolean> {
+    log(`checking providers for missing contexts from timestamp ${lastContextTimestamp} ...`)
+
+    /** prepare request data */
+    const timestamp = getTimestamp();
+    const wallet = process.env.SIGN_WALLET_ADDRESS
+    const hash = muonSha3(
+      { type: "uint64", value: timestamp },
+      { type: "address", value: wallet },
+      { type: "string", value: `give me my last context time` }
+    );
+    const signature = crypto.sign(hash);
+
+    /** get app status from providers */
+    const apis:AxiosInstance[] = _.shuffle(this.apis).slice(0,2)
+    // @ts-ignore
+    const res:{timestamp: number|null} = await Promise.any(
+      apis.map(api => {
+        return api.post("/last-context-time", {timestamp, wallet, signature})
+          .then(({data}) => data)
+          .catch(e => {
+            log.error("%o", e.message)
+            throw e;
+          })
+      })
+    )
+      .catch(e => ({timestamp: null}))
+
+    let result: boolean = res.timestamp !== null && res.timestamp > lastContextTimestamp;
+    log(result ? `there is some missing context %o`:`there is no missing context %o`, res);
+    return result;
   }
 
   /**

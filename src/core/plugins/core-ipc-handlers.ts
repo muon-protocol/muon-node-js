@@ -4,7 +4,8 @@ import System from "./system.js";
 import AppManager from "./app-manager.js";
 import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
-import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey} from "../../common/types";
+import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
+import NodeManagerPlugin from "./node-manager";
 
 export const IpcMethods = {
   ExecRemoteCall: "exec-remote-call",
@@ -19,6 +20,7 @@ export const IpcMethods = {
   EnsureAppTssKeyExist: "ensure-app-tss-key-exist",
   FindNAvailablePartners: "find-n-available-partner",
   VerifyRequestSignature: "verify-req-sign",
+  GetNodeLastContextTime: "get-node-last-ctx-time"
 } as const;
 type IpcKeys = keyof typeof IpcMethods;
 export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
@@ -36,6 +38,10 @@ class CoreIpcHandlers extends CallablePlugin {
 
   get appManager(): AppManager {
     return this.muon.getPlugin("app-manager");
+  }
+
+  get nodeManager(): NodeManagerPlugin {
+    return this.muon.getPlugin('node-manager');
   }
 
   @ipcMethod(IpcMethods.ExecRemoteCall)
@@ -153,6 +159,14 @@ class CoreIpcHandlers extends CallablePlugin {
   async __getAppDeploymentInfo(data: {appId: string, seed: string}): Promise<AppDeploymentInfo> {
     const {appId, seed} = data
     return this.appManager.getAppDeploymentInfo(appId, seed)
+  }
+
+  @ipcMethod(IpcMethods.GetNodeLastContextTime)
+  async __getNodeLastContextTime(nodeIndex: string): Promise<number|undefined> {
+    const node: MuonNodeInfo = this.nodeManager.getNodeInfo(nodeIndex)!;
+    if(!node)
+      return undefined;
+    return this.appManager.getNodeLastTimestamp(node);
   }
 }
 

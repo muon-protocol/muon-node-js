@@ -4,6 +4,7 @@
   "routes": {
     "enable": {
       "api": true,
+      "network": true,
       "status": true,
       "delegate": true,
       "mine": true,
