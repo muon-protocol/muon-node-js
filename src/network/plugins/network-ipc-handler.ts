@@ -16,6 +16,7 @@ import {logger} from '@libp2p/logger'
 import {isPrivate} from "../utils.js";
 import {GatewayCallParams} from "../../gateway/types";
 import LatencyCheckPlugin from "./latency-check.js";
+import {MapOf} from "../../common/mpc/types";
 
 class AggregatorBus extends MessagePublisher {
   async send(message:any){
@@ -197,20 +198,28 @@ class NetworkIpcHandler extends CallablePlugin {
         break;
       case "exit":
         delete this.clustersPids[pid];
+        for(const [key, data] of Object.entries(this.clusterPermissions)) {
+          if(data.pid === pid)
+            delete this.clusterPermissions[key];
+        }
         break;
     }
   }
 
-  clusterPermissions = {};
+  clusterPermissions: MapOf<{pid: number, time: number}> = {};
 
   @ipcMethod(IpcMethods.AskClusterPermission)
-  async __askClusterPermission(data, callerInfo) {
+  async __askClusterPermission(data: {key: string, pid: number, expireTime?: number}, callerInfo) {
+    const {key, pid, expireTime=Infinity} = data
     // every 20 seconds one process get permission to do election
     if (
-      (!this.clusterPermissions[data?.key])
-      || (Date.now() - this.clusterPermissions[data?.key] > data.expireTime)
+      (!this.clusterPermissions[key])
+      || (Date.now() - this.clusterPermissions[key].time > expireTime)
     ) {
-      this.clusterPermissions[data?.key] = Date.now()
+      this.clusterPermissions[key] = {
+        pid,
+        time: Date.now()
+      }
       return true
     } else
       return false;

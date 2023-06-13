@@ -27,7 +27,6 @@ const RemoteMethods = {
 
 @remoteApp
 export default class DbSynchronizer extends CallablePlugin {
-  APP_NAME='synchronizer'
   private readonly recoveryQueue: PQueue;
   private readonly apis: AxiosInstance[];
 
@@ -52,7 +51,17 @@ export default class DbSynchronizer extends CallablePlugin {
     await super.onStart();
     log('onStart done.')
 
-    this.startMonitoring().catch(e => {});
+    /**
+     When cluster mode is enabled, there are multiple core processes running simultaneously, which can cause problems.
+     Therefore, only one core process should be allowed to handle the database synchronization.
+     */
+    let permitted = await NetworkIpc.askClusterPermission('db-synchronizer', 20000)
+    if(permitted) {
+      this.startMonitoring().catch(e => {});
+    }
+    else {
+      log(`process pid:${process.pid} not permitted to synchronize db.`)
+    }
   }
 
   private get nodeManager(): NodeManagerPlugin {
@@ -77,20 +86,23 @@ export default class DbSynchronizer extends CallablePlugin {
        * Find missing context
        * Recover missing keys
        * */
-      await this.syncContextsAndKeys()
+      try {
+        await this.syncContextsAndKeys()
+      }catch (e) {
+        log.error(`error when syncing context: ${e.message} %o`, e);
+      }
 
       /**
        * Remove expired context and keys.
        */
-      await this.pruneContextAndKeys()
+      try {
+        await this.purgeContextAndKeys()
+      }catch (e) {
+        log.error(`error when purging context: ${e.message} %o`, e);
+      }
 
       await timeout(interval);
     }
-  }
-
-  @gatewayMethod("sync-db")
-  async __syncDatabase() {
-    await this.syncContextsAndKeys()
   }
 
   private async syncContextsAndKeys() {
@@ -184,7 +196,7 @@ export default class DbSynchronizer extends CallablePlugin {
    * Remove expired contexts and corresponding keys.
    * All contexts that are not rotated, should be preserved. This contexts required for rotate and re-share.
    */
-  private async pruneContextAndKeys() {
+  private async purgeContextAndKeys() {
     /** Get all local contexts that expired */
     let expiredContexts:AppContext[] = this.appManager.getAllExpiredContexts();
     log(`there is ${expiredContexts.length} expired context`)
@@ -206,7 +218,7 @@ export default class DbSynchronizer extends CallablePlugin {
         /** If a rotated version of a context not found locally, it need to check it by deployers. */
         seedsToCheck.push(seed);
     }
-    log(`there is ${seedsToCheck.length} context than is not rotated.`)
+    log(`there is ${seedsToCheck.length} context that is not rotated.`)
     if(seedsToCheck.length > 0) {
       const seedsRotated: boolean[] = await this.isSeedsRotated(seedsToCheck);
       for (const [i, seed] of seedsToCheck.entries()) {

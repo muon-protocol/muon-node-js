@@ -66,8 +66,9 @@ export function assignTask(taskId) {
   return call(IpcMethods.AssignTask, {taskId})
 }
 
-export function askClusterPermission(key, expireTime) {
-  return call(IpcMethods.AskClusterPermission, {key, expireTime})
+export function askClusterPermission(key: string, expireTime?: number) {
+  let pid = process.pid;
+  return call(IpcMethods.AskClusterPermission, {key, pid, expireTime})
 }
 
 export function provideContent(cids: string | string[]): Promise<any> {

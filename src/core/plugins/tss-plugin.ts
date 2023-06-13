@@ -324,8 +324,8 @@ class TssPlugin extends CallablePlugin {
         this.appManager.currentNodeInfo!.id,
         {
           id: `app-${appId}`,
-          share: _key.keyShare,
-          publicKey: _key.publicKey.encoded,
+          share: _key.keyShare!,
+          publicKey: _key.publicKey!.encoded!,
           partners: context.party.partners,
           polynomial: _key.polynomial,
         }
