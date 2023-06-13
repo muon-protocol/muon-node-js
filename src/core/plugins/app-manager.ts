@@ -57,10 +57,10 @@ export type FindAvailableNodesOptions = {
 @remoteApp
 export default class AppManager extends CallablePlugin {
   /** map App deployment seed to context */
-  private appContexts: { [index: string]: any } = {}
+  private appContexts: MapOf<AppContext> = {}
   /** map appId to its seeds list */
-  private appSeeds: { [index: string]: string[] } = {}
-  private appTssConfigs: { [index: string]: any } = {}
+  private appSeeds: MapOf<string[]> = {}
+  private appTssConfigs: MapOf<AppTssConfig> = {}
   private loading: TimeoutPromise = new TimeoutPromise();
   private deploymentPublicKey: PublicKey | null = null;
   /**
@@ -324,7 +324,7 @@ export default class AppManager extends CallablePlugin {
     }
     const context = seed ? this.getAppContext(appId, seed) : null
     if(context) {
-      result.reqId = appId === '1' ? null : context.deploymentRequest.reqId
+      result.reqId = appId === '1' ? undefined : context.deploymentRequest?.reqId
       result.contextHash = hashAppContext(context)
     }
     return result
@@ -486,7 +486,7 @@ export default class AppManager extends CallablePlugin {
       .map(seed => this.appContexts[seed]);
     if(!includeExpired) {
       contexts = contexts.filter(ctx => {
-        return ctx.expiration > currentTime
+        return ctx.expiration === undefined || ctx.expiration > currentTime
       })
     }
     return contexts;
@@ -514,7 +514,7 @@ export default class AppManager extends CallablePlugin {
   }
 
   async getAppContextAsync(appId: string, seed: string, tryFromNetwork:boolean=false): Promise<AppContext|undefined> {
-    let context = this.appContexts[seed];
+    let context:AppContext|undefined = this.appContexts[seed];
     if(!context && tryFromNetwork) {
       const contexts = await this.queryAndLoadAppContext(appId, {seeds: [seed], includeExpired: true})
       context = contexts.find(ctx => ctx.seed === seed)
@@ -532,7 +532,7 @@ export default class AppManager extends CallablePlugin {
       const now = getTimestamp()
       contexts = contexts.filter(ctx => ((ctx.expiration ?? Infinity) > now))
     }
-    return contexts.reduce((first: AppContext, ctx: AppContext): AppContext => {
+    return contexts.reduce((first: AppContext|null, ctx: AppContext): AppContext|null => {
         if(!first)
           return ctx
         if((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (first.deploymentRequest?.data.timestamp ?? Infinity))
@@ -542,17 +542,17 @@ export default class AppManager extends CallablePlugin {
       }, null)
   }
 
-  getAppLastContext(appId: string): AppContext {
+  getAppLastContext(appId: string): AppContext|undefined {
     return this.getAppSeeds(appId)
       .map(seed => this.appContexts[seed])
-      .reduce((last, ctx) => {
+      .reduce((last:AppContext|undefined, ctx): AppContext|undefined => {
         if(!last)
           return ctx
-        if(ctx.deploymentRequest.data.timestamp > last.deploymentRequest.data.timestamp)
+        if(ctx.deploymentRequest!.data.timestamp > last.deploymentRequest!.data.timestamp)
           return ctx
         else
           return last
-      }, null)
+      }, undefined)
   }
 
   /**
@@ -562,7 +562,7 @@ export default class AppManager extends CallablePlugin {
     let currentTime = getTimestamp();
     return Object.values(this.appContexts)
       .filter(ctx => {
-        return ctx.expiration < currentTime;
+        return ctx.expiration !== undefined && ctx.expiration < currentTime;
       })
   }
 
@@ -632,16 +632,13 @@ export default class AppManager extends CallablePlugin {
 
     const hasKey: MapOf<boolean> = Object.keys(this.appTssConfigs)
       .reduce((obj, seed) => (obj[seed]=true, obj), {});
-    return Object.keys(this.appContexts)
+    return Object.values(this.appContexts)
       /** Remove the contexts that have a key */
-      .filter(seed => !hasKey[seed])
-      .map(seed => this.appContexts[seed])
+      .filter(({seed, appId}) => (appId!=="1" && !hasKey[seed]))
       .filter(ctx => {
         return ctx.party.partners.includes(currentNode.id)
           /** Remove new contexts. */
-          && ctx.deploymentRequest.data.timestamp < pastTenMinutes
-          /** Remove the deployment context */
-          && ctx.appId !== '1'
+          && ctx.deploymentRequest!.data.timestamp < pastTenMinutes
       })
   }
 

@@ -171,6 +171,7 @@ class System extends CallablePlugin {
   @appApiMethod({})
   getAppLastDeploymentInfo(appId: string): AppDeploymentInfo {
     const context = this.appManager.getAppLastContext(appId)
+    // @ts-ignore
     return this.appManager.getAppDeploymentInfo(appId, context?.seed);
   }
 
