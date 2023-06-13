@@ -251,39 +251,6 @@ class BaseAppPlugin extends CallablePlugin {
     else{
       let t0 = Date.now(), t1, t2, t3, t4, t5, t6;
       let appParty = this.getParty(deploymentSeed)!;
-      /** find available partners to sign the request */
-      const availableCount = Math.min(
-        Math.ceil(appParty.t*1.5),
-        appParty.partners.length,
-      );
-      const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
-        this.APP_ID,
-        deploymentSeed,
-        availableCount,
-      );
-      // const availablePartners: string[] = await this.appManager.findNAvailablePartners(
-      //   this.APP_ID,
-      //   appParty.partners,
-      //   Math.min(
-      //     Math.ceil(appParty.t*1.5),
-      //     appParty.partners.length,
-      //   ),
-      //   {timeout: 5000}
-      // );
-      // let count = Math.min(
-      //   Math.ceil(appParty.t*1.5),
-      //   appParty.partners.length,
-      // );
-      // const availablePartners = shuffle(appParty.partners).slice(0, count-1);
-
-      t1 = Date.now();
-      this.log(`partners:[%o] are available to sign the request`, availablePartners)
-      if(availablePartners.length < appParty.t) {
-        /** send analytic data to server */
-        reportInsufficientPartners({graph, minGraph, count: availableCount})
-          .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
-        throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
-      }
 
       if(this.validateRequest){
         this.log(`calling validateRequest ...`)
@@ -332,6 +299,26 @@ class BaseAppPlugin extends CallablePlugin {
       else {
         this.requestManager.addRequest(newRequest, {requestTimeout: this.requestTimeout});
 
+        /** find available partners to sign the request */
+        const availableCount = Math.min(
+          Math.ceil(appParty.t*1.5),
+          appParty.partners.length,
+        );
+        const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
+          this.APP_ID,
+          deploymentSeed,
+          availableCount,
+        );
+
+        t1 = Date.now();
+        this.log(`partners:[%o] are available to sign the request`, availablePartners)
+        if(availablePartners.length < appParty.t) {
+          /** send analytic data to server */
+          reportInsufficientPartners({graph, minGraph, count: availableCount})
+            .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
+          throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+        }
+
         t2 = Date.now()
         newRequest.data.init = {
           ... newRequest.data.init,
@@ -365,8 +352,8 @@ class BaseAppPlugin extends CallablePlugin {
       let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
       this.log(`request signed with %o`, nonce.partners);
       this.log('request time parts %O',{
-        "find online nodes": t1-t0,
-        "req exec time": t2-t1,
+        "req exec time": t1-t0,
+        "find online nodes": t2-t1,
         "dkg time": t3-t2,
         "req broadcast": t4-t3,
         "confirm waiting": t5-t4,
