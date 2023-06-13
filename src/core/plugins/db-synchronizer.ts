@@ -38,29 +38,33 @@ export default class DbSynchronizer extends CallablePlugin {
     });
 
     const netConfigs: NetConfigs = muon.configs.net as NetConfigs;
-    this.apis = netConfigs.synchronizer.monitor.providers.map((baseUrl) =>
-      axios.create({
-        baseURL: baseUrl,
-        responseType: "json",
-        timeout: 5000,
-      })
-    );
+    if(netConfigs.synchronizer) {
+      this.apis = netConfigs.synchronizer.monitor.providers.map((baseUrl) =>
+        axios.create({
+          baseURL: baseUrl,
+          responseType: "json",
+          timeout: 5000,
+        })
+      );
+    }
   }
 
   async onStart(): Promise<void> {
     await super.onStart();
-    log('onStart done.')
+    if(this.muon.configs.net.synchronizer) {
+      log('onStart done.')
 
-    /**
-     When cluster mode is enabled, there are multiple core processes running simultaneously, which can cause problems.
-     Therefore, only one core process should be allowed to handle the database synchronization.
-     */
-    let permitted = await NetworkIpc.askClusterPermission('db-synchronizer', 20000)
-    if(permitted) {
-      this.startMonitoring().catch(e => {});
-    }
-    else {
-      log(`process pid:${process.pid} not permitted to synchronize db.`)
+      /**
+       When cluster mode is enabled, there are multiple core processes running simultaneously, which can cause problems.
+       Therefore, only one core process should be allowed to handle the database synchronization.
+       */
+      let permitted = await NetworkIpc.askClusterPermission('db-synchronizer', 20000)
+      if (permitted) {
+        this.startMonitoring().catch(e => {});
+      }
+      else {
+        log(`process pid:${process.pid} not permitted to synchronize db.`)
+      }
     }
   }
 

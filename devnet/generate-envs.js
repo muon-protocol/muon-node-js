@@ -143,16 +143,17 @@ const createEnv = async () => {
 
   let netConf = JSON.stringify(
     {
-      "tss": {
+      ...defaultNetConfigs,
+      tss: {
         ...defaultNetConfigs.tss,
         "threshold": threshold,
         "max": 100
       },
-      "nodeManager": {
+      nodeManager: {
         "network": "mumbai",
         "address": "0x3112a7D5b3960d2C528cd83217E3170f8d252432"
       },
-      "routing": {
+      routing: {
         "delegate": [
           `http://127.0.0.1:${baseGatewayPort}/delegate`
         ],
@@ -160,9 +161,12 @@ const createEnv = async () => {
           `http://127.0.0.1:${baseGatewayPort}/ifconfig`
         ]
       },
-      "bootstrap": [
+      nodes: undefined,
+      bootstrap: [
         firstNodeAddress
-      ]
+      ],
+      fee: undefined,
+      synchronizer: undefined,
     },
     null,
     2
