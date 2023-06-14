@@ -5,7 +5,8 @@ import {isPeerId, Libp2pPeer, Libp2pPeerInfo} from '../../types.js';
 import {peerIdFromString} from '@libp2p/peer-id'
 import {logger, Logger} from '@libp2p/logger'
 import { multiaddr } from '@multiformats/multiaddr';
-import {numToUint8Array,uint8ArrayToNum} from "../../../utils/helpers.js";
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
 import {loadGlobalConfigs} from "../../../common/configurations.js";
 
 export default class BaseNetworkPlugin extends Events {
@@ -55,22 +56,7 @@ export default class BaseNetworkPlugin extends Events {
       let peer: Libp2pPeer = await this.network.libp2p.peerStore.get(peerId)
         .catch(e => null)
 
-      if(peer && !peer.metadata.get("timestamp")){
-        const timestamp = Date.now();
-        const uint8Array = numToUint8Array(timestamp);
-        try{
-          this.network.libp2p.peerStore.patch(peerId, {
-            metadata: {timestamp: uint8Array}
-          });
-        }catch(e){
-          this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
-        }
-      }
-
-      peer = this.validatePeerstoreTimestamp(peer);
-
-
-      if(peer && peer.addresses.length) {
+      if (peer && peer.addresses.length && this.hasValidTimestamp(peer)) {
         this.defaultLogger(`peer found local %p`, peerId)
         return {
           id: peerId,
@@ -80,6 +66,18 @@ export default class BaseNetworkPlugin extends Events {
       }
       this.defaultLogger(`peer not found local %p`, peerId)
       let routingPeer = await this.network.libp2p.peerRouting.findPeer(peerId);
+
+      //set timestamp on newly found peer
+      const timestamp = Date.now();
+      const uint8Array = uint8ArrayFromString(`${timestamp}`);
+      try{
+        this.network.libp2p.peerStore.patch(peerId, {
+          metadata: {timestamp: uint8Array}
+        });
+      }catch(e){
+        this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
+      }
+
 
       // There is a bug on libp2p 0.45.x
       // When a node dial another node, peer.addresses does not
@@ -162,19 +160,16 @@ export default class BaseNetworkPlugin extends Events {
   }
 
 
-  validatePeerstoreTimestamp(peer) {
-    if (!peer)
-      return peer;
+  hasValidTimestamp(peer) {
     const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
     const peerStoreTTL = parseInt(configs.routing.peerStoreTTL);
     let timestamp = peer.metadata.get("timestamp");
     if (!timestamp)
-      return peer;
-    timestamp = uint8ArrayToNum(timestamp);
-    if (Date.now() - timestamp > peerStoreTTL) {
-      this.network.libp2p.peerStore.delete(peer.id);
-      return null;
-    }
-    return peer;
+      return false;
+    timestamp = uint8ArrayToString(timestamp);
+    if (Date.now() - timestamp > peerStoreTTL)
+      return false;
+
+    return true;
   }
 }

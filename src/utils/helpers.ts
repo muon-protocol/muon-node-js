@@ -161,20 +161,3 @@ export async function getCommitId(): Promise<string> {
 export function statusCodeToTitle(code: number): AppDeploymentStatus {
   return ["NEW", "TSS_GROUP_SELECTED", "DEPLOYED", "PENDING", "EXPIRED"][code] as AppDeploymentStatus;
 }
-
-export function numToUint8Array(num) {
-  let arr = new Uint8Array(8);
-  for (let i = 0; i < 8; i++) {
-    arr[i] = num % 256;
-    num = Math.floor(num / 256);
-  }
-  return arr;
-}
-
-export function uint8ArrayToNum(arr) {
-  let num = 0;
-  for (let i = 7; i >= 0; i--) {
-    num = num * 256 + arr[i];
-  }
-  return num;
-}
