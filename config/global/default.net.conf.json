@@ -26,7 +26,9 @@
       "http://188.166.73.132:8000/ifconfig",
       "https://ifconfig.muon.net/",
       "https://ifconfig.me/all.json"
-    ]
+    ],
+    "discoveryValidPeriod": 30000,
+    "delegateRoutingTTL": 1200000
   },
   "nodes": {
     "onlineList": "http://103.75.196.96/nodes",
@@ -49,6 +51,5 @@
       "startDelay": 600e3,
       "interval": 3600e3
     }
-  },
-  "discoveryValidPeriod": 30000
+  }
 }
