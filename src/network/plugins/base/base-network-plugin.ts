@@ -5,6 +5,8 @@ import {isPeerId, Libp2pPeer, Libp2pPeerInfo} from '../../types.js';
 import {peerIdFromString} from '@libp2p/peer-id'
 import {logger, Logger} from '@libp2p/logger'
 import { multiaddr } from '@multiformats/multiaddr';
+import {numToUint8Array,uint8ArrayToNum} from "../../../utils/helpers.js";
+import {loadGlobalConfigs} from "../../../common/configurations.js";
 
 export default class BaseNetworkPlugin extends Events {
   network: Network;
@@ -47,9 +49,27 @@ export default class BaseNetworkPlugin extends Events {
         throw `Invalid string PeedID [${peerId}]: ${e.message}`;
       }
     }
+
+
     try {
       let peer: Libp2pPeer = await this.network.libp2p.peerStore.get(peerId)
         .catch(e => null)
+
+      if(peer && !peer.metadata.get("timestamp")){
+        const timestamp = Date.now();
+        const uint8Array = numToUint8Array(timestamp);
+        try{
+          this.network.libp2p.peerStore.patch(peerId, {
+            metadata: {timestamp: uint8Array}
+          });
+        }catch(e){
+          this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
+        }
+      }
+
+      peer = this.validatePeerstoreTimestamp(peer);
+
+
       if(peer && peer.addresses.length) {
         this.defaultLogger(`peer found local %p`, peerId)
         return {
@@ -77,6 +97,7 @@ export default class BaseNetworkPlugin extends Events {
           this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
         };
       }
+
       return routingPeer;
     }
     catch (e) {
@@ -138,5 +159,22 @@ export default class BaseNetworkPlugin extends Events {
       // this.defaultLogger.error("%o", e)
       throw e;
     }
+  }
+
+
+  validatePeerstoreTimestamp(peer) {
+    if (!peer)
+      return peer;
+    const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
+    const peerStoreTTL = parseInt(configs.routing.peerStoreTTL);
+    let timestamp = peer.metadata.get("timestamp");
+    if (!timestamp)
+      return peer;
+    timestamp = uint8ArrayToNum(timestamp);
+    if (Date.now() - timestamp > peerStoreTTL) {
+      this.network.libp2p.peerStore.delete(peer.id);
+      return null;
+    }
+    return peer;
   }
 }
