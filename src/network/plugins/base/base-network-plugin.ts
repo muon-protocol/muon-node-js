@@ -57,27 +57,18 @@ export default class BaseNetworkPlugin extends Events {
         .catch(e => null)
 
       if (peer && peer.addresses.length && this.hasValidTimestamp(peer)) {
-        this.defaultLogger(`peer found local %p`, peerId)
+        this.defaultLogger(`peer found local %p`, peerId);
         return {
           id: peerId,
           multiaddrs: peer.addresses.map(addr => addr.multiaddr),
           protocols: []
         };
       }
-      this.defaultLogger(`peer not found local %p`, peerId)
+      this.defaultLogger(`peer not found local %p`, peerId);
       let routingPeer = await this.network.libp2p.peerRouting.findPeer(peerId);
 
-      //set timestamp on newly found peer
-      const timestamp = Date.now();
-      const uint8Array = uint8ArrayFromString(`${timestamp}`);
-      try{
-        this.network.libp2p.peerStore.patch(peerId, {
-          metadata: {timestamp: uint8Array}
-        });
-      }catch(e){
-        this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
-      }
-
+      peer = await this.network.libp2p.peerStore.get(peerId)
+        .catch(e => null);
 
       // There is a bug on libp2p 0.45.x
       // When a node dial another node, peer.addresses does not
@@ -86,14 +77,19 @@ export default class BaseNetworkPlugin extends Events {
       //
       // We load addresses from peerRouting and patch the
       // peerStore
-      if(peer && !peer.addresses.length){
-        try{
+      if (peer) {
+        try {
+          //set timestamp on newly found peer
+          const timestamp = Date.now();
+          const uint8Array = uint8ArrayFromString(`${timestamp}`);
+
           this.network.libp2p.peerStore.patch(peerId, {
-            multiaddrs: routingPeer.multiaddrs.map(x => multiaddr(x))
+            multiaddrs: routingPeer.multiaddrs.map(x => multiaddr(x)),
+            metadata: {timestamp: uint8Array}
           });
-        }catch(e){
+        } catch (e) {
           this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
-        };
+        }
       }
 
       return routingPeer;
