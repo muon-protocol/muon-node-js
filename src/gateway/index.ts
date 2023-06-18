@@ -6,8 +6,9 @@ import api from './api/index.js'
 import status from './status.js'
 import mine from './mine.js'
 import ifconfig from './ifconfig.js'
-import analitics from './analytics/index.js'
+import analytics from './analytics/index.js'
 import delegate from './delegate-routing.js'
+import network from './network.js'
 import {logger} from '@libp2p/logger'
 import {GatewayGlobalConfigs, load as loadConfigs} from './configurations.js';
 
@@ -40,6 +41,8 @@ async function start() {
 
   if(configs.routes.enable.api)
     app.use('/v1/', api)
+  if(configs.routes.enable.network)
+    app.use('/network', network)
   if(configs.routes.enable.status)
     app.use('/status', status)
   if(configs.routes.enable.delegate)
@@ -47,7 +50,7 @@ async function start() {
   if(configs.routes.enable.mine)
     app.use('/mine', mine)
   if(configs.routes.enable.crashReport)
-    app.use('/analytics', analitics)
+    app.use('/analytics', analytics)
   if(configs.routes.enable.ifconfig)
     app.use('/ifconfig', ifconfig)
 

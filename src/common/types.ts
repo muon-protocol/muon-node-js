@@ -230,6 +230,7 @@ export type NetConfigs = {
     },
     synchronizer: {
         "monitor": {
+            "providers": string[],
             "startDelay": number,
             "interval": number
         }

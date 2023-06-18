@@ -203,7 +203,7 @@ class Explorer extends CallablePlugin {
     let appStatus = "NEW";
     if(contextStatuses.length > 0) {
       const context = this.appManager.getAppLastContext(appId);
-      appStatus = this.appManager.getAppDeploymentStatus(appId, context.seed);
+      appStatus = this.appManager.getAppDeploymentStatus(appId, context!.seed);
     }
 
     return {

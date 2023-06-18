@@ -57,12 +57,17 @@ export type FindAvailableNodesOptions = {
 @remoteApp
 export default class AppManager extends CallablePlugin {
   /** map App deployment seed to context */
-  private appContexts: { [index: string]: any } = {}
+  private appContexts: MapOf<AppContext> = {}
   /** map appId to its seeds list */
-  private appSeeds: { [index: string]: string[] } = {}
-  private appTssConfigs: { [index: string]: any } = {}
+  private appSeeds: MapOf<string[]> = {}
+  private appTssConfigs: MapOf<AppTssConfig> = {}
   private loading: TimeoutPromise = new TimeoutPromise();
   private deploymentPublicKey: PublicKey | null = null;
+  /**
+   Map each nodeId to last context timestamp that the node included.
+   nodeId => timestamp
+   */
+  private nodesLastTimestamp: MapOf<number> = {}
 
   async onStart() {
     await super.onStart()
@@ -140,16 +145,18 @@ export default class AppManager extends CallablePlugin {
         ...await AppContextModel.find({})
       ]
 
-      allAppContexts.forEach(ac => {
-        const {appId, seed} = ac;
-        this.appContexts[seed] = ac;
+      allAppContexts.forEach(ctx => {
+        const {appId, seed} = ctx;
+        this.appContexts[seed] = ctx;
         if(this.appSeeds[appId] === undefined)
           this.appSeeds[appId] = [seed]
         else
           this.appSeeds[appId].push(seed);
-        if(ac.party.partners.includes(currentNode.id) && (!ac.expiration || Date.now() < ac.expiration*1000)) {
-          NetworkIpc.addContextToLatencyCheck(ac).catch(e => {})
+        if(ctx.party.partners.includes(currentNode.id) && (!ctx.expiration || Date.now() < ctx.expiration*1000)) {
+          NetworkIpc.addContextToLatencyCheck(ctx).catch(e => {})
         }
+
+        this.updateNodesLastTimestamp(ctx);
       })
       log('apps contexts loaded.')
 
@@ -169,6 +176,22 @@ export default class AppManager extends CallablePlugin {
     catch (e) {
       console.error(`core.AppManager.loadAppsInfo`, e);
     }
+  }
+
+  private updateNodesLastTimestamp(ctx: AppContext) {
+    const {deploymentRequest} = ctx;
+    if(deploymentRequest) {
+      const deployTime: number = deploymentRequest.data.timestamp;
+      for (const node of ctx.party.partners) {
+        if (this.nodesLastTimestamp[node] === undefined || this.nodesLastTimestamp[node] < deployTime) {
+          this.nodesLastTimestamp[node] = deployTime;
+        }
+      }
+    }
+  }
+
+  getNodeLastTimestamp(node: MuonNodeInfo): number|undefined {
+    return this.nodesLastTimestamp[node.id];
   }
 
   async onDeploymentTssKeyGenerate(tssKey) {
@@ -235,14 +258,16 @@ export default class AppManager extends CallablePlugin {
     NetworkIpc.fireEvent({type: "app-context:update", data: context,})
   }
 
-  private async onAppContextAdd(doc) {
-    log(`app context add %o`, doc)
-    const {appId, seed} = doc;
-    this.appContexts[seed] = doc;
+  private async onAppContextAdd(ctx: AppContext) {
+    log(`app context add %o`, ctx)
+    const {appId, seed} = ctx;
+    this.appContexts[seed] = ctx;
     this.appSeeds[appId] = _.uniq([
       ...this.getAppSeeds(appId),
       seed
     ]) as string[]
+
+    this.updateNodesLastTimestamp(ctx);
   }
 
   private async onAppContextUpdate(doc) {
@@ -299,7 +324,7 @@ export default class AppManager extends CallablePlugin {
     }
     const context = seed ? this.getAppContext(appId, seed) : null
     if(context) {
-      result.reqId = appId === '1' ? null : context.deploymentRequest.reqId
+      result.reqId = appId === '1' ? undefined : context.deploymentRequest?.reqId
       result.contextHash = hashAppContext(context)
     }
     return result
@@ -461,7 +486,7 @@ export default class AppManager extends CallablePlugin {
       .map(seed => this.appContexts[seed]);
     if(!includeExpired) {
       contexts = contexts.filter(ctx => {
-        return ctx.expiration > currentTime
+        return ctx.expiration === undefined || ctx.expiration > currentTime
       })
     }
     return contexts;
@@ -489,7 +514,7 @@ export default class AppManager extends CallablePlugin {
   }
 
   async getAppContextAsync(appId: string, seed: string, tryFromNetwork:boolean=false): Promise<AppContext|undefined> {
-    let context = this.appContexts[seed];
+    let context:AppContext|undefined = this.appContexts[seed];
     if(!context && tryFromNetwork) {
       const contexts = await this.queryAndLoadAppContext(appId, {seeds: [seed], includeExpired: true})
       context = contexts.find(ctx => ctx.seed === seed)
@@ -507,7 +532,7 @@ export default class AppManager extends CallablePlugin {
       const now = getTimestamp()
       contexts = contexts.filter(ctx => ((ctx.expiration ?? Infinity) > now))
     }
-    return contexts.reduce((first: AppContext, ctx: AppContext): AppContext => {
+    return contexts.reduce((first: AppContext|null, ctx: AppContext): AppContext|null => {
         if(!first)
           return ctx
         if((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (first.deploymentRequest?.data.timestamp ?? Infinity))
@@ -517,17 +542,17 @@ export default class AppManager extends CallablePlugin {
       }, null)
   }
 
-  getAppLastContext(appId: string): AppContext {
+  getAppLastContext(appId: string): AppContext|undefined {
     return this.getAppSeeds(appId)
       .map(seed => this.appContexts[seed])
-      .reduce((last, ctx) => {
+      .reduce((last:AppContext|undefined, ctx): AppContext|undefined => {
         if(!last)
           return ctx
-        if(ctx.deploymentRequest.data.timestamp > last.deploymentRequest.data.timestamp)
+        if(ctx.deploymentRequest!.data.timestamp > last.deploymentRequest!.data.timestamp)
           return ctx
         else
           return last
-      }, null)
+      }, undefined)
   }
 
   /**
@@ -537,7 +562,7 @@ export default class AppManager extends CallablePlugin {
     let currentTime = getTimestamp();
     return Object.values(this.appContexts)
       .filter(ctx => {
-        return ctx.expiration < currentTime;
+        return ctx.expiration !== undefined && ctx.expiration < currentTime;
       })
   }
 
@@ -607,16 +632,13 @@ export default class AppManager extends CallablePlugin {
 
     const hasKey: MapOf<boolean> = Object.keys(this.appTssConfigs)
       .reduce((obj, seed) => (obj[seed]=true, obj), {});
-    return Object.keys(this.appContexts)
+    return Object.values(this.appContexts)
       /** Remove the contexts that have a key */
-      .filter(seed => !hasKey[seed])
-      .map(seed => this.appContexts[seed])
+      .filter(({seed, appId}) => (appId!=="1" && !hasKey[seed]))
       .filter(ctx => {
         return ctx.party.partners.includes(currentNode.id)
           /** Remove new contexts. */
-          && ctx.deploymentRequest.data.timestamp < pastTenMinutes
-          /** Remove the deployment context */
-          && ctx.appId !== '1'
+          && ctx.deploymentRequest!.data.timestamp < pastTenMinutes
       })
   }
 

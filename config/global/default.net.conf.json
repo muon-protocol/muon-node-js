@@ -49,6 +49,12 @@
   },
   "synchronizer": {
     "monitor": {
+      "providers": [
+        "http://104.131.177.195:8080/network",
+        "http://3.130.24.220:8080/network",
+        "http://194.195.211.27:8080/network",
+        "http://209.250.252.247:8080/network"
+      ],
       "startDelay": 600e3,
       "interval": 3600e3
     }
