@@ -77,7 +77,6 @@ export default class BaseNetworkPlugin extends Events {
       //
       // We load addresses from peerRouting and patch the
       // peerStore
-      if (peer) {
         try {
           //set timestamp on newly found peer
           const timestamp = Date.now();
@@ -90,7 +89,6 @@ export default class BaseNetworkPlugin extends Events {
         } catch (e) {
           this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
         }
-      }
 
       return routingPeer;
     }
