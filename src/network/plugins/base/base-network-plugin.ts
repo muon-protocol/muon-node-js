@@ -67,9 +67,6 @@ export default class BaseNetworkPlugin extends Events {
       this.defaultLogger(`peer not found local %p`, peerId);
       let routingPeer = await this.network.libp2p.peerRouting.findPeer(peerId);
 
-      peer = await this.network.libp2p.peerStore.get(peerId)
-        .catch(e => null);
-
       // There is a bug on libp2p 0.45.x
       // When a node dial another node, peer.addresses does not
       // save correctly on peerStore.
@@ -77,18 +74,18 @@ export default class BaseNetworkPlugin extends Events {
       //
       // We load addresses from peerRouting and patch the
       // peerStore
-        try {
-          //set timestamp on newly found peer
-          const timestamp = Date.now();
-          const uint8Array = uint8ArrayFromString(`${timestamp}`);
+      try {
+        //set timestamp on newly found peer
+        const timestamp = Date.now();
+        const uint8Array = uint8ArrayFromString(`${timestamp}`);
 
-          this.network.libp2p.peerStore.patch(peerId, {
-            multiaddrs: routingPeer.multiaddrs.map(x => multiaddr(x)),
-            metadata: {timestamp: uint8Array}
-          });
-        } catch (e) {
-          this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
-        }
+        this.network.libp2p.peerStore.patch(peerId, {
+          multiaddrs: routingPeer.multiaddrs.map(x => multiaddr(x)),
+          metadata: {timestamp: uint8Array}
+        });
+      } catch (e) {
+        this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
+      }
 
       return routingPeer;
     }
