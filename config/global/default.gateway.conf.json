@@ -4,9 +4,9 @@
   "routes": {
     "enable": {
       "api": true,
-      "network": false,
+      "network": true,
       "status": true,
-      "delegate": false,
+      "delegate": true,
       "mine": true,
       "crashReport": true,
       "ifconfig": true
