@@ -33,9 +33,23 @@ router.use(
   mixGetPost,
   asyncHandler(async (req, res, next) => {
     // @ts-ignore
-    let { id } = req.mixed;
+    const {id, timestamp, signature} = req.mixed;
 
-    if (!id) throw `Missing parameter 'id'`;
+    if (!id || !timestamp || !signature)
+      throw `Missing parameters`;
+
+    let hash = muonSha3(
+      { type: "uint64", value: timestamp },
+      { type: "string", value: "peerInfo" },
+    );
+    // @ts-ignore
+    const wallet = crypto.recover(hash, signature);
+    const requesterInfo: MuonNodeInfo[] = await NetworkIpc.filterNodes({
+      list: [wallet],
+    })!;
+
+    if(!requesterInfo[0])
+      throw `Invalid signature`;
 
     const peerInfos: MuonNodeInfo[] = await NetworkIpc.filterNodes({
       list: [id],

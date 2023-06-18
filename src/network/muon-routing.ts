@@ -144,12 +144,26 @@ export class MuonRouting implements PeerRouting, Startable {
       const randomIndexs = _.shuffle(_.range(this.apis.length)).slice(0,2);
       const apis = randomIndexs.map(i => this.apis[i])
       log(`Calling delegate server %o ...`, apis.map(api => api.defaults.baseURL));
+
+      const timestamp = Date.now();
+      const hash = muonSha3(
+        { type: "uint64", value: timestamp },
+        { type: "string", value: "peerInfo" },
+      );
+
+      const findPeerData = {
+        signature: crypto.sign(hash),
+        timestamp: timestamp,
+        id: `${id}`
+      };
+
+
       // @ts-ignore
       let result = await Promise.any(
         apis.map(api => {
           return api.post(
             "/findpeer",
-            {id: `${id}`},
+            findPeerData,
             {
               timeout: options.timeout,
             }
