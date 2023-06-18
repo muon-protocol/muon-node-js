@@ -29,6 +29,9 @@ export function load(): GatewayGlobalConfigs{
   if(!!process.env.gateway_routes_enable_api)
     configs.routes.enable.api = parseBool(process.env.gateway_routes_enable_api)
 
+  if(!!process.env.gateway_routes_enable_network)
+    configs.routes.enable.network = parseBool(process.env.gateway_routes_enable_network)
+
   if(!!process.env.gateway_routes_enable_status)
     configs.routes.enable.status = parseBool(process.env.gateway_routes_enable_status)
 
