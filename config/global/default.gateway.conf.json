@@ -8,8 +8,8 @@
       "status": true,
       "delegate": false,
       "mine": true,
-      "crashReport": false,
-      "ifconfig": false
+      "crashReport": true,
+      "ifconfig": true
     }
   }
 }
