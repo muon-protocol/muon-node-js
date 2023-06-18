@@ -5,6 +5,9 @@ import {isPeerId, Libp2pPeer, Libp2pPeerInfo} from '../../types.js';
 import {peerIdFromString} from '@libp2p/peer-id'
 import {logger, Logger} from '@libp2p/logger'
 import { multiaddr } from '@multiformats/multiaddr';
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
+import {loadGlobalConfigs} from "../../../common/configurations.js";
 
 export default class BaseNetworkPlugin extends Events {
   network: Network;
@@ -47,18 +50,21 @@ export default class BaseNetworkPlugin extends Events {
         throw `Invalid string PeedID [${peerId}]: ${e.message}`;
       }
     }
+
+
     try {
       let peer: Libp2pPeer = await this.network.libp2p.peerStore.get(peerId)
         .catch(e => null)
-      if(peer && peer.addresses.length) {
-        this.defaultLogger(`peer found local %p`, peerId)
+
+      if (peer && peer.addresses.length && this.hasValidTimestamp(peer)) {
+        this.defaultLogger(`peer found local %p`, peerId);
         return {
           id: peerId,
           multiaddrs: peer.addresses.map(addr => addr.multiaddr),
           protocols: []
         };
       }
-      this.defaultLogger(`peer not found local %p`, peerId)
+      this.defaultLogger(`peer not found local %p`, peerId);
       let routingPeer = await this.network.libp2p.peerRouting.findPeer(peerId);
 
       // There is a bug on libp2p 0.45.x
@@ -68,15 +74,19 @@ export default class BaseNetworkPlugin extends Events {
       //
       // We load addresses from peerRouting and patch the
       // peerStore
-      if(peer && !peer.addresses.length){
-        try{
-          this.network.libp2p.peerStore.patch(peerId, {
-            multiaddrs: routingPeer.multiaddrs.map(x => multiaddr(x))
-          });
-        }catch(e){
-          this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
-        };
+      try {
+        //set timestamp on newly found peer
+        const timestamp = Date.now();
+        const uint8Array = uint8ArrayFromString(`${timestamp}`);
+
+        this.network.libp2p.peerStore.patch(peerId, {
+          multiaddrs: routingPeer.multiaddrs.map(x => multiaddr(x)),
+          metadata: {timestamp: uint8Array}
+        });
+      } catch (e) {
+        this.defaultLogger.error(`cannot patch peerStore, ${e.message}`);
       }
+
       return routingPeer;
     }
     catch (e) {
@@ -138,5 +148,19 @@ export default class BaseNetworkPlugin extends Events {
       // this.defaultLogger.error("%o", e)
       throw e;
     }
+  }
+
+
+  hasValidTimestamp(peer) {
+    const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
+    const peerStoreTTL = parseInt(configs.routing.peerStoreTTL);
+    let timestamp = peer.metadata.get("timestamp");
+    if (!timestamp)
+      return false;
+    timestamp = uint8ArrayToString(timestamp);
+    if (Date.now() - timestamp > peerStoreTTL)
+      return false;
+
+    return true;
   }
 }

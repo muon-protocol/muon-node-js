@@ -45,10 +45,14 @@ router.use(
 
     const peerInfo = peerInfos[0];
 
-
+    const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
+    const delegateRoutingTTL = parseInt(configs.routing.delegateRoutingTTL);
+    const onlinePeer = onlines[peerInfo.id];
+    if (onlinePeer && Date.now() - onlinePeer.timestamp > delegateRoutingTTL)
+      throw `PeerId '${id}' expired`;
 
     res.json({
-      peerInfo: onlines[peerInfo.id]?.peerInfo
+      peerInfo: onlinePeer?.peerInfo
     });
   })
 );
@@ -74,7 +78,7 @@ router.use(
 
 
     const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
-    const discoveryTimestampValidation = parseInt(configs.discoveryValidPeriod);
+    const discoveryTimestampValidation = parseInt(configs.routing.discoveryValidPeriod);
     let diff = Date.now() - timestamp;
     if (diff < 0)
       throw `Discovery timestamp cannot be future time`;
