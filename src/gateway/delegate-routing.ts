@@ -47,9 +47,11 @@ router.use(
     const requesterInfo: MuonNodeInfo[] = await NetworkIpc.filterNodes({
       list: [wallet],
     })!;
-
     if(!requesterInfo[0])
       throw `Invalid signature`;
+
+    if (!hasCommonContext(requesterInfo[0].id, id))
+      throw `Access denied`;
 
     const peerInfos: MuonNodeInfo[] = await NetworkIpc.filterNodes({
       list: [id],
@@ -152,5 +154,9 @@ router.use(
     res.json(Object.values(onlines).filter((p) => p.timestamp > time));
   })
 );
+
+function hasCommonContext(peerId1, peerId2) {
+  return true;
+}
 
 export default router;
