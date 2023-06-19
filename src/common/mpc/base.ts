@@ -268,7 +268,7 @@ export class MultiPartyComputation {
         );
 
         if(qualifiedPartners.length < this.t) {
-          throw `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified. partners=[${this.partners.join(',')}], round=${currentRound}, partyErrors=${partyErrors}`
+          throw `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified. partners=[${this.partners.join(',')}], round=${currentRound}, partyErrors=${JSON.stringify(partyErrors)}`
         }
       }
 
