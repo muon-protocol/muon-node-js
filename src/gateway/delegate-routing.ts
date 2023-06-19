@@ -1,6 +1,6 @@
 import { Router } from "express";
 import * as NetworkIpc from "../network/ipc.js";
-import { mixGetPost } from "./middlewares.js";
+import { mixGetPost,rateLimit } from "./middlewares.js";
 import { logger } from "@libp2p/logger";
 import { muonSha3 } from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
@@ -31,6 +31,10 @@ const onlines: { [index: string]: RoutingData } = {};
 router.use(
   "/findpeer",
   mixGetPost,
+  rateLimit({
+    points: 100,
+    duration: 60*60e3,
+  }),
   asyncHandler(async (req, res, next) => {
     // @ts-ignore
     const {id, timestamp, signature} = req.mixed;
@@ -85,6 +89,10 @@ function mergeRoutingData(routingData: RoutingData) {
 router.use(
   "/discovery",
   mixGetPost,
+  rateLimit({
+    points: 50,
+    duration: 60*60e3,
+  }),
   asyncHandler(async (req, res, next) => {
     // @ts-ignore
     const { timestamp, gatewayPort, peerInfo, signature } = req.mixed;

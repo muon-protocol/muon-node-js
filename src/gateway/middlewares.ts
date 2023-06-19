@@ -1,5 +1,6 @@
 import {muonSha3} from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
+import {RateLimiterMemory} from "rate-limiter-flexible";
 
 /**  */
 const ADMIN_WALLETS = (`${process.env.ADMIN_WALLETS||""}|${process.env.SIGN_WALLET_ADDRESS}`)
@@ -44,4 +45,20 @@ export const onlyAdmins = (req, res, next) => {
   else {
     throw `Admin restricted`
   }
+}
+
+export function rateLimit(options) {
+  const rateLimiter = new RateLimiterMemory(options);
+  return (req, res, next) => {
+    console.log("checking rate limit");
+    rateLimiter.consume(req.ip)
+      .then(() => {
+        console.log("rate limit ok");
+        next();
+      })
+      .catch(_ => {
+        console.log("rate limit fail");
+        res.status(429).send('Too Many Requests');
+      });
+  };
 }
