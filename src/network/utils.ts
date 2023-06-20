@@ -7,13 +7,27 @@ import {createRequire} from "module";
 import {MuonNodeInfo, NodeManagerConfigs, NodeManagerData, NodeManagerDataRaw} from "../common/types";
 import {peerIdFromString} from "@libp2p/peer-id";
 import {timeout} from "../utils/helpers.js";
-import _ from "lodash";
 import { multiaddr } from "@multiformats/multiaddr";
+import { createClient, RedisClient } from 'redis'
+import redisConfig from '../common/redis-config.js'
+import {promisify} from "util";
+import {createAjv} from "../common/ajv.js";
+import {NodeManagerDataSchema} from "../common/ajv-schemas.js";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../data/NodeManager-ABI.json')
 const MuonNodesPaginationAbi = require('../data/MuonNodesPagination-ABI.json')
 const log = logger('muon:network:utils')
+
+const ajv = createAjv()
+
+const redisClient = createClient(redisConfig);
+redisClient.on("error", function(error) {
+  log.error(`redisClient error`, error);
+});
+const redisSet = promisify(redisClient.set.bind(redisClient));
+const redisGet = promisify(redisClient.get.bind(redisClient));
+const redisExpire = promisify(redisClient.expire).bind(redisClient)
 
 /**
  * This function checks if a given
@@ -32,6 +46,7 @@ export async function tryAndGetNodeManagerData(nodeManagerConfigs: NodeManagerCo
   do {
     try {
       const nodeManagerData = await getNodeManagerData(nodeManagerConfigs);
+      await storeNodeManagerDataIntoCache(nodeManagerConfigs, nodeManagerData);
       return nodeManagerData
     }catch (e) {
       log('loading NodeManager data failed. %o', e)
@@ -39,6 +54,28 @@ export async function tryAndGetNodeManagerData(nodeManagerConfigs: NodeManagerCo
     }
   }
   while(true)
+}
+
+function nodeManagerDataCacheKey(configs: NodeManagerConfigs) {
+  return `muon-node-manager-data@${configs.address}`
+}
+
+export async function getNodeManagerDataFromCache(configs: NodeManagerConfigs): Promise<NodeManagerData> {
+  let dataStr = await redisGet(nodeManagerDataCacheKey(configs));
+  if(!dataStr)
+    throw "cached data not found."
+  let data: NodeManagerData = JSON.parse(dataStr) as NodeManagerData;
+  if(!ajv.validate(NodeManagerDataSchema, data)) {
+    // @ts-ignore
+    throw ajv.errors.map(e => e.message).join("\n");
+  }
+  return data;
+}
+
+export async function storeNodeManagerDataIntoCache(configs: NodeManagerConfigs, data: NodeManagerData) {
+  await redisSet(nodeManagerDataCacheKey(configs), JSON.stringify(data));
+  /** keep in the cache for 36 hours */
+  await redisExpire(nodeManagerDataCacheKey(configs), 36 * 60 * 60);
 }
 
 export async function getNodeManagerData(nodeManagerConfigs: NodeManagerConfigs): Promise<NodeManagerData> {
@@ -93,6 +130,7 @@ export async function getNodeManagerData(nodeManagerConfigs: NodeManagerConfigs)
     nodes
   };
 }
+
 async function paginateAndGetNodeManagerData(paginationAddress:string, nodeManagerAddress: string, network: string): Promise<NodeManagerDataRaw> {
   const itemPerPage = 1200;
   const lastNodeIdStr: string = await eth.call(nodeManagerAddress, 'lastNodeId', [], NodeManagerAbi, network)
@@ -193,7 +231,7 @@ async function paginateAndGetNodeManagerChanges(paginationAddress:string, nodeMa
 
   return {
     // @ts-ignore
-    _lastUpdateTime: _nodes.reduce((max, node) => Math.max(max, parseInt(node.lastEditTime)), 0),
+    _lastUpdateTime: _nodes.reduce((max, node) => Math.max(max, parseInt(node.lastEditTime)), timestamp),
     _nodes
   }
 }
