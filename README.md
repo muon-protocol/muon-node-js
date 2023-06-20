@@ -8,11 +8,11 @@
   MUON, Decentralize all Off-Chain Components of your dApp.
   <br />
   <br />
-  <a href="https://github.com/dec0dOS/amazing-github-template/issues/new?assignees=&labels=bug&template=01_BUG_REPORT.md&title=bug%3A+">Report a Bug</a>
+  <a href="https://github.com/muon-protocol/muon-node-js/issues/new?assignees=&labels=bug&template=01_BUG_REPORT.md&title=bug%3A+">Report a Bug</a>
   ·
-  <a href="https://github.com/dec0dOS/amazing-github-template/issues/new?assignees=&labels=enhancement&template=02_FEATURE_REQUEST.md&title=feat%3A+">Request a Feature</a>
+  <a href="https://github.com/muon-protocol/muon-node-js/issues/new?assignees=&labels=enhancement&template=02_FEATURE_REQUEST.md&title=feat%3A+">Request a Feature</a>
   .
-  <a href="https://github.com/dec0dOS/amazing-github-template/discussions">Ask a Question</a>
+  <a href="https://github.com/muon-protocol/muon-node-js/discussions">Ask a Question</a>
 </div>
 
 <div align="center">
@@ -36,13 +36,8 @@
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Usage](#usage)
-    - [Cookiecutter template](#cookiecutter-template)
     - [Manual setup](#manual-setup)
-    - [Variables reference](#variables-reference)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
 - [Support](#support)
-- [License](#license)
 - [Acknowledgements](#acknowledgements)
 
 </details>
@@ -79,9 +74,8 @@ If you want to run the Muon node inside a Docker container, please refer to
 [this document](https://docs.muon.net/muon-network/muon-nodes/joining-alice-testnet).
 
 
-### Usage
 
-#### Cloning this repository
+### Cloning this repository
 Because of containing submodule, add the `--recurse-submodules` flag to the `clone`/`pull` commands.
 
     $ git clone <the-repo> --recurse-submodules
@@ -90,7 +84,7 @@ If you already cloned the old repo before the `apps` submodule, run the code bel
 
     $ git submodule init
     
-#### Run
+### Run
 To run this project execute following command:
 
     $ env-cmd babel-node index.js
@@ -100,12 +94,12 @@ Or if you want to run project with a custom env file:
     $ env-cmd -f ./1.env babel-node index.js
 
 
-#### Auto-Update
+### Auto-Update
 Enabling auto-update will trigger an update and restart the server for any commit made to the repository. To enable auto-update, run the following command: 
 
     bash ./scripts/auto-update.sh -a setup -p '<PM2_APP_NAME|PM2_APP_ID>'
 
-#### Update credentials
+### Update credentials
 
     cat >>~/.netrc <<EOF
     machine github.com
@@ -114,8 +108,8 @@ Enabling auto-update will trigger an update and restart the server for any commi
     EOF
 
 
-### Development
-#### Run a local devnet
+## Development
+### Run a local devnet
 
 You can run local devnet on port 8080
 
@@ -126,7 +120,7 @@ To check local devnet open http://localhost:8080/v1/?app=tss&method=test in your
 
 After any changes, you will need to build again.
 
-#### Develop MUON app
+### Develop MUON app
 
 ## Support
 
