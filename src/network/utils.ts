@@ -215,3 +215,11 @@ export function validateMultiaddrs(multiaddrs) {
   }
   return true;
 }
+
+export function validateTimestamp(timestamp, validPeriod) {
+  let diff = Date.now() - timestamp;
+  if (diff < 0)
+    throw `Discovery timestamp cannot be future time`;
+  if (diff > validPeriod)
+    throw `Discovery timestamp is too old`;
+}

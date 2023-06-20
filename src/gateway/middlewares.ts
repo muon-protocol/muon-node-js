@@ -50,14 +50,13 @@ export const onlyAdmins = (req, res, next) => {
 export function rateLimit(options) {
   const rateLimiter = new RateLimiterMemory(options);
   return (req, res, next) => {
-    console.log("checking rate limit");
+    if(!options.enabled)
+      next();
     rateLimiter.consume(req.ip)
       .then(() => {
-        console.log("rate limit ok");
         next();
       })
       .catch(_ => {
-        console.log("rate limit fail");
         res.status(429).send('Too Many Requests');
       });
   };

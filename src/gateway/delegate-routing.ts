@@ -1,17 +1,24 @@
-import { Router } from "express";
+import {Router} from "express";
 import * as NetworkIpc from "../network/ipc.js";
-import { mixGetPost,rateLimit } from "./middlewares.js";
-import { logger } from "@libp2p/logger";
-import { muonSha3 } from "../utils/sha3.js";
+import {mixGetPost, rateLimit} from "./middlewares.js";
+import {logger} from "@libp2p/logger";
+import {muonSha3} from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
-import { MuonNodeInfo } from "../common/types";
+import {MuonNodeInfo} from "../common/types";
 import asyncHandler from "express-async-handler";
-import {validateMultiaddrs} from "../network/utils.js";
-
+import {validateMultiaddrs, validateTimestamp} from "../network/utils.js";
+import {multiaddr} from "@multiformats/multiaddr";
 import {loadGlobalConfigs} from "../common/configurations.js";
+import {GatewayGlobalConfigs} from "./configurations";
 
 const router = Router();
 const log = logger("muon:gateway:routing");
+
+const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
+const delegateRoutingTTL = parseInt(configs.routing.delegateRoutingTTL);
+const discoveryValidPeriod = parseInt(configs.routing.discoveryValidPeriod);
+const findPeerValidPeriod = parseInt(configs.routing.findPeerValidPeriod);
+const gatewayConfigs:GatewayGlobalConfigs = loadGlobalConfigs('gateway.conf.json', 'default.gateway.conf.json')
 
 type RoutingData = {
   timestamp: number;
@@ -32,53 +39,72 @@ router.use(
   "/findpeer",
   mixGetPost,
   rateLimit({
-    points: 100,
-    duration: 60*60e3,
+    enabled: gatewayConfigs.delegates.rateLimit.findPeerEnabled,
+    points: gatewayConfigs.delegates.rateLimit.findPeerLimit,
+    duration: gatewayConfigs.delegates.rateLimit.findPeerDuration,
   }),
   asyncHandler(async (req, res, next) => {
     // @ts-ignore
-    const {id, timestamp, signature} = req.mixed;
+    const {id, timestamp, signature, requesterId} = req.mixed;
 
-    if (!id || !timestamp || !signature)
+    if (!id || !timestamp || !signature || !requesterId)
       throw `Missing parameters`;
 
-    let hash = muonSha3(
-      { type: "uint64", value: timestamp },
-      { type: "string", value: "peerInfo" },
-    );
-    // @ts-ignore
-    const wallet = crypto.recover(hash, signature);
-    const requesterInfo: MuonNodeInfo[] = await NetworkIpc.filterNodes({
-      list: [wallet],
+    validateTimestamp(timestamp, findPeerValidPeriod);
+    const nodesInfo: MuonNodeInfo[] = await NetworkIpc.filterNodes({
+      list: [requesterId, id],
     })!;
-    if(!requesterInfo[0])
-      throw `Invalid signature`;
+    const requesterPeerInfo = nodesInfo.find(peerInfo => peerInfo.peerId == requesterId);
+    const targetPeerInfo = nodesInfo.find(peerInfo => peerInfo.peerId == id);
 
-    if (!hasCommonContext(requesterInfo[0].id, id))
+
+    if (!requesterPeerInfo)
+      throw `Invalid request source`;
+    if (!targetPeerInfo)
+      throw `PeerId '${id}' not found`;
+
+    const targetOnlinePeer = onlines[targetPeerInfo.id];
+    if (!targetPeerInfo)
+      throw `PeerInfo '${id}' not found`;
+
+    if (!hasCommonContext(requesterPeerInfo, targetPeerInfo))
       throw `Access denied`;
 
-    const peerInfos: MuonNodeInfo[] = await NetworkIpc.filterNodes({
-      list: [id],
-    })!;
-
-    if (peerInfos.length < 1) throw `PeerId '${id}' not found`;
-
-    const peerInfo = peerInfos[0];
-
-    const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
-    const delegateRoutingTTL = parseInt(configs.routing.delegateRoutingTTL);
-    const onlinePeer = onlines[peerInfo.id];
-    if (onlinePeer && Date.now() - onlinePeer.timestamp > delegateRoutingTTL)
+    if (Date.now() - targetOnlinePeer.timestamp > delegateRoutingTTL)
       throw `PeerId '${id}' expired`;
 
+    const requesterOnlinePeer = onlines[requesterPeerInfo.id];
+    if (requesterOnlinePeer) {
+      //Validate IP address
+      let validIp = false;
+      for (let i = 0; i < requesterOnlinePeer.peerInfo.multiaddrs.length; i++) {
+        const address = multiaddr(requesterOnlinePeer.peerInfo.multiaddrs[0]);
+        if (address.nodeAddress().address == req.ip) {
+          validIp = true;
+          break;
+        }
+      }
+      if (!validIp)
+        throw `Request sent by invalid IP address`;
+    } else {
+      //Validate signature
+      const hash = muonSha3(
+        {type: "uint64", value: timestamp},
+        {type: "string", value: `${requesterId}`},
+      );
+      const wallet = crypto.recover(hash, signature);
+      if (wallet != requesterPeerInfo.wallet)
+        throw `Invalid signature`;
+    }
+
     res.json({
-      peerInfo: onlinePeer?.peerInfo
+      peerInfo: targetOnlinePeer?.peerInfo
     });
   })
 );
 
 function mergeRoutingData(routingData: RoutingData) {
-  let { id } = routingData;
+  let {id} = routingData;
   onlines[id] = routingData;
 }
 
@@ -90,24 +116,20 @@ router.use(
   "/discovery",
   mixGetPost,
   rateLimit({
-    points: 50,
-    duration: 60*60e3,
+    enabled: gatewayConfigs.delegates.rateLimit.discoveryEnabled,
+    points: gatewayConfigs.delegates.rateLimit.discoveryLimit,
+    duration: gatewayConfigs.delegates.rateLimit.discoveryDuration,
   }),
   asyncHandler(async (req, res, next) => {
     // @ts-ignore
-    const { timestamp, gatewayPort, peerInfo, signature } = req.mixed;
+    const {timestamp, gatewayPort, peerInfo, signature} = req.mixed;
 
     if (!gatewayPort || !timestamp || !peerInfo || !signature)
       throw `Missing parameters`;
 
 
-    const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
-    const discoveryTimestampValidation = parseInt(configs.routing.discoveryValidPeriod);
-    let diff = Date.now() - timestamp;
-    if (diff < 0)
-      throw `Discovery timestamp cannot be future time`;
-    if (diff > discoveryTimestampValidation)
-      throw `Discovery timestamp is too old`;
+
+    validateTimestamp(timestamp, discoveryValidPeriod);
 
     if (!validateMultiaddrs(peerInfo?.multiaddrs))
       throw `Invalid multiaddrs`;
@@ -118,10 +140,10 @@ router.use(
     if (realPeerInfo.length < 1) throw `Unknown peerId`;
 
     let hash = muonSha3(
-      { type: "uint16", value: gatewayPort },
-      { type: "uint64", value: timestamp },
-      { type: "string", value: peerInfo.id },
-      ...peerInfo.multiaddrs.map((value) => ({ type: "string", value }))
+      {type: "uint16", value: gatewayPort},
+      {type: "uint64", value: timestamp},
+      {type: "string", value: peerInfo.id},
+      ...peerInfo.multiaddrs.map((value) => ({type: "string", value}))
     );
     // @ts-ignore
     const wallet = crypto.recover(hash, signature);
@@ -145,8 +167,6 @@ router.use(
 );
 
 
-
-
 /**
  Lists online nodes filtered by online duration.
  (default duration: 60 minutes)
@@ -156,7 +176,7 @@ router.use(
   mixGetPost,
   asyncHandler(async (req, res, next) => {
     // @ts-ignore
-    let { duration = 60 } = req.mixed;
+    let {duration = 60} = req.mixed;
 
     const time = Date.now() - duration * 60000;
     res.json(Object.values(onlines).filter((p) => p.timestamp > time));

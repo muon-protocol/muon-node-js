@@ -14,6 +14,16 @@ export type GatewayGlobalConfigs = {
       crashReport: boolean,
       ifconfig: boolean,
     }
+  },
+  delegates: {
+    rateLimit: {
+      findPeerEnabled: boolean,
+      discoveryEnabled: boolean,
+      findPeerLimit: number,
+      findPeerDuration: number,
+      discoveryLimit: number,
+      discoveryDuration: number
+    }
   }
 }
 

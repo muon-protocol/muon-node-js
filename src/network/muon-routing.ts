@@ -147,16 +147,16 @@ export class MuonRouting implements PeerRouting, Startable {
 
       const timestamp = Date.now();
       const hash = muonSha3(
-        { type: "uint64", value: timestamp },
-        { type: "string", value: "peerInfo" },
+        {type: "uint64", value: timestamp},
+        {type: "string", value: `${this.components.peerId}`},
       );
 
       const findPeerData = {
         signature: crypto.sign(hash),
         timestamp: timestamp,
+        requesterId: this.components.peerId,
         id: `${id}`
       };
-
 
       // @ts-ignore
       let result = await Promise.any(
