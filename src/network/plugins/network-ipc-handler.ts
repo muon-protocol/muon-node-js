@@ -8,7 +8,6 @@ import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
 // import NetworkDHTPlugin from "./network-dht.js";
-import NetworkContentPlugin from "./content-plugin.js";
 import {parseBool, timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
@@ -70,8 +69,6 @@ export const IpcMethods = {
   ForwardCoreRemoteCall: "forward-core-remote-call",
   GetPeerInfo: "GPI",
   //GetPeerInfoLight: "GPILight",
-  ContentRoutingProvide: "content-routing-provide",
-  ContentRoutingFind: "content-routing-find",
   ForwardGatewayRequest: "forward-gateway-request",
   GetCurrentNodeInfo: "get-current-node-info",
   AllowRemoteCallByShieldNode: "allow-remote-call-by-shield-node",
@@ -117,10 +114,6 @@ class NetworkIpcHandler extends CallablePlugin {
 
   get remoteCallPlugin(): RemoteCall {
     return this.network.getPlugin('remote-call');
-  }
-
-  get contentPlugin(): NetworkContentPlugin {
-    return this.network.getPlugin('content');
   }
 
   get latencyCheckPlugin(): LatencyCheckPlugin {
@@ -273,16 +266,6 @@ class NetworkIpcHandler extends CallablePlugin {
       multiaddrs: peerInfo.multiaddrs.map(ma => ma.toString()),
       protocols: peerInfo.protocols
     }
-  }
-
-  @ipcMethod(IpcMethods.ContentRoutingProvide)
-  async __contentRoutingProvide(cids: string | string[], callerInfo) {
-    await this.contentPlugin.provide(cids);
-  }
-
-  @ipcMethod(IpcMethods.ContentRoutingFind)
-  async __onContentRoutingFind(cid: string, callerInfo) {
-    return this.contentPlugin.find(cid);
   }
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)

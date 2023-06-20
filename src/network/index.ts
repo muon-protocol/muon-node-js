@@ -1,4 +1,3 @@
-import NetworkContentPlugin from "./plugins/content-plugin.js";
 import mongoose from "mongoose";
 import Events from "events-async";
 import { create } from "./libp2p_bundle.js";
@@ -9,7 +8,6 @@ import {
   getNodeManagerDataFromCache,
   isPrivate,
   peerId2Str,
-  storeNodeManagerDataIntoCache,
   tryAndGetNodeManagerData
 } from "./utils.js";
 import { MessagePublisher } from "../common/message-bus/index.js";
@@ -309,7 +307,6 @@ async function start() {
       ],
       "latency": [LatencyCheckPlugin, {}],
       broadcast: [NetworkBroadcastPlugin, {}],
-      content: [NetworkContentPlugin, {}],
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],
       "ipc-handler": [IpcHandlerPlugin, {}],
