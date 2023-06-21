@@ -7,7 +7,6 @@ import * as crypto from "../utils/crypto.js";
 import {MuonNodeInfo} from "../common/types";
 import asyncHandler from "express-async-handler";
 import {validateMultiaddrs, validateTimestamp} from "../network/utils.js";
-import {multiaddr} from "@multiformats/multiaddr";
 import {loadGlobalConfigs} from "../common/configurations.js";
 import {GatewayGlobalConfigs} from "./configurations";
 
@@ -18,11 +17,12 @@ const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
 const delegateRoutingTTL = parseInt(configs.routing.delegateRoutingTTL);
 const discoveryValidPeriod = parseInt(configs.routing.discoveryValidPeriod);
 const findPeerValidPeriod = parseInt(configs.routing.findPeerValidPeriod);
-const gatewayConfigs:GatewayGlobalConfigs = loadGlobalConfigs('gateway.conf.json', 'default.gateway.conf.json')
+const gatewayConfigs: GatewayGlobalConfigs = loadGlobalConfigs('gateway.conf.json', 'default.gateway.conf.json');
 
 type RoutingData = {
   timestamp: number;
   id: string;
+  wallet: string;
   gatewayPort: number;
   peerInfo: {
     id: string;
@@ -50,50 +50,34 @@ router.use(
     if (!id || !timestamp || !signature || !requesterId)
       throw `Missing parameters`;
 
-    validateTimestamp(timestamp, findPeerValidPeriod);
-    const nodesInfo: MuonNodeInfo[] = await NetworkIpc.filterNodes({
-      list: [requesterId, id],
-    })!;
-    const requesterPeerInfo = nodesInfo.find(peerInfo => peerInfo.peerId == requesterId);
-    const targetPeerInfo = nodesInfo.find(peerInfo => peerInfo.peerId == id);
+    let requesterOnlinePeer = onlines[requesterId];
+    let targetOnlinePeer = onlines[id];
 
-
-    if (!requesterPeerInfo)
+    if (!requesterOnlinePeer)
       throw `Invalid request source`;
-    if (!targetPeerInfo)
+    if (!targetOnlinePeer)
       throw `PeerId '${id}' not found`;
 
-    const targetOnlinePeer = onlines[targetPeerInfo.id];
-    if (!targetPeerInfo)
-      throw `PeerInfo '${id}' not found`;
+    validateTimestamp(timestamp, findPeerValidPeriod);
 
-    if (!hasCommonContext(requesterPeerInfo, targetPeerInfo))
+    if (!hasCommonContext(requesterOnlinePeer, targetOnlinePeer))
       throw `Access denied`;
 
     if (Date.now() - targetOnlinePeer.timestamp > delegateRoutingTTL)
       throw `PeerId '${id}' expired`;
 
-    const requesterOnlinePeer = onlines[requesterPeerInfo.id];
-    if (requesterOnlinePeer) {
-      //Validate IP address
-      let validIp = false;
-      for (let i = 0; i < requesterOnlinePeer.peerInfo.multiaddrs.length; i++) {
-        const address = multiaddr(requesterOnlinePeer.peerInfo.multiaddrs[0]);
-        if (address.nodeAddress().address == req.ip) {
-          validIp = true;
-          break;
-        }
-      }
-      if (!validIp)
-        throw `Request sent by invalid IP address`;
-    } else {
+    const requesterIp = req.headers['x-forwarded-for'] || req.ip;
+    // @ts-ignore
+    const hasValidIp = requesterOnlinePeer.peerInfo.multiaddrs.some(ma => ma.includes(requesterIp));
+
+    if (!hasValidIp) {
       //Validate signature
       const hash = muonSha3(
         {type: "uint64", value: timestamp},
         {type: "string", value: `${requesterId}`},
       );
       const wallet = crypto.recover(hash, signature);
-      if (wallet != requesterPeerInfo.wallet)
+      if (wallet != requesterOnlinePeer.wallet)
         throw `Invalid signature`;
     }
 
@@ -104,7 +88,7 @@ router.use(
 );
 
 function mergeRoutingData(routingData: RoutingData) {
-  let {id} = routingData;
+  let {id} = routingData.peerInfo;
   onlines[id] = routingData;
 }
 
@@ -126,7 +110,6 @@ router.use(
 
     if (!gatewayPort || !timestamp || !peerInfo || !signature)
       throw `Missing parameters`;
-
 
 
     validateTimestamp(timestamp, discoveryValidPeriod);
@@ -157,6 +140,7 @@ router.use(
       id: realPeerInfo[0].id,
       gatewayPort,
       peerInfo,
+      wallet
     });
 
     log(`PeerInfo updated successfully %s`, peerInfo.id);
