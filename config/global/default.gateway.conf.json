@@ -14,7 +14,7 @@
   },
   "delegates": {
     "rateLimit": {
-      "findPeerEnabled": true,
+      "findPeerEnabled": false,
       "discoveryEnabled": true,
       "findPeerLimit": 100,
       "findPeerDuration": 600000,
