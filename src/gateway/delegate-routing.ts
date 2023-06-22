@@ -5,6 +5,7 @@ import {logger} from "@libp2p/logger";
 import {muonSha3} from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
 import {MuonNodeInfo} from "../common/types";
+import {multiaddr} from "@multiformats/multiaddr";
 import asyncHandler from "express-async-handler";
 import {validateMultiaddrs, validateTimestamp} from "../network/utils.js";
 import {loadGlobalConfigs} from "../common/configurations.js";
@@ -66,11 +67,11 @@ router.use(
     if (Date.now() - targetOnlinePeer.timestamp > delegateRoutingTTL)
       throw `PeerId '${id}' expired`;
 
-    const requesterIp = req.headers['x-forwarded-for'] || req.ip;
+    const requesterIp = req.ip;
     // @ts-ignore
-    const hasValidIp = requesterOnlinePeer.peerInfo.multiaddrs.some(ma => ma.includes(requesterIp));
+    const isNodeIP = requesterOnlinePeer.peerInfo.multiaddrs.some(ma => multiaddr(ma).nodeAddress().address == requesterIp);
 
-    if (!hasValidIp) {
+    if (!isNodeIP) {
       //Validate signature
       const hash = muonSha3(
         {type: "uint64", value: timestamp},
