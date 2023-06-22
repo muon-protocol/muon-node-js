@@ -50,8 +50,8 @@ export const onlyAdmins = (req, res, next) => {
 export function rateLimit(options) {
   const rateLimiter = new RateLimiterMemory(options);
   return (req, res, next) => {
-    if(!options.enabled)
-      next();
+    if (!options.enabled)
+      return next();
     rateLimiter.consume(req.ip)
       .then(() => {
         next();
