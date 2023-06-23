@@ -16,13 +16,15 @@ import axios, {AxiosInstance} from "axios";
 import _ from 'lodash';
 import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
+import {readSetting, writeSetting} from "../../common/db-models/Settings.js";
 
 const CONCURRENT_TSS_RECOVERY = 5;
 const log = logger("muon:core:plugins:synchronizer")
 
 const RemoteMethods = {
   GetAllContexts: "get-all-ctx",
-  IsSeedsRotated: "is-seeds-rotated"
+  IsSeedsRotated: "is-seeds-rotated",
+  GetMissingContext: "get-missing-context",
 }
 
 @remoteApp
@@ -60,7 +62,10 @@ export default class DbSynchronizer extends CallablePlugin {
        */
       let permitted = await NetworkIpc.askClusterPermission('db-synchronizer', 20000)
       if (permitted) {
-        this.startMonitoring().catch(e => {});
+        this.nonDeployersSyncLoop().catch(e => log.error(`error when starting monitor %o`, e));
+
+        if(this.nodeManager.currentNodeInfo?.isDeployer)
+          this.deployersSyncLoop().catch(e => log.error(`error in deployers sync loop %o`, e));
       }
       else {
         log(`process pid:${process.pid} not permitted to synchronize db.`)
@@ -80,9 +85,9 @@ export default class DbSynchronizer extends CallablePlugin {
     return this.muon.getPlugin('tss-plugin')
   }
 
-  private async startMonitoring() {
+  private async nonDeployersSyncLoop() {
     const {monitor: {startDelay, interval}} = this.muon.configs.net.synchronizer;
-    log(`monitor start %o`, {startDelay, interval})
+    log(`non-deployers sync loop start %o`, {startDelay, interval})
 
     await timeout(Math.floor((0.5 + Math.random()) * startDelay));
     while (true) {
@@ -103,6 +108,72 @@ export default class DbSynchronizer extends CallablePlugin {
         await this.purgeContextAndKeys()
       }catch (e) {
         log.error(`error when purging context: ${e.message} %o`, e);
+      }
+
+      await timeout(interval);
+    }
+  }
+
+  /**
+   This method ensures that all deployers have a complete list of active contexts.
+   Non-deployer nodes query deployers to find their own contexts. Sometimes a deployer
+   may miss some contexts. This method detects and retrieves the missing contexts from
+   other deployers and updates the own context list accordingly.
+   */
+  async deployersSyncLoop() {
+    const {monitor: {startDelay, interval}} = this.muon.configs.net.synchronizer;
+    log(`deployers sync loop start %o`, {startDelay, interval})
+
+    await timeout(Math.floor((0.5 + Math.random()) * startDelay));
+    while (true) {
+      let lastTimestamp: number = await readSetting('deployers-sync.lastTimestamp', 0);
+      log(`checking for deployer sync %o`, {lastTimestamp})
+
+      /** select random deployers */
+      const deployers: string[] = this.nodeManager
+        .filterNodes({isDeployer: true, excludeSelf: true})
+        .map(n => n.peerId);
+      const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployers, 3, {timeout: 3000, return: 'peerId'});
+
+      /** paginate and get missing contexts */
+      let res: AppContext[][] = await Promise.all(
+        onlineDeployers.map(peerId => {
+          return this.remoteCall(
+            peerId,
+            RemoteMethods.GetMissingContext,
+            {
+              from: lastTimestamp+1,
+              count: 1
+            },
+          )
+        })
+      );
+      let uniqueList:AppContext[] = Object.values(
+        _.flatten(res).reduce((obj:MapOf<AppContext>, ctx: AppContext): MapOf<AppContext> => {
+          obj[ctx.deploymentRequest!.reqId] = ctx
+          return obj;
+        }, {})
+      );
+
+      if(uniqueList.length > 0) {
+        const lastContextTime: number = uniqueList.reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
+
+        /** filter out locally existing context and keep only missing contexts. */
+        uniqueList = uniqueList.filter(ctx => {
+          const {appId, seed} = ctx
+          return !this.appManager.getAppContext(appId, seed)
+        })
+
+        for (const ctx of uniqueList) {
+          await this.appManager.saveAppContext(ctx);
+        }
+
+        log(`deployer-sync: there is ${uniqueList.length} missing contexts.`)
+
+        if (lastContextTime > lastTimestamp) {
+          log('updating lastTimestamp setting %o', {lastTimestamp: lastContextTime})
+          await writeSetting("deployers-sync.lastTimestamp", lastContextTime);
+        }
       }
 
       await timeout(interval);
@@ -315,5 +386,12 @@ export default class DbSynchronizer extends CallablePlugin {
     const {seeds} = data;
     const rotatedSeed = this.appManager.getContextRotateMap()
     return seeds.map(seed => !!rotatedSeed[seed]);
+  }
+
+  @remoteMethod(RemoteMethods.GetMissingContext)
+  async __getMissingContext(data: {from: number, count: number}, callerInfo:MuonNodeInfo): Promise<AppContext[]> {
+    if(!callerInfo.isDeployer)
+      throw `deployer restricted method.`
+    return this.appManager.getSortedContexts(data.from, data.count);
   }
 }

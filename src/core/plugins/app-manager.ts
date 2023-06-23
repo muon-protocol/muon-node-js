@@ -619,6 +619,9 @@ export default class AppManager extends CallablePlugin {
     return status;
   }
 
+  /**
+   * @return {number} - Deployment timestamp of most recent context
+   */
   getLastContextTime(): number {
     return Object.values(this.appContexts).reduce((max, ctx) => {
       return Math.max(max, ctx.deploymentRequest?.data.timestamp || 0)
@@ -893,6 +896,44 @@ export default class AppManager extends CallablePlugin {
       .filter((ctx:AppContext) => {
         return (!ctx.expiration || ctx.expiration > currentTime) && ctx.party.partners.includes(node.id)
       })
+  }
+
+  /**
+   * Sort the AppContext list by deployment timestamp and return the `count` number of results.
+   * @param fromTimestamp {number} - All context with deployment time grater than this value will be select
+   * @param count {number} - The number of outputs that the user wants. The actual number of outputs may be higher than the value of this parameter.
+   */
+  getSortedContexts(fromTimestamp: number, count: number): AppContext[] {
+    const currentTime = getTimestamp()
+    let list = Object.values(this.appContexts)
+      .filter((ctx:AppContext) => {
+        return (!ctx.expiration || ctx.expiration > currentTime)
+          && !!ctx.deploymentRequest
+          && ctx.deploymentRequest.data.timestamp >= fromTimestamp
+      })
+      .sort((a,b) => {
+        // @ts-ignore
+        const ta = a.deploymentRequest.data.timestamp, tb = b.deploymentRequest.data.timestamp;
+        if(ta > tb)
+          return 1
+        else if(ta < tb)
+          return -1
+        else
+          return 0;
+      })
+
+    if(list.length > count) {
+      let lastItem = count-1;
+      // @ts-ignore
+      const cuttingEdgeTimestamp = list[lastItem].deploymentRequest.data.timestamp;
+      // @ts-ignore
+      while (list[lastItem] && list[lastItem+1].deploymentRequest.data.timestamp === cuttingEdgeTimestamp) {
+        lastItem++;
+      }
+      list = list.slice(0, lastItem+1);
+    }
+
+    return list;
   }
 
   /**
