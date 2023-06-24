@@ -64,8 +64,7 @@ export default class DbSynchronizer extends CallablePlugin {
       if (permitted) {
         this.nonDeployersSyncLoop().catch(e => log.error(`error when starting monitor %o`, e));
 
-        if(this.nodeManager.currentNodeInfo?.isDeployer)
-          this.deployersSyncLoop().catch(e => log.error(`error in deployers sync loop %o`, e));
+        this.deployersSyncLoop().catch(e => log.error(`error in deployers sync loop %o`, e));
       }
       else {
         log(`process pid:${process.pid} not permitted to synchronize db.`)
@@ -126,57 +125,76 @@ export default class DbSynchronizer extends CallablePlugin {
 
     await timeout(Math.floor((0.5 + Math.random()) * startDelay));
     while (true) {
-      let lastTimestamp: number = await readSetting('deployers-sync.lastTimestamp', 0);
-      log(`checking for deployer sync %o`, {lastTimestamp})
+      if(this.currentNodeInfo?.isDeployer) {
+        let lastTimestamp: number = await readSetting('deployers-sync.lastTimestamp', 0);
+        log(`checking for deployer sync %o`, {lastTimestamp})
 
-      /** select random deployers */
-      const deployers: string[] = this.nodeManager
-        .filterNodes({isDeployer: true, excludeSelf: true})
-        .map(n => n.peerId);
-      const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(deployers, 3, {timeout: 3000, return: 'peerId'});
+        /** select random deployers */
+        const deployers: string[] = this.nodeManager
+          .filterNodes({isDeployer: true, excludeSelf: true})
+          .map(n => n.peerId);
 
-      /** paginate and get missing contexts */
-      let res: AppContext[][] = await Promise.all(
-        onlineDeployers.map(peerId => {
-          return this.remoteCall(
-            peerId,
-            RemoteMethods.GetMissingContext,
-            {
-              from: lastTimestamp+1,
-              count: 1
-            },
-          )
-        })
-      );
-      let uniqueList:AppContext[] = Object.values(
-        _.flatten(res).reduce((obj:MapOf<AppContext>, ctx: AppContext): MapOf<AppContext> => {
-          obj[ctx.deploymentRequest!.reqId] = ctx
-          return obj;
-        }, {})
-      );
+        /**
+         * Different nodes may have different processing speeds and network delays.
+         * If we always select the fastest nodes to participate in a protocol, we
+         * may introduce bias and reduce the randomness of the system. To keep
+         * randomness and prevent always selecting fast nodes, we can select half
+         * of the nodes as the candidate nodes and then select some of them to do query. */
+        const candidateDeployers = deployers.slice(0, Math.ceil(deployers.length/2))
 
-      if(uniqueList.length > 0) {
-        const lastContextTime: number = uniqueList.reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
+        const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
+          candidateDeployers,
+          3,
+          {
+            timeout: 3000,
+            return: 'peerId'
+          },
+        );
 
-        /** filter out locally existing context and keep only missing contexts. */
-        uniqueList = uniqueList.filter(ctx => {
-          const {appId, seed} = ctx
-          return !this.appManager.getAppContext(appId, seed)
-        })
+        /** paginate and get missing contexts */
+        let res: AppContext[][] = await Promise.all(
+          onlineDeployers.map(peerId => {
+            return this.remoteCall(
+              peerId,
+              RemoteMethods.GetMissingContext,
+              {
+                from: lastTimestamp + 1,
+                count: 100
+              },
+            )
+              .catch(e => [])
+          })
+        );
+        let uniqueList: AppContext[] = Object.values(
+          _.flatten(res).reduce((obj: MapOf<AppContext>, ctx: AppContext): MapOf<AppContext> => {
+            obj[ctx.deploymentRequest!.reqId] = ctx
+            return obj;
+          }, {})
+        );
 
-        for (const ctx of uniqueList) {
-          await this.appManager.saveAppContext(ctx);
-        }
+        if (uniqueList.length > 0) {
+          const lastContextTime: number = uniqueList.reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
 
-        log(`deployer-sync: there is ${uniqueList.length} missing contexts.`)
+          /** filter out locally existing context and keep only missing contexts. */
+          uniqueList = uniqueList.filter(ctx => {
+            const {appId, seed} = ctx
+            return !this.appManager.getAppContext(appId, seed)
+          })
 
-        if (lastContextTime > lastTimestamp) {
-          log('updating lastTimestamp setting %o', {lastTimestamp: lastContextTime})
-          await writeSetting("deployers-sync.lastTimestamp", lastContextTime);
+          for (const ctx of uniqueList) {
+            await this.appManager.saveAppContext(ctx);
+          }
+
+          log(`deployer-sync: there is ${uniqueList.length} missing contexts.`)
+
+          if (lastContextTime > lastTimestamp) {
+            log('updating lastTimestamp setting %o', {lastTimestamp: lastContextTime})
+            await writeSetting("deployers-sync.lastTimestamp", lastContextTime);
+          }
         }
       }
 
-      await timeout(interval);
+      await timeout(Math.floor((0.5 + Math.random()) * interval));
     }
   }
 
