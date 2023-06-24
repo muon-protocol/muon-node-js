@@ -39,6 +39,7 @@ const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
 const RemoteMethods = {
   AskSignature: 'AskSign',
   InformRequestConfirmation: 'InformReqConfirmation',
+  InformRequestError: 'InformReqError',
 }
 
 @remoteApp
@@ -55,6 +56,7 @@ class BaseAppPlugin extends CallablePlugin {
   /** multiple group can be returned in order to check separately in confirmation check */
   getConfirmAnnounceGroups: (request: object) => Promise<string[][]>;
   onConfirm: (request: object, result: any, signatures: any[]) => void;
+  onError: (request: object) => void;
   METHOD_PARAMS_SCHEMA: object = {};
   /**=================================*/
   APP_NAME: string | null = null
@@ -345,64 +347,75 @@ class BaseAppPlugin extends CallablePlugin {
         t4 = Date.now()
       }
 
-      let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
-      this.log(`confirmation done with %s`, confirmed)
-      t5 = Date.now()
+      /**
+       * If an error occurs at any point after the request is broadcasted to the network, the onError
+       * callback function will be invoked on the partners that are collaborating on the request.
+       * This applies only to the partners that jointly generated the request nonce.
+       */
+      try {
+        let [confirmed, signatures] = await this.isOtherNodesConfirmed(newRequest)
+        this.log(`confirmation done with %s`, confirmed)
+        t5 = Date.now()
 
-      let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
-      this.log(`request signed with %o`, nonce.partners);
-      this.log('request time parts %O',{
-        "req exec time": t1-t0,
-        "find online nodes": t2-t1,
-        "dkg time": t3-t2,
-        "req broadcast": t4-t3,
-        "confirm waiting": t5-t4,
-      })
+        let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
+        this.log(`request signed with %o`, nonce.partners);
+        this.log('request time parts %O', {
+          "req exec time": t1 - t0,
+          "find online nodes": t2 - t1,
+          "dkg time": t3 - t2,
+          "req broadcast": t4 - t3,
+          "confirm waiting": t5 - t4,
+        })
 
-      if (confirmed) {
-        newRequest['confirmedAt'] = getTimestamp()
-      }
-
-      let requestData: any = {
-        confirmed,
-        ...omit(newRequest._doc, [
-          '__v',
-          '_id'
-        ]),
-        signatures: confirmed ? signatures : []
-      }
-
-      // console.log("requestData", requestData)
-
-      if(confirmed && gwSign){
-        let cryptoSign = crypto.sign(resultHash);
-        requestData.gwSignature = cryptoSign;
-        requestData.nodeSignature = cryptoSign;
-      }
-
-      if (confirmed && !isDuplicateRequest) {
-        if(!!this.onConfirm) {
-          this.informRequestConfirmation(requestData)
-            .catch(e => {
-              this.log.error("error when informing request confirmation %O", e)
-            })
+        if (confirmed) {
+          newRequest['confirmedAt'] = getTimestamp()
         }
 
-        /** send request data to aggregator nodes */
-        this.log('sending request to aggregator nodes ...')
-        NetworkIpc.sendToAggregatorNode("AppRequest", requestData)
-          .then(aggregatorNodeIdList => {
-            this.log(`request sent to aggregator nodes: %o`, aggregatorNodeIdList)
-          })
-          .catch(e => {
-            this.log(`error when sending request to aggregator nodes %o`, e)
-          })
+        let requestData: any = {
+          confirmed,
+          ...omit(newRequest._doc, [
+            '__v',
+            '_id'
+          ]),
+          signatures: confirmed ? signatures : []
+        }
 
-        /** store data locally */
-        newRequest.save()
+        // console.log("requestData", requestData)
+
+        if (confirmed && gwSign) {
+          let cryptoSign = crypto.sign(resultHash);
+          requestData.gwSignature = cryptoSign;
+          requestData.nodeSignature = cryptoSign;
+        }
+
+        if (confirmed && !isDuplicateRequest) {
+          if (!!this.onConfirm) {
+            this.informRequestConfirmation(requestData)
+              .catch(e => {
+                this.log.error("error when informing request confirmation %O", e)
+              })
+          }
+
+          /** send request data to aggregator nodes */
+          this.log('sending request to aggregator nodes ...')
+          NetworkIpc.sendToAggregatorNode("AppRequest", requestData)
+            .then(aggregatorNodeIdList => {
+              this.log(`request sent to aggregator nodes: %o`, aggregatorNodeIdList)
+            })
+            .catch(e => {
+              this.log(`error when sending request to aggregator nodes %o`, e)
+            })
+
+          /** store data locally */
+          newRequest.save()
+        }
+
+        return requestData
       }
-
-      return requestData
+      catch (e) {
+        this.informRequestError(requestData).catch(e => {})
+        throw e
+      }
     }
   }
 
@@ -509,6 +522,39 @@ class BaseAppPlugin extends CallablePlugin {
     const successResponses = responses.filter(r => (r !== 'error'))
     if(successResponses.length < this.getParty(request.deploymentSeed)!.t)
       throw `Error when informing request confirmation.`
+  }
+
+  async informRequestError(request: AppRequest) {
+    request = clone(request)
+    let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
+
+    let announceList = this.getParty(request.deploymentSeed)!.partners;
+
+    const partners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: announceList})
+      .filter((op: MuonNodeInfo) => nonce.partners.includes(op.id))
+    this.log(`nodes selected to announce failure: %o`, partners.map(p => p.id))
+
+    await Promise.all(partners.map(async node => {
+      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
+        return this.__onRequestError(request, node)
+          .catch(e => {
+            this.log.error(`informRequestConfirmation error %o`, e)
+            return 'error'
+          })
+      }
+      else {
+        return this.remoteCall(
+          node.peerId,
+          RemoteMethods.InformRequestError,
+          request,
+          {taskId: `keygen-${nonce.id}`, timeout: 10e3}
+        )
+          .catch(e => {
+            this.log.error(`informRequestConfirmation error %o`, e)
+            return 'error'
+          })
+      }
+    }))
   }
 
   calculateRequestId(request, resultHash) {
@@ -652,10 +698,8 @@ class BaseAppPlugin extends CallablePlugin {
     let party = this.getParty(request.deploymentSeed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
-    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: party.partners})
-      .filter((op: MuonNodeInfo) => {
-        return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.id)
-      })
+    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: party.partners, excludeSelf: true})
+      .filter((op: MuonNodeInfo) => nonce.partners.includes(op.id))
 
     this.requestManager.setPartnerCount(request.reqId, partners.length + 1);
 
@@ -963,6 +1007,30 @@ class BaseAppPlugin extends CallablePlugin {
     await requestConfirmationCache.set(request.reqId, '1');
 
     return `OK`;
+  }
+
+  @remoteMethod(RemoteMethods.InformRequestError)
+  async __onRequestError(request: AppRequest, callerInfo: MuonNodeInfo) {
+    if(!this.onError)
+      throw `onError not defined for this app`;
+
+    deepFreeze(request);
+    /**
+     * Check request owner
+     */
+    if(request.gwAddress !== callerInfo.wallet){
+      throw "Only request owner can inform onError."
+    }
+
+    this.log('calling onError ...')
+    try {
+      await this.onError(request)
+    }
+    catch (e) {
+      this.log.error("error calling onError %O", e)
+      throw e;
+    }
+    this.log('calling onError done successfully.')
   }
 }
 
