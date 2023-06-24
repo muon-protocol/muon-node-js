@@ -140,7 +140,8 @@ export default class DbSynchronizer extends CallablePlugin {
          * may introduce bias and reduce the randomness of the system. To keep
          * randomness and prevent always selecting fast nodes, we can select half
          * of the nodes as the candidate nodes and then select some of them to do query. */
-        const candidateDeployers = deployers.slice(0, Math.ceil(deployers.length/2))
+        let numCandidate = Math.min(10, Math.ceil(deployers.length/2))
+        const candidateDeployers = _.shuffle(deployers).slice(0, numCandidate)
 
         const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
           candidateDeployers,
