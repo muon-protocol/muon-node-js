@@ -273,6 +273,8 @@ export class MuonRouting implements PeerRouting, Startable {
         log("Discovery responses: %o", responses);
       } catch (e) {
         log.error(`Discovery error: %O`, e);
+        await timeout(5000);
+        continue;
       }
 
       // randomize time of the next call
