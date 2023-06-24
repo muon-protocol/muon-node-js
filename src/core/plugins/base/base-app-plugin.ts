@@ -895,7 +895,7 @@ class BaseAppPlugin extends CallablePlugin {
      * Check request owner
      */
     if(request.gwAddress !== callerInfo.wallet){
-      throw "Only request owner can want signature."
+      throw "Only request owner can ask signature."
     }
 
     /**

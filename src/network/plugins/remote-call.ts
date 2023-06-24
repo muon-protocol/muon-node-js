@@ -94,45 +94,19 @@ class RemoteCall extends BaseNetworkPlugin {
     }
   }
 
-  // async handler1 ({ connection, stream , ...otherOptions}) {
-  //   try {
-  //     let response;
-  //     await pipe(
-  //       stream,
-  //       async (source) => {
-  //         for await (const message of source) {
-  //           response = await this.handleIncomingMessage(uint8ArrayToString(message.subarray()), stream, connection.remotePeer)
-  //         }
-  //       }
-  //     )
-  //     if(response) {
-  //       await pipe(
-  //         [this.prepareSendData(response)],
-  //         stream
-  //       )
-  //     }
-  //     // stream.close();
-  //   } catch (err) {
-  //     console.error("network.RemoteCall.handler", err)
-  //   }
-  //   // finally {
-  //   //   // Replies are done on new streams, so let's close this stream so we don't leak it
-  //   //   await pipe([], stream)
-  //   // }
-  // }
-
   async handler ({ connection, stream , ...otherOptions}) {
     const remoteCallInstance = this;
     try {
-      let response;
       await pipe(
         stream,
         (source) => {
           return (async function *() {
+            let buff = "";
             for await (const message of source) {
-              response = await remoteCallInstance.handleIncomingMessage(uint8ArrayToString(message.subarray()), stream, connection.remotePeer)
-              yield remoteCallInstance.prepareSendData(response);
+              buff += uint8ArrayToString(message.subarray())
             }
+            const response = await remoteCallInstance.handleIncomingMessage(buff, stream, connection.remotePeer)
+            yield remoteCallInstance.prepareSendData(response);
           })();
         },
         stream.sink
@@ -154,9 +128,11 @@ class RemoteCall extends BaseNetworkPlugin {
         [this.prepareSendData(data)],
         stream,
         async (source) => {
+          let buff = ""
           for await (const message of source) {
-            this.handleSendResponse(uint8ArrayToString(message.subarray()), peer.id)
+            buff += uint8ArrayToString(message.subarray());
           }
+          this.handleSendResponse(buff, peer.id)
         }
       )
       //stream.close();
