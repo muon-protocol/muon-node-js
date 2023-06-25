@@ -56,7 +56,7 @@
         "http://194.195.211.27:8080/network",
         "http://209.250.252.247:8080/network"
       ],
-      "startDelay": 600e3,
+      "startDelay": 120e3,
       "interval": 3600e3
     }
   }
