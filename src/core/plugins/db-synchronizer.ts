@@ -19,6 +19,7 @@ import * as crypto from "../../utils/crypto.js";
 import {readSetting, writeSetting} from "../../common/db-models/Settings.js";
 
 const CONCURRENT_TSS_RECOVERY = 5;
+const DEPLOYER_SYNC_ITEM_PER_PAGE = 100;
 const log = logger("muon:core:plugins:synchronizer")
 
 const RemoteMethods = {
@@ -152,46 +153,54 @@ export default class DbSynchronizer extends CallablePlugin {
           },
         );
 
-        /** paginate and get missing contexts */
-        let res: AppContext[][] = await Promise.all(
-          onlineDeployers.map(peerId => {
-            return this.remoteCall(
-              peerId,
-              RemoteMethods.GetMissingContext,
-              {
-                from: lastTimestamp + 1,
-                count: 100
-              },
-            )
-              .catch(e => [])
-          })
-        );
-        let uniqueList: AppContext[] = Object.values(
-          _.flatten(res).reduce((obj: MapOf<AppContext>, ctx: AppContext): MapOf<AppContext> => {
-            obj[ctx.deploymentRequest!.reqId] = ctx
-            return obj;
-          }, {})
-        );
+        /** loop while there is more contexts to sync */
+        while(true) {
+          /** paginate and get missing contexts */
+          let res: AppContext[][] = await Promise.all(
+            onlineDeployers.map(peerId => {
+              return this.remoteCall(
+                peerId,
+                RemoteMethods.GetMissingContext,
+                {
+                  from: lastTimestamp + 1,
+                  count: DEPLOYER_SYNC_ITEM_PER_PAGE
+                },
+              )
+                .catch(e => [])
+            })
+          );
+          let uniqueList: AppContext[] = Object.values(
+            _.flatten(res).reduce((obj: MapOf<AppContext>, ctx: AppContext): MapOf<AppContext> => {
+              obj[ctx.deploymentRequest!.reqId] = ctx
+              return obj;
+            }, {})
+          );
 
-        if (uniqueList.length > 0) {
-          const lastContextTime: number = uniqueList.reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
+          if (uniqueList.length > 0) {
+            const lastContextTime: number = uniqueList.reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
 
-          /** filter out locally existing context and keep only missing contexts. */
-          uniqueList = uniqueList.filter(ctx => {
-            const {appId, seed} = ctx
-            return !this.appManager.getAppContext(appId, seed)
-          })
+            /** filter out locally existing context and keep only missing contexts. */
+            uniqueList = uniqueList.filter(ctx => {
+              const {appId, seed} = ctx
+              return !this.appManager.getAppContext(appId, seed)
+            })
 
-          for (const ctx of uniqueList) {
-            await this.appManager.saveAppContext(ctx);
+            for (const ctx of uniqueList) {
+              await this.appManager.saveAppContext(ctx);
+            }
+
+            log(`deployer-sync: there is ${uniqueList.length} missing contexts.`)
+
+            if (lastContextTime > lastTimestamp) {
+              lastTimestamp = lastContextTime
+              log('updating lastTimestamp setting %o', {lastTimestamp})
+              await writeSetting("deployers-sync.lastTimestamp", lastTimestamp);
+            }
           }
 
-          log(`deployer-sync: there is ${uniqueList.length} missing contexts.`)
-
-          if (lastContextTime > lastTimestamp) {
-            log('updating lastTimestamp setting %o', {lastTimestamp: lastContextTime})
-            await writeSetting("deployers-sync.lastTimestamp", lastContextTime);
-          }
+          /** break the loop if no more contexts */
+          if(uniqueList.length < DEPLOYER_SYNC_ITEM_PER_PAGE)
+            break;
         }
       }
 
