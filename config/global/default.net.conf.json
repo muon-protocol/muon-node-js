@@ -28,6 +28,7 @@
       "https://ifconfig.me/all.json"
     ],
     "discoveryValidPeriod": 30000,
+    "findPeerValidPeriod": 30000,
     "delegateRoutingTTL": 1200000,
     "peerStoreTTL": 1200000
   },

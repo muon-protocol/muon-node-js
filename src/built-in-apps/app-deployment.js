@@ -32,32 +32,29 @@ function shuffleNodes(nodes, seed) {
     return sorted.map(({id}) => id)
 }
 
-const pattern_id = "^[1-9][0-9]*$";
-const schema_uint32 = {
+const uint32Schema = {
     type: 'string',
-    pattern: "^0x[0-9A-Fa-f]{1,64}$"
+    customType: "uint32"
 };
-const schema_app_id = {
+const appIdSchema = {
     type: "string",
-    pattern: pattern_id,
+    customType: 'decimal',
     errorMessage: {
-        pattern: "appId must be an string contains only digits."
+        type: "appId is not string type",
+        customType: "appId is not decimal number"
     }
 }
-const schema_eth_Address = {
+const ethAddressSchema = {
     type: 'string',
-    pattern: "^0x[0-9A-Fa-f]{40}$",
-    errorMessage: {
-        pattern: "wrong ethereum address."
-    }
+    customType: "ethereumAddress",
 }
 
-const schema_verifiable_seed = {
+const verifiableSeedSchema = {
     type: "object",
     properties: {
-        value: schema_uint32,
-        reqId: schema_uint32,
-        nonce: schema_eth_Address,
+        value: uint32Schema,
+        reqId: uint32Schema,
+        nonce: ethAddressSchema,
     },
     required: ["value", "reqId", "nonce"],
 }
@@ -66,30 +63,30 @@ const METHOD_PARAMS_SCHEMA = {
     [Methods.Check]:{
         type: 'object',
         properties: {
-            appId: schema_app_id,
+            appId: appIdSchema,
         },
         required: ["appId"]
     },
     [Methods.RandomSeed]:{
       type: 'object',
       properties: {
-          appId: schema_app_id,
-          previousSeed: schema_uint32
+          appId: appIdSchema,
+          previousSeed: uint32Schema
       },
       required: ["appId"]
     },
     [Methods.Deploy]: {
         type: "object",
         properties: {
-            appId: schema_app_id,
-            seed: schema_verifiable_seed,
+            appId: appIdSchema,
+            seed: verifiableSeedSchema,
             nodes: {
                 type: "array",
                 items: {
                     type: "string",
-                    pattern: pattern_id,
+                    customType: 'decimal',
                     errorMessage: {
-                      type: "nodes list item must be string",
+                      type: "nodes list item must be an array of decimal numbers",
                     }
                 },
                 errorMessage: {
@@ -116,24 +113,25 @@ const METHOD_PARAMS_SCHEMA = {
     [Methods.TssKeyGen]: {
         type: "object",
         properties: {
-            appId: schema_app_id,
-            seed: schema_uint32,
+            appId: appIdSchema,
+            seed: uint32Schema,
         },
         required: ["appId", "seed"]
     },
     [Methods.TssRotate]: {
         type: "object",
         properties: {
-            appId: schema_app_id,
-            seed: schema_verifiable_seed,
-            previousSeed: schema_uint32,
+            appId: appIdSchema,
+            seed: verifiableSeedSchema,
+            previousSeed: uint32Schema,
             nodes: {
                 type: "array",
                 items: {
                     type: "string",
-                    pattern: pattern_id,
+                    customType: "decimal",
                     errorMessage: {
                         type: "nodes list item must be string",
+                        customType: "nodes list item must be decimal number",
                     }
                 },
                 errorMessage: {
@@ -150,8 +148,8 @@ const METHOD_PARAMS_SCHEMA = {
     [Methods.TssReshare]: {
         type: "object",
         properties: {
-            appId: schema_app_id,
-            seed: schema_uint32,
+            appId: appIdSchema,
+            seed: uint32Schema,
         },
         required: ["appId", "seed"]
     },

@@ -18,7 +18,6 @@ import NodeManagerPlugin from "../node-manager.js";
 import {AppContext, AppRequest, MuonNodeInfo} from "../../../common/types";
 import {useOneTime} from "../../../utils/tss/use-one-time.js";
 import chalk from 'chalk'
-import Ajv from "ajv"
 import {logger} from '@libp2p/logger'
 import {bn2hex} from "../../../utils/tss/utils.js";
 import * as NetworkIpc from "../../../network/ipc.js";
@@ -29,10 +28,11 @@ import {GatewayCallParams} from "../../../gateway/types";
 import {MapOf} from "../../../common/mpc/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
 import {reportInsufficientPartners} from "../../../common/analitics-reporter.js";
+import {createAjv} from "../../../common/ajv.js";
 
 const { omit } = lodash;
 const {utils: {toBN}} = Web3
-const ajv = new Ajv({strict: false})
+const ajv = createAjv();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
 

@@ -1,11 +1,15 @@
-import NetworkContentPlugin from "./plugins/content-plugin.js";
 import mongoose from "mongoose";
 import Events from "events-async";
 import { create } from "./libp2p_bundle.js";
 import { bootstrap } from "@libp2p/bootstrap";
 import loadConfigs from "./configurations.js";
 import { createFromJSON } from "@libp2p/peer-id-factory";
-import {isPrivate, peerId2Str, tryAndGetNodeManagerData} from "./utils.js";
+import {
+  getNodeManagerDataFromCache,
+  isPrivate,
+  peerId2Str,
+  tryAndGetNodeManagerData
+} from "./utils.js";
 import { MessagePublisher } from "../common/message-bus/index.js";
 import NodeManagerPlugin, {NodeManagerPluginConfigs} from "./plugins/node-manager.js";
 import LatencyCheckPlugin from "./plugins/latency-check.js";
@@ -21,6 +25,7 @@ import * as NetworkIpc from "../network/ipc.js";
 import MessageSubscriber from "../common/message-bus/msg-subscriber.js";
 import {GLOBAL_EVENT_CHANNEL} from "../network/ipc.js";
 import {CoreGlobalEvent} from "../core/ipc";
+import {NodeManagerData} from "../common/types";
 
 const log = logger("muon:network");
 
@@ -257,8 +262,17 @@ async function start() {
   // When the network restarts
   await timeout(Math.floor(Math.random()*5e3));
 
-  log(`loading NodeManager data from ${net.nodeManager.address} on the network ${net.nodeManager.network}`)
-  let nodeManagerData = await tryAndGetNodeManagerData(net.nodeManager);
+  log(`loading NodeManager data %o`,{chain: net.nodeManager.network, contract: net.nodeManager.address})
+  let nodeManagerData: NodeManagerData;
+  log("checking cache for NodeManager data ...")
+  try {
+    nodeManagerData = await getNodeManagerDataFromCache(net.nodeManager);
+    log('NodeManager data loaded from cache.');
+  }
+  catch (e) {
+    log('NodeManager data load from cache failed. loading from network ... %O', e)
+    nodeManagerData = await tryAndGetNodeManagerData(net.nodeManager);
+  }
   const maxId: number = nodeManagerData.nodes.reduce((max, n) => Math.max(max, parseInt(n.id)), 0);
   log(`${nodeManagerData.nodes.length} node info loaded. max id: ${maxId}`)
 
@@ -293,7 +307,6 @@ async function start() {
       ],
       "latency": [LatencyCheckPlugin, {}],
       broadcast: [NetworkBroadcastPlugin, {}],
-      content: [NetworkContentPlugin, {}],
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],
       "ipc-handler": [IpcHandlerPlugin, {}],

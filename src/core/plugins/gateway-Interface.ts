@@ -42,8 +42,6 @@ export default class GatewayInterface extends BasePlugin{
   }
 
   async __handleCallResponse(callingArgs, response){
-    if(callingArgs.app === 'content')
-      return ;
     if(response?.confirmed){
       try {
         // @ts-ignore

@@ -180,16 +180,6 @@ async function start() {
           config: {},
         },
         {
-          name: "content-verify",
-          module: (await import("./plugins/content-verify-plugin.js")).default,
-          config: {},
-        },
-        {
-          name: "content",
-          module: (await import("./plugins/content-app.js")).default,
-          config: {},
-        },
-        {
           name: "memory",
           module: (await import("./plugins/memory-plugin.js")).default,
           config: {},

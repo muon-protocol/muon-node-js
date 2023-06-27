@@ -7,7 +7,12 @@ import * as CoreIpc from '../../core/ipc.js'
 import _ from 'lodash'
 import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
-import {tryAndGetNodeManagerChanges} from "../utils.js";
+import {
+  getNodeManagerDataFromCache,
+  storeNodeManagerDataIntoCache,
+  tryAndGetNodeManagerChanges,
+  tryAndGetNodeManagerData
+} from "../utils.js";
 import {remoteApp, remoteMethod} from "./base/app-decorators.js";
 import lodash from "lodash";
 import {Network} from "../index";
@@ -78,6 +83,9 @@ export default class NodeManagerPlugin extends CallablePlugin{
 
   async onStart() {
     await super.onStart()
+
+    this.updateCache()
+      .catch(e => {})
   }
 
   private updateNodeInfo(index: string, dataToMerge: object) {
@@ -190,17 +198,49 @@ export default class NodeManagerPlugin extends CallablePlugin{
     log(`nodes list updated.`);
   }
 
+  async updateCache() {
+    let {nodeManager: nodeManagerConfigs} = this.network.configs.net;
+    while (true) {
+      await timeout(24*60*60e3 + Math.random()*60*60e3);
+      log(`check for updating NodeManager cached data.`)
+      try {
+        const cachedData:NodeManagerData = await getNodeManagerDataFromCache(nodeManagerConfigs);
+
+        const onchainLastEditTime = await this.getOnchainLastEditTime()
+
+        if(cachedData.lastUpdateTime == onchainLastEditTime) {
+          /** update expiration */
+          await storeNodeManagerDataIntoCache(nodeManagerConfigs, cachedData)
+          log(`cached data is the same as onchain data.`)
+          continue;
+        }
+
+        log.error(`updating cache ...`);
+        /** load from chain and store it into the redis. */
+        await tryAndGetNodeManagerData(nodeManagerConfigs);
+      }
+      catch (e) {
+        log.error(`error when updating cache %o`, e);
+      }
+    }
+  }
+
+  private async getOnchainLastEditTime(): Promise<number> {
+    let {nodeManager: {address, network}} = this.network.configs.net;
+    return eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
+  }
+
   async watchNodesChange(nodeManagerInfo) {
     const {address, network} = nodeManagerInfo;
     while (true) {
-      /** every 20 seconds */
+      /** every 5 minutes */
       await timeout(5*60000);
       try {
         let lastUpdateTime;
         log(`checking for nodes list changes ...`)
         do {
           try {
-            lastUpdateTime = await eth.call(address, 'lastUpdateTime', [], NodeManagerAbi, network)
+            lastUpdateTime = await this.getOnchainLastEditTime()
           }catch (e) {
             log('loading lastUpdateTime failed. %o', e)
             await timeout(5000)

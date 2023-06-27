@@ -71,14 +71,6 @@ export function askClusterPermission(key: string, expireTime?: number) {
   return call(IpcMethods.AskClusterPermission, {key, pid, expireTime})
 }
 
-export function provideContent(cids: string | string[]): Promise<any> {
-  return call(IpcMethods.ContentRoutingProvide, cids)
-}
-
-export function findContent(cid: string): Promise<any> {
-  return call(IpcMethods.ContentRoutingFind, cid)
-}
-
 export function forwardRequest(id, requestData: GatewayCallParams, appTimeout?:number) {
   return call(IpcMethods.ForwardGatewayRequest, {id, requestData, appTimeout});
 }

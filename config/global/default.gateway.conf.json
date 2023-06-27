@@ -11,5 +11,15 @@
       "crashReport": true,
       "ifconfig": true
     }
+  },
+  "delegates": {
+    "rateLimit": {
+      "findPeerEnabled": false,
+      "discoveryEnabled": true,
+      "findPeerLimit": 100,
+      "findPeerDuration": 600000,
+      "discoveryLimit": 20,
+      "discoveryDuration": 600000
+    }
   }
 }
