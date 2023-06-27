@@ -34,9 +34,10 @@
 - [About](#about)
   - [Built With](#built-with)
 - [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Usage](#usage)
-    - [Manual setup](#manual-setup)
+  - [Minimum Requirement](#minimum-requirement)
+  - [Cloning this Repository](#cloning-this-repository)
+  - [Running Local Node](#runing-local-node)
+  - [Auto Update](#auto-update)
 - [Support](#support)
 - [Acknowledgements](#acknowledgements)
 
@@ -45,7 +46,7 @@
 ---
 
 ## About
-Muon is a decentralized oracle network that carries out data requests from any source. 
+[Muon](https://muon.net) is a decentralized oracle network that carries out data requests from any source. 
 Muon acts as a unique inter-blockchain data-availability network that makes messaging and secure data interfacing possible between different chains that are otherwise incompatible.
 
 Muon is creating a network in order to:
@@ -62,10 +63,12 @@ To this end, Muon oracle network provides off-chain, on-chain and cross-chain pr
 - [Node.js](https://github.com/nodejs/node)
 - [libp2p](https://github.com/libp2p/js-libp2p)
 - [Redis](https://github.com/redis/redis)
+- [MongoDB](https://www.mongodb.com/)
 
+<a name="getting-started"></a>
 ## Getting Started
-
-### Prerequisites
+<a name="prerequisites"></a>
+### Minimum Requirement
 
 To run a Muon node on your local machine, you need to first install [Redis](https://redis.com) and [MongoDB](https://www.mongodb.com/).
 Additionally you will need A Linux server with 4 GB of RAM, dual-core CPU, 20GB of storage space. 
@@ -80,54 +83,60 @@ Because of containing submodule, add the `--recurse-submodules` flag to the `clo
 
     $ git clone <the-repo> --recurse-submodules
     $ git pull --recurse-submodules
+    
 If you already cloned the old repo before the `apps` submodule, run the code below
 
     $ git submodule init
     
-### Run
+### Runing local node
 To run this project execute following command:
 
-    $ env-cmd babel-node index.js
+    $ env-cmd ts-node index.js
     
-Or if you want to run project with a custom env file:
+or if you want to run project with a custom env file:
 
-    $ env-cmd -f ./1.env babel-node index.js
+    $ env-cmd -f ./1.env ts-node index.js
 
 
-### Auto-Update
+#### Auto-Update
 Enabling auto-update will trigger an update and restart the server for any commit made to the repository. To enable auto-update, run the following command: 
 
     bash ./scripts/auto-update.sh -a setup -p '<PM2_APP_NAME|PM2_APP_ID>'
 
-### Update credentials
 
-    cat >>~/.netrc <<EOF
-    machine github.com
-        login <USERNAME>
-        password <PASSWORD>
-    EOF
+## Run a local testnet
 
-
-## Development
-### Run a local devnet
-
-You can run local devnet on port 8080
+You can execute the following command to run a local testnet on port 8080.
 
     docker-compose build --build-arg INFURA_PROJECT_ID=< your infura project id >
     docker-compose up
 
-To check local devnet open http://localhost:8080/v1/?app=tss&method=test in your browser.
+To check local testnet open `http://localhost:8080/v1/?app=tss&method=test` in your browser.
 
 After any changes, you will need to build again.
 
-### Develop MUON app
+## Develop MUON app
+ A Muon app refers to an oracle app that is deployed and runs on the Muon network to fetch and process data and generate an output that can be fed to a smart contract reliably.
+
+To learn more about how to build a Muon app, please refer to [this document](https://dev.muon.net/).
+
+To run a local network to test and develop your Muon apps, first make sure you have installed Mongodb and Redist, then use following commands:
+<br/>
+<br/>
+Generate a network with 10 nodes and tss threshold of 2.
+
+    npm run devnet-init -- -t=2 -n=10 -infura=<your-infura-project-id>
+    
+run the network with 3 nodes and any 2 of 3 nodes can sign the request.
+
+    npm run devnet-run -- -n=3
 
 ## Support
 
 Reach out to the maintainer at one of the following places:
 
 - Join our [Discord server](https://discord.com/invite/rcK4p8g7Ce)
-- The email which is located [MUON website](https://muon.net)
+- The email which is located at [MUON website](https://muon.net)
 
 
 ## Acknowledgements
