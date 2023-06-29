@@ -1,69 +1,51 @@
-<h1 align="center">
+<div align="center">
   <a href="https://www.muon.net/" target="_blank">
     <img src="https://assets.website-files.com/614c6fa0cc868403c37c5e53/614c6fa0cc8684353e7c5e63_muon-logo.svg" alt="Logo" width="302" height="80">
   </a>
-</h1>
-
-<div align="center">
-  MUON, Decentralize all Off-Chain Components of your dApp.
-  <br />
-  <br />
-  <a href="https://github.com/muon-protocol/muon-node-js/issues/new?assignees=&labels=bug&template=01_BUG_REPORT.md&title=bug%3A+">Report a Bug</a>
-  ·
-  <a href="https://github.com/muon-protocol/muon-node-js/issues/new?assignees=&labels=enhancement&template=02_FEATURE_REQUEST.md&title=feat%3A+">Request a Feature</a>
-  .
-  <a href="https://github.com/muon-protocol/muon-node-js/discussions">Ask a Question</a>
 </div>
 
 <div align="center">
+  
+## About
+[Muon](https://muon.net) is an innovative decentralized oracle network (DON) that enables dApps to make their off-chain components decentralized.
+<br>
+This repository contains the nodejs implementation of the node in Muon [threshold network](https://docs.muon.net/muon-network/architecture/threshold-network). 
+<br>
+The core node is run by node operators who participate in a decentralized oracle network.
+//todo 
+//explain more about this source code
+
+  
+<br />
 <br />
 
-![Static Badge](https://img.shields.io/badge/node_js-%3E%3D16.14-blue)
-[![](https://img.shields.io/badge/project-libp2p-blue.svg)](http://libp2p.io/)
-[![](https://img.shields.io/badge/project-nodejs-blue.svg)](http://libp2p.io/)
 
-![Static Badge](https://img.shields.io/badge/docs-passing-green)
-![Static Badge](https://img.shields.io/badge/build-passing-green)
+<a href="https://github.com/muon-protocol/muon-node-js/issues/new?assignees=&labels=bug&template=01_BUG_REPORT.md&title=bug%3A+">Report a Bug</a>
+·
+<a href="https://github.com/muon-protocol/muon-node-js/issues/new?assignees=&labels=enhancement&template=02_FEATURE_REQUEST.md&title=feat%3A+">Request a Feature</a>
+.
+<a href="https://github.com/muon-protocol/muon-node-js/discussions">Ask a Question</a>
+</div>
 
+<div align="center">
+
+[![](https://img.shields.io/badge/Discord-Join_Chat-blue.svg)](https://discord.com/invite/rcK4p8g7Ce)
+[![](https://img.shields.io/badge/Documents-Development-blue.svg)](https://dev.muon.net/)
+[![](https://img.shields.io/badge/Git_Book-Muon_network-blue.svg)](https://docs.muon.net/muon-network/)
 
 </div>
 
-<details open="open">
-<summary>Table of Contents</summary>
-
-- [About](#about)
-  - [Built With](#built-with)
-- [Getting Started](#getting-started)
-  - [Minimum Requirement](#minimum-requirement)
-  - [Cloning this Repository](#cloning-this-repository)
-  - [Running Local Node](#runing-local-node)
-  - [Auto Update](#auto-update)
-- [Support](#support)
-- [Acknowledgements](#acknowledgements)
-
-</details>
-
----
-
-## About
-[Muon](https://muon.net) is a decentralized oracle network that carries out data requests from any source. 
-Muon acts as a unique inter-blockchain data-availability network that makes messaging and secure data interfacing possible between different chains that are otherwise incompatible.
-
-Muon is creating a network in order to:
-
-- make Web3 interoperable
-- scale data feed verification
-- secure the metaverse 
-
-To this end, Muon oracle network provides off-chain, on-chain and cross-chain price feeds, event logs, data feeds and random inputs in a secure and decentralized way.
-
-
-### Built With
-
-- [Node.js](https://github.com/nodejs/node)
-- [libp2p](https://github.com/libp2p/js-libp2p)
-- [Redis](https://github.com/redis/redis)
-- [MongoDB](https://www.mongodb.com/)
+//what are different use cases
+//1 run node on alice: link to dev docs
+//2 (not required) run local network with docker 
+//if possible to develop muon app (do not use git clone commands) 
+//3 run network on local node outside docker(npmi and clone...)
+ 
+//if user is gonna test its muon app its better to run network on docker if possible
+//todo running node in docker and outside docker( explain all commands with npm i )
+//if node is supposed to run on alice use docker
+//if node is run for develop use docker or node
+//network: local/alice
 
 <a name="getting-started"></a>
 ## Getting Started
@@ -72,22 +54,25 @@ To this end, Muon oracle network provides off-chain, on-chain and cross-chain pr
 
 To run a Muon node on your local machine, you need to first install [Redis](https://redis.com) and [MongoDB](https://www.mongodb.com/).
 Additionally you will need A Linux server with 4 GB of RAM, dual-core CPU, 20GB of storage space. 
-<br/>  
-If you want to run the Muon node inside a Docker container, please refer to 
+
+### Joining Muon Network
+If you want to run a node and join the muon network read 
 [this document](https://docs.muon.net/muon-network/muon-nodes/joining-alice-testnet).
 
 
 
-### Cloning this repository
+### Cloning this Repository
 Because of containing submodule, add the `--recurse-submodules` flag to the `clone`/`pull` commands.
 
-    $ git clone <the-repo> --recurse-submodules
-    $ git pull --recurse-submodules
+    $ git clone git@github.com:muon-protocol/muon-node-js.git --recurse-submodules
+    $ cd muon-node-js
+    $ git checkout testnet
     
-If you already cloned the old repo before the `apps` submodule, run the code below
-
-    $ git submodule init
+The next step is to install required node modules as follows:
     
+    $ npm install
+        
+//todo run local node or local network    
 ### Runing local node
 To run this project execute following command:
 
@@ -108,6 +93,8 @@ Enabling auto-update will trigger an update and restart the server for any commi
 
 You can execute the following command to run a local testnet on port 8080.
 
+//todo what happens to network parameters like n and t when using this command
+
     docker-compose build --build-arg INFURA_PROJECT_ID=< your infura project id >
     docker-compose up
 
@@ -116,42 +103,34 @@ To check local testnet open `http://localhost:8080/v1/?app=tss&method=test` in y
 After any changes, you will need to build again.
 
 ## Develop MUON app
- A Muon app refers to an oracle app that is deployed and runs on the Muon network to fetch and process data and generate an output that can be fed to a smart contract reliably.
+A Muon app refers to an oracle app that is deployed and runs on the Muon network to fetch and process data and generate an output that can be fed to a smart contract reliably.
 
 To learn more about how to build a Muon app, please refer to [this document](https://dev.muon.net/).
 
-To run a local network to test and develop your Muon apps, first make sure you have installed Mongodb and Redist, then use following commands:
+To run a local network to test and develop your Muon apps, first make sure you have installed Mongodb and Redis, 
+then use following commands:
 <br/>
 <br/>
 Generate a network with 10 nodes and tss threshold of 2.
 
     npm run devnet-init -- -t=2 -n=10 -infura=<your-infura-project-id>
     
-run the network with 3 nodes and any 2 of 3 nodes can sign the request.
+This command generates .env files inside `/devnet/nodes` directory 
+to run a dev network.
+    
+Then run following command to run devnet.
+following command runs a network with 3 nodes and any 2 of 3 nodes can sign the request.
+
+
 
     npm run devnet-run -- -n=3
 
 ## Support
 
-Reach out to the maintainer at one of the following places:
 
-- Join our [Discord server](https://discord.com/invite/rcK4p8g7Ce)
-- The email which is located at [MUON website](https://muon.net)
+Muon has an active and continuously expanding community. 
+Discord serves as the primary communication channel for day-to-day interactions and addressing development-related inquiries. 
+You can ask your development related questions in dev-help channel.
 
-
-## Acknowledgements
-
-Thanks for these awesome resources that were used during the development of the **MUON**:
-
-- <https://github.com/Automattic>
-- <https://github.com/expressjs>
-- <https://github.com/docker>
-- <https://github.com/nodejs>
-- <https://github.com/libp2p>
-- <https://github.com/redis>
-- <https://github.com/axios>
-- <https://github.com/remy>
-- <https://github.com/web3>
-
-
+Join our [Discord server](https://discord.com/invite/rcK4p8g7Ce)
 
