@@ -7,7 +7,7 @@ import {
   AppDeploymentStatus,
   AppTssConfig,
   JsonPublicKey,
-  MuonNodeInfo, PolynomialInfoJson, WithRequired
+  MuonNodeInfo, NetConfigs, PolynomialInfoJson, WithRequired
 } from "../../common/types";
 import TssPlugin from "./tss-plugin.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
@@ -118,6 +118,7 @@ export default class AppManager extends CallablePlugin {
     await this.nodeManager.waitToLoad();
     const currentNode = this.nodeManager.currentNodeInfo!;
     let deploymentTssPublicKey: any = undefined;
+    const netConfigs:NetConfigs = this.netConfigs;
     if (currentNode && currentNode.isDeployer) {
       // TODO: tssPlugin is not loaded yet, so the tssKey is null.
       if (!!this.tssPlugin.tssKey) {
@@ -136,8 +137,8 @@ export default class AppManager extends CallablePlugin {
           // ttl: 0,
           party: {
             partners: this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id),
-            t: this.nodeManager.TssThreshold,
-            max: this.nodeManager.MaxGroupSize
+            t: netConfigs.tss.threshold,
+            max: netConfigs.tss.max
           },
           publicKey: deploymentTssPublicKey,
         },

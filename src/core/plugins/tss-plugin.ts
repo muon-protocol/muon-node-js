@@ -9,7 +9,7 @@ import NodeManagerPlugin from "./node-manager.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import * as CoreIpc from '../ipc.js'
-import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
+import {AppContext, MuonNodeInfo, NetConfigs, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import TssParty from "../../utils/tss/party.js";
 import {IMpcNetwork, MapOf} from "../../common/mpc/types";
@@ -159,14 +159,6 @@ class TssPlugin extends CallablePlugin {
     })
   }
 
-  get TSS_THRESHOLD() {
-    return this.muon.configs.net.tss.threshold;
-  }
-
-  get TSS_MAX() {
-    return this.muon.configs.net.tss.max;
-  }
-
   private get nodeManager(): NodeManagerPlugin {
     return this.muon.getPlugin('node-manager')
   }
@@ -188,10 +180,6 @@ class TssPlugin extends CallablePlugin {
   }
 
   async loadDeploymentTss() {
-    if(!this.nodeManager.networkInfo){
-      throw {message: `TssPlugin.loadDeploymentTss: NodeManager plugin not loaded the network info.`}
-    }
-    let {networkInfo} = this.nodeManager;
 
     const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
 
@@ -214,7 +202,7 @@ class TssPlugin extends CallablePlugin {
     // validate tssConfig
     let tssConfig = this.getDeploymentTssConfig();
 
-    if(tssConfig && tssConfig.party.t == networkInfo.tssThreshold){
+    if(tssConfig && tssConfig.party.t == this.netConfigs.tss.threshold){
       let key = AppTssKey.fromJson(
         this.tssParty,
         this.nodeManager.currentNodeInfo!.id,
@@ -251,7 +239,7 @@ class TssPlugin extends CallablePlugin {
           {timeout: 5000}
         );
 
-        if(onlineDeployers.length >= this.nodeManager.TssThreshold) {
+        if(onlineDeployers.length >= this.netConfigs.tss.threshold) {
           log(`${onlineDeployers.length} number of deployers are now online.`)
           break;
         }
@@ -431,11 +419,11 @@ class TssPlugin extends CallablePlugin {
 
     const readyDeployers = await this.appManager.findNAvailablePartners(
       deployers,
-      this.nodeManager.TssThreshold,
+      this.netConfigs.tss.threshold,
       {appId: "1", seed: "1"}
     )
     log(`there is ${readyDeployers.length} deployers are ready.`)
-    return readyDeployers.length < this.nodeManager.TssThreshold;
+    return readyDeployers.length < this.netConfigs.tss.threshold;
   }
 
   saveTssConfig(party, key) {
@@ -721,8 +709,7 @@ class TssPlugin extends CallablePlugin {
             return false
           });
         }))
-        // console.log(`key save broadcast threshold: ${this.TSS_THRESHOLD} count: ${key.partners.length}`, callResult);
-        if (callResult.filter(r => r === true).length+1 < this.TSS_THRESHOLD)
+        if (callResult.filter(r => r === true).length+1 < this.netConfigs.tss.threshold)
           throw `Tss creation failed.`
         await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
         this.saveTssConfig(this.tssParty, key)

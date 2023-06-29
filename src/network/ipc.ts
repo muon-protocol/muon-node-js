@@ -29,8 +29,8 @@ export function getNetworkConfig(options?: IpcCallOptions) {
   return call(IpcMethods.GetNetworkConfig, {} , options);
 }
 
-export function getContractInfo(options?: IpcCallOptions) {
-  return call(IpcMethods.GetContractInfo, {}, options)
+export function getNodeManagerData(options?: IpcCallOptions) {
+  return call(IpcMethods.GetNodeManagerData, {}, options)
 }
 
 export function filterNodes(filter: NodeFilterOptions, callOptions?: IpcCallOptions): Promise<MuonNodeInfo[]> {

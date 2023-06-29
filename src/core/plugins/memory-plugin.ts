@@ -120,24 +120,20 @@ class MemoryPlugin extends CallablePlugin {
       return false
     }
 
-    let allowedList = nodeManager.getAllowedWallets().map(addr => addr.toLowerCase());
-
     switch (memWrite.type) {
       case "app": {
-        if(signatures.length < nodeManager.TssThreshold)
+        if(signatures.length < this.netConfigs.tss.threshold)
           throw "Insufficient MemWrite signature";
         let sigOwners: string[] = signatures.map(sig => crypto.recover(hash, sig).toLowerCase())
-        console.log({sigOwners})
-        let ownerIsValid: number[] = sigOwners.map(owner => (allowedList.indexOf(owner) >= 0 ? 1 : 0))
-        let validCount: number = ownerIsValid.reduce((sum, curr) => (sum + curr), 0)
-        return validCount >= nodeManager.TssThreshold;
+        let validOwners: string[] = nodeManager.filterNodes({list: sigOwners}).map(n => n.id)
+        return validOwners.length >= this.netConfigs.tss.threshold;
       }
       case "node": {
         if(signatures.length !== 1){
           throw `Node MemWrite must have one signature. currently has ${signatures.length}.`;
         }
         const owner = crypto.recover(hash, signatures[0]).toLowerCase()
-        return allowedList.indexOf(owner) >= 0;
+        return !!nodeManager.getNodeInfo(owner);
       }
       default:
         throw `Unknown MemWrite type: ${memWrite.type}`
