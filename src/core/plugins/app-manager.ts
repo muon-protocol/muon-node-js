@@ -9,7 +9,7 @@ import {
   JsonPublicKey,
   MuonNodeInfo, NetConfigs, PolynomialInfoJson, WithRequired
 } from "../../common/types";
-import TssPlugin from "./tss-plugin.js";
+import KeyManager from "./key-manager.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import NodeManagerPlugin from "./node-manager.js";
 import * as CoreIpc from "../ipc.js";
@@ -105,8 +105,8 @@ export default class AppManager extends CallablePlugin {
     }
   }
 
-  get tssPlugin(): TssPlugin {
-    return this.muon.getPlugin('tss-plugin');
+  get keyManager(): KeyManager {
+    return this.muon.getPlugin('key-manager');
   }
 
   get nodeManager(): NodeManagerPlugin {
@@ -120,9 +120,9 @@ export default class AppManager extends CallablePlugin {
     let deploymentTssPublicKey: any = undefined;
     const netConfigs:NetConfigs = this.netConfigs;
     if (currentNode && currentNode.isDeployer) {
-      // TODO: tssPlugin is not loaded yet, so the tssKey is null.
-      if (!!this.tssPlugin.tssKey) {
-        deploymentTssPublicKey = pub2json(this.tssPlugin.tssKey.publicKey!)
+      // TODO: keyManager is not loaded yet, so the tssKey is null.
+      if (!!this.keyManager.tssKey) {
+        deploymentTssPublicKey = pub2json(this.keyManager.tssKey.publicKey!)
       }
     }
     try {
@@ -591,7 +591,7 @@ export default class AppManager extends CallablePlugin {
       status = "TSS_GROUP_SELECTED";
 
       if(appId === "1") {
-        if(this.tssPlugin.isReady)
+        if(this.keyManager.isReady)
           status = "DEPLOYED";
       }
       else if(!!seed) {
@@ -660,7 +660,7 @@ export default class AppManager extends CallablePlugin {
   appHasTssKey(appId: string, seed: string): boolean {
     if (appId == '1') {
       const nodeInfo = this.nodeManager.currentNodeInfo!
-      return nodeInfo?.isDeployer && !!this.tssPlugin.tssKey
+      return nodeInfo?.isDeployer && !!this.keyManager.tssKey
     } else {
       return !!this.appTssConfigs[seed];
     }
@@ -677,9 +677,9 @@ export default class AppManager extends CallablePlugin {
       const deploymentContextSeed = this.appSeeds["1"][0]
       const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
       if(currentNode.isDeployer) {
-        if(this.tssPlugin.tssKey) {
+        if(this.keyManager.tssKey) {
           return {
-            [deploymentContextSeed]:this.tssPlugin.tssKey.publicKey!
+            [deploymentContextSeed]:this.keyManager.tssKey.publicKey!
           };
         }
         else
@@ -969,7 +969,7 @@ export default class AppManager extends CallablePlugin {
 
     if(appId === '1') {
       const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!
-      publicKey = currentNode.isDeployer ? pub2json(this.tssPlugin.tssKey?.publicKey!) : null
+      publicKey = currentNode.isDeployer ? pub2json(this.keyManager.tssKey?.publicKey!) : null
     }
     else {
       publicKey = this.getAppTssKey(appId, seed)?.publicKey;

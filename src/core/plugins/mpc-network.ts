@@ -7,7 +7,7 @@ import {DistKey} from '../../common/mpc/dist-key.js'
 import NodeManagerPlugin from "./node-manager.js";
 import AppTssKey from "../../utils/tss/app-tss-key.js";
 import * as NetworkIpc from '../../network/ipc.js'
-import TssPlugin from "./tss-plugin.js";
+import KeyManager from "./key-manager.js";
 import * as SharedMemory from "../../common/shared-memory/index.js";
 import {bn2hex} from "../../utils/tss/utils.js";
 import NodeCache from 'node-cache'
@@ -50,8 +50,8 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
     return this.muon.getPlugin('node-manager');
   }
 
-  private get tssPlugin(): TssPlugin {
-    return this.muon.getPlugin('tss-plugin');
+  private get keyManager(): KeyManager {
+    return this.muon.getPlugin('key-manager');
   }
 
   async registerMpc(mpc: MultiPartyComputation) {
@@ -102,7 +102,7 @@ class MpcNetworkPlugin extends CallablePlugin implements IMpcNetwork{
               return;
 
             const partyInfo: PartyInfo = mpc.extraParams.partyInfo as PartyInfo
-            const party = await this.tssPlugin.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+            const party = await this.keyManager.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
             if(!party) {
               throw `party[${mpc.extraParams.party}] not found`
             }

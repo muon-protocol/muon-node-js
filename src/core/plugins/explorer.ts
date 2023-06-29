@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin.js'
 import Content from '../../common/db-models/Content.js'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
-import TssPlugin from "./tss-plugin.js";
+import KeyManager from "./key-manager.js";
 import {AppContext, AppDeploymentStatus, AppRequest, MuonNodeInfo, Override} from "../../common/types";
 import HealthCheck from "./health-check.js";
 import {GatewayCallParams} from "../../gateway/types";
@@ -35,8 +35,8 @@ const RemoteMethods = {
 class Explorer extends CallablePlugin {
   APP_NAME="explorer"
 
-  get tssPlugin(): TssPlugin {
-    return this.muon.getPlugin('tss-plugin');
+  get keyManager(): KeyManager {
+    return this.muon.getPlugin("key-manager");
   }
 
   get nodeManager(): NodeManagerPlugin {
@@ -84,7 +84,7 @@ class Explorer extends CallablePlugin {
     if(!request)
       throw `request undefined`
     // @ts-ignore
-    const appParty = this.tssPlugin.getAppParty(request.appId, request.deploymentSeed)
+    const appParty = this.keyManager.getAppParty(request.appId, request.deploymentSeed)
     if(!appParty)
       throw `App party not found`;
 
@@ -243,7 +243,7 @@ class Explorer extends CallablePlugin {
     }
     if(status !== 'DEPLOYED') {
       await timeout(2000)
-      await this.tssPlugin.checkAppTssKeyRecovery(appId, seed);
+      await this.keyManager.checkAppTssKeyRecovery(appId, seed);
     }
   }
 }

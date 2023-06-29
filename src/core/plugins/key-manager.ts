@@ -57,7 +57,7 @@ const RemoteMethods = {
 }
 
 @remoteApp
-class TssPlugin extends CallablePlugin {
+class KeyManager extends CallablePlugin {
   isReady = false
   parties:{[index: string]: TssParty} = {}
   tssKey: AppTssKey | null = null;
@@ -452,9 +452,9 @@ class TssPlugin extends CallablePlugin {
   }
 
   loadParty(party) {
-    // console.log(`TssPlugin.loadParty`, party)
+    // console.log(`KeyManager.loadParty`, party)
     if(party.partners.lengh > 0 && typeof party.partners[0] !== "string") {
-      console.log("TssPlugin.loadParty.partners most be string array", party.partners)
+      console.log("KeyManager.loadParty.partners most be string array", party.partners)
       console.log(stackTrace())
     }
     try {
@@ -464,7 +464,7 @@ class TssPlugin extends CallablePlugin {
     catch (e) {
       console.log('loading party: ', party);
       console.log('partners info: ', party);
-      console.log(`TssPlugin.loadParty ERROR:`, e)
+      console.log(`KeyManager.loadParty ERROR:`, e)
     }
   }
 
@@ -838,7 +838,7 @@ class TssPlugin extends CallablePlugin {
     // TODO: can malicious user use a nonce twice?
     const {nonce: nonceId, appId, seed} = data;
 
-    // console.log('TssPlugin.__recoverMyKey', data, callerInfo.wallet)
+    // console.log('KeyManager.__recoverMyKey', data, callerInfo.wallet)
     const appParty = this.getAppParty(appId, seed)
     if(!appParty)
       throw `Missing app Party.`
@@ -890,9 +890,9 @@ class TssPlugin extends CallablePlugin {
     let party = this.getParty(partyId)
     let key: AppTssKey = await this.getSharedKey(keyId);
     if (!party)
-      throw {message: 'TssPlugin.storeDeploymentTssKey: party not found.'}
+      throw {message: 'KeyManager.storeDeploymentTssKey: party not found.'}
     if (!key)
-      throw {message: 'TssPlugin.storeDeploymentTssKey: key not found.'};
+      throw {message: 'KeyManager.storeDeploymentTssKey: key not found.'};
     if(callerInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.saveTssConfig(party, key);
@@ -909,4 +909,4 @@ class TssPlugin extends CallablePlugin {
   }
 }
 
-export default TssPlugin;
+export default KeyManager;

@@ -5,7 +5,7 @@ import AppManager from "./app-manager.js";
 import NodeManagerPlugin from "./node-manager.js";
 import * as NetworkIpc from "../../network/ipc.js";
 import {AppContext, MuonNodeInfo, NetConfigs} from "../../common/types";
-import TssPlugin from "./tss-plugin.js";
+import KeyManager from "./key-manager.js";
 import {getTimestamp, timeout} from "../../utils/helpers.js";
 import {logger} from '@libp2p/logger'
 import {MapOf} from "../../common/mpc/types";
@@ -81,8 +81,8 @@ export default class DbSynchronizer extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
-  private get tssPlugin(): TssPlugin {
-    return this.muon.getPlugin('tss-plugin')
+  private get keyManager(): KeyManager {
+    return this.muon.getPlugin('key-manager')
   }
 
   private async nonDeployersSyncLoop() {
@@ -380,7 +380,7 @@ export default class DbSynchronizer extends CallablePlugin {
     for(let numTry=3 ; numTry > 0 ; numTry--) {
       await timeout(10000);
       try {
-        const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed, true);
+        const recovered = await this.keyManager.checkAppTssKeyRecovery(appId, seed, true);
         if(recovered) {
           log(`tss key for app: ${ctx.appName}:${ctx.seed} recovered successfully.`)
           break;

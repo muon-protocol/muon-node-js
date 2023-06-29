@@ -11,7 +11,7 @@ import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators.js'
 import MemoryPlugin, {MemWriteOptions} from '../memory-plugin.js'
 import { isArrowFn, deepFreeze } from '../../../utils/helpers.js'
 import AppTssKey from "../../../utils/tss/app-tss-key.js";
-import TssPlugin from "../tss-plugin.js";
+import KeyManager from "../key-manager.js";
 import AppManager from "../app-manager.js";
 import TssParty from "../../../utils/tss/party.js";
 import NodeManagerPlugin from "../node-manager.js";
@@ -114,15 +114,15 @@ class BaseAppPlugin extends CallablePlugin {
     await this.nodeManager.waitToLoad();
 
     for(const seed of this.appManager.getAppSeeds(this.APP_ID)) {
-      const appParty = this.tssPlugin.getAppParty(this.APP_ID, seed);
+      const appParty = this.keyManager.getAppParty(this.APP_ID, seed);
       if(appParty) {
         this.log(`App party loaded %s`, appParty.id)
       }
     }
   }
 
-  get tssPlugin(): TssPlugin{
-    return this.muon.getPlugin('tss-plugin');
+  get keyManager(): KeyManager{
+    return this.muon.getPlugin('key-manager');
   }
 
   get nodeManager(): NodeManagerPlugin{
@@ -149,11 +149,11 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   private getParty(seed: string): TssParty | null | undefined {
-    return this.tssPlugin.getAppParty(this.APP_ID, seed);
+    return this.keyManager.getAppParty(this.APP_ID, seed);
   }
 
   private getTss(seed: string): AppTssKey | null {
-    return this.tssPlugin.getAppTssKey(this.APP_ID, seed)
+    return this.keyManager.getAppTssKey(this.APP_ID, seed)
   }
 
   /**
@@ -176,7 +176,7 @@ class BaseAppPlugin extends CallablePlugin {
     let deploymentSeed;
 
     if(this.APP_ID === '1') {
-      if (!this.tssPlugin.isReady)
+      if (!this.keyManager.isReady)
         throw {message: "Deployment tss is not initialized"}
       /**
        deployer list load's from contract and has'nt deployment request and seed.
@@ -189,7 +189,7 @@ class BaseAppPlugin extends CallablePlugin {
         throw `App not deployed`;
       const oldestContext: AppContext = this.appManager.getAppOldestContext(this.APP_ID)!
       if(!this.appManager.appHasTssKey(this.APP_ID, oldestContext.seed)) {
-        this.tssPlugin.checkAppTssKeyRecovery(this.APP_ID, oldestContext.seed)
+        this.keyManager.checkAppTssKeyRecovery(this.APP_ID, oldestContext.seed)
           .catch(e => {})
         throw `App tss not initialized`
       }
@@ -349,7 +349,7 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`confirmation done with %s`, confirmed)
       t5 = Date.now()
 
-      let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
+      let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
       this.log(`request signed with %o`, nonce.partners);
       this.log('request time parts %O',{
         "req exec time": t1-t0,
@@ -464,7 +464,7 @@ class BaseAppPlugin extends CallablePlugin {
   async informRequestConfirmation(request: AppRequest) {
     request = clone(request)
     // await this.onConfirm(request)
-    let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${request.reqId}`)!;
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)!;
 
     let announceList = this.getParty(request.deploymentSeed)!.partners;
     if(!!this.getConfirmAnnounceGroups) {
@@ -523,7 +523,6 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[]) {
-    let tssPlugin = this.muon.getPlugin(`tss-plugin`)
     const seed = request.deploymentSeed;
 
     if(!this.getTss(seed)){
@@ -536,14 +535,14 @@ class BaseAppPlugin extends CallablePlugin {
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     this.log(`generating nonce with ${nonceParticipantsCount} partners.`)
-    let nonce = await tssPlugin.keyGen({appId: this.APP_ID, seed}, {
+    let nonce = await this.keyManager.keyGen({appId: this.APP_ID, seed}, {
       id: `nonce-${request.reqId}`,
       partners: availablePartners,
       maxPartners: nonceParticipantsCount
     })
     this.log(`nonce generation has ben completed with address %s.`, TssModule.pub2addr(nonce.publicKey))
 
-    // let sign = tssPlugin.sign(null, party);
+    // let sign = this.keyManager.sign(null, party);
     return {
       // noncePub: nonce.publicKey.encode('hex'),
       nonceAddress: TssModule.pub2addr(nonce.publicKey),
@@ -617,8 +616,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     let {s, e} = splitSignature(signature)
     //
-    let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce: AppTssKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)
 
     const ownerInfo = this.nodeManager.getNodeInfo(owner)
     if(!ownerInfo){
@@ -647,8 +645,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async broadcastNewRequest(request: AppRequest) {
-    let tssPlugin = this.muon.getPlugin('tss-plugin');
-    let nonce: AppTssKey = await tssPlugin.getSharedKey(`nonce-${request.reqId}`, 15000)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, 15000)
     let party = this.getParty(request.deploymentSeed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
@@ -708,11 +705,11 @@ class BaseAppPlugin extends CallablePlugin {
 
   async makeSignature(request: AppRequest, result: any, resultHash): Promise<string> {
     let {reqId} = request;
-    let nonce: AppTssKey = await this.tssPlugin.getSharedKey(`nonce-${reqId}`, 15000)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${reqId}`, 15000)
     if(!nonce)
       throw `nonce not found for request ${reqId}`
 
-    // let tssKey = this.isBuiltInApp ? tssPlugin.tssKey : tssPlugin.getAppTssKey(this.APP_ID);
+    // let tssKey = this.isBuiltInApp ? this.keyManager.tssKey : this.keyManager.getAppTssKey(this.APP_ID);
     let tssKey: AppTssKey = this.getTss(request.deploymentSeed)!;
     if(!tssKey)
       throw `App TSS key not found`;

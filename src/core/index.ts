@@ -185,8 +185,8 @@ async function start() {
           config: {},
         },
         {
-          name: "tss-plugin",
-          module: (await import("./plugins/tss-plugin.js")).default,
+          name: "key-manager",
+          module: (await import("./plugins/key-manager.js")).default,
           config: {},
         },
         {
@@ -225,7 +225,7 @@ async function start() {
         ...getBuiltInApps(),
       ],
       net,
-      // TODO: pass it into the tss-plugin
+      // TODO: pass it into the key-manager
       tss,
     });
 

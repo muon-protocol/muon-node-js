@@ -313,7 +313,7 @@ async function start() {
       // dht: [NetworkDHTPlugin, {}]
     },
     net,
-    // TODO: pass it into the tss-plugin
+    // TODO: pass it into the key-manager
     tss,
   };
   const network = new Network(configs);
