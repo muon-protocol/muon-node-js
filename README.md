@@ -34,17 +34,6 @@ You can also use core node to run a local devnet to develop your own Muon apps.
 
 </div>
 
-//what are different use cases
-//1 run node on alice: link to dev docs
-//2 (not required) run local network with docker 
-//if possible to develop muon app (do not use git clone commands) 
-//3 run network on local node outside docker(npmi and clone...)
- 
-//if user is gonna test its muon app its better to run network on docker if possible
-//running node in docker and outside docker( explain all commands with npm i )
-//if node is supposed to run on alice use docker
-//if node is run for develop use docker or node
-//network: local/alice
 
 <a name="getting-started"></a>
 ## Getting Started
