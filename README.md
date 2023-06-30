@@ -9,11 +9,10 @@
 ## About
 [Muon](https://muon.net) is an innovative decentralized oracle network (DON) that enables dApps to make their off-chain components decentralized.
 <br>
-This repository contains the nodejs implementation of the node in Muon [threshold network](https://docs.muon.net/muon-network/architecture/threshold-network). 
+This repository contains the nodejs implementation of the node in Muon [Threshold Network](https://docs.muon.net/muon-network/architecture/threshold-network). 
 <br>
 The core node is run by node operators who participate in a decentralized oracle network.
-//todo 
-//explain more about this source code
+You can also use core node to run a local devnet to develop your own Muon apps.
 
   
 <br />
@@ -42,7 +41,7 @@ The core node is run by node operators who participate in a decentralized oracle
 //3 run network on local node outside docker(npmi and clone...)
  
 //if user is gonna test its muon app its better to run network on docker if possible
-//todo running node in docker and outside docker( explain all commands with npm i )
+//running node in docker and outside docker( explain all commands with npm i )
 //if node is supposed to run on alice use docker
 //if node is run for develop use docker or node
 //network: local/alice
@@ -55,61 +54,29 @@ The core node is run by node operators who participate in a decentralized oracle
 To run a Muon node on your local machine, you need to first install [Redis](https://redis.com) and [MongoDB](https://www.mongodb.com/).
 Additionally you will need A Linux server with 4 GB of RAM, dual-core CPU, 20GB of storage space. 
 
-### Joining Muon Network
-If you want to run a node and join the muon network read 
+### Joining Alice Testnet
+If you want to run a node and join the Alice testnet read 
 [this document](https://docs.muon.net/muon-network/muon-nodes/joining-alice-testnet).
 
 
 
 ### Cloning this Repository
-Because of containing submodule, add the `--recurse-submodules` flag to the `clone`/`pull` commands.
+Clone Muon node’s repository and checkout the `testnet` branch through the following command:
 
     $ git clone git@github.com:muon-protocol/muon-node-js.git --recurse-submodules
     $ cd muon-node-js
     $ git checkout testnet
     
+Because of containing submodule, add the `--recurse-submodules` flag to the `clone`/`pull` commands.  
 The next step is to install required node modules as follows:
     
     $ npm install
         
-//todo run local node or local network    
-### Runing local node
-To run this project execute following command:
 
-    $ env-cmd ts-node index.js
-    
-or if you want to run project with a custom env file:
+## Run a local devnet
 
-    $ env-cmd -f ./1.env ts-node index.js
-
-
-#### Auto-Update
-Enabling auto-update will trigger an update and restart the server for any commit made to the repository. To enable auto-update, run the following command: 
-
-    bash ./scripts/auto-update.sh -a setup -p '<PM2_APP_NAME|PM2_APP_ID>'
-
-
-## Run a local testnet
-
-You can execute the following command to run a local testnet on port 8080.
-
-//todo what happens to network parameters like n and t when using this command
-
-    docker-compose build --build-arg INFURA_PROJECT_ID=< your infura project id >
-    docker-compose up
-
-To check local testnet open `http://localhost:8080/v1/?app=tss&method=test` in your browser.
-
-After any changes, you will need to build again.
-
-## Develop MUON app
-A Muon app refers to an oracle app that is deployed and runs on the Muon network to fetch and process data and generate an output that can be fed to a smart contract reliably.
-
-To learn more about how to build a Muon app, please refer to [this document](https://dev.muon.net/).
-
-To run a local network to test and develop your Muon apps, first make sure you have installed Mongodb and Redis, 
-then use following commands:
-<br/>
+To run a local devnet to test and develop your Muon apps 
+follow these steps:
 <br/>
 Generate a network with 10 nodes and tss threshold of 2.
 
@@ -119,16 +86,26 @@ This command generates .env files inside `/devnet/nodes` directory
 to run a dev network.
     
 Then run following command to run devnet.
-following command runs a network with 3 nodes and any 2 of 3 nodes can sign the request.
-
-
+This command runs a network with 3 nodes and any 2 of 3 nodes can sign the request.
 
     npm run devnet-run -- -n=3
+    
+This command allows you to run all three nodes simultaneously in a single terminal. Alternatively, 
+you can run each node separately in a separate terminal using the following command:
+
+    env-cmd ./devnet/nodes/dev-node-1.env ts-node src/index.ts
+    
+
+To run other nodes, simply change `dev-node-1.env` to the desired environment file.         
+
+## Develop MUON app
+A Muon app refers to an oracle app that is deployed and runs on the Muon network to fetch and process data and generate an output that can be fed to a smart contract reliably.
+
+To learn more about how to build a Muon app, please refer to [this document](https://dev.muon.net/).
+
 
 ## Support
-
-
-Muon has an active and continuously expanding community. 
+Muon has an active and continuously expanding community.
 Discord serves as the primary communication channel for day-to-day interactions and addressing development-related inquiries. 
 You can ask your development related questions in dev-help channel.
 
