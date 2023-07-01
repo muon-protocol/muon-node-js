@@ -64,22 +64,21 @@ The next step is to install required node modules as follows:
 
 ## Run a local devnet
 
-To run a local devnet to test and develop your Muon apps 
-follow these steps:
+To set up and run a local devnet for testing and developing your Muon apps, follow these steps:
 <br/>
-Generate a network with 10 nodes and tss threshold of 2.
+1- Generate a network with 10 nodes and a TSS threshold of 2 using the following command:
 
     npm run devnet-init -- -t=2 -n=10 -infura=<your-infura-project-id>
     
-This command generates .env files inside `/devnet/nodes` directory 
-to run a dev network.
+This command will generate .env files inside the `/devnet/nodes` directory to run a dev network.
     
-Then run following command to run devnet.
-This command runs a network with 3 nodes and any 2 of 3 nodes can sign the request.
+2- Run the following command to start the devnet. 
+This command will run a network with 3 nodes, and any 2 out of the 3 nodes can sign the request. 
+This command enables you to run all three nodes simultaneously within a single terminal.
 
     npm run devnet-run -- -n=3
     
-This command allows you to run all three nodes simultaneously in a single terminal. Alternatively, 
+ Alternatively, 
 you can run each node separately in a separate terminal using the following command:
 
     env-cmd ./devnet/nodes/dev-node-1.env ts-node src/index.ts
