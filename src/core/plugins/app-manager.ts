@@ -41,6 +41,11 @@ export type AppContextQueryOptions = {
   includeExpired?: boolean,
 }
 
+export type ContextFilterOptions = {
+  appId?: string,
+  deploymentStatus?: AppDeploymentStatus[]
+}
+
 export type FindAvailableNodesOptions = {
   /** If it is set, target nodes will check the status of this app. */
   appId?: string,
@@ -497,6 +502,10 @@ export default class AppManager extends CallablePlugin {
     return this.appContexts[seed];
   }
 
+  getSeedContext(seed: string): AppContext | undefined {
+    return this.appContexts[seed];
+  }
+
   mergeResharePolynomial(oldPoly: PolynomialInfoJson, resharePoly: PolynomialInfoJson, seed: string): PolynomialInfoJson {
     return {
       t: oldPoly.t,
@@ -564,6 +573,20 @@ export default class AppManager extends CallablePlugin {
     return Object.values(this.appContexts)
       .filter(ctx => {
         return ctx.expiration !== undefined && ctx.expiration < currentTime;
+      })
+  }
+
+  filterContexts(options: ContextFilterOptions={}): AppContext[] {
+    return Object.values(this.appContexts)
+      .filter(ctx => {
+        const {appId, seed} = ctx;
+        if(options.appId !== undefined && appId !== options.appId)
+          return false
+        if(options.deploymentStatus && options.deploymentStatus.length>0) {
+          if(!options.deploymentStatus.includes(this.getAppDeploymentStatus(appId, seed)))
+            return false
+        }
+        return true
       })
   }
 
