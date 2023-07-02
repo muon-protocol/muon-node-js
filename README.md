@@ -48,7 +48,7 @@ A network of local nodes (devnet) can be run and used to develope and test Muon 
 
 For instance, a network of 4 nodes is initialized with the following command, where a request can be signed with 3 of them.
 
-    $ npm run devnet-init -- -t=3 -n=4 -infura=<your-infura-project-id>
+    $ npm run devnet-init -- -t=3 -n=4
     
 This command generates 4 env files inside `./devnet/nodes` directory where each one can be used to run a node locally.
 
