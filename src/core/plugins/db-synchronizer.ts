@@ -313,8 +313,10 @@ export default class DbSynchronizer extends CallablePlugin {
     const seedsToCheck: string[] = []
 
     for(const ctx of expiredContexts) {
-      const {seed} = ctx;
-      if(contextIsRotated[seed])
+      const {appId, seed} = ctx;
+      const nextSeed = contextIsRotated[seed];
+      /** delete the context, if context rotated and next context key-gen completed */
+      if(nextSeed && !!this.appManager.getAppContext(appId, nextSeed)?.keyGenRequest)
         /** If a context rotated and next context is exist, so we dont need it (the old one) any more. */
         seedsToDelete.push(seed);
       else
@@ -413,7 +415,10 @@ export default class DbSynchronizer extends CallablePlugin {
   async __isSeedsRotated(data: {seeds: string[]}): Promise<boolean[]> {
     const {seeds} = data;
     const rotatedSeed = this.appManager.getContextRotateMap()
-    return seeds.map(seed => !!rotatedSeed[seed]);
+    return seeds.map(seed => {
+      const nextSeed = rotatedSeed[seed]
+      return !!nextSeed && !!this.appManager.getSeedContext(nextSeed)?.keyGenRequest;
+    });
   }
 
   @remoteMethod(RemoteMethods.GetMissingContext)
