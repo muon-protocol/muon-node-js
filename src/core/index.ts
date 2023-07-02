@@ -123,7 +123,7 @@ function getGeneralApps(): MuonPlugin[] {
   return result;
 }
 
-var muon;
+var muon: Muon;
 
 async function start() {
   log("starting ...");
@@ -219,6 +219,11 @@ async function start() {
           module: (await import("./plugins/db-synchronizer.js")).default,
           config: {},
         },
+        {
+          name: "reshare-cj",
+          module: (await import("./plugins/cron-jobs/reshare-cron-job.js")).default,
+          config: {},
+        },
         ...(await getEnvPlugins()),
         ...getCustomApps(),
         ...getGeneralApps(),
@@ -231,7 +236,7 @@ async function start() {
 
     await muon.initialize();
 
-    muon.start();
+    await muon.start();
   } catch (e) {
     console.error(e);
     throw e;

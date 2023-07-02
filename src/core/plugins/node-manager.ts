@@ -17,14 +17,18 @@ export default class NodeManagerPlugin extends BasePlugin{
    */
   loading = new TimeoutPromise(0, "contract loading timed out");
 
+  async onInit(): Promise<any> {
+    await super.onInit();
+
+    await this._loadNodeManagerData();
+  }
+
   async onStart(){
-    super.onStart();
+    await super.onStart();
 
     this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
     this.muon.on("contract:node:edit", this.onNodeEdit.bind(this));
     this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
-
-    this._loadNodeManagerData();
   }
 
   private updateNodeInfo(index: string, dataToMerge: object, keysToDelete?:string[]) {

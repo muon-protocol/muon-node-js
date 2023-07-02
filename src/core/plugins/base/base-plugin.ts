@@ -31,7 +31,7 @@ export default class BasePlugin extends Events{
    * @returns {Promise<void>}
    */
   async onStart(){
-    this.registerBroadcastHandler()
+    await this.registerBroadcastHandler()
   }
 
   get muon(): Muon {
