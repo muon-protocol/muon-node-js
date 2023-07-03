@@ -80,10 +80,15 @@ class System extends CallablePlugin {
       availableIds = availables.map(p => `${p.id}`)
     }
     else {
-      const delegateRoutingUrl = this.muon.configs.net.routing?.delegate;
-      if(!delegateRoutingUrl)
+      const delegateRoutingUrls = this.muon.configs.net.routing?.delegate;
+      if(!Array.isArray(delegateRoutingUrls) || delegateRoutingUrls.length < 1)
         throw `delegate routing url not defined to get available list.`
-      let response = await axios.get(`${delegateRoutingUrl}/onlines`).then(({data}) => data);
+      // @ts-ignore
+      let response = await Promise.any(
+        delegateRoutingUrls.map(url => {
+          return axios.get(`${url}/onlines`)
+        })
+      ).then(({data}) => data);
       let thresholdTimestamp = Date.now() - 60*60*1000
       let availables = response.filter(item => {
         /** active nodes that has uptime more than 1 hour */
