@@ -1,10 +1,10 @@
 import BN from "bn.js";
 import {PublicKey} from "../../utils/tss/types";
-import Web3 from 'web3'
 import * as TssModule from "../../utils/tss/index.js";
 import {bn2str} from "./utils.js";
+import {toBN} from "../../utils/helpers.js";
 
-const {toBN} = Web3.utils
+
 
 export type DistKeyJson = {
   index: string,

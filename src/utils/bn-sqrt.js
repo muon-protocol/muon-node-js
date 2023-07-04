@@ -1,7 +1,6 @@
-import Web3 from 'web3'
+import BN from "bn.js";
 
 export const BNSqrt = (num) => {
-  const BN = Web3.utils.BN
   if(num.lt(new BN(0))) {
     throw { message: "Sqrt only works on non-negtiave inputs" }
   }

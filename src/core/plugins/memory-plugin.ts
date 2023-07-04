@@ -32,6 +32,7 @@ import { createClient, RedisClient } from 'redis'
 import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
 import Web3 from 'web3'
+import {muonSha3, soliditySha3} from '../../utils/sha3.js'
 
 export type MemWriteType = 'app' | 'node' | 'local'
 
@@ -147,7 +148,7 @@ class MemoryPlugin extends CallablePlugin {
   hashMemWrite(memWrite: MemWrite) {
     let {type, owner, timestamp, ttl, nSign, data} = memWrite;
     let ownerIsWallet = type === MemoryTypes.Node;
-    return crypto.soliditySha3([
+    return soliditySha3([
       {type: 'string', value: type},
       {type: ownerIsWallet ? 'address' : 'string', value: owner},
       {type: 'uint256', value: timestamp},
@@ -177,7 +178,7 @@ class MemoryPlugin extends CallablePlugin {
       hash: '',
       signatures: []
     }
-    memWrite.hash = this.hashMemWrite(memWrite)
+    memWrite.hash = this.hashMemWrite(memWrite)!;
     memWrite.signatures = [crypto.sign(memWrite.hash)]
 
     await this.storeMemWrite(memWrite);
