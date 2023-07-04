@@ -1,8 +1,8 @@
 import fs from 'fs'
 import readline from 'readline'
+import numberToBN from  'number-to-bn'
 import BigNumber from 'bignumber.js'
 BigNumber.set({DECIMAL_PLACES: 26})
-import Web3 from 'web3'
 import axios from 'axios';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -14,7 +14,8 @@ import childProcess from 'node:child_process'
 import {isIP} from 'net'
 import isIpPrivate from 'private-ip'
 import {loadGlobalConfigs} from "../common/configurations.js";
-const toBN = Web3.utils.toBN;
+
+
 const exec = promisify(childProcess.exec);
 
 export const timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -160,4 +161,13 @@ export async function getCommitId(): Promise<string> {
 
 export function statusCodeToTitle(code: number): AppDeploymentStatus {
   return ["NEW", "TSS_GROUP_SELECTED", "DEPLOYED", "PENDING", "EXPIRED"][code] as AppDeploymentStatus;
+}
+
+export function toBN(number) {
+  try {
+    return numberToBN.apply(null, arguments);
+  }
+  catch (e) {
+    throw new Error(e + ' Given value: "' + number + '"');
+  }
 }

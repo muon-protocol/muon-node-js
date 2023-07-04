@@ -2,7 +2,6 @@ import CallablePlugin from './base/callable-plugin.js'
 import AppTssKey, {AppTssKeyJson} from "../../utils/tss/app-tss-key.js";
 import lodash from 'lodash'
 import * as tssModule from '../../utils/tss/index.js'
-import Web3 from 'web3'
 import {timeout, stackTrace, uuid, pub2json} from '../../utils/helpers.js'
 import {remoteApp, remoteMethod} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
@@ -20,7 +19,6 @@ import {bn2hex} from "../../utils/tss/utils.js";
 import {useOneTime} from "../../utils/tss/use-one-time.js";
 
 const {shuffle} = lodash;
-const {utils:{toBN}} = Web3;
 const log = logger('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';

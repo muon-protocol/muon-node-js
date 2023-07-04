@@ -25,6 +25,8 @@ import {
 import {soliditySha3} from '../utils/sha3.js'
 import { multiCall } from '../utils/multicall.js'
 import { BNSqrt } from'../utils/bn-sqrt.js'
+import BN from "bn.js";
+import {toBN} from "../utils/tss/utils.js";
 
 const { flatten, groupBy } = lodash;
 
@@ -37,9 +39,9 @@ global.MuonAppUtils = {
   tron,
   ws,
   timeout,
-  BN: Web3.utils.BN,
+  BN,
   BigNumber,
-  toBN: Web3.utils.toBN,
+  toBN,
   floatToBN,
   multiCall,
   ethGetBlock,
