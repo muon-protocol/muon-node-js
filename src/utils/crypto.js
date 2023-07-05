@@ -11,8 +11,11 @@ if(PRIVATE_KEY) {
   web3.eth.accounts.wallet.add(account)
 }
 
-function soliditySha3(params){
-  return web3.utils.soliditySha3(...params);
+export function soliditySha3(params) {
+  if (Array.isArray(params))
+    return web3Instance.utils.soliditySha3(...params);
+  else
+    return web3Instance.utils.soliditySha3(params)
 }
 
 function sign(hash) {
