@@ -5,8 +5,7 @@ const web3Instance = new Web3()
 export function soliditySha3(params) {
   if (Array.isArray(params))
     return web3Instance.utils.soliditySha3(...params);
-  else
-    return web3Instance.utils.soliditySha3(params);
+  return web3Instance.utils.soliditySha3(params);
 }
 
 export function muonSha3(...args): string {
