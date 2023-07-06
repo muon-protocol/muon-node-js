@@ -2,7 +2,6 @@ import {MapOf, RoundOutput, RoundProcessor} from "./types";
 import validations from './dkg-validations.js';
 import {MultiPartyComputation} from "./base.js";
 import {bn2str} from './utils.js'
-import Web3 from 'web3'
 import Polynomial from "../../utils/tss/polynomial.js";
 import * as TssModule from "../../utils/tss/index.js";
 import {PublicKey} from "../../utils/tss/types";
@@ -10,7 +9,7 @@ import BN from 'bn.js';
 import {muonSha3} from "../../utils/sha3.js";
 import {DistKey} from "./dist-key.js";
 
-const {toBN} = Web3.utils
+import {toBN} from "../../utils/helpers.js";
 
 /**
  * Round1 input/output types

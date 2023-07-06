@@ -1,12 +1,11 @@
 import Web3 from 'web3'
 import jsSha3 from 'js-sha3'
-const web3Instance = new Web3();
+const web3Instance = new Web3()
 
 export function soliditySha3(params) {
   if (Array.isArray(params))
     return web3Instance.utils.soliditySha3(...params);
-  else
-    return web3Instance.utils.soliditySha3(params)
+  return web3Instance.utils.soliditySha3(params);
 }
 
 export function muonSha3(...args): string {
