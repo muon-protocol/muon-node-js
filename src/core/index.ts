@@ -123,7 +123,7 @@ function getGeneralApps(): MuonPlugin[] {
   return result;
 }
 
-var muon;
+var muon: Muon;
 
 async function start() {
   log("starting ...");
@@ -185,8 +185,8 @@ async function start() {
           config: {},
         },
         {
-          name: "tss-plugin",
-          module: (await import("./plugins/tss-plugin.js")).default,
+          name: "key-manager",
+          module: (await import("./plugins/key-manager.js")).default,
           config: {},
         },
         {
@@ -219,19 +219,24 @@ async function start() {
           module: (await import("./plugins/db-synchronizer.js")).default,
           config: {},
         },
+        {
+          name: "reshare-cj",
+          module: (await import("./plugins/cron-jobs/reshare-cron-job.js")).default,
+          config: {},
+        },
         ...(await getEnvPlugins()),
         ...getCustomApps(),
         ...getGeneralApps(),
         ...getBuiltInApps(),
       ],
       net,
-      // TODO: pass it into the tss-plugin
+      // TODO: pass it into the key-manager
       tss,
     });
 
     await muon.initialize();
 
-    muon.start();
+    await muon.start();
   } catch (e) {
     console.error(e);
     throw e;

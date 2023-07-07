@@ -66,6 +66,8 @@ export type AppDeploymentInfo = {
     seed: string|null,
     /** Is app deployed? */
     deployed: boolean,
+    /** Is this node has the App's TSS key share */
+    hasTssKey: boolean,
     /** deployment status*/
     status: AppDeploymentStatus,
     /** reqId of confirmed deployment request signed by deployment tss group */

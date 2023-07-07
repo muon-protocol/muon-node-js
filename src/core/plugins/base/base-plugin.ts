@@ -1,5 +1,5 @@
 import Muon from "../../muon";
-import {MuonNodeInfo} from "../../../common/types";
+import {MuonNodeInfo, NetConfigs} from "../../../common/types";
 import NodeManagerPlugin from "../node-manager.js";
 import {logger} from '@libp2p/logger'
 import Events from 'events-async'
@@ -31,11 +31,15 @@ export default class BasePlugin extends Events{
    * @returns {Promise<void>}
    */
   async onStart(){
-    this.registerBroadcastHandler()
+    await this.registerBroadcastHandler()
   }
 
   get muon(): Muon {
     return this._muon;
+  }
+
+  get netConfigs():NetConfigs {
+    return this.muon.configs.net;
   }
 
   get peerId(){

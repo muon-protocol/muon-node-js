@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
-import TssPlugin from "./tss-plugin";
+import KeyManager from "./key-manager.js";
 import {
   AppContext,
   AppDeploymentInfo,
@@ -47,8 +47,8 @@ class System extends CallablePlugin {
     return this.muon.getPlugin('node-manager');
   }
 
-  get tssPlugin(): TssPlugin{
-    return this.muon.getPlugin('tss-plugin');
+  get keyManager(): KeyManager{
+    return this.muon.getPlugin('key-manager');
   }
 
   get appManager(): AppManager{
@@ -80,10 +80,15 @@ class System extends CallablePlugin {
       availableIds = availables.map(p => `${p.id}`)
     }
     else {
-      const delegateRoutingUrl = this.muon.configs.net.routing?.delegate;
-      if(!delegateRoutingUrl)
+      const delegateRoutingUrls = this.muon.configs.net.routing?.delegate;
+      if(!Array.isArray(delegateRoutingUrls) || delegateRoutingUrls.length < 1)
         throw `delegate routing url not defined to get available list.`
-      let response = await axios.get(`${delegateRoutingUrl}/onlines`).then(({data}) => data);
+      // @ts-ignore
+      let response = await Promise.any(
+        delegateRoutingUrls.map(url => {
+          return axios.get(`${url}/onlines`)
+        })
+      ).then(({data}) => data);
       let thresholdTimestamp = Date.now() - 60*60*1000
       let availables = response.filter(item => {
         /** active nodes that has uptime more than 1 hour */
@@ -233,7 +238,7 @@ class System extends CallablePlugin {
     if(!context)
       throw `App deployment info not found.`
     const id = this.getAppTssKeyId(appId, context.seed)
-    let key: AppTssKey = await this.tssPlugin.getSharedKey(id)
+    let key: AppTssKey = await this.keyManager.getSharedKey(id)
     return key
   }
 
@@ -354,7 +359,7 @@ class System extends CallablePlugin {
       /** The current node can store the key only when it has participated in key generation. */
       if(request.data.init.keyGenerators.includes(currentNode.id)) {
         /** store tss key */
-        let key: AppTssKey = await this.tssPlugin.getSharedKey(keyId)!
+        let key: AppTssKey = await this.keyManager.getSharedKey(keyId)!
         await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
         await this.appManager.saveAppTssConfig({
           appId: appId,
@@ -372,7 +377,7 @@ class System extends CallablePlugin {
           /** Wait for a moment in order to let the other nodes get ready. */
           await timeout(10000);
           try {
-            const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed, true);
+            const recovered = await this.keyManager.checkAppTssKeyRecovery(appId, seed, true);
             if(recovered) {
               log(`tss key recovered successfully.`)
               break;
@@ -426,7 +431,7 @@ class System extends CallablePlugin {
         /** Node has the old key */
         && this.appManager.appHasTssKey(appId, context.previousSeed)
       ) {
-        let reshareKey: AppTssKey = await this.tssPlugin.getSharedKey(reshareKeyId)!
+        let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId)!
         /**
          Mark the reshareKey as used for app TSS key.
          If anyone tries to use this key for a different purpose, it will cause an error.
@@ -434,7 +439,7 @@ class System extends CallablePlugin {
          */
         await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-reshare`)
 
-        const oldKey: AppTssKey = this.tssPlugin.getAppTssKey(appId, context.previousSeed)!
+        const oldKey: AppTssKey = this.keyManager.getAppTssKey(appId, context.previousSeed)!
         if (!oldKey)
           throw `The old party's TSS key was not found.`
         /**
@@ -445,7 +450,7 @@ class System extends CallablePlugin {
         await useOneTime("key", oldKey.publicKey!.encode('hex', true), `app-${appId}-tss`)
 
 
-        const appParty = this.tssPlugin.getAppParty(appId, seed)!
+        const appParty = this.keyManager.getAppParty(appId, seed)!
         if (!appParty)
           throw `App party not found`;
 
@@ -479,7 +484,7 @@ class System extends CallablePlugin {
         for(let numTry=3 ; numTry > 0 ; numTry--) {
           await timeout(10000);
           try {
-            const recovered = await this.tssPlugin.checkAppTssKeyRecovery(appId, seed, true);
+            const recovered = await this.keyManager.checkAppTssKeyRecovery(appId, seed, true);
             if(recovered) {
               log(`tss key recovered successfully.`)
               break;
@@ -609,7 +614,7 @@ class System extends CallablePlugin {
       throw `App context already has key`
     }
 
-    let key = await this.tssPlugin.keyGen({appId, seed}, {timeout: 65e3, lowerThanHalfN: true})
+    let key = await this.keyManager.keyGen({appId, seed}, {timeout: 65e3, lowerThanHalfN: true})
 
     return {
       id: key.id,
@@ -634,7 +639,7 @@ class System extends CallablePlugin {
 
     log(`generating nonce for resharing app[${appId}] tss key`)
     const resharePartners = newContext.party.partners.filter(id => oldContext.party.partners.includes(id))
-    let nonce = await this.tssPlugin.keyGen({appId, seed}, {
+    let nonce = await this.keyManager.keyGen({appId, seed}, {
       id: `resharing-${uuid()}`,
       partners: _.uniq([
         this.nodeManager.currentNodeInfo!.id,
@@ -698,8 +703,8 @@ class System extends CallablePlugin {
     const context:AppContext = this.appManager.getAppContext(appId, seed)
     if(!context)
       throw `App deployment info not found.`
-    let key: AppTssKey = await this.tssPlugin.getSharedKey(keyId)
-    // let key = await this.tssPlugin.getAppTssKey(appId, seed)
+    let key: AppTssKey = await this.keyManager.getSharedKey(keyId)
+    // let key = await this.keyManager.getAppTssKey(appId, seed)
     if(!key)
       throw `App tss key not found.`
 

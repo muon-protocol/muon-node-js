@@ -58,7 +58,7 @@ const tasksCache = new NodeCache({
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetNetworkConfig: "get-net-conf",
-  GetContractInfo: "get-contract-info",
+  GetNodeManagerData: "get-node-manager-data",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
   BroadcastToChannel: "broadcast-to-channel",
   // PutDHT: "put-dht",
@@ -139,13 +139,10 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.network.configs.net
   }
 
-  @ipcMethod(IpcMethods.GetContractInfo)
-  async __onIpcGetContractInfo(data = {}, callerInfo) {
-
-    let {networkInfo} = this.nodeManager;
+  @ipcMethod(IpcMethods.GetNodeManagerData)
+  async __onIpcGetNodeManagerData(data = {}, callerInfo) {
     return {
       contract: this.network.configs.net.nodeManager,
-      networkInfo,
       nodesList: await this.nodeManager.getNodesList(),
     }
   }

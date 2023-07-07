@@ -8,7 +8,7 @@ import NodeManagerPlugin from "./node-manager.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import * as CoreIpc from '../ipc.js'
-import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
+import {AppContext, MuonNodeInfo, NetConfigs, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import TssParty from "../../utils/tss/party.js";
 import {IMpcNetwork, MapOf} from "../../common/mpc/types";
@@ -55,7 +55,7 @@ const RemoteMethods = {
 }
 
 @remoteApp
-class TssPlugin extends CallablePlugin {
+class KeyManager extends CallablePlugin {
   isReady = false
   parties:{[index: string]: TssParty} = {}
   tssKey: AppTssKey | null = null;
@@ -157,14 +157,6 @@ class TssPlugin extends CallablePlugin {
     })
   }
 
-  get TSS_THRESHOLD() {
-    return this.muon.configs.net.tss.threshold;
-  }
-
-  get TSS_MAX() {
-    return this.muon.configs.net.tss.max;
-  }
-
   private get nodeManager(): NodeManagerPlugin {
     return this.muon.getPlugin('node-manager')
   }
@@ -186,10 +178,6 @@ class TssPlugin extends CallablePlugin {
   }
 
   async loadDeploymentTss() {
-    if(!this.nodeManager.networkInfo){
-      throw {message: `TssPlugin.loadDeploymentTss: NodeManager plugin not loaded the network info.`}
-    }
-    let {networkInfo} = this.nodeManager;
 
     const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
 
@@ -212,7 +200,7 @@ class TssPlugin extends CallablePlugin {
     // validate tssConfig
     let tssConfig = this.getDeploymentTssConfig();
 
-    if(tssConfig && tssConfig.party.t == networkInfo.tssThreshold){
+    if(tssConfig && tssConfig.party.t == this.netConfigs.tss.threshold){
       let key = AppTssKey.fromJson(
         this.tssParty,
         this.nodeManager.currentNodeInfo!.id,
@@ -249,7 +237,7 @@ class TssPlugin extends CallablePlugin {
           {timeout: 5000}
         );
 
-        if(onlineDeployers.length >= this.nodeManager.TssThreshold) {
+        if(onlineDeployers.length >= this.netConfigs.tss.threshold) {
           log(`${onlineDeployers.length} number of deployers are now online.`)
           break;
         }
@@ -429,11 +417,11 @@ class TssPlugin extends CallablePlugin {
 
     const readyDeployers = await this.appManager.findNAvailablePartners(
       deployers,
-      this.nodeManager.TssThreshold,
+      this.netConfigs.tss.threshold,
       {appId: "1", seed: "1"}
     )
     log(`there is ${readyDeployers.length} deployers are ready.`)
-    return readyDeployers.length < this.nodeManager.TssThreshold;
+    return readyDeployers.length < this.netConfigs.tss.threshold;
   }
 
   saveTssConfig(party, key) {
@@ -462,9 +450,9 @@ class TssPlugin extends CallablePlugin {
   }
 
   loadParty(party) {
-    // console.log(`TssPlugin.loadParty`, party)
+    // console.log(`KeyManager.loadParty`, party)
     if(party.partners.lengh > 0 && typeof party.partners[0] !== "string") {
-      console.log("TssPlugin.loadParty.partners most be string array", party.partners)
+      console.log("KeyManager.loadParty.partners most be string array", party.partners)
       console.log(stackTrace())
     }
     try {
@@ -474,7 +462,7 @@ class TssPlugin extends CallablePlugin {
     catch (e) {
       console.log('loading party: ', party);
       console.log('partners info: ', party);
-      console.log(`TssPlugin.loadParty ERROR:`, e)
+      console.log(`KeyManager.loadParty ERROR:`, e)
     }
   }
 
@@ -719,8 +707,7 @@ class TssPlugin extends CallablePlugin {
             return false
           });
         }))
-        // console.log(`key save broadcast threshold: ${this.TSS_THRESHOLD} count: ${key.partners.length}`, callResult);
-        if (callResult.filter(r => r === true).length+1 < this.TSS_THRESHOLD)
+        if (callResult.filter(r => r === true).length+1 < this.netConfigs.tss.threshold)
           throw `Tss creation failed.`
         await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
         this.saveTssConfig(this.tssParty, key)
@@ -849,7 +836,7 @@ class TssPlugin extends CallablePlugin {
     // TODO: can malicious user use a nonce twice?
     const {nonce: nonceId, appId, seed} = data;
 
-    // console.log('TssPlugin.__recoverMyKey', data, callerInfo.wallet)
+    // console.log('KeyManager.__recoverMyKey', data, callerInfo.wallet)
     const appParty = this.getAppParty(appId, seed)
     if(!appParty)
       throw `Missing app Party.`
@@ -901,9 +888,9 @@ class TssPlugin extends CallablePlugin {
     let party = this.getParty(partyId)
     let key: AppTssKey = await this.getSharedKey(keyId);
     if (!party)
-      throw {message: 'TssPlugin.storeDeploymentTssKey: party not found.'}
+      throw {message: 'KeyManager.storeDeploymentTssKey: party not found.'}
     if (!key)
-      throw {message: 'TssPlugin.storeDeploymentTssKey: key not found.'};
+      throw {message: 'KeyManager.storeDeploymentTssKey: key not found.'};
     if(callerInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.saveTssConfig(party, key);
@@ -920,4 +907,4 @@ class TssPlugin extends CallablePlugin {
   }
 }
 
-export default TssPlugin;
+export default KeyManager;
