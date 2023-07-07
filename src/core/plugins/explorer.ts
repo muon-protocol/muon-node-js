@@ -27,7 +27,6 @@ type GetAppData = Override<GatewayCallParams, {params: { appName?: string, appId
 
 const RemoteMethods = {
   IsReqConfirmationAnnounced: "is-req-conf-ann",
-  AppDeploymentStatus: "app-deployment-status",
   LoadAppContextAndKey: "load-app-context",
 }
 
@@ -220,18 +219,12 @@ class Explorer extends CallablePlugin {
     return confirmed === '1'
   }
 
-  @remoteMethod(RemoteMethods.AppDeploymentStatus)
-  async __getAppDeploymentStatus(data: {appId: string, seed: string}, callerInfo: MuonNodeInfo) {
-    const {appId, seed} = data
-    return this.appManager.getAppDeploymentStatus(appId, seed)
-  }
-
   @remoteMethod(RemoteMethods.LoadAppContextAndKey)
   async __loadAppContextAndKey(data: {appId:string, seed: string}, callerInfo: MuonNodeInfo) {
     const {appId, seed} = data
     if(!callerInfo.isDeployer && callerInfo.wallet !== process.env.SIGN_WALLET_ADDRESS)
       return;
-    const status:AppDeploymentStatus = this.appManager.getAppDeploymentStatus(appId, seed)
+    const {status, hasTssKey} = this.appManager.getAppDeploymentInfo(appId, seed)
     let contexts: AppContext[];
     if(status === 'NEW') {
       contexts = await this.appManager.queryAndLoadAppContext(appId);
@@ -241,7 +234,7 @@ class Explorer extends CallablePlugin {
       if(!ctx || !ctx.party.partners.includes(this.nodeManager.currentNodeInfo!.id))
         return;
     }
-    if(status !== 'DEPLOYED') {
+    if(!hasTssKey) {
       await timeout(2000)
       await this.keyManager.checkAppTssKeyRecovery(appId, seed);
     }

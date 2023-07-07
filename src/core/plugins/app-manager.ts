@@ -43,7 +43,8 @@ export type AppContextQueryOptions = {
 
 export type ContextFilterOptions = {
   appId?: string,
-  deploymentStatus?: AppDeploymentStatus[]
+  deploymentStatus?: AppDeploymentStatus[],
+  hasKeyGenRequest?: boolean,
 }
 
 export type FindAvailableNodesOptions = {
@@ -321,11 +322,12 @@ export default class AppManager extends CallablePlugin {
 
   getAppDeploymentInfo(appId: string, seed: string): AppDeploymentInfo {
     const status = this.getAppDeploymentStatus(appId, seed);
-    const DeployedTrueStatuses: AppDeploymentStatus[] = ['TSS_GROUP_SELECTED', "DEPLOYED", "PENDING"]
+    const deployed:boolean = ['TSS_GROUP_SELECTED', "DEPLOYED", "PENDING"].includes(status);
     const result: AppDeploymentInfo = {
       appId,
       seed,
-      deployed: DeployedTrueStatuses.includes(status),
+      deployed,
+      hasTssKey: deployed && this.appHasTssKey(appId, seed),
       status,
     }
     const context = seed ? this.getAppContext(appId, seed) : null
@@ -565,29 +567,38 @@ export default class AppManager extends CallablePlugin {
       }, undefined)
   }
 
-  /**
-   * Return all expired context of all Apps. useful for context pruning process.
-   */
-  getAllExpiredContexts(): AppContext[] {
-    let currentTime = getTimestamp();
-    return Object.values(this.appContexts)
-      .filter(ctx => {
-        return ctx.expiration !== undefined && ctx.expiration < currentTime;
-      })
-  }
-
   filterContexts(options: ContextFilterOptions={}): AppContext[] {
-    return Object.values(this.appContexts)
+    const contexts : AppContext[] = !!options.appId
+      ? this.getAppSeeds(options.appId).map(seed => this.appContexts[seed])
+      : Object.values(this.appContexts);
+
+    return contexts
       .filter(ctx => {
         const {appId, seed} = ctx;
-        if(options.appId !== undefined && appId !== options.appId)
-          return false
         if(options.deploymentStatus && options.deploymentStatus.length>0) {
           if(!options.deploymentStatus.includes(this.getAppDeploymentStatus(appId, seed)))
             return false
         }
+        if(options.hasKeyGenRequest !== undefined) {
+          let hasKeyGenRequest = !!ctx.keyGenRequest
+          if(options.hasKeyGenRequest !== hasKeyGenRequest)
+            return false;
+        }
         return true
       })
+  }
+
+  isSeedRotated(seed: string): boolean {
+    const context:AppContext|undefined = this.getSeedContext(seed);
+    if(!context)
+      return false;
+
+    const deployTimestamp = context.deploymentRequest?.data.result.timestamp;
+    const appContexts: AppContext[] = this.filterContexts({appId: context.appId, hasKeyGenRequest: true})
+
+    return !!appContexts.find(ctx => {
+      return ctx.deploymentRequest?.data.result.timestamp > deployTimestamp
+    });
   }
 
   /**
@@ -607,7 +618,6 @@ export default class AppManager extends CallablePlugin {
 
   getAppDeploymentStatus(appId: string, seed: string): AppDeploymentStatus {
     let context: AppContext = this.getAppContext(appId, seed);
-    const currentNode = this.nodeManager.currentNodeInfo!;
 
     let status: AppDeploymentStatus = "NEW"
     if (!!context) {
@@ -617,14 +627,12 @@ export default class AppManager extends CallablePlugin {
         if(this.keyManager.isReady)
           status = "DEPLOYED";
       }
-      else if(!!seed) {
-        const isInTheParty = context.party.partners.includes(currentNode.id);
-        if((isInTheParty && this.appHasTssKey(appId, seed)) || (!isInTheParty && !!context.publicKey)) {
+      else {
+        if(!!context.publicKey) {
           status = "DEPLOYED";
         }
 
         if (status === "DEPLOYED") {
-
           if (!!context.ttl) {
             const deploymentTime = context.deploymentRequest!.data.timestamp
             const pendingTime = deploymentTime + context.ttl;
@@ -789,10 +797,15 @@ export default class AppManager extends CallablePlugin {
     if (selfIndex >= 0) {
       peers = peers.filter((_, i) => (i !== selfIndex))
       if(options.excludeSelf !== true) {
-        const status = this.getAppDeploymentStatus(appId!, seed!)
         /** If the appId is not set, being online is enough to be considered as available. */
-        if (!appId || status === 'DEPLOYED')
+        if (!appId)
           responseList.push(this.currentNodeInfo![options!.return!]);
+        else {
+          const deploymentInfo = this.getAppDeploymentInfo(appId, seed!);
+          if(deploymentInfo.deployed && deploymentInfo.hasTssKey) {
+            responseList.push(this.currentNodeInfo![options!.return!]);
+          }
+        }
       }
       n--;
     }
@@ -819,9 +832,9 @@ export default class AppManager extends CallablePlugin {
         {appId, seed},
         {timeout: options!.timeout},
       )
-        .then(({status}) => {
+        .then(({deployed, hasTssKey}) => {
           execTimes[i] = Date.now() - startTime
-          if (!appId || status === "DEPLOYED") {
+          if (!appId || (deployed && hasTssKey)) {
             responseList.push(peers[i][options!.return!])
             n--;
           }
@@ -1018,8 +1031,8 @@ export default class AppManager extends CallablePlugin {
     if (!context)
       throw `App not deployed`
 
-    let deploymentStatus = this.getAppDeploymentInfo(appId, seed);
-    if((["DEPLOYED", "PENDING"] as AppDeploymentStatus[]).includes(deploymentStatus.status)) {
+    let {deployed, hasTssKey} = this.getAppDeploymentInfo(appId, seed);
+    if(deployed && hasTssKey) {
       return await NetworkIpc.getAppLatency(appId, seed)
     }
     else

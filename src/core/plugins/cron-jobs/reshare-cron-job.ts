@@ -109,6 +109,10 @@ export default class ReshareCronJob extends BaseCronJob{
         }
       }
     })
+      .catch(e => {
+        this.log.error(`tss-rotate request failed %o`, e);
+        throw e;
+      })
     if(!reshareResponse?.confirmed) {
       throw "rotation request not confirmed"
     }
