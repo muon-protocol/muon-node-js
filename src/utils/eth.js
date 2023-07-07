@@ -7,12 +7,13 @@ import EthRpcList from './eth-rpc-list.js';
 const require = createRequire(import.meta.url);
 const ERC20_ABI =require('../data/ERC20-ABI.json')
 const ERC721_ABI = require('../data/ERC721-ABI.json')
+import {muonSha3} from './sha3.js'
+
 
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
 
 const _generalWeb3Instance = new Web3()
-const soliditySha3 = _generalWeb3Instance.utils.soliditySha3
 
 const lastUsedRpcIndex = {
 };
@@ -101,7 +102,7 @@ function hashCallOutput(
     value: !name || typeof result === 'string' ? result : result[name]
   }))
   params = [{ type: 'address', value: address }, ...params, ...extraParams]
-  let hash = _generalWeb3Instance.utils.soliditySha3(...params)
+  let hash = muonSha3(...params)
   return hash
 }
 
@@ -273,7 +274,6 @@ export {
   getPastEvents,
   getWeb3Sync,
   hashCallOutput,
-  soliditySha3,
   getTransaction,
   getTransactionReceipt,
   call,

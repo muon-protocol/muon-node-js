@@ -3,6 +3,8 @@ import Web3 from 'web3'
 import {hashCallOutput} from './eth.js'
 import crypto from "crypto"
 import BN from "bn.js";
+import {muonSha3} from './sha3.js'
+
 
 
 const web3 = new Web3();
@@ -85,7 +87,7 @@ function toBaseUnit(value, decimals) {
 const AES_ENCRYPTION_ALGORITHM = "aes-256-gcm"
 
 export function aesCreateIv(random, privateKey) {
-  return web3.utils.soliditySha3(
+  return muonSha3(
     {t: 'uint256', v: '0x' + privateKey},
     {t: 'uint128', v: '0x' + random}
   ).substr(2, 32)
