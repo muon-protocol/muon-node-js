@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 import {MODEL_APP_CONTEXT} from './constants.js'
-import {soliditySha3} from '../../utils/sha3.js'
+import {muonSha3} from '../../utils/sha3.js'
 
 const TssPartyInfo = mongoose.Schema({
   t: {type: Number, required: true},
@@ -63,10 +63,10 @@ modelSchema.pre('save', function (next) {
 })
 
 modelSchema.virtual('hash').get(function () {
-  return soliditySha3([
+  return muonSha3(
     {t: 'uint256', v: this.appId},
-    {t: 'uint256', v: this.seed},
-  ])
+    {t: 'uint256', v: this.seed}
+    )
 });
 
 // modelSchema.index({ owner: 1, version: 1, appId: 1}, { unique: true });
@@ -78,7 +78,7 @@ export function hash(context) {
     {t: "uint32", v: context.party.t},
     ... context.party.partners.map(v => ({t: 'uint64', v}))
   ]
-  return soliditySha3(items)
+  return muonSha3(...items)
 }
 
 export default mongoose.model(MODEL_APP_CONTEXT, modelSchema);

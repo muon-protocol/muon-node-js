@@ -3,7 +3,7 @@ import asyncHandler from 'express-async-handler'
 import RequestLog from '../../common/db-models/RequestLog.js'
 import {QueueProducer} from '../../common/message-bus/index.js'
 import {parseBool} from '../../utils/helpers.js'
-import {soliditySha3} from '../../utils/sha3.js'
+import {muonSha3} from '../../utils/sha3.js'
 import * as CoreIpc from '../../core/ipc.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import axios from 'axios'
@@ -155,7 +155,7 @@ async function callProperNode(requestData: GatewayCallParams) {
 async function shieldConfirmedResult(requestData, request) {
   log(`Shield applying %o`, requestData)
   const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
-  const requestHash = soliditySha3(request.data.signParams)
+  const requestHash = muonSha3(...request.data.signParams)
   if(shieldHash !== requestHash)
     throw `Shield result mismatch.`
   request.shieldAddress = process.env.SIGN_WALLET_ADDRESS;

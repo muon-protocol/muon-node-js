@@ -4,7 +4,7 @@ import BN from 'bn.js';
 import {toBN} from '../helpers.js';
 
 const {range} = lodash
-const {utils: {randomHex, sha3, soliditySha3, keccak256}} = Web3;
+const {utils: {randomHex, sha3, keccak256}} = Web3;
 const ZERO = toBN(0)
 const ONE = toBN(1)
 
@@ -38,7 +38,6 @@ export {
   toBN,
   bn2hex,
   sha3,
-  soliditySha3,
   keccak256,
   range,
   pub2addr,
