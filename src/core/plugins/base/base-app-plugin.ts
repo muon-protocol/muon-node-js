@@ -4,7 +4,6 @@ import {getTimestamp, pub2json} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
 import {muonSha3, soliditySha3} from '../../../utils/sha3.js'
 import * as TssModule from '../../../utils/tss/index.js'
-import Web3 from 'web3'
 import lodash from 'lodash'
 import AppRequestManager from './app-request-manager.js'
 import {remoteApp, remoteMethod, gatewayMethod} from './app-decorators.js'
@@ -31,7 +30,7 @@ import {reportInsufficientPartners} from "../../../common/analitics-reporter.js"
 import {createAjv} from "../../../common/ajv.js";
 
 const { omit } = lodash;
-const {utils: {toBN}} = Web3
+
 const ajv = createAjv();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
 const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
@@ -512,12 +511,12 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   calculateRequestId(request, resultHash) {
-    return crypto.soliditySha3([
+    return soliditySha3([
       {type: "address", value: request.gwAddress},
-      {type: "uint256", value: crypto.soliditySha3(request.data.uid)},
+      {type: "uint256", value: soliditySha3(request.data.uid)},
       {type: "uint32", value: request.data.timestamp},
       {type: "uint256", value: request.appId},
-      {type: "string", value: crypto.soliditySha3(request.method)},
+      {type: "string", value: soliditySha3(request.method)},
       {type: "uint256", value: resultHash},
     ]);
   }

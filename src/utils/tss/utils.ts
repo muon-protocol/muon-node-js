@@ -1,9 +1,10 @@
 import Web3 from 'web3'
 import lodash from 'lodash'
 import BN from 'bn.js';
+import {toBN} from '../helpers.js';
 
 const {range} = lodash
-const {utils: {toBN, randomHex, sha3, soliditySha3, keccak256}} = Web3;
+const {utils: {randomHex, sha3, soliditySha3, keccak256}} = Web3;
 const ZERO = toBN(0)
 const ONE = toBN(1)
 
@@ -28,7 +29,7 @@ function toChecksumAddress(address) {
   return ret
 }
 
-function bn2hex(num: BN, byteLength: number=32): string {
+function bn2hex(num: BN, byteLength: number = 32): string {
   return '0x' + num.toBuffer('be', byteLength).toString('hex');
 }
 

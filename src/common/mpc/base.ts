@@ -236,10 +236,16 @@ export class MultiPartyComputation {
           constructData: r===0 ? this.constructData : undefined,
         }
         this.log(`mpc[${this.id}].${currentRound} collecting round data`)
+        
+        // TODO: its just for debuging
+        // need to be removed
+        let partyErrors = {};
+
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
             qualifiedPartners.map(partner => {
               return this.tryToGetRoundData(network, partner, r, dataToSend)
                 .catch(e => {
+                  partyErrors[partner] = JSON.stringify(e);
                   this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
                   return null
                 })
@@ -262,7 +268,7 @@ export class MultiPartyComputation {
         );
 
         if(qualifiedPartners.length < this.t) {
-          throw `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified`
+          throw `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified. partners=[${this.partners.join(',')}], round=${currentRound}, partyErrors=${JSON.stringify(partyErrors)}`
         }
       }
 

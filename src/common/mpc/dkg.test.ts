@@ -11,10 +11,11 @@ import {bn2str} from './utils.js'
 import Web3 from 'web3'
 import elliptic from 'elliptic'
 import * as TssModule from '../../utils/tss/index.js'
+import {toBN} from "../../utils/tss/utils.js";
 import lodash from 'lodash'
 
 const {range, uniq} = lodash
-const {toBN, randomHex} = Web3.utils
+const {randomHex} = Web3.utils
 const ellipticCurve = new elliptic.ec('secp256k1');
 
 /**
