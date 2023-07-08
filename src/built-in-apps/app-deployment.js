@@ -16,6 +16,7 @@ const owners = [
   "0x340C978265378998D589B41F1f51F137c344C22a"
 ]
 
+const NODES_SELECTION_TOLERANCE = 0.07;
 const ROTATION_COEFFICIENT = 1.5;
 
 function shuffleNodes(nodes, seed) {
@@ -30,6 +31,18 @@ function shuffleNodes(nodes, seed) {
     })
     let sorted = unsorted.sort((a, b) => (a.hash < b.hash ? -1 : 1))
     return sorted.map(({id}) => id)
+}
+
+function symmetricDifference(arrA, arrB) {
+    const _difference = new Set(arrA);
+    for (const elem of new Set(arrB)) {
+        if (_difference.has(elem)) {
+            _difference.delete(elem);
+        } else {
+            _difference.add(elem);
+        }
+    }
+    return Array.from(_difference);
 }
 
 const uint32Schema = {
@@ -235,14 +248,16 @@ module.exports = {
                     seed: {value: seed, reqId, nonce},
                 } = params
 
-                const oldContext = await this.callPlugin('system', "getAppContext", appId, previousSeed, true)
+                const oldContext = await this.callPlugin('system', "getAppContext", appId, previousSeed)
 
                 if(!oldContext)
                     throw `App previous context not found on the deployment app's validateRequest method`
 
                 /** Most recent status of App should be PENDING (about to expire) */
-                const {status} = this.callPlugin('system', "getAppDeploymentInfo", appId, previousSeed)
+                const {status, hasTssKey} = this.callPlugin('system', "getAppDeploymentInfo", appId, previousSeed)
 
+                if(!hasTssKey)
+                    throw `Missing tss key`
                 if(status !== 'PENDING' && status !== 'EXPIRED')
                     throw `Previous context status is not PENDING/EXPIRED. It is ${status}`
 
@@ -317,9 +332,8 @@ module.exports = {
                     selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
                     selectedNodes = selectedNodes.map(({id}) => id)
                 }
-                let previousNodes;
                 if(method === Methods.TssRotate) {
-                    previousNodes = prevContext.party.partners
+                    const previousNodes = prevContext.party.partners
                     /** Pick some nodes to retain in the new party */
                     const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
                     const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
@@ -327,7 +341,6 @@ module.exports = {
                     selectedNodes = lodash.uniq([...nodesToKeep, ...selectedNodes]).slice(0, n);
                 }
                 return {
-                    previousNodes,
                     selectedNodes,
                 }
             }
@@ -388,12 +401,29 @@ module.exports = {
                     seed: {value: seed},
                     t=tssConfigs.threshold,
                     n=tssConfigs.max,
+                    nodes,
                     ttl: userDefinedTTL,
                     pendingPeriod: pending,
                 } = params
-                const ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
 
+                const ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
                 t = Math.max(t, tssConfigs.threshold);
+
+                /** check selected nodes */
+
+                let selectedNodes2;
+                if(!!nodes) {
+                    selectedNodes2 = nodes
+                }
+                else {
+                    selectedNodes2 = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
+                    selectedNodes2 = selectedNodes2.map(({id}) => id)
+                }
+
+                let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
+                if(difference > NODES_SELECTION_TOLERANCE)
+                    throw `selected nodes mismatched.`
+
                 const pendingPeriod = !!pending ? pending : tssConfigs.pendingPeriod
 
                 return {
@@ -410,13 +440,14 @@ module.exports = {
             }
             case Methods.TssRotate: {
                 const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const {previousNodes, selectedNodes} = init
+                const {selectedNodes} = init
                 let {
                     appId,
                     previousSeed,
                     seed: {value: seed},
                     t=tssConfigs.threshold,
                     n=tssConfigs.max,
+                    nodes,
                     ttl: userDefinedTTL,
                     pendingPeriod: pending,
                 } = params
@@ -424,6 +455,27 @@ module.exports = {
                 const prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
                 if (!prevContext)
                     throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
+
+                /** check selected nodes */
+
+                let selectedNodes2;
+                if(!!nodes) {
+                    selectedNodes2 = nodes
+                }
+                else {
+                    selectedNodes2 = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
+                    selectedNodes2 = selectedNodes2.map(({id}) => id)
+                }
+                const previousNodes = prevContext.party.partners
+                /** Pick some nodes to retain in the new party */
+                const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
+                const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
+                /** Merge nodes and retain n nodes */
+                selectedNodes2 = lodash.uniq([...nodesToKeep, ...selectedNodes2]).slice(0, n);
+
+                let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
+                if(difference > NODES_SELECTION_TOLERANCE)
+                    throw `selected nodes mismatched.`
 
                 const ttl = !!userDefinedTTL ? userDefinedTTL : prevContext.ttl;
                 const pendingPeriod = !!pending ? pending : prevContext.pendingPeriod;
@@ -441,7 +493,6 @@ module.exports = {
                     seed,
                     tssThreshold: t,
                     maxGroupSize: n,
-                    previousNodes,
                     selectedNodes,
                 };
             }
@@ -566,8 +617,6 @@ module.exports = {
                 return [
                   /** inform the partners of new context */
                   init.selectedNodes,
-                    /** inform the partners of previous context that retained in new context */
-                  init.previousNodes.filter(id => init.selectedNodes.includes(id))
                 ]
             }
             case Methods.TssKeyGen: {
