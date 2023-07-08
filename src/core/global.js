@@ -22,11 +22,11 @@ import {
   getNftInfo as ethGetNftInfo,
   hashCallOutput as ethHashCallOutput
 } from '../utils/eth.js'
-import {soliditySha3} from '../utils/sha3.js'
 import { multiCall } from '../utils/multicall.js'
 import { BNSqrt } from'../utils/bn-sqrt.js'
 import BN from "bn.js";
 import {toBN} from "../utils/tss/utils.js";
+import {muonSha3} from "../utils/sha3.js";
 
 const { flatten, groupBy } = lodash;
 
@@ -46,6 +46,7 @@ global.MuonAppUtils = {
   multiCall,
   ethGetBlock,
   ethGetBlockNumber,
+  muonSha3,
   ethGetPastEvents,
   ethRead,
   ethCall,
@@ -53,7 +54,6 @@ global.MuonAppUtils = {
   ethGetNftInfo,
   ethHashCallOutput,
   toBaseUnit,
-  soliditySha3,
   ecRecover: util.ecrecover,
   recoverTypedSignature: ethSigUtil.recoverTypedSignature,
   recoverTypedMessage: ethSigUtil.recoverTypedMessage,

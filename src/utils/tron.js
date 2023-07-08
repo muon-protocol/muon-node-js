@@ -2,6 +2,8 @@
 import ethers from 'ethers'
 import TronWeb from 'tronweb'
 import Web3 from 'web3'
+import {muonSha3} from './sha3.js'
+
 
 // console.log(TronWeb.utils)
 
@@ -95,7 +97,7 @@ function soliditySha3(inputs) {
     else
       return {type, value}
   })
-  return Web3.utils.soliditySha3(...inputs)
+  return muonSha3(...inputs)
 }
 
 export {
