@@ -64,11 +64,7 @@ export default class ReshareCronJob extends BaseCronJob{
     }
     /** filter and keep, only contexts that not rotated */
     pendingContexts = pendingContexts.filter(ctx => {
-      const {appId, seed} = ctx;
-      let rotatedContext = appsContexts[appId].find(ctx2 => {
-        return !!ctx2.previousSeed && ctx2.previousSeed === seed
-      })
-      return !rotatedContext;
+      return !this.appManager.isSeedRotated(ctx.seed);
     })
 
     this.log(`starting ${pendingContexts.length} apps key reshare ...`)

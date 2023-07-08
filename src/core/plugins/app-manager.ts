@@ -327,7 +327,7 @@ export default class AppManager extends CallablePlugin {
       appId,
       seed,
       deployed,
-      hasTssKey: deployed && this.appHasTssKey(appId, seed),
+      hasTssKey: this.appHasTssKey(appId, seed),
       status,
     }
     const context = seed ? this.getAppContext(appId, seed) : null

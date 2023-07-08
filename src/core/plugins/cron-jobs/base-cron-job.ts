@@ -52,7 +52,7 @@ export default class BaseCronJob extends BasePlugin {
           await this.process();
         }
         catch (e) {
-          this.log.error(`${this.ConstructorName} process error %o`, e);
+          this.log.error(`main loop error %o`, e);
         }
       }
       await timeout((0.5 + Math.random()) * interval)

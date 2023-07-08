@@ -247,7 +247,18 @@ export default class DbSynchronizer extends CallablePlugin {
       )
 
       contextToSave = allContexts.filter(ctx => {
-        return !this.appManager.hasContext(ctx)
+        const {appId} = ctx
+
+        /** if context already exist */
+        if(appId === "1" || this.appManager.hasContext(ctx))
+          return false
+
+        /** if a newer version of context exist */
+        const lastCtx = this.appManager.getAppLastContext(appId);
+        if(lastCtx && lastCtx.deploymentRequest?.data.timestamp! > ctx.deploymentRequest?.data.timestamp!)
+          return false;
+
+        return true;
       })
     }
 
