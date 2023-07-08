@@ -1,6 +1,6 @@
 const {
     lodash,
-  soliditySha3,
+  muonSha3,
 } = MuonAppUtils
 
 const Methods = {
@@ -22,10 +22,10 @@ function shuffleNodes(nodes, seed) {
     let unsorted = nodes.map(id => {
         return {
             id,
-            hash: soliditySha3([
+            hash: muonSha3(
              {type: "uint64", value: id},
-             {type: "uint256", value: seed},
-         ])
+             {type: "uint256", value: seed}
+             )
         }
     })
     let sorted = unsorted.sort((a, b) => (a.hash < b.hash ? -1 : 1))

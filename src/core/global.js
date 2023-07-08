@@ -26,6 +26,7 @@ import { multiCall } from '../utils/multicall.js'
 import { BNSqrt } from'../utils/bn-sqrt.js'
 import BN from "bn.js";
 import {toBN} from "../utils/tss/utils.js";
+import {muonSha3} from "../utils/sha3.js";
 
 const { flatten, groupBy } = lodash;
 
@@ -45,6 +46,7 @@ global.MuonAppUtils = {
   multiCall,
   ethGetBlock,
   ethGetBlockNumber,
+  muonSha3,
   ethGetPastEvents,
   ethRead,
   ethCall,
