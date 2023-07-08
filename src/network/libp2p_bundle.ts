@@ -17,7 +17,7 @@ const DEFAULT_OPTS = {
     noise(),
   ],
   connectionManager: {
-    maxConnections: 90, // TODO: set default values
+    maxConnections: 1000, // TODO: set default values
     minConnections: 0,
     maxIncomingPendingConnections: 500, // TODO: set default values
     //dialTimeout: 10 * 1000
