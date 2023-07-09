@@ -12,7 +12,7 @@ export const MuonNodeInfoSchema = {
     active: {type: "boolean"},
     staker: {
       type: 'string',
-      customType: "ethereumAddress",
+      customType: "ethAddress",
       errorMessage: {
         type: "staker address must be a valid ethereum address.",
         customType: "staker address must be a valid ethereum address."
@@ -20,7 +20,7 @@ export const MuonNodeInfoSchema = {
     },
     wallet: {
       type: 'string',
-      customType: "ethereumAddress",
+      customType: "ethAddress",
       errorMessage: {
         type: "wallet address must be a valid ethereum address.",
         customType: "wallet address must be a valid ethereum address."

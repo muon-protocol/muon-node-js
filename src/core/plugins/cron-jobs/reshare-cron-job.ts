@@ -8,6 +8,7 @@ import {MapOf} from "../../../common/mpc/types";
 import {GatewayCallParams} from "../../../gateway/types";
 import {AnnounceCheckOptions, muonCall} from "../../../cmd/utils.js";
 import {timeout} from "../../../utils/helpers.js";
+import * as crypto from "../../../utils/crypto.js";
 
 const CONCURRENT_RESHARE = 5;
 let requestQueue = new QueueProducer(`gateway-requests`);
@@ -92,6 +93,7 @@ export default class ReshareCronJob extends BaseCronJob{
     this.log(`Random seed generated %o`, {randomSeed: randomSeedResponse.signatures[0].signature})
 
     this.log('Selecting new party ...')
+    const leaderSignature = crypto.sign(randomSeedResponse.signatures[0].signature)
     const reshareResponse = await requestQueue.send({
       app: 'deployment',
       method: `tss-rotate`,
@@ -102,7 +104,8 @@ export default class ReshareCronJob extends BaseCronJob{
           value: randomSeedResponse.signatures[0].signature,
           reqId: randomSeedResponse.reqId,
           nonce: randomSeedResponse.data.init.nonceAddress,
-        }
+        },
+        leaderSignature,
       }
     })
       .catch(e => {
@@ -124,6 +127,7 @@ export default class ReshareCronJob extends BaseCronJob{
       params: {
         appId,
         seed: reshareResponse.data.result.seed,
+        leaderSignature,
       }
     })
     if(!keyGenResponse?.confirmed) {

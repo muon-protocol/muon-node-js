@@ -27,6 +27,7 @@ import _ from 'lodash'
 import BaseAppPlugin from "./base/base-app-plugin";
 
 import { createRequire } from "module";
+import ReshareCronJob from "./cron-jobs/reshare-cron-job";
 const require = createRequire(import.meta.url);
 const Rand = require('rand-seed').default;
 
@@ -506,6 +507,13 @@ class System extends CallablePlugin {
         expiration,
       })
     }
+  }
+
+  @appApiMethod({})
+  async getReshareLeader(): Promise<MuonNodeInfo|undefined> {
+    const resharePlugin: ReshareCronJob = this.muon.getPlugin('reshare-cj');
+    const id: string = resharePlugin.getLeader()
+    return this.nodeManager.getNodeInfo(id);
   }
 
   @appApiMethod({})

@@ -29,6 +29,11 @@ import BN from "bn.js";
 import {toBN} from "../utils/tss/utils.js";
 
 const { flatten, groupBy } = lodash;
+const web3Instance = new Web3();
+
+function ecRecover(message, signature) {
+  return web3Instance.eth.accounts.recover(message, signature);
+}
 
 global.MuonAppUtils = {
   axios,
@@ -54,7 +59,7 @@ global.MuonAppUtils = {
   ethHashCallOutput,
   toBaseUnit,
   soliditySha3,
-  ecRecover: util.ecrecover,
+  ecRecover,
   recoverTypedSignature: ethSigUtil.recoverTypedSignature,
   recoverTypedMessage: ethSigUtil.recoverTypedMessage,
   BNSqrt: BNSqrt

@@ -1,6 +1,7 @@
 const {
     lodash,
   soliditySha3,
+  ecRecover,
 } = MuonAppUtils
 
 const Methods = {
@@ -59,7 +60,7 @@ const appIdSchema = {
 }
 const ethAddressSchema = {
     type: 'string',
-    customType: "ethereumAddress",
+    customType: "ethAddress",
 }
 
 const verifiableSeedSchema = {
@@ -154,8 +155,9 @@ const METHOD_PARAMS_SCHEMA = {
             n: {type: "integer", minimum: 2},
             ttl: {type: "integer", minimum: 10},
             pendingPeriod: {type: "integer", minimum: 1},
+            leaderSignature: {type: "string", customType: "ethSignature"},
         },
-        required: ["appId", "seed"],
+        required: ["appId", "seed", "previousSeed", "leaderSignature"],
         additionalProperties: false,
     },
     [Methods.TssReshare]: {
@@ -163,8 +165,9 @@ const METHOD_PARAMS_SCHEMA = {
         properties: {
             appId: appIdSchema,
             seed: uint32Schema,
+            leaderSignature: {type: "string", customType: "ethSignature"},
         },
-        required: ["appId", "seed"]
+        required: ["appId", "seed", "leaderSignature"]
     },
 }
 
@@ -246,12 +249,21 @@ module.exports = {
                     appId,
                     previousSeed,
                     seed: {value: seed, reqId, nonce},
+                    leaderSignature,
                 } = params
 
                 const oldContext = await this.callPlugin('system', "getAppContext", appId, previousSeed)
 
                 if(!oldContext)
                     throw `App previous context not found on the deployment app's validateRequest method`
+
+                const reshareLeader = await this.callPlugin('system', "getReshareLeader")
+                if(!reshareLeader)
+                    throw `There is no leader to rotate app party.`
+
+                const caller = ecRecover(seed, leaderSignature);
+                if(reshareLeader.wallet !== caller)
+                    throw `Only the leader can rotate the app's party.`
 
                 /** Most recent status of App should be PENDING (about to expire) */
                 const {status, hasTssKey} = this.callPlugin('system', "getAppDeploymentInfo", appId, previousSeed)
@@ -265,7 +277,7 @@ module.exports = {
                 break
             }
             case Methods.TssReshare: {
-                const {appId, seed} = params
+                const {appId, seed, leaderSignature} = params
 
                 /** ensure the app's context exists */
                 let newContext = await this.callPlugin('system', "getAppContext", appId, seed, true)
@@ -287,6 +299,14 @@ module.exports = {
 
                 if(oldInfo.status !== 'PENDING' && oldInfo.status !== "EXPIRED")
                     throw `App key cannot be reshared`
+
+                const reshareLeader = await this.callPlugin('system', "getReshareLeader")
+                if(!reshareLeader)
+                    throw `There is no leader to reshare the app's tss.`
+
+                const caller = ecRecover(seed, leaderSignature);
+                if(reshareLeader.wallet !== caller)
+                    throw `Only the leader can reshare the app's tss key.`
 
                 break;
             }
