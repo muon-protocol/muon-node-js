@@ -2,7 +2,7 @@ import CallablePlugin from './callable-plugin.js'
 import Request from '../../../common/db-models/Request.js'
 import {getTimestamp, pub2json} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
-import {muonSha3, soliditySha3} from '../../../utils/sha3.js'
+import {muonSha3} from '../../../utils/sha3.js'
 import * as TssModule from '../../../utils/tss/index.js'
 import lodash from 'lodash'
 import AppRequestManager from './app-request-manager.js'
@@ -511,14 +511,14 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   calculateRequestId(request, resultHash) {
-    return soliditySha3([
+    return muonSha3(
       {type: "address", value: request.gwAddress},
-      {type: "uint256", value: soliditySha3(request.data.uid)},
+      {type: "uint256", value: muonSha3(request.data.uid)},
       {type: "uint32", value: request.data.timestamp},
       {type: "uint256", value: request.appId},
-      {type: "string", value: soliditySha3(request.method)},
+      {type: "string", value: muonSha3(request.method)},
       {type: "uint256", value: resultHash},
-    ]);
+    );
   }
 
   async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[]) {
@@ -690,7 +690,7 @@ class BaseAppPlugin extends CallablePlugin {
       signParams = this.appendSecurityParams(request, signParams);
     }
     try {
-      return soliditySha3(signParams)
+      return muonSha3(...signParams)
     }
     catch (e) {
       const {message, ...otherProps} = e;
