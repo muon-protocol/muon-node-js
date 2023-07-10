@@ -1,7 +1,7 @@
 import BasePlugin from './base/base-plugin.js'
 import TimeoutPromise from '../../common/timeout-promise.js'
 import * as NetworkIpc from '../../network/ipc.js'
-import {NetworkInfo, NodeFilterOptions} from '../../network/plugins/node-manager.js'
+import {NodeFilterOptions} from '../../network/plugins/node-manager.js'
 import {MuonNodeInfo} from "../../common/types";
 import {logger} from '@libp2p/logger'
 import lodash from 'lodash'
@@ -9,8 +9,6 @@ import lodash from 'lodash'
 const log = logger('muon:core:plugins:node-manager')
 
 export default class NodeManagerPlugin extends BasePlugin{
-  networkInfo: NetworkInfo;
-  private allowedWallets: string[] = []
 
   private _nodesList: MuonNodeInfo[];
   private _nodesMap: Map<string, MuonNodeInfo> = new Map<string, MuonNodeInfo>();
@@ -19,14 +17,18 @@ export default class NodeManagerPlugin extends BasePlugin{
    */
   loading = new TimeoutPromise(0, "contract loading timed out");
 
+  async onInit(): Promise<any> {
+    await super.onInit();
+
+    await this._loadNodeManagerData();
+  }
+
   async onStart(){
-    super.onStart();
+    await super.onStart();
 
     this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
     this.muon.on("contract:node:edit", this.onNodeEdit.bind(this));
     this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
-
-    this._loadContractInfo();
   }
 
   private updateNodeInfo(index: string, dataToMerge: object, keysToDelete?:string[]) {
@@ -61,8 +63,6 @@ export default class NodeManagerPlugin extends BasePlugin{
       .set(nodeInfo.id, nodeInfo)
       .set(nodeInfo.wallet, nodeInfo)
       .set(nodeInfo.peerId, nodeInfo)
-
-    this.allowedWallets.push(nodeInfo.wallet);
   }
 
   async onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
@@ -76,12 +76,6 @@ export default class NodeManagerPlugin extends BasePlugin{
       .set(nodeInfo.id, nodeInfo)
       .set(nodeInfo.wallet, nodeInfo)
       .set(nodeInfo.peerId, nodeInfo)
-
-
-    /** update allowedWallets */
-    const idx2 = this.allowedWallets.findIndex(w => w === oldNodeInfo.wallet)
-    this.allowedWallets.splice(idx2, 1);
-    this.allowedWallets.push(nodeInfo.wallet);
   }
 
   async onNodeDelete(nodeInfo: MuonNodeInfo) {
@@ -96,24 +90,18 @@ export default class NodeManagerPlugin extends BasePlugin{
     this._nodesMap.delete(nodeInfo.id)
     this._nodesMap.delete(nodeInfo.wallet)
     this._nodesMap.delete(nodeInfo.peerId)
-
-    /** remove from allowedWallets */
-    const idx2 = this.allowedWallets.findIndex(w => w === nodeInfo.wallet)
-    this.allowedWallets.splice(idx2, 1);
   }
 
-  private async _loadContractInfo(){
+  private async _loadNodeManagerData(){
     let info;
     while(!info) {
       try {
-        info = await NetworkIpc.getContractInfo({timeout: 1000});
+        info = await NetworkIpc.getNodeManagerData({timeout: 1000});
       }catch (e) {
         log(`process[${process.pid}] contract info loading failed %o`, e);
       }
     }
-    const { networkInfo, nodesList } = info
-
-    this.networkInfo = networkInfo;
+    const { nodesList } = info
 
     this._nodesList = nodesList;
     nodesList.forEach(n => {
@@ -121,18 +109,12 @@ export default class NodeManagerPlugin extends BasePlugin{
         .set(n.id, n)
         .set(n.wallet, n)
         .set(n.peerId, n)
-      this.allowedWallets.push(n.wallet);
     })
 
     log('Contract info loaded.');
     // @ts-ignore
     this.emit('loaded');
     this.loading.resolve(true);
-  }
-
-  // TODO: not implemented
-  getAllowedWallets(){
-    return this.allowedWallets;
   }
 
   /**
@@ -147,21 +129,6 @@ export default class NodeManagerPlugin extends BasePlugin{
    */
   get currentNodeInfo(): MuonNodeInfo|undefined {
     return this._nodesMap.get(process.env.SIGN_WALLET_ADDRESS!);
-  }
-
-  get TssThreshold(): number{
-    if(this.networkInfo)
-      return this.networkInfo?.tssThreshold;
-    else
-      return Infinity;
-  }
-
-  get MinGroupSize(){
-    return this.networkInfo?.minGroupSize;
-  }
-
-  get MaxGroupSize(){
-    return this.networkInfo?.maxGroupSize;
   }
 
   waitToLoad(): Promise<any>{

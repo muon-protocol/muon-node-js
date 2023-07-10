@@ -1,6 +1,6 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
-import TssPlugin from "./tss-plugin.js";
+import KeyManager from "./key-manager.js";
 import * as NetworkIpc from '../../network/ipc.js'
 import {MuonNodeInfo} from "../../common/types";
 import {timeout} from '../../utils/helpers.js'

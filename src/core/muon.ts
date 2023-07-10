@@ -44,12 +44,12 @@ export default class Muon extends Events {
     await this._initializePlugin(this.configs.plugins)
   }
 
-  _initializePlugin(plugins: MuonPlugin[]) {
+  async _initializePlugin(plugins: MuonPlugin[]) {
     for (let plugin of plugins) {
 
       const pluginInstance = new plugin.module(this, plugin.config)
       this._plugins[plugin.name] = pluginInstance
-      pluginInstance.onInit();
+      await pluginInstance.onInit();
 
       if(pluginInstance instanceof BaseAppPlugin) {
         if(pluginInstance.APP_NAME) {
@@ -98,12 +98,12 @@ export default class Muon extends Events {
   async start() {
     // @ts-ignore
     this.globalEventBus.on("message", this.onGlobalEventReceived.bind(this));
-    this._onceStarted();
+    await this._onceStarted();
   }
 
   async _onceStarted() {
     for (let pluginName in this._plugins) {
-      this._plugins[pluginName].onStart()
+      await this._plugins[pluginName].onStart()
     }
   }
 

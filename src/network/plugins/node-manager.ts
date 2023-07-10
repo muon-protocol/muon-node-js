@@ -28,12 +28,6 @@ export type NodeFilterOptions = {
   excludeSelf?: boolean
 }
 
-export type NetworkInfo = {
-  tssThreshold: number,
-  minGroupSize: number,
-  maxGroupSize: number
-}
-
 const RemoteMethods = {
   CheckOnline: 'CKON',
 }
@@ -44,7 +38,6 @@ export type NodeManagerPluginConfigs = {
 
 @remoteApp
 export default class NodeManagerPlugin extends CallablePlugin{
-  networkInfo: NetworkInfo | null = null;
 
   private lastNodesUpdateTime: number;
   private _nodesList: MuonNodeInfo[];
@@ -58,14 +51,6 @@ export default class NodeManagerPlugin extends CallablePlugin{
     await super.onInit()
 
     let {nodeManager} = this.network.configs.net;
-
-    let {tss} = this.network.configs.net;
-
-    this.networkInfo = {
-      tssThreshold: parseInt(tss.threshold),
-      minGroupSize: parseInt(tss.min || tss.threshold),
-      maxGroupSize: parseInt(tss.max)
-    }
 
     let {lastUpdateTime, nodes} = (this.configs as NodeManagerPluginConfigs).initialNodeManagerData;
 
