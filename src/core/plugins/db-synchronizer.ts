@@ -25,7 +25,7 @@ const log = logger("muon:core:plugins:synchronizer")
 
 const RemoteMethods = {
   GetAllContexts: "get-all-ctx",
-  IsSeedsRotated: "is-seeds-rotated",
+  IsSeedListReshared: "is-seed-list-reshared",
   GetMissingContext: "get-missing-context",
 }
 
@@ -337,7 +337,7 @@ export default class DbSynchronizer extends CallablePlugin {
     for(const ctx of expiredContexts) {
       const {seed} = ctx;
       /** delete the context, if context rotated */
-      if(this.appManager.isSeedRotated(seed))
+      if(this.appManager.isSeedReshared(seed))
         /** If a context rotated and next context is exist, so we dont need it (the old one) any more. */
         seedsToDelete.push(seed);
       else if(!currentNode.isDeployer)
@@ -346,7 +346,7 @@ export default class DbSynchronizer extends CallablePlugin {
     }
     log(`there is ${seedsToCheck.length} context that is not rotated.`)
     if(seedsToCheck.length > 0) {
-      const seedsRotated: boolean[] = await this.isSeedsRotated(seedsToCheck);
+      const seedsRotated: boolean[] = await this.isSeedListReshared(seedsToCheck);
       for (const [i, seed] of seedsToCheck.entries()) {
         /** If a rotated version found on deployers, this context should be remover. */
         if (seedsRotated[i])
@@ -375,10 +375,10 @@ export default class DbSynchronizer extends CallablePlugin {
     NetworkIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
   }
 
-  private async isSeedsRotated(seeds: string[]): Promise<boolean[]> {
+  private async isSeedListReshared(seeds: string[]): Promise<boolean[]> {
     const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
     if(currentNode.isDeployer) {
-      return this.__isSeedsRotated({seeds})
+      return this.__isSeedListReshared({seeds})
     }
     else {
       log(`query deployers to find if seeds are rotated or not ...`)
@@ -389,7 +389,7 @@ export default class DbSynchronizer extends CallablePlugin {
         peerIds.map(peerId => {
           return this.remoteCall(
             peerId,
-            RemoteMethods.IsSeedsRotated,
+            RemoteMethods.IsSeedListReshared,
             {seeds}
           )
         })
@@ -432,11 +432,11 @@ export default class DbSynchronizer extends CallablePlugin {
     return allContexts
   }
 
-  @remoteMethod(RemoteMethods.IsSeedsRotated)
-  async __isSeedsRotated(data: {seeds: string[]}): Promise<boolean[]> {
+  @remoteMethod(RemoteMethods.IsSeedListReshared)
+  async __isSeedListReshared(data: {seeds: string[]}): Promise<boolean[]> {
     const {seeds} = data;
     return seeds.map(seed => {
-      return this.appManager.isSeedRotated(seed);
+      return this.appManager.isSeedReshared(seed);
     });
   }
 

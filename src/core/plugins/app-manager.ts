@@ -45,6 +45,7 @@ export type ContextFilterOptions = {
   appId?: string,
   deploymentStatus?: AppDeploymentStatus[],
   hasKeyGenRequest?: boolean,
+  custom?: (ctx: AppContext) => boolean,
 }
 
 export type FindAvailableNodesOptions = {
@@ -584,11 +585,27 @@ export default class AppManager extends CallablePlugin {
           if(options.hasKeyGenRequest !== hasKeyGenRequest)
             return false;
         }
+        if(options.custom && !options.custom(ctx)) {
+          return false;
+        }
         return true
       })
   }
 
   isSeedRotated(seed: string): boolean {
+    const context:AppContext|undefined = this.getSeedContext(seed);
+    if(!context)
+      return false;
+
+    const deployTimestamp = context.deploymentRequest?.data.result.timestamp;
+    const appContexts: AppContext[] = this.filterContexts({appId: context.appId})
+
+    return !!appContexts.find(ctx => {
+      return ctx.deploymentRequest?.data.result.timestamp > deployTimestamp
+    });
+  }
+
+  isSeedReshared(seed: string): boolean {
     const context:AppContext|undefined = this.getSeedContext(seed);
     if(!context)
       return false;
