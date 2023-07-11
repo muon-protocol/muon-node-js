@@ -80,11 +80,11 @@ export default class ReshareCronJob extends BaseCronJob{
 
     this.log(`starting ${pendingContexts.length} apps key reshare ...`)
     const rotatedContexts = await Promise.all(pendingContexts.map(ctx => {
-      return this.rotateQueue.add(() => this.rotateAppContext(ctx))
+      return this.rotateQueue.add(() => this.rotateAppContext(ctx).catch(e => null))
     }))
 
     //@ts-ignore
-    const contextToReshare: AppContext[] = [...rotatedContexts, ...list0];
+    const contextToReshare: AppContext[] = [...rotatedContexts.filter(ctx => !!ctx), ...list0];
     this.log(`starting ${contextToReshare.length} apps key reshare ...`)
     await Promise.all(contextToReshare.map(ctx => {
       return this.rotateQueue.add(() => this.reshareAppTss(ctx))
@@ -108,9 +108,14 @@ export default class ReshareCronJob extends BaseCronJob{
         appId,
         previousSeed: seed,
       }
-    } as GatewayCallParams);
+    } as GatewayCallParams)
+      .catch(e => {
+        this.log.error("random-seed failed %o", e)
+        throw e;
+      });
     if(!randomSeedResponse?.confirmed) {
-      throw "random seed not confirmed"
+      this.log.error("random-seed failed %o", randomSeedResponse)
+      throw "random seed failed";
     }
     this.log(`Random seed generated %o`, {randomSeed: randomSeedResponse.signatures[0].signature})
 
@@ -162,6 +167,10 @@ export default class ReshareCronJob extends BaseCronJob{
         leaderSignature: crypto.sign(seed),
       }
     })
+      .catch(e => {
+        this.log.error("tss-reshare failed %o", e)
+        throw e;
+      });
     if(!keyGenResponse?.confirmed) {
       throw "key-gen request not confirmed"
     }
