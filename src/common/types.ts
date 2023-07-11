@@ -66,6 +66,8 @@ export type AppDeploymentInfo = {
     seed: string|null,
     /** Is app deployed? */
     deployed: boolean,
+    /** Is this context contains the TSS key generation request data */
+    hasKeyGenRequest: boolean,
     /** Is this node has the App's TSS key share */
     hasTssKey: boolean,
     /** deployment status*/
