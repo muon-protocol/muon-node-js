@@ -328,13 +328,15 @@ export default class AppManager extends CallablePlugin {
       appId,
       seed,
       deployed,
+      hasKeyGenRequest: false,
       hasTssKey: this.appHasTssKey(appId, seed),
       status,
     }
     const context = seed ? this.getAppContext(appId, seed) : null
     if(context) {
-      result.reqId = appId === '1' ? undefined : context.deploymentRequest?.reqId
-      result.contextHash = hashAppContext(context)
+      result.hasKeyGenRequest = !!context.keyGenRequest;
+      result.reqId = appId === '1' ? undefined : context.deploymentRequest?.reqId;
+      result.contextHash = hashAppContext(context);
     }
     return result
   }
