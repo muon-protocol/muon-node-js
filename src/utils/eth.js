@@ -149,11 +149,11 @@ function getNftInfo(address, network) {
 }
 
 function getTransaction(txHash, network) {
-  return getWeb3(network).then((web3) => wrappedCall(network, web3.eth.getTransaction, [txHash]))
+  return getWeb3(network).then((web3) => wrappedCall(network, web3.eth.getTransaction.bind(web3), [txHash]))
 }
 
 function getTransactionReceipt(txHash, network) {
-  return getWeb3(network).then((web3) => wrappedCall(network, web3.eth.getTransactionReceipt, [txHash]))
+  return getWeb3(network).then((web3) => wrappedCall(network, web3.eth.getTransactionReceipt.bind(web3), [txHash]))
 }
 
 function call(contractAddress, methodName, params, abi, network) {
@@ -163,29 +163,22 @@ function call(contractAddress, methodName, params, abi, network) {
   })
 }
 
-function read(contractAddress, property, params, abi, network) {
-  return getWeb3(network).then((web3) => {
-    let contract = new web3.eth.Contract(abi, contractAddress)
-    return wrappedCall(network, contract.methods[property].call, params)
-  })
-}
-
 function getBlock(network, blockHashOrBlockNumber) {
   return getWeb3(network).then((web3) => {
-    return wrappedCall(network, web3.eth.getBlock, [blockHashOrBlockNumber])
+    return wrappedCall(network, web3.eth.getBlock.bind(web3), [blockHashOrBlockNumber])
   })
 }
 
 function getBlockNumber(network) {
   return getWeb3(network).then((web3) => {
-    return wrappedCall(network, web3.eth.getBlockNumber)
+    return wrappedCall(network, web3.eth.getBlockNumber.bind(web3))
   })
 }
 
 function getPastEvents(network, contractAddress, abi, event, options) {
   return getWeb3(network).then((web3) => {
     let contract = new web3.eth.Contract(abi, contractAddress)
-    return wrappedCall(network, contract.getPastEvents, [event, options])
+    return wrappedCall(network, contract.getPastEvents.bind(contract), [event, options])
   })
 }
 
@@ -277,7 +270,6 @@ export {
   getTransaction,
   getTransactionReceipt,
   call,
-  read,
   subscribeLogEvent,
   getTokenInfo,
   getNftInfo
