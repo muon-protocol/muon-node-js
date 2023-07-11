@@ -6,7 +6,6 @@ import axios from 'axios'
 import Web3 from 'web3'
 import * as tron from '../utils/tron.js'
 import lodash from 'lodash'
-import BigNumber from 'bignumber.js'
 import { toBaseUnit } from '../utils/crypto.js'
 import { timeout, floatToBN } from '../utils/helpers.js'
 import util from 'ethereumjs-util'
@@ -39,7 +38,6 @@ global.MuonAppUtils = {
   ws,
   timeout,
   BN,
-  BigNumber,
   toBN,
   floatToBN,
   multiCall,

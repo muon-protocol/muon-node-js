@@ -37,7 +37,6 @@
     "ajv": "^8.12.0",
     "ajv-errors": "^3.0.0",
     "axios": "^0.21.1",
-    "bignumber.js": "^9.0.1",
     "bn.js": "^5.2.1",
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
