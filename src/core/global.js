@@ -27,7 +27,7 @@ import {toBN} from "../utils/tss/utils.js";
 import {muonSha3} from "../utils/sha3.js";
 
 const { flatten, groupBy } = lodash;
-const web3Instance = new Web3();
+const web3Instance = new Web3('http://localhost:8545');
 
 function ecRecover(message, signature) {
   return web3Instance.eth.accounts.recover(message, signature);
