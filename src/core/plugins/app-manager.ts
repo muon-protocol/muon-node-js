@@ -947,10 +947,9 @@ export default class AppManager extends CallablePlugin {
    @return {AppContext[]} - returns all contexts that include the input node.
    */
   getNodeAllContexts(node: MuonNodeInfo): AppContext[] {
-    const currentTime = getTimestamp()
     return Object.values(this.appContexts)
       .filter((ctx:AppContext) => {
-        return (!ctx.expiration || ctx.expiration > currentTime) && ctx.party.partners.includes(node.id)
+        return ctx.party.partners.includes(node.id)
       })
   }
 

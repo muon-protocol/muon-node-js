@@ -157,7 +157,7 @@ export default class ReshareCronJob extends BaseCronJob{
   async reshareAppTss(ctx: AppContext) {
     const {appId, seed} = ctx;
 
-    this.log('Generating app tss key ...')
+    this.log('Generating app tss key ... %o', {appId, seed})
     const keyGenResponse = await requestQueue.send({
       app: `deployment`,
       method: "tss-reshare",
@@ -168,7 +168,7 @@ export default class ReshareCronJob extends BaseCronJob{
       }
     })
       .catch(e => {
-        this.log.error("tss-reshare failed %o", e)
+        this.log.error("tss-reshare failed %o %o", {appId, seed}, e)
         throw e;
       });
     if(!keyGenResponse?.confirmed) {
