@@ -47,12 +47,14 @@ export default class BaseCronJob extends BasePlugin {
     await timeout((0.5 + Math.random()) * startDelay)
     while (true) {
       let currentNode: MuonNodeInfo|undefined = this.nodeManager.currentNodeInfo;
-      if(currentNode && currentNode?.isDeployer && this.getLeader() === currentNode.id && this.process !== undefined) {
+      const leader = this.getLeader();
+      this.log(`main loop %o`, {leader: this.getLeader()})
+      if(currentNode && currentNode?.isDeployer && leader === currentNode.id && this.process !== undefined) {
         try {
           await this.process();
         }
         catch (e) {
-          this.log.error(`${this.ConstructorName} process error %o`, e);
+          this.log.error(`main loop error %o`, e);
         }
       }
       await timeout((0.5 + Math.random()) * interval)

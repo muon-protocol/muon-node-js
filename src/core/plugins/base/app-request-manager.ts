@@ -111,8 +111,8 @@ export default class AppRequestManager{
                 // @ts-ignore
                 params: req.data.params,
               },
-              responses: item.signatures,
-              errors: item.errors
+              responses: Object.values(item.signatures),
+              errors: Object.values(item.errors)
             }
           })
       }

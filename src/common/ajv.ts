@@ -27,6 +27,10 @@ function isUint32(input: string): boolean {
   return /^0x[0-9A-Fa-f]{1,64}$/.test(input)
 }
 
+function isEthSignature(input: string): boolean {
+  return /^0x[0-9A-Fa-f]{130}$/.test(input)
+}
+
 const rangeKeywork: KeywordDefinition = {
   keyword: "range",
   type: "number",
@@ -56,8 +60,10 @@ const customType: KeywordDefinition = {
           return isHex(input);
         case "decimal":
           return isDecimal(input);
-        case "ethereumAddress":
+        case "ethAddress":
           return isEthAddress(input);
+        case "ethSignature":
+          return isEthSignature(input);
         case "uint32":
           return isUint32(input);
         default:
@@ -78,7 +84,7 @@ const customType: KeywordDefinition = {
   } as KeywordErrorDefinition,
   metaSchema: {
     type: "string",
-    enum: ["peerId", "hex", "decimal", "ethereumAddress", "uint32"],
+    enum: ["peerId", "hex", "decimal", "ethAddress", "ethSignature", "uint32"],
   },
 }
 
