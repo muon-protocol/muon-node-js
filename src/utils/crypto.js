@@ -7,7 +7,7 @@ import {muonSha3} from './sha3.js'
 
 
 
-const web3 = new Web3();
+const web3 = new Web3('http://localhost:8545');
 let PRIVATE_KEY = process.env.SIGN_WALLET_PRIVATE_KEY;
 if (PRIVATE_KEY) {
   const account = web3.eth.accounts.privateKeyToAccount("0x" + PRIVATE_KEY)
