@@ -18,6 +18,7 @@ import {logger} from '@libp2p/logger'
 import {bn2hex} from "../../utils/tss/utils.js";
 import {useOneTime} from "../../utils/tss/use-one-time.js";
 import {KeyRedistribution} from "../../common/mpc/kdist.js";
+import MpcNetworkPlugin from "./mpc-network";
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -84,6 +85,9 @@ class KeyManager extends CallablePlugin {
     await this.appManager.waitToLoad();
     this.loadDeploymentTss();
 
+    const mpcNetwork:MpcNetworkPlugin = this.muon.getPlugin('mpcnet');
+    mpcNetwork.registerMpcInitHandler("DistributedKeyGeneration", this.dkgInitializeHandler.bind(this))
+    mpcNetwork.registerMpcInitHandler("KeyRedistribution", this.keyRedistInitHandler.bind(this))
   }
 
   async onNodeAdd(nodeInfo: MuonNodeInfo) {
@@ -801,6 +805,61 @@ class KeyManager extends CallablePlugin {
 
     await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
     return key;
+  }
+
+  async dkgInitializeHandler(constructData, network: MpcNetworkPlugin) {
+    const dkg = new DistributedKeyGeneration(constructData)
+    const {extra} = constructData
+
+    dkg.runByNetwork(network)
+      .then(async (dKey: DistKey) => {
+        if(extra.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
+          return;
+
+        const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
+        const party = await this.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+        if(!party)
+          throw `party[${extra.party}] not found`
+
+        let key = new AppTssKey(party, extra.keyId, dKey)
+        await SharedMemory.set(extra.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+      })
+      .catch(e => {
+        // TODO
+        log.error("KeyManager running mpc failed. %O", e)
+      })
+
+    return dkg;
+  }
+
+  async keyRedistInitHandler(constructData, network:MpcNetworkPlugin): Promise<KeyRedistribution> {
+    const {extra} = constructData
+    const {prevPartyInfo: {appId, seed}} = extra;
+    const {keyShare} = this.appManager.getAppTssKey(appId, seed);
+    const keyRedist = new KeyRedistribution({
+      ...constructData,
+      value: keyShare
+    });
+
+    keyRedist.runByNetwork(network)
+      .then(async (dKey: DistKey) => {
+        if(extra.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
+          return;
+
+        const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
+        const party = await this.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+        if(!party)
+          throw `party[${extra.party}] not found`
+
+        let key = new AppTssKey(party, extra.keyId, dKey)
+        await SharedMemory.set(extra.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+      })
+      .catch(e => {
+        // TODO
+        log.error("KeyManager running mpc failed. %O", e)
+      })
+
+    return keyRedist;
   }
 
   async redistributeKey(prevPartyInfo: PartyInfo, newPartyInfo: PartyInfo, options: KeyGenOptions={}): Promise<AppTssKey> {
