@@ -1,22 +1,24 @@
 import LevelPromise from "./level-promise.js";
-import Ajv from 'ajv';
-import {MapOf, IMpcNetwork, RoundOutput, MPCConstructData, PartnerRoundReceive, PartyConnectivityGraph} from "./types";
+import {MapOf, IMpcNetwork, RoundOutput, PartnerRoundReceive, PartyConnectivityGraph} from "./types";
 import lodash from 'lodash'
-import * as PromiseLibs from '../promise-libs.js'
 import {timeout} from "../../utils/helpers.js";
-import { logger, Logger } from '@libp2p/logger'
+import { logger, Logger } from '@libp2p/logger';
+import _ from 'lodash';
 
 const {countBy} = lodash;
 const random = () => Math.floor(Math.random()*9999999)
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
-const ajv = new Ajv()
-// for(let round of this.rounds) {
-//   if(this.InputSchema[round])
-//     ajv.addSchema(this.InputSchema[round], round);
-// }
+
+
+export type MPCOpts = {
+  id: string,
+  rounds: string[],
+  starter: string,
+  partners: string[],
+}
 
 export class MultiPartyComputation {
-  private readonly constructData;
+  protected constructData;
   protected t: number;
   public readonly id: string;
   public readonly starter: string
@@ -29,8 +31,9 @@ export class MultiPartyComputation {
   protected RoundValidations: object;
   protected log: Logger;
 
-  constructor(rounds: string[], id: string, starter: string, partners: string[]) {
-    this.constructData = Object.values(arguments).slice(1)
+  constructor(options: MPCOpts) {
+    const {id, rounds, starter, partners} = options
+    this.constructData = _.omit(options, ["rounds"]);
 
     rounds.forEach(round => {
       if(!this[round])
@@ -151,7 +154,7 @@ export class MultiPartyComputation {
       /** wait for the round to be executed and data to be prepared. */
       await this.roundsPromise.waitToLevelResolve(round);
 
-      const {send, broadcast, qualifieds} = this.roundsOutput[strRound]
+      const {send, broadcast, qualifieds} = this.roundsOutput[strRound] || {}
 
       return {
         send: !!send ? send[partner] : undefined,
@@ -188,9 +191,32 @@ export class MultiPartyComputation {
     return this.roundsOutput[round].store;
   }
 
-  private async tryToGetRoundData(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any) {
+  private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any, responseNeeded: boolean) {
+    const NumReTry = 1;
     const roundTitle = this.rounds[roundIndex];
-    let result: any = await network.askRoundData(from, this.id, roundIndex, dataToSend);
+    let lastError: any;
+    let result: any;
+    for(let i=1 ; i<=NumReTry ; i++) {
+      lastError = undefined;
+      try {
+        if(responseNeeded) {
+          result = await network.askRoundData(from, this.id, roundIndex, dataToSend);
+          return result;
+        }
+        else {
+          network.askRoundData(from, this.id, roundIndex, dataToSend).catch(e => {});
+          return null;
+        }
+        break;
+      }catch (e) {
+        lastError = e;
+        if(i != NumReTry)
+          await timeout(i*1000)
+      }
+    }
+    if(lastError)
+      throw lastError;
+
     if(this.RoundValidations[roundTitle] && !this.RoundValidations[roundTitle](result)){
       // console.dir({r,currentRound, result}, {depth: null})
       this.log.error(`round[${roundTitle}] data validation error. data: %o`, result)
@@ -200,11 +226,15 @@ export class MultiPartyComputation {
     return result;
   }
 
+  getInitialQualifieds(): string[] {
+    return clone(this.partners);
+  }
+
   private async process(network: IMpcNetwork, timeout: number) {
     this.log = logger(`muon:common:mpc:${this.ConstructorName}`);
     try {
       /** Some partners may be excluded during the MPC process. */
-      let qualifiedPartners = clone(this.partners);
+      let qualifiedPartners = this.getInitialQualifieds();
       this.log(`${this.ConstructorName}[${this.id}] start with partners %o`, qualifiedPartners)
 
       for (let r = 0; r < this.rounds.length; r++) {
@@ -226,36 +256,41 @@ export class MultiPartyComputation {
             return obj
           }, {})
         }
+        const isQualified: MapOf<boolean> = this.partners.reduce((obj, id) => (obj[id]=qualifiedPartners.includes(id), obj), {})
         /** execute MPC round */
-        this.roundsOutput[currentRound] = await this.processRound(r, inputs, broadcasts, network.id, qualifiedPartners);
-        this.log(`round executed [${network.id}].mpc[${this.id}].${currentRound}`)
+        if(isQualified[network.id]) {
+          this.roundsOutput[currentRound] = await this.processRound(r, inputs, broadcasts, network.id, qualifiedPartners);
+          this.log(`round executed [${network.id}].mpc[${this.id}].${currentRound}`)
+        }
         this.roundsPromise.resolve(r, true);
 
         /** Gather other partners data */
         const dataToSend = {
           constructData: r===0 ? this.constructData : undefined,
         }
-        this.log(`mpc[${this.id}].${currentRound} collecting round data`)
-        
+        this.log(`MPC[${this.id}].${currentRound} collecting round data`)
+
         // TODO: its just for debuging
         // need to be removed
         let partyErrors = {};
 
+        const callingPartners = r===0 ? this.partners : qualifiedPartners;
+
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
-            qualifiedPartners.map(partner => {
-              return this.tryToGetRoundData(network, partner, r, dataToSend)
-                .catch(e => {
-                  partyErrors[partner] = JSON.stringify(e);
-                  this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
-                  return null
-                })
-            })
-          )
+          callingPartners.map(partner => {
+            return this.tryToGetRoundDate(network, partner, r, dataToSend, isQualified[partner])
+              .catch(e => {
+                partyErrors[partner] = JSON.stringify(e);
+                this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
+                return null
+              })
+          })
+        )
         this.log(`MPC[${this.id}].${currentRound} ${allPartiesResult.filter(i => !!i).length} nodes response received`)
         /** store partners output for current round */
         this.roundsArrivedMessages[currentRound] = allPartiesResult.reduce((obj, curr, i) => {
-          if(curr !== null)
-            obj[qualifiedPartners[i]] = curr;
+          if(isQualified[callingPartners[i]] && curr !== null)
+            obj[callingPartners[i]] = curr;
           return obj
         }, {})
 

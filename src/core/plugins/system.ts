@@ -438,7 +438,7 @@ class System extends CallablePlugin {
          If anyone tries to use this key for a different purpose, it will cause an error.
          Likewise, if this key has been used for another purpose before, it will throw an error again.
          */
-        await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-reshare`)
+        await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-tss`)
 
         const oldKey: AppTssKey = this.keyManager.getAppTssKey(appId, context.previousSeed)!
         if (!oldKey)
@@ -455,16 +455,13 @@ class System extends CallablePlugin {
         if (!appParty)
           throw `App party not found`;
 
-        const hexSeed = "0x" + BigInt(seed).toString(16)
-        let share = oldKey.share!.add(reshareKey.share!).sub(toBN(hexSeed)).umod(TssModule.curve.n!);
-
         /** store tss key */
         await this.appManager.saveAppTssConfig({
           appId: appId,
           seed,
           keyGenRequest: request,
           publicKey,
-          keyShare: bn2hex(share),
+          keyShare: bn2hex(reshareKey.share!),
           polynomial,
           expiration,
         })
@@ -645,23 +642,21 @@ class System extends CallablePlugin {
     if(!oldContext)
       throw `App's previous context not found.`
 
-    log(`generating nonce for resharing app[${appId}] tss key`)
-    const resharePartners = newContext.party.partners.filter(id => oldContext.party.partners.includes(id))
-    let nonce = await this.keyManager.keyGen({appId, seed}, {
-      id: `resharing-${uuid()}`,
-      partners: _.uniq([
-        this.nodeManager.currentNodeInfo!.id,
-        ...resharePartners,
-      ]),
-      value: newContext.seed
-    });
-    log(`Nonce generated for resharing app[${appId}] tss key.`)
+    log(`redistributing app[${appId}] tss key`)
+    let keyRedist = await this.keyManager.redistributeKey(
+      {appId, seed: oldContext.seed},
+      {appId, seed: newContext.seed},
+      {
+        id: `resharing-${uuid()}`,
+      }
+    );
+    log(`Key redistribution done for app[${appId}] tss key.`)
 
     return {
-      id: nonce.id,
+      id: keyRedist.id,
       /** The TSS key's publicKey will remain unchanged when it is reshared. */
       publicKey: oldContext.publicKey!.encoded,
-      generators: nonce.partners
+      generators: keyRedist.partners
     }
   }
 
