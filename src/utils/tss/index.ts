@@ -1,4 +1,4 @@
-import {PublicKey} from "./types";
+import {PublicKey, PublicKeyShare} from "./types";
 import ethJsUtil from 'ethereumjs-util'
 import {BN, toBN, keccak256, range, pub2addr} from './utils.js'
 import assert from 'assert'
@@ -19,9 +19,9 @@ const HALF_N = curve.n!.shrn(1).addn(1);
 const H = curve.keyFromPublic("04206ae271fa934801b55f5144bec8416be0b85f22d452ad410f3f0fca1083dc7ae41249696c446f8c5b166760377115943662991c35ff02f9585f892970af89ed", 'hex').getPublic()
 
 export function pointAdd(point1?: PublicKey, point2?: PublicKey): PublicKey {
-  if (point1 === null)
+  if (!point1)
     return point2!;
-  if (point2 === null)
+  if (!point2)
     return point1!;
 
   return point1!.add(point2!);
@@ -96,6 +96,18 @@ export function reconstructKey(shares, t, index=0) {
     sum = sum.add(key.mul(coef))
   }
   return sum.umod(curve.n!);
+}
+
+export function reconstructPubKey(shares: PublicKeyShare[], t, index=0): PublicKey {
+  assert(shares.length >= t);
+  let sum: PublicKey|undefined = undefined;
+  for (let j = 0; j < t; j++) {
+    let coef = lagrangeCoef(j, t, shares, index)
+    let pubKey:PublicKey = shares[j].publicKey
+    sum = pointAdd(sum, pubKey.mul(coef))
+  }
+  // @ts-ignore
+  return sum;
 }
 
 export function addKeys(key1, key2) {
