@@ -178,7 +178,14 @@ module.exports = {
     APP_ID: 1,
     owners,
 
-    readOnlyMethods: ['undeploy'],
+    readOnlyMethods: ["init", 'undeploy'],
+
+    init: async function(params) {
+        return {
+            success: true,
+            result: await this.callPlugin("system", "initializeDeploymentKey"),
+        }
+    },
 
     undeploy: async function (params) {
         const {
@@ -531,7 +538,7 @@ module.exports = {
                 }
 
                 /** ensure a random key already generated */
-                let publicKey, oldPolynomial, polynomial;
+                let publicKey, polynomial;
                 if(method === Methods.TssKeyGen) {
                     const tssPublicInfo = await this.callPlugin('system', "findAndGetAppTssPublicInfo", appId, seed, init.id);
                     ({publicKey, polynomial}=tssPublicInfo)
@@ -539,7 +546,6 @@ module.exports = {
                 else {
                     const oldContext = await this.callPlugin("system", "getAppContext", appId, context.previousSeed, true)
                     publicKey = oldContext.publicKey;
-                    oldPolynomial = oldContext.polynomial;
                     const tssPublicInfo = await this.callPlugin('system', "findAndGetAppTssPublicInfo", appId, seed, init.id);
                     polynomial = tssPublicInfo.polynomial
                 }
@@ -553,8 +559,6 @@ module.exports = {
                     expiration: request.data.timestamp + ttl + pendingPeriod,
                     seed: context.seed,
                     publicKey,
-                    /** only when resharing the App'a key */
-                    oldPolynomial,
                     polynomial,
                 }
             }
@@ -600,12 +604,6 @@ module.exports = {
                 let polynomialParams = []
                 if(result.polynomial) {
                     polynomialParams = result.polynomial.Fx.map(v => ({t: 'bytes',v}))
-                }
-                if(result.oldPolynomial) {
-                    polynomialParams = [
-                      ...polynomialParams,
-                      ...result.oldPolynomial.Fx.map(v => ({t: 'bytes',v})),
-                    ]
                 }
                 return [
                     {t: "bool", v: request.data.result.rotationEnabled},

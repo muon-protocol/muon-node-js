@@ -234,10 +234,6 @@ class Explorer extends CallablePlugin {
       if(!ctx || !ctx.party.partners.includes(this.nodeManager.currentNodeInfo!.id))
         return;
     }
-    if(!hasTssKey) {
-      await timeout(2000)
-      await this.keyManager.checkAppTssKeyRecovery(appId, seed);
-    }
   }
 }
 
