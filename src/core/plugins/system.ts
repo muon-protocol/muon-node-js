@@ -229,7 +229,7 @@ class System extends CallablePlugin {
     if(!context)
       throw `App deployment info not found.`
 
-    const generatorId = await this.getFirstOnlinePartner(appId, seed);
+    const generatorId = await this.getFirstOnlinePartner(context.party.partners);
     if(!generatorId)
       throw `key-gen starter node not online`
 
@@ -254,8 +254,12 @@ class System extends CallablePlugin {
     const newContext = this.appManager.getAppContext(appId, seed);
     if(!newContext)
       throw `App's new context not found.`
+    const oldContext = this.appManager.getAppContext(appId, newContext.previousSeed);
+    if(!oldContext)
+      throw `App's new context not found.`
 
-    const generatorId = await this.getFirstOnlinePartner(appId, seed);
+    const dealers: string[] = newContext.party.partners.filter(id => oldContext.party.partners.includes(id));
+    const generatorId = await this.getFirstOnlinePartner(dealers);
     if(!generatorId)
       throw `key-gen starter node not online`
 
@@ -553,12 +557,9 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod()
-  async getFirstOnlinePartner(appId: string, seed: string): Promise<string | undefined> {
-    const context = this.appManager.getAppContext(appId, seed)
-    if(!context)
-      throw `context not found`
+  async getFirstOnlinePartner(checkList: string[]): Promise<string | undefined> {
     const currentNode = this.nodeManager.currentNodeInfo!;
-    for(const id of context.party.partners) {
+    for(const id of checkList) {
       const isOnline = id === currentNode.id || (await NetworkIpc.isNodeOnline(id))
       if(isOnline) {
         return id
