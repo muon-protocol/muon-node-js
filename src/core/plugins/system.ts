@@ -8,7 +8,7 @@ import {
   AppRequest,
   AppTssPublicInfo,
   JsonPublicKey,
-  MuonNodeInfo
+  MuonNodeInfo, NetConfigs
 } from "../../common/types";
 import * as TssModule from '../../utils/tss/index.js'
 import AppContextModel from "../../common/db-models/app-context.js"
@@ -28,6 +28,7 @@ import BaseAppPlugin from "./base/base-app-plugin";
 
 import { createRequire } from "module";
 import ReshareCronJob from "./cron-jobs/reshare-cron-job";
+import {throws} from "assert";
 const require = createRequire(import.meta.url);
 const Rand = require('rand-seed').default;
 
@@ -38,6 +39,7 @@ const RemoteMethods = {
   Undeploy: "undeploy",
   GetAppPublicKey: "getAppPubKey",
   StartAppTssReshare: "startAppTssReshare",
+  DeploymentAppStatus: "deploymentAppStatus",
 }
 
 @remoteApp
@@ -54,6 +56,46 @@ class System extends CallablePlugin {
 
   get appManager(): AppManager{
     return this.muon.getPlugin('app-manager');
+  }
+
+  @appApiMethod()
+  async initializeDeploymentKey() {
+    const currentNode:MuonNodeInfo = this.nodeManager.currentNodeInfo!
+    if(!currentNode || !currentNode.isDeployer)
+      throw `Only deployers can initialize the network.`
+
+    const netConfigs: NetConfigs = this.muon.configs.net;
+
+    const deployers: MuonNodeInfo[] = this.nodeManager.filterNodes({isDeployer: true});
+
+    const responses = await Promise.all(
+      deployers.map(n => {
+        if(n.id === currentNode.id) {
+          return this.__deploymentAppStatus(null, currentNode);
+        }
+        else {
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.DeploymentAppStatus,
+            null,
+            {timeout: 2000}
+          )
+            .catch(e => null)
+        }
+      })
+    )
+
+    let withoutKeyCount = responses.filter(s => (!!s && !s.hasTssKey)).length;
+    let withKeyCount = responses.filter(s => (!!s && s.hasTssKey)).length
+
+    if(withKeyCount>netConfigs.tss.threshold)
+      throw `There is t deployer node with deployment keys`;
+    if(withoutKeyCount<netConfigs.tss.threshold)
+      throw `No enough online deployers to create the key.`;
+
+    const key = await this.keyManager.createDeploymentTssKey()
+
+    return key;
   }
 
   private async getAvailableNodes(): Promise<MuonNodeInfo[]> {
@@ -343,12 +385,12 @@ class System extends CallablePlugin {
       data: {
         params: {appId},
         init: {id: keyId},
-        result: {rotationEnabled, ttl, expiration, seed, publicKey, polynomial},
+        result: {expiration, seed, polynomial},
       }
     } = request;
 
     /** check context exist */
-    const context = await AppContextModel.findOne({appId}).exec();
+    const context = this.appManager.getAppContext(appId, seed);
     if(!context) {
       throw `App deployment info not found to process tss KeyGen confirmation.`
     }
@@ -356,39 +398,18 @@ class System extends CallablePlugin {
     const currentNode = this.nodeManager.currentNodeInfo!;
     if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
-
-      /** The current node can store the key only when it has participated in key generation. */
-      if(request.data.init.keyGenerators.includes(currentNode.id)) {
-        /** store tss key */
-        let key: AppTssKey = await this.keyManager.getSharedKey(keyId)!
-        await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
-        await this.appManager.saveAppTssConfig({
-          appId: appId,
-          seed,
-          keyGenRequest: request,
-          publicKey: pub2json(key.publicKey!),
-          keyShare: bn2hex(key.share!),
-          polynomial,
-          expiration,
-        })
-      }
-      /** Otherwise, it should recover it's key. */
-      else {
-        for(let numTry = 3 ; numTry > 0 ; numTry--) {
-          /** Wait for a moment in order to let the other nodes get ready. */
-          await timeout(10000);
-          try {
-            const recovered = await this.keyManager.checkAppTssKeyRecovery(appId, seed, true);
-            if(recovered) {
-              log(`tss key recovered successfully.`)
-              break;
-            }
-          }
-          catch (e) {
-            log.error('error when recovering tss key. %O', e)
-          }
-        }
-      }
+      let key: AppTssKey = await this.keyManager.getSharedKey(keyId)!
+      /** store tss key */
+      await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
+      await this.appManager.saveAppTssConfig({
+        appId: appId,
+        seed,
+        keyGenRequest: request,
+        publicKey: pub2json(key.publicKey!),
+        keyShare: bn2hex(key.share!),
+        polynomial,
+        expiration,
+      })
     }
     else {
       await this.appManager.saveAppTssConfig({
@@ -407,10 +428,12 @@ class System extends CallablePlugin {
     const {
       data: {
         params: {appId},
-        init: {id: reshareKeyId, keyGenerators},
-        result: {expiration, seed, publicKey, polynomial: resharePolynomial, oldPolynomial},
+        init: {id: reshareKeyId},
+        result: {expiration, seed, publicKey, polynomial: resharePolynomial},
       }
     } = request;
+
+    const polynomial = resharePolynomial;
 
     /** check context exist */
     const context = await this.appManager.getAppContext(appId, seed);
@@ -418,81 +441,32 @@ class System extends CallablePlugin {
       throw `App new context not found in app reshare confirmation.`
     }
 
-    /** calculate new polynomial */
-    const polynomial = this.appManager.mergeResharePolynomial(oldPolynomial, resharePolynomial, seed);
-
     const currentNode = this.nodeManager.currentNodeInfo!;
     if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
-      /** The current node can reshare immediately if it is in the overlap partners. */
-      if(
-        /** Node has participated in reshare key generation */
-        keyGenerators.includes(currentNode.id)
-        /** Node has the old key */
-        && this.appManager.appHasTssKey(appId, context.previousSeed)
-      ) {
-        let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId)!
-        /**
-         Mark the reshareKey as used for app TSS key.
-         If anyone tries to use this key for a different purpose, it will cause an error.
-         Likewise, if this key has been used for another purpose before, it will throw an error again.
-         */
-        await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-tss`)
+      let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId)!
+      /**
+       Mark the reshareKey as used for app TSS key.
+       If anyone tries to use this key for a different purpose, it will cause an error.
+       Likewise, if this key has been used for another purpose before, it will throw an error again.
+       */
+      await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-tss`)
 
-        const oldKey: AppTssKey = this.keyManager.getAppTssKey(appId, context.previousSeed)!
-        if (!oldKey)
-          throw `The old party's TSS key was not found.`
-        /**
-         Mark the oldKey as used for app TSS key.
-         If anyone tries to use this key for a different purpose, it will cause an error.
-         Likewise, if this key has been used for another purpose before, it will throw an error again.
-         */
-        await useOneTime("key", oldKey.publicKey!.encode('hex', true), `app-${appId}-tss`)
+      const appParty = this.keyManager.getAppParty(appId, seed)!
+      if (!appParty)
+        throw `App party not found`;
 
-
-        const appParty = this.keyManager.getAppParty(appId, seed)!
-        if (!appParty)
-          throw `App party not found`;
-
-        /** store tss key */
-        await this.appManager.saveAppTssConfig({
-          appId: appId,
-          seed,
-          keyGenRequest: request,
-          publicKey,
-          keyShare: bn2hex(reshareKey.share!),
-          polynomial,
-          expiration,
-        })
-      }
-      /** Otherwise, it has to wait and try to recover its key later. */
-      else {
-        log(`current node is not in the party overlap. it should recover the key.`)
-
-        await this.appManager.saveAppTssConfig({
-          appId: appId,
-          seed,
-          keyGenRequest: request,
-          publicKey,
-          polynomial,
-          expiration,
-        })
-
-        for(let numTry=3 ; numTry > 0 ; numTry--) {
-          await timeout(10000);
-          try {
-            const recovered = await this.keyManager.checkAppTssKeyRecovery(appId, seed, true);
-            if(recovered) {
-              log(`tss key recovered successfully.`)
-              break;
-            }
-          }
-          catch (e) {
-            log.error('error when recovering tss key. %O', e)
-          }
-        }
-      }
+      /** store tss key */
+      await this.appManager.saveAppTssConfig({
+        appId: appId,
+        seed,
+        keyGenRequest: request,
+        publicKey,
+        keyShare: bn2hex(reshareKey.share!),
+        polynomial,
+        expiration,
+      })
     }
     else {
       await this.appManager.saveAppTssConfig({
@@ -716,6 +690,11 @@ class System extends CallablePlugin {
       publicKey: keyJson.publicKey,
       polynomial: keyJson.polynomial
     }
+  }
+
+  @remoteMethod(RemoteMethods.DeploymentAppStatus)
+  async __deploymentAppStatus(data, callerInfo: MuonNodeInfo): Promise<AppDeploymentInfo> {
+    return this.appManager.getAppDeploymentInfo("1", "1");
   }
 
 }

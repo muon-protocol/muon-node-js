@@ -1,5 +1,4 @@
-import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators.js";
-import PQueue from "p-queue";
+import {remoteApp, remoteMethod} from "./base/app-decorators.js";
 import CallablePlugin from "./base/callable-plugin.js";
 import AppManager from "./app-manager.js";
 import NodeManagerPlugin from "./node-manager.js";
@@ -19,7 +18,6 @@ import * as crypto from "../../utils/crypto.js";
 import {readSetting, writeSetting} from "../../common/db-models/Settings.js";
 import {APP_STATUS_EXPIRED} from "../constants.js";
 
-const CONCURRENT_TSS_RECOVERY = 5;
 const DEPLOYER_SYNC_ITEM_PER_PAGE = 100;
 const log = logger("muon:core:plugins:synchronizer")
 
@@ -31,15 +29,10 @@ const RemoteMethods = {
 
 @remoteApp
 export default class DbSynchronizer extends CallablePlugin {
-  private readonly recoveryQueue: PQueue;
   private readonly apis: AxiosInstance[];
 
   constructor(muon, configs) {
     super(muon, configs)
-
-    this.recoveryQueue = new PQueue({
-      concurrency: CONCURRENT_TSS_RECOVERY,
-    });
 
     const netConfigs: NetConfigs = muon.configs.net as NetConfigs;
     if(netConfigs.synchronizer) {
@@ -80,10 +73,6 @@ export default class DbSynchronizer extends CallablePlugin {
 
   private get appManager(): AppManager {
     return this.muon.getPlugin('app-manager');
-  }
-
-  private get keyManager(): KeyManager {
-    return this.muon.getPlugin('key-manager')
   }
 
   private async nonDeployersSyncLoop() {
@@ -262,13 +251,7 @@ export default class DbSynchronizer extends CallablePlugin {
       })
     }
 
-    log(`there is ${contextToSave.length} missing contexts: %o`, contextToSave.map(ctx => ctx.seed))
-
-    /** Before saving the missing contexts, find the contexts that have no tss key. */
-    let contextsWithoutKey: AppContext[] = this.appManager.contextsWithoutKey()
-    log(`there is ${contextsWithoutKey.length} contexts without a key: %o`, contextToSave.map(ctx => ctx.seed))
-
-    if(contextToSave.length === 0 && contextsWithoutKey.length === 0)
+    if(contextToSave.length === 0)
       return ;
 
     /** Save all new contexts */
@@ -276,15 +259,7 @@ export default class DbSynchronizer extends CallablePlugin {
       await this.appManager.saveAppContext(ctx);
     }
 
-    /** Wait for event propagation */
-    await timeout(2000)
-
-    /** Recover app's tss keys */
-    log(`starting ${contextToSave.length+contextsWithoutKey.length} tss key recovery ...`)
-    await Promise.all([...contextsWithoutKey, ...contextToSave].map(ctx => {
-      return this.recoveryQueue.add(() => this.tryTssRecovery(ctx))
-    }))
-    log(`all ${contextToSave.length+contextsWithoutKey.length} tss key recovery done.`)
+    log(`${contextToSave.length} missing contexts has been saved: %o`, contextToSave.map(ctx => ctx.seed))
   }
 
   private async checkNewContext(lastContextTimestamp: number): Promise<boolean> {
@@ -394,24 +369,6 @@ export default class DbSynchronizer extends CallablePlugin {
           )
         })
       )
-    }
-  }
-
-  async tryTssRecovery(ctx: AppContext) {
-    log(`starting key recovery app: ${ctx.appName}:${ctx.seed}`)
-    const {appId, seed} = ctx
-    for(let numTry=3 ; numTry > 0 ; numTry--) {
-      await timeout(10000);
-      try {
-        const recovered = await this.keyManager.checkAppTssKeyRecovery(appId, seed, true);
-        if(recovered) {
-          log(`tss key for app: ${ctx.appName}:${ctx.seed} recovered successfully.`)
-          break;
-        }
-      }
-      catch (e) {
-        log.error(`error when recovering tss key for app: ${ctx.appName}:${ctx.seed}. %O`, e)
-      }
     }
   }
 

@@ -511,23 +511,6 @@ export default class AppManager extends CallablePlugin {
     return this.appContexts[seed];
   }
 
-  mergeResharePolynomial(oldPoly: PolynomialInfoJson, resharePoly: PolynomialInfoJson, seed: string): PolynomialInfoJson {
-    return {
-      t: oldPoly.t,
-      Fx: resharePoly.Fx.map((p,i) => {
-        let a = TssModule.keyFromPublic(p);
-        let b = TssModule.keyFromPublic(oldPoly.Fx[i]);
-        let result = a.add(b)
-        if(i === 0) {
-          let diff = TssModule.keyFromPrivate(toBN(seed).neg()).getPublic()
-          result = result.add(diff)
-        }
-        return result
-      })
-        .map(p => p.encode('hex', true))
-    }
-  }
-
   async getAppContextAsync(appId: string, seed: string, tryFromNetwork:boolean=false): Promise<AppContext|undefined> {
     let context:AppContext|undefined = this.appContexts[seed];
     if(!context && tryFromNetwork) {
