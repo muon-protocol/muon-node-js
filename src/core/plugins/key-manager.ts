@@ -17,6 +17,8 @@ import {DistKey} from "../../common/mpc/dist-key.js";
 import {logger} from '@libp2p/logger'
 import {bn2hex} from "../../utils/tss/utils.js";
 import {useOneTime} from "../../utils/tss/use-one-time.js";
+import {KeyRedistribution} from "../../common/mpc/kdist.js";
+import MpcNetworkPlugin from "./mpc-network";
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -83,6 +85,9 @@ class KeyManager extends CallablePlugin {
     await this.appManager.waitToLoad();
     this.loadDeploymentTss();
 
+    const mpcNetwork:MpcNetworkPlugin = this.muon.getPlugin('mpcnet');
+    mpcNetwork.registerMpcInitHandler("DistributedKeyGeneration", this.dkgInitializeHandler.bind(this))
+    mpcNetwork.registerMpcInitHandler("KeyRedistribution", this.keyRedistInitHandler.bind(this))
   }
 
   async onNodeAdd(nodeInfo: MuonNodeInfo) {
@@ -768,27 +773,30 @@ class KeyManager extends CallablePlugin {
 
     let keyGen: DistributedKeyGeneration, dKey: DistKey;
     do {
-      keyGen = new DistributedKeyGeneration(
+      keyGen = new DistributedKeyGeneration({
         /** MPC ID */
-        uuid(),
+        id: uuid(),
         /**
          * starter of MPC
          * starter have higher priority than others when selecting MPC fully connected sub set.
          */
-        this.nodeManager.currentNodeInfo!.id,
+        starter: this.nodeManager.currentNodeInfo!.id,
         /** partners list */
-        partners.map(p => p.id),
+        partners: partners.map(p => p.id),
         /** DKG threshold */
-        party.t,
+        t: party.t,
         /** DKG value to be shared between partners */
-        options.value,
+        value: options.value,
         /** extra values usable in DKG */
-        {
+        extra: {
+          mpcType: "DistributedKeyGeneration",
           partyInfo,
-          keyId,
-          lowerThanHalfN: options.lowerThanHalfN,
+            keyId,
+            lowerThanHalfN
+        :
+          options.lowerThanHalfN,
         }
-      );
+      });
       dKey = await keyGen.runByNetwork(network, timeout)
     }
     while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
@@ -796,6 +804,123 @@ class KeyManager extends CallablePlugin {
     let key = new AppTssKey(party, keyGen.extraParams.keyId!, dKey)
 
     await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+    return key;
+  }
+
+  async dkgInitializeHandler(constructData, network: MpcNetworkPlugin) {
+    const dkg = new DistributedKeyGeneration(constructData)
+    const {extra} = constructData
+
+    dkg.runByNetwork(network)
+      .then(async (dKey: DistKey) => {
+        if(extra.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
+          return;
+
+        const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
+        const party = await this.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+        if(!party)
+          throw `party[${extra.party}] not found`
+
+        let key = new AppTssKey(party, extra.keyId, dKey)
+        await SharedMemory.set(extra.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+      })
+      .catch(e => {
+        // TODO
+        log.error("KeyManager running mpc failed. %O", e)
+      })
+
+    return dkg;
+  }
+
+  async keyRedistInitHandler(constructData, network:MpcNetworkPlugin): Promise<KeyRedistribution> {
+    const {extra} = constructData
+    const {prevPartyInfo: {appId, seed}} = extra;
+    const {keyShare} = this.appManager.getAppTssKey(appId, seed);
+    const keyRedist = new KeyRedistribution({
+      ...constructData,
+      value: keyShare
+    });
+
+    keyRedist.runByNetwork(network)
+      .then(async (dKey: DistKey) => {
+        if(extra.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
+          return;
+
+        const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
+        const party = await this.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+        if(!party)
+          throw `party[${extra.party}] not found`
+
+        let key = new AppTssKey(party, extra.keyId, dKey)
+        await SharedMemory.set(extra.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+      })
+      .catch(e => {
+        // TODO
+        log.error("KeyManager running mpc failed. %O", e)
+      })
+
+    return keyRedist;
+  }
+
+  async redistributeKey(prevPartyInfo: PartyInfo, newPartyInfo: PartyInfo, options: KeyGenOptions={}): Promise<AppTssKey> {
+    let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
+    let {id, timeout=60000} = options;
+
+    const prevParty = this.getAppParty(prevPartyInfo.appId, prevPartyInfo.seed)
+    if(!prevParty)
+      throw {message: `party not found`, prevPartyInfo}
+
+    const newParty = this.getAppParty(newPartyInfo.appId, newPartyInfo.seed)
+    if(!newParty)
+      throw {message: `party not found`, newPartyInfo};
+
+    if(!this.appManager.appHasTssKey(prevPartyInfo.appId, prevPartyInfo.seed))
+      throw {message: `the previous party doesn't have the tss key.`}
+
+    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({
+      list: newParty.partners,
+    })
+
+    const keyId = id || uuid()
+
+    log(`creating key with partners: %o`, partners.map(p => p.id))
+
+    let keyRedist: KeyRedistribution, dKey: DistKey;
+    do {
+      keyRedist = new KeyRedistribution({
+        /** MPC ID */
+        id: uuid(),
+        /**
+         * starter of MPC
+         * starter have higher priority than others when selecting MPC fully connected sub set.
+         */
+        starter: this.nodeManager.currentNodeInfo!.id,
+        /** partners of the old party, that redistribute the key to the new partners. */
+        dealers: lodash.intersection(prevParty.partners, newParty.partners),
+        /** partners list */
+        partners: partners.map(p => p.id),
+        /** Previous party threshold */
+        previousT: prevParty.t,
+        /** DKG threshold */
+        t: newParty.t,
+        /** DKG value to be shared between partners */
+        value: this.appManager.getAppTssKey(prevPartyInfo.appId, prevPartyInfo.seed).keyShare,
+        /** extra values usable in DKG */
+        extra: {
+          mpcType: "KeyRedistribution",
+          prevPartyInfo: prevPartyInfo,
+          partyInfo: newPartyInfo,
+          keyId,
+          lowerThanHalfN: options.lowerThanHalfN,
+        }
+      });
+      dKey = await keyRedist.runByNetwork(network, timeout)
+    }
+    while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
+
+    let key = new AppTssKey(newParty, keyRedist.extraParams.keyId!, dKey)
+
+    await SharedMemory.set(keyRedist.extraParams.keyId, {partyInfo: newPartyInfo, key: key.toJson()}, 30*60*1000)
     return key;
   }
 
