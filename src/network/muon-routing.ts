@@ -4,7 +4,6 @@ import { CID } from "multiformats/cid";
 import PQueue from "p-queue";
 import defer from "p-defer";
 import errCode from "err-code";
-import anySignal from "any-signal";
 import type { PeerId } from "@libp2p/interface-peer-id";
 import type { AbortOptions } from "ipfs-core-types/src/utils";
 import type { PeerRouting } from "@libp2p/interface-peer-routing";
