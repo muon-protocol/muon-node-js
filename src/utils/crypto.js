@@ -1,4 +1,3 @@
-import ethers from 'ethers'
 import Web3 from 'web3'
 import {hashCallOutput} from './eth.js'
 import crypto from "crypto"
@@ -24,9 +23,6 @@ function recover(hash, signature) {
   return signer;
 }
 
-function toFixedHex(bigNum) {
-  return ethers.utils.hexZeroPad('0x' + bigNum.toString(16), 32);
-}
 
 function isString(s) {
   return (typeof s === 'string' || s instanceof String)
@@ -125,7 +121,6 @@ export function isAesEncrypted(cipher) {
 
 export {
   hashCallOutput,
-  toFixedHex,
   sign,
   recover,
   toBaseUnit,

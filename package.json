@@ -35,7 +35,6 @@
     "elliptic": "^6.5.4",
     "eth-sig-util": "3.0.1",
     "ethereum-multicall": "^2.10.0",
-    "ethers": "^5.1.4",
     "events-async": "^1.2.1",
     "express": "^4.17.1",
     "express-async-handler": "^1.2.0",
