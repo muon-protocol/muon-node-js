@@ -6,7 +6,6 @@ import axios from 'axios'
 import Web3 from 'web3'
 import * as tron from '../utils/tron.js'
 import lodash from 'lodash'
-import BigNumber from 'bignumber.js'
 import { toBaseUnit } from '../utils/crypto.js'
 import { timeout, floatToBN } from '../utils/helpers.js'
 import util from 'ethereumjs-util'
@@ -28,7 +27,7 @@ import {toBN} from "../utils/tss/utils.js";
 import {muonSha3} from "../utils/sha3.js";
 
 const { flatten, groupBy } = lodash;
-const web3Instance = new Web3();
+const web3Instance = new Web3('http://localhost:8545');
 
 function ecRecover(message, signature) {
   return web3Instance.eth.accounts.recover(message, signature);
@@ -44,7 +43,6 @@ global.MuonAppUtils = {
   ws,
   timeout,
   BN,
-  BigNumber,
   toBN,
   floatToBN,
   multiCall,

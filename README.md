@@ -78,3 +78,7 @@ To learn more about how to build a Muon app, please refer to the [Muon Developme
 Muon has an active and continuously expanding community. Our [Discord server](https://discord.com/invite/rcK4p8g7Ce) serves as the primary communication channel for day-to-day interactions and addressing development-related inquiries. 
 You can ask your development related questions in #dev-help channel.
 
+## License
+This project is licensed under the terms of the GNU General Public License v3.0.
+A copy of the license can be found at [https://www.gnu.org/licenses/gpl-3.0](https://www.gnu.org/licenses/gpl-3.0).
+

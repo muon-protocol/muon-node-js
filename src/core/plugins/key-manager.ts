@@ -17,6 +17,8 @@ import {DistKey} from "../../common/mpc/dist-key.js";
 import {logger} from '@libp2p/logger'
 import {bn2hex} from "../../utils/tss/utils.js";
 import {useOneTime} from "../../utils/tss/use-one-time.js";
+import {KeyRedistribution} from "../../common/mpc/kdist.js";
+import MpcNetworkPlugin from "./mpc-network";
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -32,6 +34,10 @@ export type KeyGenOptions = {
    partners to generate key between them
    */
   partners?: string[],
+  /**
+   * The partners subset who responsible to initialize and create the key.
+   */
+  dealers?: string[],
   /**
    Max number of partners to generate key.
    This option will ignore if exact list of partners specified
@@ -50,7 +56,6 @@ export type KeyGenOptions = {
 }
 
 const RemoteMethods = {
-  recoverMyKey: 'recoverMyKey',
   storeDeploymentTssKey: 'storeDeploymentTssKey',
 }
 
@@ -83,6 +88,9 @@ class KeyManager extends CallablePlugin {
     await this.appManager.waitToLoad();
     this.loadDeploymentTss();
 
+    const mpcNetwork:MpcNetworkPlugin = this.muon.getPlugin('mpcnet');
+    mpcNetwork.registerMpcInitHandler("DistributedKeyGeneration", this.dkgInitializeHandler.bind(this))
+    mpcNetwork.registerMpcInitHandler("KeyRedistribution", this.keyRedistInitHandler.bind(this))
   }
 
   async onNodeAdd(nodeInfo: MuonNodeInfo) {
@@ -216,72 +224,6 @@ class KeyManager extends CallablePlugin {
       this.tssKey = key;
       this.isReady = true
       log('deployment tss is ready.');
-    }
-    else{
-      /**
-       A core process is responsible for creating or recovering the Tss Key.
-       However, sometimes (when cluster mode is enabled) there are multiple core processes running simultaneously, which can cause problems.
-       Therefore, only one core process should be allowed to handle the Tss Key at a time.
-       */
-      let permitted = await NetworkIpc.askClusterPermission('deployment-tss-key-creation', 20000)
-      if(!permitted)
-        return;
-
-      log('waiting for the threshold number of deployers to get online ...')
-      let onlineDeployers: string[];
-      while (true) {
-        const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
-        onlineDeployers = await NetworkIpc.findNOnlinePeer(
-          deployers,
-          Math.ceil(this.tssParty.t*1.3),
-          {timeout: 5000}
-        );
-
-        if(onlineDeployers.length >= this.netConfigs.tss.threshold) {
-          log(`${onlineDeployers.length} number of deployers are now online.`)
-          break;
-        }
-
-        /** wait 5 seconds and retry again */
-        log("online deployers %o", onlineDeployers)
-        log(`waiting: only ${onlineDeployers.length} number of deployers are online.`)
-        await timeout(5000);
-      }
-
-      const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
-      if (currentNodeInfo && currentNodeInfo.id == LEADER_ID && await this.isNeedToCreateKey()) {
-        log(`Got permission to create tss key`);
-        let key: AppTssKey = await this.tryToCreateDeploymentTssKey();
-        log(`TSS key generated with ${key.partners.length} partners`);
-      }
-      else{
-        log(`trying to recover deployment tss key... timeout(6000)`)
-
-        while (!this.isReady) {
-          log("waiting for tss, timeout(5000)");
-          await timeout(5000);
-          const context: AppContext = this.appManager.getAppContext("1", "1")
-          const readyPartnersId = await this.appManager.findNAvailablePartners(
-            context.party.partners,
-            Math.ceil(context.party.t * 1.2),
-            {appId: "1", seed: "1", excludeSelf: true},
-          )
-
-          if(readyPartnersId.length >= context.party.t){
-            log(`deployment tss is ready.`);
-            try {
-              const readyPartners = this.nodeManager.filterNodes({list: readyPartnersId});
-              await this.tryToRecoverDeploymentTssKey(readyPartners!);
-            }
-            catch (e) {
-              log(`Error when trying to recover tss key`);
-            }
-          }
-          else {
-            log(`deployment tss is not ready.`);
-          }
-        }
-      }
     }
   }
 
@@ -473,253 +415,53 @@ class KeyManager extends CallablePlugin {
     }
   }
 
-  private async tryToRecoverDeploymentTssKey(readyPartners: MuonNodeInfo[]){
-    log(`generating nonce for recovering deployment tss key`)
-
-    let nonce = await this.keyGen({appId: "1", seed: "1"}, {
-      id: `recovery-${uuid()}`,
-      partners: [
-        this.nodeManager.currentNodeInfo!.id,
-        ...readyPartners.map(p => p.id),
-      ]
-    });
-    log(`nonce generated for recovering deployment tss key`)
-
-    const noncePartners = this.nodeManager.filterNodes({
-      list: nonce.partners,
-      excludeSelf: true,
-    })
-    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-1-tss-recovery`, 3600)
-    let tssKey = await this.recoverAppTssKey('1', '1', noncePartners, nonce);
-
-    this.tssKey = tssKey
-    this.isReady = true;
-    await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-1-tss`)
-    this.saveTssConfig(this.tssParty, tssKey)
-    CoreIpc.fireEvent({type: "deployment-tss-key:generate", data: tssKey.toJson()});
-    log(`pid:${process.pid} tss key recovered`);
-    return true;
-  }
-
-  /**
-   * Recover share of App's TSS key.
-   * In general, only party partners are allowed to recover their own key share, but when the party rotates, a new party is allowed too.
-   *
-   * @param appId {string} - Which app is needs to be recovered.
-   * @param seed {string} - Which context of app needs to be recovered.
-   * @param partners {string[]} - List of partners that helps to the key be recovered.
-   * @param nonce {string} - ID of nonce that will be used for recovery.
-   * @param newSeed {string} - Deployment seed of App's new context. A new context will be generated by deployers when the old context is about to expire..
-   */
-  async recoverAppTssKey(appId: string, seed: string, partners: MuonNodeInfo[], nonce: AppTssKey): Promise<AppTssKey> {
-    let appParty = this.getAppParty(appId, seed);
-
-    if(!appParty)
-      throw `AppParty does not exist for recovering the key.`
-
-    if(partners.length < appParty.t)
-      throw {message: "No enough online partners to recover the key."};
-
-    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
-
-    let keyResults = await Promise.all(
-      partners.map(p => {
-          return this.remoteCall(
-            // online partners
-            p.peerId,
-            RemoteMethods.recoverMyKey,
-            {nonce: nonce.id, appId, seed},
-            {taskId: nonce.id}
-          ).catch(e => {
-            log.error(`getting key recovery share error:`, e)
-            return null
-          })
-        }
-      )
+  async createDeploymentTssKey(): Promise<AppTssKey> {
+    const currentNode = this.nodeManager.currentNodeInfo!;
+    const deployers: MuonNodeInfo[] = this.nodeManager.filterNodes({isDeployer: true})
+    const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
+      deployers.map(n => n.peerId),
+      Math.ceil(this.tssParty!.t*1.2),
+      {timeout: 10000}
     )
+    if(onlineDeployers.length < this.tssParty!.t) {
+      log(`Its need ${this.tssParty!.t} deployer to create deployment tss but only ${onlineDeployers.length} are available`)
+      throw `No enough online deployers to create the deployment tss key.`
+    }
+    log(`Deployers %o are available to create deployment tss`, onlineDeployers)
 
-    let shares = partners
-      .map((p, j) => {
-          if (!keyResults[j])
-            return null
-          return {
-            i: p.id,
-            key: tssModule.keyFromPrivate(keyResults[j].recoveryShare)
-          }
-        }
-      )
-      .filter(s => !!s)
-
-    if (shares.length < appParty!.t)
-      throw `Need's of ${appParty!.t} result to recover the Key, but received ${shares.length} result.`
-
-    let myIndex = this.currentNodeInfo!.id;
-    // @ts-ignore
-    let reconstructed = tssModule.reconstructKey(shares, appParty.t, myIndex)
-    let myKey = reconstructed.sub(nonce.share!).umod(tssModule.curve.n!)
-
-    return AppTssKey.fromJson(
-      appParty,
-      this.currentNodeInfo!.id,
+    let key: AppTssKey = await this.keyGen(
+      {appId: "1", seed: "1"},
       {
-        id: keyResults[0].id,
-        share: bn2hex(myKey),
-        publicKey: keyResults[0].publicKey,
-        partners: appParty.partners,
-        polynomial: keyResults[0].polynomial,
+        partners: deployers.map(n => n.id),
+        dealers: onlineDeployers,
+        lowerThanHalfN: true
       }
     )
-  }
 
-  private appTssKeyRecoveryCheckTime: MapOf<number> = {};
+    let keyPartners = deployers.filter(n => (n.id !== currentNode.id));
+    let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
+      return this.remoteCall(
+        peerId,
+        RemoteMethods.storeDeploymentTssKey,
+        {
+          party: this.tssParty!.id,
+          key: key.id,
+        },
+        {timeout: 120e3}
+        // {taskId: `keygen-${key.id}`}
+      ).catch(e=>{
+        console.log("RemoteCall.storeDeploymentTssKey", e);
+        return false
+      });
+    }))
+    if (callResult.filter(r => r === true).length+1 < this.netConfigs.tss.threshold)
+      throw `Tss creation failed.`
+    await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
+    this.saveTssConfig(this.tssParty, key)
 
-  /**
-   * Find a list of partners who have the app key and attempt to recover the app key.
-   * @param appId {string} - App ID
-   * @param seed {string} - Apps context identifier.
-   * @param forceRetry {boolean} - By default, this method will cache the result to prevent simultaneous search.
-   * Sometimes it is necessary to retry and ignore the cache.
-   * @return {boolean} - Is App's tss key recovered successfully or not.
-   */
-  async checkAppTssKeyRecovery(appId: string, seed: string, forceRetry:boolean=false): Promise<boolean> {
-    const lastCallTime = this.appTssKeyRecoveryCheckTime[`${appId}-${seed}`] ?? 0;
-    if(!forceRetry && lastCallTime + 5*60e3 > Date.now())
-      return false;
-
-    log(`checking to recover app[${appId}] tss key`)
-    this.appTssKeyRecoveryCheckTime[`${appId}-${seed}`] = Date.now();
-    try {
-      let context: AppContext = this.appManager.getAppContext(appId, seed);
-      if(!context || !context.keyGenRequest) {
-        const contexts: AppContext[] = await this.appManager.queryAndLoadAppContext(appId);
-        context = contexts.find(ctx => ctx.seed === seed)!
-
-        if(!context || !context.keyGenRequest)
-          throw `app tss is not ready yet (missing context).`
-      }
-      const readyPartnersId = await this.appManager.findNAvailablePartners(
-        context.party.partners,
-        Math.ceil(context.party.t * 1.2),
-        {appId, seed, excludeSelf: true}
-      )
-      log(`this nodes are ready to recover App's key: ${readyPartnersId}`)
-      const readyPartners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: readyPartnersId});
-
-      if(readyPartners.length >= context.party.t) {
-        log(`app[${appId}] tss is ready and can be recovered by partners `, readyPartners!.map(({id}) => id));
-        log(`generating nonce for recovering app[${appId}] tss key`)
-        let nonce = await this.keyGen(
-          {appId, seed},
-          {
-            id: `recovery-${uuid()}`,
-            partners: [
-              this.nodeManager.currentNodeInfo!.id,
-              ...readyPartners.map(p => p.id),
-            ]
-          }
-        );
-        log(`nonce generated for recovering app[${appId}] tss key`)
-        //
-        const noncePartners = this.nodeManager.filterNodes({
-          list: nonce.partners,
-          excludeSelf: true,
-        })
-        let key = await this.recoverAppTssKey(appId, seed, noncePartners, nonce);
-        if(key) {
-          log(`app tss key recovered`)
-          const netConfigs = this.muon.configs.net
-          let expiration: number|undefined;
-          let polynomial: any;
-          if(context.deploymentRequest && context.ttl) {
-            expiration = context.deploymentRequest.data.timestamp + context.ttl + netConfigs.tss.pendingPeriod
-          }
-          if(context.keyGenRequest) {
-            polynomial = context.keyGenRequest.data.result.polynomial
-            if(context.keyGenRequest.data.result.oldPolynomial) {
-              polynomial = this.appManager.mergeResharePolynomial(
-                context.keyGenRequest.data.result.oldPolynomial,
-                context.keyGenRequest.data.result.polynomial,
-                seed)
-            }
-          }
-          await this.appManager.saveAppTssConfig({
-            appId: appId,
-            seed,
-            keyGenRequest: context.keyGenRequest,
-            publicKey: pub2json(key.publicKey!),
-            keyShare: bn2hex(key.share!),
-            polynomial,
-            expiration
-          })
-
-          return true;
-        }
-      }
-      else {
-        log(`app[${appId}] tss is not ready yet`)
-        throw `app tss is not ready yet (no enough ready partners)`;
-      }
-    }
-    catch (e) {
-      log(`recovering app[${appId}] tss key failed %O`, e);
-      throw e;
-    }
-    return false;
-  }
-
-  async tryToCreateDeploymentTssKey(): Promise<AppTssKey> {
-    const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
-    while (!this.isReady) {
-      log('deployment tss is not ready. timeout(5000)')
-      await timeout(5000);
-      try {
-        const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
-          deployers,
-          Math.ceil(this.tssParty!.t*1.2),
-          {timeout: 10000}
-        )
-        if(onlineDeployers.length < this.tssParty!.t) {
-          log(`Its need ${this.tssParty!.t} deployer to create deployment tss but only ${onlineDeployers.length} are available`)
-          continue;
-        }
-        log(`Deployers %o are available to create deployment tss`, onlineDeployers)
-        let key: AppTssKey = await this.keyGen(
-          {appId: "1", seed: "1"},
-          {
-            partners: onlineDeployers,
-            lowerThanHalfN: true
-          }
-        )
-
-        let keyPartners = this.nodeManager.filterNodes({list: key.partners, excludeSelf: true})
-        let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
-          return this.remoteCall(
-            peerId,
-            RemoteMethods.storeDeploymentTssKey,
-            {
-              party: this.tssParty!.id,
-              key: key.id,
-            },
-            {timeout: 120e3}
-            // {taskId: `keygen-${key.id}`}
-          ).catch(e=>{
-            console.log("RemoteCall.storeDeploymentTssKey", e);
-            return false
-          });
-        }))
-        if (callResult.filter(r => r === true).length+1 < this.netConfigs.tss.threshold)
-          throw `Tss creation failed.`
-        await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
-        this.saveTssConfig(this.tssParty, key)
-
-        this.tssKey = key;
-        this.isReady = true;
-        CoreIpc.fireEvent({type: "deployment-tss-key:generate", data: key.toJson()});
-        log('tss ready.')
-      } catch (e) {
-        log('error when trying to create tss key %o %o', e, e.stack);
-      }
-    }
+    this.tssKey = key;
+    this.isReady = true;
+    CoreIpc.fireEvent({type: "deployment-tss-key:generate", data: key.toJson()});
 
     return this.tssKey!
   }
@@ -768,27 +510,31 @@ class KeyManager extends CallablePlugin {
 
     let keyGen: DistributedKeyGeneration, dKey: DistKey;
     do {
-      keyGen = new DistributedKeyGeneration(
+      keyGen = new DistributedKeyGeneration({
         /** MPC ID */
-        uuid(),
+        id: uuid(),
         /**
          * starter of MPC
          * starter have higher priority than others when selecting MPC fully connected sub set.
          */
-        this.nodeManager.currentNodeInfo!.id,
+        starter: this.nodeManager.currentNodeInfo!.id,
         /** partners list */
-        partners.map(p => p.id),
+        partners: partners.map(p => p.id),
+        dealers: options.dealers || undefined,
         /** DKG threshold */
-        party.t,
+        t: party.t,
         /** DKG value to be shared between partners */
-        options.value,
+        value: options.value,
         /** extra values usable in DKG */
-        {
+        extra: {
+          mpcType: "DistributedKeyGeneration",
           partyInfo,
-          keyId,
-          lowerThanHalfN: options.lowerThanHalfN,
+            keyId,
+            lowerThanHalfN
+        :
+          options.lowerThanHalfN,
         }
-      );
+      });
       dKey = await keyGen.runByNetwork(network, timeout)
     }
     while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
@@ -796,6 +542,123 @@ class KeyManager extends CallablePlugin {
     let key = new AppTssKey(party, keyGen.extraParams.keyId!, dKey)
 
     await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+    return key;
+  }
+
+  async dkgInitializeHandler(constructData, network: MpcNetworkPlugin) {
+    const dkg = new DistributedKeyGeneration(constructData)
+    const {extra} = constructData
+
+    dkg.runByNetwork(network)
+      .then(async (dKey: DistKey) => {
+        if(extra.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
+          return;
+
+        const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
+        const party = await this.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+        if(!party)
+          throw `party[${extra.party}] not found`
+
+        let key = new AppTssKey(party, extra.keyId, dKey)
+        await SharedMemory.set(extra.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+      })
+      .catch(e => {
+        // TODO
+        log.error("KeyManager running mpc failed. %O", e)
+      })
+
+    return dkg;
+  }
+
+  async keyRedistInitHandler(constructData, network:MpcNetworkPlugin): Promise<KeyRedistribution> {
+    const {extra} = constructData
+    const {prevPartyInfo: {appId, seed}} = extra;
+    const {keyShare} = this.appManager.getAppTssKey(appId, seed);
+    const keyRedist = new KeyRedistribution({
+      ...constructData,
+      value: keyShare
+    });
+
+    keyRedist.runByNetwork(network)
+      .then(async (dKey: DistKey) => {
+        if(extra.lowerThanHalfN && dKey.publicKeyLargerThanHalfN())
+          return;
+
+        const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
+        const party = await this.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+        if(!party)
+          throw `party[${extra.party}] not found`
+
+        let key = new AppTssKey(party, extra.keyId, dKey)
+        await SharedMemory.set(extra.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+      })
+      .catch(e => {
+        // TODO
+        log.error("KeyManager running mpc failed. %O", e)
+      })
+
+    return keyRedist;
+  }
+
+  async redistributeKey(prevPartyInfo: PartyInfo, newPartyInfo: PartyInfo, options: KeyGenOptions={}): Promise<AppTssKey> {
+    let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
+    let {id, timeout=60000} = options;
+
+    const prevParty = this.getAppParty(prevPartyInfo.appId, prevPartyInfo.seed)
+    if(!prevParty)
+      throw {message: `party not found`, prevPartyInfo}
+
+    const newParty = this.getAppParty(newPartyInfo.appId, newPartyInfo.seed)
+    if(!newParty)
+      throw {message: `party not found`, newPartyInfo};
+
+    if(!this.appManager.appHasTssKey(prevPartyInfo.appId, prevPartyInfo.seed))
+      throw {message: `the previous party doesn't have the tss key.`}
+
+    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({
+      list: newParty.partners,
+    })
+
+    const keyId = id || uuid()
+
+    log(`creating key with partners: %o`, partners.map(p => p.id))
+
+    let keyRedist: KeyRedistribution, dKey: DistKey;
+    do {
+      keyRedist = new KeyRedistribution({
+        /** MPC ID */
+        id: uuid(),
+        /**
+         * starter of MPC
+         * starter have higher priority than others when selecting MPC fully connected sub set.
+         */
+        starter: this.nodeManager.currentNodeInfo!.id,
+        /** partners of the old party, that redistribute the key to the new partners. */
+        dealers: lodash.intersection(prevParty.partners, newParty.partners),
+        /** partners list */
+        partners: partners.map(p => p.id),
+        /** Previous party threshold */
+        previousT: prevParty.t,
+        /** DKG threshold */
+        t: newParty.t,
+        /** DKG value to be shared between partners */
+        value: this.appManager.getAppTssKey(prevPartyInfo.appId, prevPartyInfo.seed).keyShare,
+        /** extra values usable in DKG */
+        extra: {
+          mpcType: "KeyRedistribution",
+          prevPartyInfo: prevPartyInfo,
+          partyInfo: newPartyInfo,
+          keyId,
+          lowerThanHalfN: options.lowerThanHalfN,
+        }
+      });
+      dKey = await keyRedist.runByNetwork(network, timeout)
+    }
+    while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
+
+    let key = new AppTssKey(newParty, keyRedist.extraParams.keyId!, dKey)
+
+    await SharedMemory.set(keyRedist.extraParams.keyId, {partyInfo: newPartyInfo, key: key.toJson()}, 30*60*1000)
     return key;
   }
 
@@ -817,59 +680,6 @@ class KeyManager extends CallablePlugin {
    *           Remote Methods
    *
    *===================================*/
-
-  /**
-   * Each node can request other nodes to recover its own key.
-   * This process will be done after creating a AppTssKey as a nonce.
-   *
-   * @param data: Key recovery info
-   * @param data.nonce: Nonce id that crated for key recovery
-   *
-   * @param callerInfo: caller node information
-   * @param callerInfo.wallet: collateral wallet of caller node
-   * @param callerInfo.peerId: PeerID of caller node
-   * @returns {Promise<{address: string, recoveryShare: string, id: *, publicKey: string}|null>}
-   * @private
-   */
-  @remoteMethod(RemoteMethods.recoverMyKey)
-  async __recoverMyKey(data: {nonce: string, appId: string, seed: string}, callerInfo: MuonNodeInfo) {
-    // TODO: can malicious user use a nonce twice?
-    const {nonce: nonceId, appId, seed} = data;
-
-    // console.log('KeyManager.__recoverMyKey', data, callerInfo.wallet)
-    const appParty = this.getAppParty(appId, seed)
-    if(!appParty)
-      throw `Missing app Party.`
-
-    if(!appParty.partners.includes(callerInfo.id))
-      throw `Only partners can can request to recover the key`
-
-    const appTssKey: AppTssKey|null = this.getAppTssKey(appId, seed)
-
-    // if(!this.tssKey || !this.tssParty){
-    if(!appTssKey){
-        throw "Tss not initialized"
-    }
-
-    if (nonceId === appTssKey!.id)
-      throw `Cannot use tss key as nonce`;
-
-    let nonce: AppTssKey = await this.getSharedKey(nonceId);
-    await useOneTime("key", nonce.publicKey!.encode('hex', true), `app-${appId}-tss-recovery`, 3600)
-    let keyPart = nonce.share!.add(appTssKey.share!).umod(tssModule.curve.n!);
-
-    const appTssKeyJson: AppTssKeyJson = appTssKey.toJson();
-    return {
-      id: appTssKey!.id,
-      recoveryShare: `0x${keyPart.toString(16, 64)}`,
-      // distributed key public
-      publicKey: `${appTssKey!.publicKey!.encode('hex', true)}`,
-      // distributed key address
-      address: tssModule.pub2addr(appTssKey!.publicKey!),
-
-      polynomial: appTssKeyJson.polynomial
-    }
-  }
 
   /**
    * Node with ID:[1] inform other nodes that tss creation completed.

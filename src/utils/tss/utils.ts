@@ -2,11 +2,13 @@ import Web3 from 'web3'
 import lodash from 'lodash'
 import BN from 'bn.js';
 import {toBN} from '../helpers.js';
-
+import jsSha3 from 'js-sha3'
+const {keccak_256: keccak256} = jsSha3;
 const {range} = lodash
-const {utils: {randomHex, sha3, keccak256}} = Web3;
+const {utils: {randomHex, sha3}} = Web3;
 const ZERO = toBN(0)
 const ONE = toBN(1)
+
 
 function pub2addr(publicKey) {
   let pubKeyHex = publicKey.encode('hex').substr(2);

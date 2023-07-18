@@ -1,8 +1,6 @@
 import fs from 'fs'
 import readline from 'readline'
 import numberToBN from  'number-to-bn'
-import BigNumber from 'bignumber.js'
-BigNumber.set({DECIMAL_PLACES: 26})
 import axios from 'axios';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -14,6 +12,7 @@ import childProcess from 'node:child_process'
 import {isIP} from 'net'
 import isIpPrivate from 'private-ip'
 import {loadGlobalConfigs} from "../common/configurations.js";
+import BN from "bn.js";
 
 
 const exec = promisify(childProcess.exec);
@@ -24,16 +23,27 @@ export const uuid = () => {
   return Date.now().toString(32) + Math.floor(Math.random()*999999999).toString(32);
 }
 export const sortObject = o => Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {})
-export const floatToBN = (num, decimals) => {
-  let n0 = new BigNumber(num).multipliedBy(`1e${decimals}`);
-  let n1 = n0.decimalPlaces(decimals).integerValue();
-  return toBN(`0x${n1.toString(16)}`);
+
+export const floatToBN = (floatNumber, decimals) => {
+  const floatString = floatNumber.toString();
+  const [integerPart, decimalPart = ''] = floatString.split('.');
+  let bnValue = new BN(integerPart);
+  const decimalPartTruncated = decimalPart.slice(0, decimals);
+  const paddingZeros = '0'.repeat(decimals - decimalPartTruncated.length);
+  const decimalPartCombined = decimalPartTruncated + paddingZeros;
+  const decimalBN = new BN(decimalPartCombined);
+  bnValue = bnValue.mul(new BN(10).pow(new BN(decimals))).add(decimalBN);
+  return toBN(bnValue.toString());
 }
+
+
 export const parseBool = v => {
   if(typeof v === 'string')
     v = v.toLowerCase();
   return v === '1' || v==='true' || v === true || v === 1;
 }
+
+
 
 export const flattenObject = (obj, prefix="") => {
   let result = {}

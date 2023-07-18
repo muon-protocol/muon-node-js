@@ -1,6 +1,7 @@
 import {GlobalBroadcastChannels} from "./contantes";
 import BN from 'bn.js'
 import {PublicKey} from "../utils/tss/types";
+import {MultiPartyComputation} from "./mpc/base";
 
 export type JsonPeerInfo = {
     id: string;
@@ -280,3 +281,7 @@ export type NodeManagerData = {
 }
 
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] }
+
+export type MpcType = "DistributedKeyGeneration" | "KeyRedistribution";
+
+export type MpcInitHandler = (constructData, MpcNetwork) => Promise<MultiPartyComputation>

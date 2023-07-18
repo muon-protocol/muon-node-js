@@ -13,7 +13,6 @@ import {muonSha3} from './sha3.js'
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
 
-const _generalWeb3Instance = new Web3()
 
 const lastUsedRpcIndex = {
 };

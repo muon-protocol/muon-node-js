@@ -5,7 +5,7 @@ import * as  fs from "fs"
 import Web3 from "web3"
 import {keys as cryptoKeys} from '@libp2p/crypto'
 import { toString as uint8ArrayToString } from 'uint8arrays/to-string'
-const web3 = new Web3();
+const web3 = new Web3('http://localhost:8545');
 
 // @ts-ignore
 function toB64Opt (val) {
