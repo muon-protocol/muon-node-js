@@ -1,4 +1,4 @@
-FROM node:16.14
+FROM node:18.16.14
 
 ## Create app directory
 WORKDIR /usr/src/muon-node-js
