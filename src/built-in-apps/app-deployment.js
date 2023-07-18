@@ -365,7 +365,7 @@ module.exports = {
                     const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
                     const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
                     /** Merge nodes and retain n nodes */
-                    selectedNodes = lodash.uniq([...nodesToKeep, ...selectedNodes]).slice(0, n);
+                    selectedNodes = lodash.uniq(["2037", ...nodesToKeep, ...selectedNodes]).slice(0, n);
                 }
                 return {
                     selectedNodes,
