@@ -9,7 +9,6 @@ import lodash from 'lodash'
 import { toBaseUnit } from '../utils/crypto.js'
 import { timeout, floatToBN } from '../utils/helpers.js'
 import util from 'ethereumjs-util'
-import ws from 'ws'
 import ethSigUtil from 'eth-sig-util'
 import {
   getBlock as ethGetBlock,
@@ -40,7 +39,6 @@ global.MuonAppUtils = {
   flatten,
   groupBy,
   tron,
-  ws,
   timeout,
   BN,
   toBN,
