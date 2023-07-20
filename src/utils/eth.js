@@ -105,20 +105,31 @@ function hashCallOutput(
   return hash
 }
 
+const web3ProvidersSpecificErrors = [
+  'CONNECTION ERROR',
+  "Invalid JSON RPC response",
+  "invalid json response body",
+  "not authorized",
+  "we can't execute this request",
+  "Returned error:",
+  "Returned values aren't valid",
+].map(msg => msg.toLowerCase());
+
+function errorNeedRpcRotate(msg) {
+  msg = msg.toLowerCase();
+  for(const specificMsg of web3ProvidersSpecificErrors) {
+    if(specificMsg.includes(msg))
+      return true;
+  }
+  return false
+}
+
 async function wrappedCall(network, web3ApiCall, args=[]) {
   try {
     return await web3ApiCall(...args)
   }
   catch (e) {
-    let errorMessage = e.message;
-    if(
-      errorMessage.includes('CONNECTION ERROR')
-      || errorMessage.includes("Invalid JSON RPC response")
-      || errorMessage.includes("not authorized")
-      || errorMessage.includes("we can't execute this request")
-      || errorMessage.includes("Returned error:")
-      || errorMessage.includes("Returned values aren't valid")
-    ) {
+    if(errorNeedRpcRotate(e.message) ) {
       const chainId = getNetworkId(network);
       console.log(`error on web3 call`, {chainId}, e.message)
       delete web3Instances[chainId];

@@ -165,6 +165,16 @@ class BaseAppPlugin extends CallablePlugin {
     return this.REMOTE_CALL_TIMEOUT * 2 + 5000;
   }
 
+  private resultChecking(result) {
+    /** Serialization and deserialization must work on the request result. */
+    try {
+      JSON.parse(JSON.stringify(result))
+    }
+    catch (e) {
+      throw `App result serialize/deserialize error: ${e.message}`;
+    }
+  }
+
   @gatewayMethod("default")
   async __defaultRequestHandler(callParams: GatewayCallParams) {
     const {method, params, mode, callId: gatewayCallId, gwSign, fee: feeParams} = callParams;
@@ -188,7 +198,7 @@ class BaseAppPlugin extends CallablePlugin {
         throw `App not deployed`;
       const oldestContext: AppContext = this.appManager.getAppOldestContext(this.APP_ID)!
       if(!this.appManager.appHasTssKey(this.APP_ID, oldestContext.seed)) {
-        throw `App tss not initialized`
+        throw `App tss not initialized currentNode: ${process.env.SIGN_WALLET_ADDRESS} seed: ${oldestContext.seed}`
       }
       deploymentSeed = oldestContext.seed;
     }
@@ -241,6 +251,7 @@ class BaseAppPlugin extends CallablePlugin {
         await this.validateRequest(clone(newRequest))
       }
       let result = await this.onRequest(clone(newRequest))
+      this.resultChecking(result)
       newRequest.data.result = result
       return omit(newRequest._doc, ['__v'])
     }
@@ -270,6 +281,7 @@ class BaseAppPlugin extends CallablePlugin {
       let result;
       try {
         result = await this.onRequest(clone(newRequest))
+        this.resultChecking(result)
       }
       catch (e) {
         this.log.error("error calling onRequest %O", e)
@@ -819,6 +831,7 @@ class BaseAppPlugin extends CallablePlugin {
      * Check request result to be same.
      */
     let result = await this.onRequest(request)
+    this.resultChecking(result)
 
     const appSignParams = this.signParams(request, result)
     const resultHashWithoutSecurityParams = this.hashAppSignParams(request, appSignParams, false)

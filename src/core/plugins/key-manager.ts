@@ -573,10 +573,12 @@ class KeyManager extends CallablePlugin {
   async keyRedistInitHandler(constructData, network:MpcNetworkPlugin): Promise<KeyRedistribution> {
     const {extra} = constructData
     const {prevPartyInfo: {appId, seed}} = extra;
-    const {keyShare} = this.appManager.getAppTssKey(appId, seed);
+    const currentNode = this.nodeManager.currentNodeInfo!;
+    const key = this.appManager.getAppTssKey(appId, seed);
     const keyRedist = new KeyRedistribution({
       ...constructData,
-      value: keyShare
+      dealers: !!key ? constructData.dealers : constructData.dealers.filter(id => id !== currentNode.id),
+      value: !!key ? key.keyShare : undefined
     });
 
     keyRedist.runByNetwork(network)
