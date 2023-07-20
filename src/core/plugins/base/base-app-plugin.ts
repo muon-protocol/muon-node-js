@@ -424,7 +424,7 @@ class BaseAppPlugin extends CallablePlugin {
       const appId = this.APP_ID;
 
       /** fee signature is valid for 5 minutes */
-      if(spender.timestamp/1000 < request.data.timestamp-5*60e3)
+      if(spender.timestamp/1000 < request.data.timestamp-5*60)
         throw `fee spend time has been expired.`
 
       const hash = muonSha3(
