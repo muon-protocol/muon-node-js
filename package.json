@@ -6,8 +6,8 @@
   "main": "index.js",
   "scripts": {
     "start": "env-cmd node_modules/.bin/ts-node-esm ./src/index.ts",
-    "start.debug": "env-cmd --use-shell 'DEBUG=libp2p:noise node_modules/.bin/ts-node ./index.ts' ",
-    "dev": "env-cmd nodemon --exec node_modules/.bin/ts-node ./index.ts",
+    "start.debug": "env-cmd --use-shell 'DEBUG=libp2p:noise node_modules/.bin/ts-node ./src/index.ts' ",
+    "dev": "env-cmd nodemon --exec node_modules/.bin/ts-node ./src/index.ts",
     "devnet-init": "./node_modules/.bin/ts-node devnet/generate-envs.js",
     "devnet-run": "./node_modules/.bin/ts-node devnet/run.js"
   },
