@@ -3,7 +3,6 @@
 import {CoreGlobalEvent} from "./ipc.js";
 import Events from 'events'
 import chalk from 'chalk'
-import emoji from 'node-emoji'
 import fs from 'fs'
 import { MessagePublisher, MessageSubscriber } from '../common/message-bus/index.js'
 import { GLOBAL_EVENT_CHANNEL, fireEvent } from './ipc.js'

@@ -5,7 +5,6 @@ import PQueue from "p-queue";
 import defer from "p-defer";
 import errCode from "err-code";
 import type { PeerId } from "@libp2p/interface-peer-id";
-import type { AbortOptions } from "ipfs-core-types/src/utils";
 import type { PeerRouting } from "@libp2p/interface-peer-routing";
 import type { PeerInfo } from "@libp2p/interface-peer-info";
 import type { Startable } from "@libp2p/interfaces/startable";
@@ -118,7 +117,7 @@ export class MuonRouting implements PeerRouting, Startable {
    */
   async findPeer(
     id: PeerId,
-    options: HTTPClientExtraOptions & AbortOptions = {}
+    options: any = {}
   ) {
     log("findPeer starts: %p", id);
 
@@ -207,7 +206,7 @@ export class MuonRouting implements PeerRouting, Startable {
    */
   async *getClosestPeers(
     key: Uint8Array,
-    options: HTTPClientExtraOptions & AbortOptions = {}
+    options: any = {}
   ) {
     yield* [];
   }
