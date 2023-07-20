@@ -834,9 +834,9 @@ export default class AppManager extends CallablePlugin {
         {appId, seed},
         {timeout: options!.timeout},
       )
-        .then(({deployed, hasTssKey}) => {
+        .then(({hasTssKey}) => {
           execTimes[i] = Date.now() - startTime
-          if (!appId || (deployed && hasTssKey)) {
+          if (!appId || hasTssKey) {
             responseList.push(peers[i][options!.return!])
             n--;
           }

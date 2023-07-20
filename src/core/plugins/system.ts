@@ -259,7 +259,12 @@ class System extends CallablePlugin {
       throw `App's new context not found.`
 
     const dealers: string[] = newContext.party.partners.filter(id => oldContext.party.partners.includes(id));
-    const generatorId = await this.getFirstOnlinePartner(dealers);
+    const readyDealers = await this.appManager.findNAvailablePartners(
+      dealers,
+      dealers.length,
+      {appId, seed: oldContext.seed, return: "id"},
+    );
+    const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
     if(!generatorId)
       throw `key-gen starter node not online`
 

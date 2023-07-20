@@ -193,7 +193,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       send[id] = {
         f: bn2str(this.getStore('round1').fx.calc(id)),
       }
-      if(qualified.includes(id)) {
+      if(newQualified.includes(id)) {
         broadcast.allPartiesFxHash[id] = muonSha3(...prevStepBroadcast[id].Fx.map(v => ({t: 'bytes', v})))
       }
     })
