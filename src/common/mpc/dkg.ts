@@ -142,11 +142,17 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
      */
     const r1Msg = this.getRoundReceives('round1')
 
+    const nonQualifiedList: string[] = []
     const malignant: string[] = [];
 
     /** check each node's commitments sent to all nodes are the same. */
     qualified.forEach(sender => {
-      const {Fx, sig: {nonce, signature}} = prevStepBroadcast[sender];
+      const broadcast = prevStepBroadcast[sender];
+      if(!broadcast) {
+        nonQualifiedList.push(sender)
+        return;
+      }
+      const {Fx, sig: {nonce, signature}} = broadcast;
       const popHash = muonSha3(
         /** i */
         {type: "uint64", value: sender},
@@ -174,7 +180,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
 
     /** exclude malignant from qualified list */
     const newQualified = qualified
-      .filter(id => !malignant.includes(id))
+      .filter(id => (!malignant.includes(id) && !nonQualifiedList.includes(id)))
 
     const store = {}
     const send = {}
