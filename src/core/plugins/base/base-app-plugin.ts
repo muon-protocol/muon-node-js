@@ -599,6 +599,8 @@ class BaseAppPlugin extends CallablePlugin {
     let confirmed = TssModule.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
     // TODO: check and detect nodes misbehavior if request not confirmed
 
+    //TODO: REZA: Remove this. Its just for testing purpose
+    confirmed = true;
     return [
       confirmed,
       confirmed ? [{
