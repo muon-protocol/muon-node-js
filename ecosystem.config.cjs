@@ -1,6 +1,6 @@
 module.exports = {
   apps : [{
-    "name": "muon-node-js-testnet",
+    "name": "muon-node-js-alice2",
     "script": "npm",
     "args" : "start",
     "watch"  : false,
