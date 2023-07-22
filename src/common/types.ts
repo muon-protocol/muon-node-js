@@ -47,6 +47,8 @@ export type MuonNodeInfo = {
     staker: string,
     wallet: string,
     peerId: string,
+    tier: number,
+    roles: number[],
     isDeployer: boolean
 }
 
@@ -210,8 +212,6 @@ export type NodeManagerConfigs = {
     address: string,
     /** The network that node manager deployed on */
     network: string,
-    /** The Pagination contract address */
-    pagination?: string
 }
 
 export type NetConfigs = {
@@ -261,19 +261,17 @@ export type DeploymentTssConfigs = {
 }
 
 export type NodeManagerDataRaw = {
-    _lastUpdateTime: string,
-    _nodes: {
-        id: string,
-        nodeAddress: string,
-        stakerAddress: string,
-        peerId: string,
-        active: boolean,
-        startTime: number,
-        endTime: number,
-        lastEditTime: number,
-        isDeployer: boolean,
-    }[]
-}
+    id: string,
+    nodeAddress: string,
+    stakerAddress: string,
+    peerId: string,
+    active: boolean,
+    tier: number,
+    roles: number[],
+    startTime: number,
+    endTime: number,
+    lastEditTime: number,
+}[];
 
 export type NodeManagerData = {
     lastUpdateTime: number,
