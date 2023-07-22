@@ -96,9 +96,8 @@ export default class NodeManagerPlugin extends CallablePlugin{
    * 1) Add new node.
    * 2) Remove node by Admin
    * 3) Deactivate node by collateral address
-   * 4) Edit nodeAddress
-   * 5) Edit PeerId
-   * 6) Edit isDeployer
+   * 4) Edit isDeployer
+   * 5) Edit node roles
    */
   async onNodesChange() {
     log(`nodes list updating ...`)
@@ -112,7 +111,7 @@ export default class NodeManagerPlugin extends CallablePlugin{
     const deletedNodes = {}
     changes.forEach(n => {
       /** A violent node may use another node's peerId. */
-      if(!!this._nodesMap[n.peerId]?.id && n.id !== this._nodesMap[n.peerId]?.id) {
+      if(!!this._nodesMap[n.peerId] && n.id !== this._nodesMap[n.peerId]?.id) {
         console.log(`same peerId used by two nodes`, {
           peerId: n.peerId,
           nodes: [n.id, this._nodesMap[n.peerId]?.id]
@@ -151,11 +150,10 @@ export default class NodeManagerPlugin extends CallablePlugin{
         return;
       }
       /**
-       * 4) Edit nodeAddress
-       * 5) Edit PeerId
-       * 6) Edit isDeployer
+       * 4) Edit isDeployer
+       * 5) Edit node roles
        */
-      if(oldNode.wallet !== n.wallet || oldNode.peerId !== n.peerId || oldNode.isDeployer !== n.isDeployer) {
+      if(oldNode.isDeployer !== n.isDeployer || oldNode.roles.join(',') !== n.roles.join(',')) {
         this._nodesMap
           .set(n.id, n)
           .set(n.wallet, n)
