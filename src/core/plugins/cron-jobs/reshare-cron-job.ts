@@ -179,7 +179,7 @@ export default class ReshareCronJob extends BaseCronJob{
     this.log(`Reshare confirmation waiting ...`);
     await this.waitToRequestBeAnnounced(keyGenResponse, {checkAllGroups: true});
     this.log(
-      `TSS key resharing done with this generators: [${keyGenResponse.data.init.keyGenerators}]. %O`,
+      `TSS key resharing done with this generators: [${keyGenResponse.data.init.keyGenerators}]. %o`,
       keyGenResponse.data.result
     )
   }

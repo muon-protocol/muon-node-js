@@ -41,7 +41,7 @@ export class KeyRedistribution extends DistributedKeyGeneration {
     }
 
     if(totalFx[0].encode('hex', true) !== this.publicKey)
-      throw `reshare error: public key changed`;
+      throw `reshare error: public key changed. expected: ${this.publicKey} computed: ${totalFx[0].encode('hex', true)}`;
 
     /** share public key */
     const publicKey1 = TssModule.keyFromPrivate(share).getPublic().encode("hex", true);
