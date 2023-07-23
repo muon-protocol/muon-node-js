@@ -4,15 +4,17 @@ import {PublicKey, PublicKeyShare} from "../../utils/tss/types";
 import {DistributedKeyGeneration, DKGOpts} from "./dkg.js";
 import {DistKey} from "./dist-key.js";
 
-export type KeyReDistOpts = DKGOpts & {previousT: number}
+export type KeyReDistOpts = DKGOpts & {publicKey: string, previousT: number}
 
 export class KeyRedistribution extends DistributedKeyGeneration {
   previousT: number;
+  publicKey: string;
 
   constructor(options: KeyReDistOpts) {
     super(options);
     delete this.constructData.value;
     this.previousT = options.previousT;
+    this.publicKey = options.publicKey;
   }
 
   onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId: string, qualified: string[]): any {
@@ -37,6 +39,17 @@ export class KeyRedistribution extends DistributedKeyGeneration {
       }));
       totalFx[j] = TssModule.reconstructPubKey(shares, previousT);
     }
+
+    if(totalFx[0].encode('hex', true) !== this.publicKey)
+      throw `reshare error: public key changed`;
+
+    /** share public key */
+    const publicKey1 = TssModule.keyFromPrivate(share).getPublic().encode("hex", true);
+    /** node public key at the polynomial */
+    const publicKey2 = TssModule.calcPolyPoint(networkId, totalFx).encode("hex", true);
+
+    if(publicKey1 !== publicKey2)
+      throw `reshare failed: share public key not matched with polynomial`;
 
     return new DistKey(
       networkId,

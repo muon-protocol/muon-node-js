@@ -625,6 +625,8 @@ class KeyManager extends CallablePlugin {
 
     log(`creating key with partners: %o`, partners.map(p => p.id))
 
+    const appKey = this.appManager.getAppTssKey(prevPartyInfo.appId, prevPartyInfo.seed);
+
     let keyRedist: KeyRedistribution, dKey: DistKey;
     do {
       keyRedist = new KeyRedistribution({
@@ -644,7 +646,9 @@ class KeyManager extends CallablePlugin {
         /** DKG threshold */
         t: newParty.t,
         /** DKG value to be shared between partners */
-        value: this.appManager.getAppTssKey(prevPartyInfo.appId, prevPartyInfo.seed).keyShare,
+        value: appKey.keyShare,
+        /** public key of distributed key */
+        publicKey: appKey.publicKey.encoded!,
         /** extra values usable in DKG */
         extra: {
           mpcType: "KeyRedistribution",
