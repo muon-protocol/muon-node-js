@@ -1,24 +1,27 @@
 import CallablePlugin from './base/callable-plugin.js'
-import AppTssKey, {AppTssKeyJson} from "../../utils/tss/app-tss-key.js";
+import AppTssKey from "../../utils/tss/app-tss-key.js";
 import lodash from 'lodash'
-import * as tssModule from '../../utils/tss/index.js'
-import {timeout, stackTrace, uuid, pub2json} from '../../utils/helpers.js'
+import * as TssModule from '../../utils/tss/index.js'
+import {timeout, stackTrace, uuid} from '../../utils/helpers.js'
 import {remoteApp, remoteMethod} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import * as CoreIpc from '../ipc.js'
-import {AppContext, MuonNodeInfo, NetConfigs, PartyInfo} from "../../common/types";
+import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import TssParty from "../../utils/tss/party.js";
-import {IMpcNetwork, MapOf} from "../../common/mpc/types";
+import {IMpcNetwork} from "../../common/mpc/types";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from "../../common/mpc/dist-key.js";
 import {logger} from '@libp2p/logger'
-import {bn2hex} from "../../utils/tss/utils.js";
 import {useOneTime} from "../../utils/tss/use-one-time.js";
 import {KeyRedistribution} from "../../common/mpc/kdist.js";
 import MpcNetworkPlugin from "./mpc-network";
+import {PublicKey} from "../../utils/tss/types";
+import * as crypto from "../../utils/crypto.js";
+import {muonSha3} from "../../utils/sha3.js";
+import {bn2hex} from "../../utils/tss/utils.js";
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -57,6 +60,7 @@ export type KeyGenOptions = {
 
 const RemoteMethods = {
   storeDeploymentTssKey: 'storeDeploymentTssKey',
+  KeyShareProof: "keyShareProof",
 }
 
 @remoteApp
@@ -380,7 +384,7 @@ class KeyManager extends CallablePlugin {
         // public of tss key
         publicKey: `${key.publicKey.encode('hex', true)}`,
         // distributed key address
-        address: tssModule.pub2addr(key.publicKey),
+        address: TssModule.pub2addr(key.publicKey),
         // tss key's polynomial info
         ...(!!key.polynomial ? {polynomial: key.toJson().polynomial} : {}),
       }
@@ -625,6 +629,8 @@ class KeyManager extends CallablePlugin {
 
     log(`creating key with partners: %o`, partners.map(p => p.id))
 
+    const appKey = this.appManager.getAppTssKey(prevPartyInfo.appId, prevPartyInfo.seed);
+
     let keyRedist: KeyRedistribution, dKey: DistKey;
     do {
       keyRedist = new KeyRedistribution({
@@ -644,7 +650,9 @@ class KeyManager extends CallablePlugin {
         /** DKG threshold */
         t: newParty.t,
         /** DKG value to be shared between partners */
-        value: this.appManager.getAppTssKey(prevPartyInfo.appId, prevPartyInfo.seed).keyShare,
+        value: appKey.keyShare,
+        /** public key of distributed key */
+        publicKey: appKey.publicKey.encoded!,
         /** extra values usable in DKG */
         extra: {
           mpcType: "KeyRedistribution",
@@ -671,6 +679,52 @@ class KeyManager extends CallablePlugin {
       throw `party [${key.party}] not found`
 
     return AppTssKey.fromJson(party, this.currentNodeInfo!.id, key)
+  }
+
+  /**
+   * Ask all the key partners who has the key share.
+   *
+   * @param holders {string[]} - key partners id list
+   * @param keyId {string} - the unique id of the key
+   * @param Fx {string[]} - public polynomial of the key
+   */
+  async getKeyShareProofs(partners: string[], keyId: string, Fx: PublicKey[]) {
+    let nodeInfos = this.nodeManager.filterNodes({list: partners});
+    /** nodes must sign hash of publicKey */
+    const keyPublicHash = muonSha3(Fx[0].encode("hex", true));
+
+    const signatures = await Promise.all(
+      nodeInfos.map(n => {
+        const isCurrentNode = n.id === this.nodeManager.currentNodeInfo!.id;
+        return (
+          isCurrentNode
+          ?
+          this.__keyShareProof({keyId}, this.nodeManager.currentNodeInfo!)
+          :
+          this.remoteCall(
+            n.peerId,
+            RemoteMethods.KeyShareProof,
+            {keyId},
+            {timeout: 2000},
+          )
+        )
+          .then(signature => {
+            const nodesPublicKey = TssModule.calcPolyPoint(n.id, Fx);
+            const nodesAddress = TssModule.pub2addr(nodesPublicKey);
+            if (crypto.recover(keyPublicHash, signature) !== nodesAddress) {
+              throw `verification failed`
+            }
+            return signature
+          })
+          .catch(e => null)
+      })
+    )
+
+    return nodeInfos.reduce((obj, n, i) => {
+      if(!!signatures[i])
+        obj[n.id]=signatures[i]
+      return obj;
+    }, {});
   }
 
   getParty(id) {
@@ -716,6 +770,13 @@ class KeyManager extends CallablePlugin {
     else{
       throw "Not permitted to create tss key"
     }
+  }
+
+  @remoteMethod(RemoteMethods.KeyShareProof)
+  async __keyShareProof(data: {keyId: string}, callerInfo:MuonNodeInfo): Promise<string> {
+    const key = await this.getSharedKey(data.keyId);
+    const keyPublicHash = muonSha3(key.publicKey.encode('hex', true));
+    return crypto.signWithPrivateKey(keyPublicHash, bn2hex(key.share));
   }
 }
 
