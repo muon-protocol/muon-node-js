@@ -18,6 +18,11 @@ function sign(hash) {
   return sig.signature;
 }
 
+export function signWithPrivateKey (hash, PK) {
+  let sig = web3.eth.accounts.sign(hash, "0x" + PK.replace("0x", ""))
+  return sig.signature;
+}
+
 function recover(hash, signature) {
   let signer = web3.eth.accounts.recover(hash, signature)
   return signer;

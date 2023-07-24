@@ -374,7 +374,7 @@ module.exports = {
             case Methods.TssKeyGen: {
                 const { appId, seed } = params
 
-                const {id, publicKey, generators} = await this.callPlugin('system', "generateAppTss", appId, seed)
+                const {id, publicKey, generators, shareProofs} = await this.callPlugin('system', "generateAppTss", appId, seed)
 
                 let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
 
@@ -382,7 +382,8 @@ module.exports = {
                     id,
                     publicKey,
                     partners: context.party.partners,
-                    keyGenerators: generators
+                    keyGenerators: generators,
+                    shareProofs,
                 }
             }
             case Methods.TssReshare: {
@@ -391,13 +392,14 @@ module.exports = {
                 /** ensure app context to be exist */
                 let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
 
-                const {id, publicKey, generators} = await this.callPlugin('system', "reshareAppTss", appId, seed)
+                const {id, publicKey, generators, shareProofs} = await this.callPlugin('system', "reshareAppTss", appId, seed)
 
                 return {
                     id,
                     publicKey,
                     partners: context.party.partners,
-                    keyGenerators: generators
+                    keyGenerators: generators,
+                    shareProofs
                 }
             }
         }
@@ -493,7 +495,10 @@ module.exports = {
                     selectedNodes2 = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
                     selectedNodes2 = selectedNodes2.map(({id}) => id)
                 }
-                const previousNodes = prevContext.party.partners
+                let previousNodes = prevContext.party.partners
+                if(!!prevContext.keyGenRequest?.data?.init?.shareProofs) {
+                    previousNodes = Object.keys(prevContext.keyGenRequest?.data?.init?.shareProofs)
+                }
                 /** Pick some nodes to retain in the new party */
                 const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
                 const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
@@ -552,6 +557,18 @@ module.exports = {
 
                 if(!publicKey)
                     throw `App new tss key not found`;
+
+                const shareProofsIsValid = await this.callPlugin(
+                  "system",
+                  "validateShareProofs",
+                  polynomial.Fx,
+                  init.shareProofs
+                );
+                if(!shareProofsIsValid) {
+                    throw `error in validating share proofs.`
+                }
+                if(Object.keys(init.shareProofs).length < polynomial.t)
+                    throw `Insufficient share holder.`
 
                 return {
                     rotationEnabled: true,

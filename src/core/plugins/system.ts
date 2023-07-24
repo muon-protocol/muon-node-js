@@ -28,7 +28,8 @@ import BaseAppPlugin from "./base/base-app-plugin";
 
 import { createRequire } from "module";
 import ReshareCronJob from "./cron-jobs/reshare-cron-job";
-import {throws} from "assert";
+import {muonSha3} from "../../utils/sha3.js";
+import * as crypto from "../../utils/crypto.js";
 const require = createRequire(import.meta.url);
 const Rand = require('rand-seed').default;
 
@@ -282,6 +283,21 @@ class System extends CallablePlugin {
         {timeout: 65e3}
       )
     }
+  }
+
+  @appApiMethod({})
+  async validateShareProofs(polynomial: string[], shareProofs: MapOf<string>): Promise<boolean> {
+    /** nodes must sign hash of publicKey */
+    const keyPublicHash = muonSha3(polynomial[0]);
+    const poly = polynomial.map(pub => TssModule.keyFromPublic(pub));
+    for(const [nodeId, signature] of Object.entries(shareProofs)) {
+      const nodesPublicKey = TssModule.calcPolyPoint(nodeId, poly);
+      const nodesAddress = TssModule.pub2addr(nodesPublicKey);
+      if (crypto.recover(keyPublicHash, signature) !== nodesAddress) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @appApiMethod({})
@@ -601,10 +617,17 @@ class System extends CallablePlugin {
 
     let key = await this.keyManager.keyGen({appId, seed}, {timeout: 65e3, lowerThanHalfN: true})
 
+    const shareProofs = await this.keyManager.getKeyShareProofs(
+      key.partners,
+      key.id,
+      key.polynomial!.Fx
+    )
+
     return {
       id: key.id,
       publicKey: pub2json(key.publicKey!),
-      generators: key.partners
+      generators: key.partners,
+      shareProofs,
     }
   }
 
@@ -632,11 +655,18 @@ class System extends CallablePlugin {
     );
     log(`Key redistribution done for app[${appId}] tss key.`)
 
+    const shareProofs = await this.keyManager.getKeyShareProofs(
+      keyRedist.partners,
+      keyRedist.id,
+      keyRedist.polynomial!.Fx
+    )
+
     return {
       id: keyRedist.id,
       /** The TSS key's publicKey will remain unchanged when it is reshared. */
       publicKey: oldContext.publicKey!.encoded,
-      generators: keyRedist.partners
+      generators: keyRedist.partners,
+      shareProofs,
     }
   }
 

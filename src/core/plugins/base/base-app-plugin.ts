@@ -179,7 +179,7 @@ class BaseAppPlugin extends CallablePlugin {
   async __defaultRequestHandler(callParams: GatewayCallParams) {
     const {method, params, mode, callId: gatewayCallId, gwSign, fee: feeParams} = callParams;
 
-    this.log(`request arrived %O`, {method, params})
+    this.log(`request arrived %o`, {method, params})
     let t0 = Date.now()
     let startedAt = getTimestamp()
     let deploymentSeed;
@@ -287,7 +287,7 @@ class BaseAppPlugin extends CallablePlugin {
         this.log.error("error calling onRequest %O", e)
         throw e;
       }
-      this.log(`app result: %O`, result)
+      this.log(`app result: %o`, result)
       newRequest.data.result = result
 
       let resultHash;
@@ -360,7 +360,7 @@ class BaseAppPlugin extends CallablePlugin {
 
       let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
       this.log(`request signed with %o`, nonce.partners);
-      this.log('request time parts %O',{
+      this.log('request time parts %o',{
         "req exec time": t1-t0,
         "find online nodes": t2-t1,
         "dkg time": t3-t2,
