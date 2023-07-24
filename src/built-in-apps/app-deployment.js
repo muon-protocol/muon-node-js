@@ -454,10 +454,8 @@ module.exports = {
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
                 
-                //TODO: Reza: uncomment
-
-                // if(difference > NODES_SELECTION_TOLERANCE)
-                //     throw `selected nodes mismatched.`
+                if(difference > NODES_SELECTION_TOLERANCE)
+                    throw `selected nodes mismatched.`
 
                 const pendingPeriod = !!pending ? pending : tssConfigs.pendingPeriod
 
@@ -513,10 +511,8 @@ module.exports = {
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
                 
-                //TODO: Reza: uncomment
-                
-                // if(difference > NODES_SELECTION_TOLERANCE)
-                //     throw `selected nodes mismatched.`
+                if(difference > NODES_SELECTION_TOLERANCE)
+                    throw `selected nodes mismatched.`
 
                 const ttl = !!userDefinedTTL ? userDefinedTTL : prevContext.ttl;
                 const pendingPeriod = !!pending ? pending : prevContext.pendingPeriod;
