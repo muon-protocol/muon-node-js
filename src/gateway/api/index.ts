@@ -82,8 +82,12 @@ async function forwardRequestToADeployer(requestData: GatewayCallParams) {
 }
 
 async function forwardRequestToParty(requestData: GatewayCallParams, context: AppContext) {
-  const n = context.party.partners.length;
-  const candidatePartners = _.shuffle(context.party.partners).slice(0, Math.ceil(n/2));
+  let partners = context.party.partners
+  if(!!context.keyGenRequest?.data?.init?.shareProofs) {
+    partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs);
+  }
+  const n = partners.length;
+  const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(n/2));
   const onlinePartner = (await NetworkIpc.findNOnlinePeer(candidatePartners, 1, {timeout: 5000}))[0];
 
   if(!onlinePartner)
