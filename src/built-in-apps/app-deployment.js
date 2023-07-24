@@ -360,7 +360,10 @@ module.exports = {
                     selectedNodes = selectedNodes.map(({id}) => id)
                 }
                 if(method === Methods.TssRotate) {
-                    const previousNodes = prevContext.party.partners
+                    let previousNodes = prevContext.party.partners
+                    if(!!prevContext.keyGenRequest?.data?.init?.shareProofs) {
+                      previousNodes = Object.keys(prevContext.keyGenRequest?.data?.init?.shareProofs)
+                    }
                     /** Pick some nodes to retain in the new party */
                     const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
                     const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
