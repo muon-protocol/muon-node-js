@@ -13,11 +13,11 @@
   "routing": {
     "delegate": [
       "http://188.166.73.132:8011/delegate",
-      "http://174.138.64.155:8011/delegate"
+      "http://89.106.206.214:8011/delegate"
     ],
     "ifconfig":[
       "http://188.166.73.132:8011/ifconfig",
-      "http://174.138.64.155:8011/ifconfig"
+      "http://89.106.206.214:8011/ifconfig"
     ],
     "discoveryValidPeriod": 30000,
     "findPeerValidPeriod": 30000,
@@ -28,8 +28,8 @@
     "aggregators": ["1", "2"]
   },
   "bootstrap": [
-    "/ip4/188.166.73.132/tcp/9011/p2p/<peer-id>",
-    "/ip4/174.138.64.155/tcp/9011/p2p/<peer-id>"
+    "/ip4/89.106.206.214/tcp/9011/p2p/QmYiFkHGFsJZH1S3z8H4K2kYZ7R932krgKgWA76eYjUDKV",
+    "/ip4/188.166.73.132/tcp/9011/p2p/QmYPbLuwy7CWqsMrZM6W9VZGSu7oM9PGRfVe1kssKcjjpj"
   ],
   "fee": {
     "endpoint": "http://70.34.217.65:3000/sign",
@@ -41,7 +41,7 @@
     "monitor": {
       "providers": [
         "http://188.166.73.132:8011/network",
-        "http://174.138.64.155:8011/network"
+        "http://89.106.206.214:8011/network"
       ],
       "startDelay": 120e3,
       "interval": 3600e3
