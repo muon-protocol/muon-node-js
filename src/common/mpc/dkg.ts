@@ -14,8 +14,8 @@ import {toBN} from "../../utils/helpers.js";
 /**
  * Round1 input/output types
  */
-type Round1Result = any
-type Round1Broadcast = {
+export type Round1Result = any
+export type Round1Broadcast = {
   /** commitment */
   Fx: string[],
   /** proof of possession */
@@ -30,11 +30,11 @@ type Round1Broadcast = {
 /**
  * Round2 input/output types
  */
-type Round2Result = {
+export type Round2Result = {
   /** key share */
   f: string,
 }
-type Round2Broadcast = {
+export type Round2Broadcast = {
   /**
    hash of commitment received from other parties
    will be used in malicious behaviour detection
@@ -45,8 +45,8 @@ type Round2Broadcast = {
 /**
  * broadcast malicious partners
  */
-type Round3Result = any;
-type Round3Broadcast = {
+export type Round3Result = any;
+export type Round3Broadcast = {
   malicious: string[],
 }
 
