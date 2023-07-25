@@ -438,10 +438,15 @@ class NetworkIpcHandler extends CallablePlugin {
       }
       else {
         /** Forward request to the appropriate node. */
-        const onlines: string[] = await this.nodeManager.findNOnline(context.party.partners, 2, {timeout: 5000});
-        const randomIndex = Math.floor(Math.random() * onlines.length);
+        let partners = context.party.partners;
+        if(!!context.keyGenRequest?.data?.init?.shareProofs) {
+          partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs);
+        }
+        const n = partners.length;
+        const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(n/2));
+        const onlines: string[] = await this.nodeManager.findNOnline(candidatePartners, 1, {timeout: 5000});
         return this.forwardGatewayCallToOtherNode(
-          onlines[randomIndex],
+          onlines[0],
           requestData,
           options.timeout,
         )
