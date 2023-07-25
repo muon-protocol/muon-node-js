@@ -182,9 +182,10 @@ class Explorer extends CallablePlugin {
       contexts = await this.appManager.queryAndLoadAppContext(appId!)
 
     const contextStatuses = contexts.map((context: AppContext) => {
-      const statusTitle = this.appManager.getAppDeploymentStatus(appId!, context.seed);
+      const {status, hasTssKey} = this.appManager.getAppDeploymentInfo(appId!, context.seed);
       return {
-        status: statusTitle,
+        status,
+        hasTssKey,
         isBuiltIn: context.isBuiltIn,
         deployedTime: context.deploymentRequest?.data.timestamp,
         previousSeed: context.previousSeed,
