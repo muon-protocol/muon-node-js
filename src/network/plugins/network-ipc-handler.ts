@@ -55,6 +55,14 @@ const tasksCache = new NodeCache({
   useClones: false,
 });
 
+const appTimeouts = {}
+async function getAppTimeout(app) {
+  if(appTimeouts[app] === undefined) {
+    appTimeouts[app] = await CoreIpc.getAppTimeout(app);
+  }
+  return appTimeouts[app];
+}
+
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetNetworkConfig: "get-net-conf",
@@ -266,9 +274,20 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
-  async __ipcForwardGateWayRequest(data: {id: string, requestData: GatewayCallParams, appTimeout: number}) {
-    const timeout = data.appTimeout || 35000
-    return this.forwardGatewayCallToOtherNode(data.id, data.requestData, timeout);
+  async __ipcForwardGateWayRequest(data: {requestData: GatewayCallParams, appTimeout: number}) {
+    const timeout = await getAppTimeout(data.requestData.app);
+    return this.__rcForwardGatewayRequest(data.requestData, this.nodeManager.currentNodeInfo, {timeout})
+  }
+
+  private async forwardGatewayRequestToOnlinePartner(partners: string[], requestData: GatewayCallParams, timeout?:number) {
+    const n = partners.length;
+    const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(n/2));
+    const onlines: string[] = await this.nodeManager.findNOnline(candidatePartners, 1, {timeout: 5000});
+    return this.forwardGatewayCallToOtherNode(
+      onlines[0],
+      requestData,
+      timeout,
+    )
   }
 
   private async forwardGatewayCallToOtherNode(nodeId: string, requestData: GatewayCallParams, timeout?: number) {
@@ -428,28 +447,29 @@ class NetworkIpcHandler extends CallablePlugin {
   async __rcForwardGatewayRequest(requestData: GatewayCallParams, callerInfo, options:{timeout?: number}={}) {
     let {app} = requestData
 
-    const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
+    const currentNode: MuonNodeInfo|undefined = this.nodeManager.currentNodeInfo;
+
+    /** If current node is not in the network */
+    if(!currentNode) {
+      const deployers:string[] = this.nodeManager.filterNodes({isDeployer: true}).map(n => n.id);
+      /** forward to a random deployer */
+      return this.forwardGatewayCallToOtherNode(_.shuffle(deployers)[0], requestData, options.timeout);
+    }
+
     const context: AppContext|undefined = await CoreIpc.getAppOldestContext(app);
     if(context) {
+      let partners = context.party.partners;
+      if(!!context.keyGenRequest?.data?.init?.shareProofs) {
+        partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs);
+      }
       /** When the context exists, the node can either process it or send it to the appropriate node. */
-      if(context.party.partners.includes(currentNode.id)) {
+      if(partners.includes(currentNode.id)) {
         /** Process the request */
         return await requestQueue.send(requestData)
       }
       else {
         /** Forward request to the appropriate node. */
-        let partners = context.party.partners;
-        if(!!context.keyGenRequest?.data?.init?.shareProofs) {
-          partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs);
-        }
-        const n = partners.length;
-        const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(n/2));
-        const onlines: string[] = await this.nodeManager.findNOnline(candidatePartners, 1, {timeout: 5000});
-        return this.forwardGatewayCallToOtherNode(
-          onlines[0],
-          requestData,
-          options.timeout,
-        )
+        return this.forwardGatewayRequestToOnlinePartner(partners, requestData, options.timeout);
       }
     }
     else {
@@ -466,13 +486,7 @@ class NetworkIpcHandler extends CallablePlugin {
          The deployer nodes know the members of the app party and can forward the request to the suitable one.
          */
         let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id);
-        const onlines: string[] = await this.nodeManager.findNOnline(deployers, 2, {timeout: 5000});
-        const randomIndex = Math.floor(Math.random() * onlines.length);
-        return this.forwardGatewayCallToOtherNode(
-          onlines[randomIndex],
-          requestData,
-          options.timeout,
-        )
+        return this.forwardGatewayRequestToOnlinePartner(deployers, requestData, options.timeout);
       }
     }
   }
