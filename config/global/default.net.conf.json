@@ -33,7 +33,7 @@
     "peerStoreTTL": 1200000
   },
   "nodes": {
-    "onlineList": "http://103.75.196.96/nodes",
+    "onlineList": "https://monitor1.muon.net/nodes",
     "aggregators": ["4", "22408"]
   },
   "bootstrap": [
