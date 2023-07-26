@@ -116,6 +116,7 @@ export type AppRequest = {
         result: any,
         signParams: TypedValue[],
         init: {
+            noncePublicKey: string,
             nonceAddress: string,
             [key: string]: any,
         },

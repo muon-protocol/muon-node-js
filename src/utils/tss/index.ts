@@ -138,19 +138,27 @@ export function key2pub(privateKey) {
   return curve.g.mul(_PK);
 }
 
-export function schnorrHash(publicKey, msg) {
-  let address = pub2addr(publicKey)
-  let addressBuff = Buffer.from(address.replace(/^0x/i, ''), 'hex');
-  let msgBuff = Buffer.from(msg.replace(/^0x/i, ''), 'hex');
-  let totalBuff = Buffer.concat([addressBuff, msgBuff])
+export function schnorrHash(signingPublicKey: PublicKey, noncePublicKey, msg) {
+  let nonceTimesGeneratorAddress = pub2addr(noncePublicKey)
+  let totalBuff = Buffer.concat([
+    /** signingPubKeyX */
+    signingPublicKey.getX().toBuffer('be', 32),
+    /** pubKeyYParity */
+    Buffer.from(signingPublicKey.getY().isEven() ? "00" : "01", "hex"),
+    /** msg hash */
+    Buffer.from(msg.replace(/^0x/i, ''), 'hex'),
+    /** nonceGeneratorAddress */
+    Buffer.from(nonceTimesGeneratorAddress.replace(/^0x/i, ''), 'hex'),
+  ])
   // @ts-ignore
   return keccak256(totalBuff)
 }
 
-export function schnorrSign(sharedPrivateKey, sharedK, kPub, msg) {
-  let _sharedPrivateKey = BN.isBN(sharedPrivateKey) ? sharedPrivateKey : toBN(sharedPrivateKey);
-  let e = toBN(schnorrHash(kPub, msg))
-  let s = sharedK.sub(_sharedPrivateKey.mul(e)).umod(curve.n);
+export function schnorrSign(signingShare:BN|string, signingPubKey:PublicKey, nonceShare:BN|string, noncePublicKey:PublicKey, msg) {
+  let _signingShare = BN.isBN(signingShare) ? signingShare : toBN(signingShare);
+  let _nonceShare = BN.isBN(nonceShare) ? nonceShare : toBN(nonceShare);
+  let e = toBN(schnorrHash(signingPubKey, noncePublicKey, msg))
+  let s = _nonceShare.sub(_signingShare.mul(e)).umod(curve.n);
   return {s, e}
 }
 
@@ -168,14 +176,14 @@ export function splitSignature(signature: string): {s: BN, e: BN} {
   }
 }
 
-export function schnorrVerify(pubKey: PublicKey, msg, sig:{s: BN, e: BN}|string) {
+export function schnorrVerify(signingPublicKey: PublicKey, noncePublicKey:PublicKey, msg, sig:{s: BN, e: BN}|string) {
   if(typeof sig === 'string')
     sig = splitSignature(sig);
-  if(!validatePublicKey(pubKey))
+  if(!validatePublicKey(signingPublicKey))
     return false
   const s = sig.s.umod(curve.n!)
-  let r_v = pointAdd(curve.g.mul(s), pubKey.mul(sig.e))
-  let e_v = schnorrHash(r_v, msg)
+  let r_v = pointAdd(curve.g.mul(s), signingPublicKey.mul(sig.e))
+  let e_v = schnorrHash(signingPublicKey, r_v, msg)
   return toBN(e_v).eq(sig.e);
 }
 

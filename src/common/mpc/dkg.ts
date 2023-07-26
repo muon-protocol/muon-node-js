@@ -119,7 +119,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       /** Ri = g^k */
       {type: "bytes", value: "0x"+kPublic.encode('hex', true)},
     )
-    const popSign = TssModule.schnorrSign(fx.coefficients[0].getPrivate(), k, kPublic, popMsg)
+    const popSign = TssModule.schnorrSign(fx.coefficients[0].getPrivate(), fx.coefficients[0].getPublic(), k, kPublic, popMsg)
     const sig = {
       nonce: kPublic.encode('hex', true),
       signature: TssModule.stringifySignature(popSign)
@@ -165,6 +165,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       )
       const verified = TssModule.schnorrVerify(
         TssModule.keyFromPublic(Fx[0]),
+        TssModule.keyFromPublic(nonce),
         popHash,
         signature
       );
