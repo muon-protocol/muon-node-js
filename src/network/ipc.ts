@@ -71,8 +71,8 @@ export function askClusterPermission(key: string, expireTime?: number) {
   return call(IpcMethods.AskClusterPermission, {key, pid, expireTime})
 }
 
-export function forwardRequest(id, requestData: GatewayCallParams, appTimeout?:number) {
-  return call(IpcMethods.ForwardGatewayRequest, {id, requestData, appTimeout});
+export function forwardRequest(requestData: GatewayCallParams) {
+  return call(IpcMethods.ForwardGatewayRequest, {requestData});
 }
 
 export function getCurrentNodeInfo(options?: IpcCallOptions): Promise<MuonNodeInfo|undefined> {

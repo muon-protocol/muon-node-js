@@ -68,45 +68,7 @@ async function isCurrentNodeInNetwork() {
   return cachedNetworkCheck.result;
 }
 
-const appTimeouts = {}
-async function getAppTimeout(app) {
-  if(appTimeouts[app] === undefined) {
-    appTimeouts[app] = await CoreIpc.getAppTimeout(app);
-  }
-  return appTimeouts[app];
-}
-
-async function forwardRequestToADeployer(requestData: GatewayCallParams) {
-  let context: AppContext = (await CoreIpc.getAppOldestContext("deployment"))!;
-  return forwardRequestToParty(requestData, context);
-}
-
-async function forwardRequestToParty(requestData: GatewayCallParams, context: AppContext) {
-  let partners = context.party.partners
-  if(!!context.keyGenRequest?.data?.init?.shareProofs) {
-    partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs);
-  }
-  const n = partners.length;
-  const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(n/2));
-  const onlinePartner = (await NetworkIpc.findNOnlinePeer(candidatePartners, 1, {timeout: 5000}))[0];
-
-  if(!onlinePartner)
-    throw `cannot find any online node to forward request`;
-  log(`forwarding request to id:%s`, onlinePartner)
-  const timeout = await getAppTimeout(requestData.app);
-  return await NetworkIpc.forwardRequest(onlinePartner, requestData, timeout);
-}
-
 async function callProperNode(requestData: GatewayCallParams) {
-  /** forward deployment app request to Deployer node */
-  if(requestData.app === 'deployment'){
-    const currentNodeInfo = await NetworkIpc.getCurrentNodeInfo();
-    if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
-      log(`current node is not deployer`)
-      return forwardRequestToADeployer(requestData);
-    }
-  }
-
   if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
     log("Deployment excerpt method call %o", requestData)
     return await requestQueue.send(requestData)
@@ -114,46 +76,20 @@ async function callProperNode(requestData: GatewayCallParams) {
 
   let context: AppContext|undefined = await CoreIpc.getAppOldestContext(requestData.app);
 
-  /** trying to find context */
-  if (!context) {
-    const currentNodeInfo: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
-    if(currentNodeInfo!.isDeployer)
-      throw `App is not deployed or expired.`
-
-    log("context not found. query the network for context.")
-    try {
-      const allContexts: any[] = await CoreIpc.queryAppAllContext(requestData.app)
-      // if(allContexts.length > 0) {}
-      /** find oldest context */
-      context = allContexts.reduce((oldest: AppContext, ctx: AppContext): AppContext | undefined => {
-        if(!oldest)
-          return ctx;
-        return ((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (oldest.deploymentRequest?.data.timestamp ?? Infinity)) ? ctx : oldest;
-      }, undefined);
-    }catch (e) {
-      log('query app context failed %o', e)
-      throw e;
-    }
-  }
-
   if (context) {
     const currentNode: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
-    if(!currentNode) {
-      throw `Node not added to network.`
-    }
-    else{
-      if(context.party.partners.includes(currentNode.id)) {
+    if(currentNode) {
+      let partners = context.party.partners;
+      if(context.keyGenRequest?.data?.init?.shareProofs)
+        partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs)
+      if(partners.includes(currentNode.id)) {
         return await requestQueue.send(requestData)
       }
-      else {
-        return forwardRequestToParty(requestData, context)
-      }
     }
   }
-  else {
-    log('app context not found and request will forward to a deployer node. %o', requestData)
-    return forwardRequestToADeployer(requestData);
-  }
+
+  log('forwarding request to a proper node. %o', requestData)
+  return await NetworkIpc.forwardRequest(requestData);
 }
 
 async function shieldConfirmedResult(requestData, request) {
