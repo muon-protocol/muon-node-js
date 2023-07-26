@@ -469,7 +469,10 @@ class NetworkIpcHandler extends CallablePlugin {
       }
       else {
         /** Forward request to the appropriate node. */
-        return this.forwardGatewayRequestToOnlinePartner(partners, requestData, options.timeout);
+        const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(partners.length/2));
+        /** find an online node that has the app's tss key */
+        const availables: string[] = await CoreIpc.findNAvailablePartners(context.appId, context.seed, candidatePartners, 1);
+        return this.forwardGatewayCallToOtherNode(availables[0], requestData, options.timeout);
       }
     }
     else {
