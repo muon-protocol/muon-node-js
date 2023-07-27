@@ -13,6 +13,7 @@ import * as TssModule from "../../utils/tss/index.js";
 import lodash from 'lodash'
 import {DistKeyJson} from "./dist-key.js";
 import {toBN} from "../../utils/helpers.js";
+import {PolynomialInfoJson} from "../types";
 
 const {range, uniq} = lodash
 const {randomHex} = Web3.utils
@@ -36,7 +37,7 @@ export type KeyConstructionData = {
   pk?: string,
 }
 
-export type KeyReDistributeData = KeyConstructionData & {previousT: number};
+export type KeyReDistributeData = KeyConstructionData & {publicKey: string, previousPolynomial: PolynomialInfoJson};
 
 function resultOk(realKey: string|null, realPubKey: string|null, resultPubKey: string, reconstructedKey, reconstructedPubKey) {
   if(resultPubKey !== reconstructedPubKey)
@@ -94,7 +95,8 @@ async function keyRedistribute(
     partners: cData.partners,
     dealers: cData.dealers,
     t: cData.t,
-    previousT: cData.previousT,
+    publicKey: cData.publicKey,
+    previousPolynomial: cData.previousPolynomial,
   }
   let keyReDists = partners.map((p, index) => {
     return new KeyRedistribution({...keyReDistOpts, value: shares[index]?.share})
@@ -153,7 +155,8 @@ async function run() {
         id: `kredist-${Date.now()}${random()}`,
         partners,
         dealers: initialPartners,
-        previousT: threshold,
+        publicKey: initialKeyShares[0].publicKey,
+        previousPolynomial: initialKeyShares[0].polynomial!,
         t: nextThreshold,
       },
       initialKeyShares
