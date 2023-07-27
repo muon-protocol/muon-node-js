@@ -165,7 +165,6 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       )
       const verified = TssModule.schnorrVerify(
         TssModule.keyFromPublic(Fx[0]),
-        TssModule.keyFromPublic(nonce),
         popHash,
         signature
       );

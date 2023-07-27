@@ -598,7 +598,7 @@ class BaseAppPlugin extends CallablePlugin {
     const noncePublicKey:PublicKey = TssModule.keyFromPublic(newRequest.data.init.noncePublicKey);
 
     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
-    let confirmed = TssModule.schnorrVerify(verifyingPubKey, noncePublicKey, resultHash, aggregatedSign)
+    let confirmed = TssModule.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
     // TODO: check and detect nodes misbehavior if request not confirmed
 
     return [
@@ -860,7 +860,7 @@ class BaseAppPlugin extends CallablePlugin {
    * @param _request
    */
   async verifyRequestSignature(_request: AppRequest): Promise<boolean> {
-    const request = clone(_request)
+    const request:AppRequest = clone(_request)
     deepFreeze(request);
 
     // const [result, hash] = await this.preProcessRemoteRequest(request);
