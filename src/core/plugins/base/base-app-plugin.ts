@@ -28,6 +28,7 @@ import {MapOf} from "../../../common/mpc/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
 import {reportInsufficientPartners} from "../../../common/analitics-reporter.js";
 import {createAjv} from "../../../common/ajv.js";
+import ethSigUtil from 'eth-sig-util';
 
 const { omit } = lodash;
 
@@ -421,20 +422,33 @@ class BaseAppPlugin extends CallablePlugin {
     if(fee && feeConfigs) {
       this.log(`spending fee %o`, fee)
       const {spender} = fee;
+      spender.address = spender.address.toLowerCase();
       const appId = this.APP_ID;
 
       /** fee signature is valid for 5 minutes */
       if(spender.timestamp/1000 < request.data.timestamp-5*60)
         throw `fee spend time has been expired.`
 
-      const hash = muonSha3(
-        {t: "address", v: spender.address},
-        {t: 'uint64', v: spender.timestamp},
-        {t: 'uint256', v: appId},
-      )
-      const signer = crypto.recover(hash, spender.signature);
+      const eip712TypedData = {
+        types: {
+          EIP712Domain: [{name: 'name', type: 'string'}],
+          Message: [
+            {type: 'address', name: 'address'},
+            {type: 'uint64', name: 'timestamp'},
+            {type: 'uint256', name: 'appId'},
+          ]
+        },
+        domain: {name: 'Muonize'},
+        primaryType: 'Message',
+        message: {address: spender.address, timestamp: spender.timestamp, appId}
+      };
+
+      // @ts-ignore
+      let signer = ethSigUtil.recoverTypedSignature_v4({data: eip712TypedData, sig: spender.signature});
+
+      signer = signer.toLowerCase();
       if(signer !== spender.address)
-        throw `fee spender not matched with signer.`
+        throw `fee spender not matched with signer.`;
 
       /** spend fee */
       const {endpoint, signers: feeSigners} = feeConfigs
