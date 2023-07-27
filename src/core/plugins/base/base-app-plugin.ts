@@ -429,15 +429,6 @@ class BaseAppPlugin extends CallablePlugin {
       if(spender.timestamp/1000 < request.data.timestamp-5*60)
         throw `fee spend time has been expired.`
 
-      /*
-      const hash = muonSha3(
-        {t: "address", v: spender.address},
-        {t: 'uint64', v: spender.timestamp},
-        {t: 'uint256', v: appId},
-      )
-      const signer = crypto.recover(hash, spender.signature);
-      */
-
       const eip712TypedData = {
         types: {
           EIP712Domain: [{name: 'name', type: 'string'}],
@@ -447,21 +438,13 @@ class BaseAppPlugin extends CallablePlugin {
             {type: 'uint256', name: 'appId'},
           ]
         },
-        domain: {name: 'MRC20 Presale'},
+        domain: {name: 'Muonize'},
         primaryType: 'Message',
         message: {address: spender.address, timestamp: spender.timestamp, appId}
       };
 
-
       // @ts-ignore
       let signer = ethSigUtil.recoverTypedSignature_v4({data: eip712TypedData, sig: spender.signature});
-
-      // This part uses @metamask/eth-sig-util package to recover the signer
-      // const signer = sigUtil.recoverTypedSignature({
-      //   data: eip712TypedData,
-      //   signature: signature,
-      //   version: sigUtil.SignTypedDataVersion.V4
-      // });
 
       signer = signer.toLowerCase();
       if(signer !== spender.address)
