@@ -553,7 +553,6 @@ class BaseAppPlugin extends CallablePlugin {
 
     // let sign = this.keyManager.sign(null, party);
     return {
-      // noncePub: nonce.publicKey.encode('hex'),
       nonceAddress: TssModule.pub2addr(nonce.publicKey),
     }
   }
@@ -734,7 +733,7 @@ class BaseAppPlugin extends CallablePlugin {
      */
     await useOneTime("key", K.encode('hex', true), `app-${this.APP_ID}-nonce-${resultHash}`, 3600)
     // TODO: remove nonce after sign
-    let signature = TssModule.schnorrSign(tssKey.share!, k_i!, K, resultHash)
+    let signature = TssModule.schnorrSign(tssKey.share!, tssKey.publicKey, k_i!, K, resultHash)
 
     if(!process.env.SIGN_WALLET_ADDRESS){
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
@@ -858,7 +857,7 @@ class BaseAppPlugin extends CallablePlugin {
    * @param _request
    */
   async verifyRequestSignature(_request: AppRequest): Promise<boolean> {
-    const request = clone(_request)
+    const request:AppRequest = clone(_request)
     deepFreeze(request);
 
     // const [result, hash] = await this.preProcessRemoteRequest(request);
