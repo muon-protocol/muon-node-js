@@ -204,7 +204,9 @@ export class MultiPartyComputation {
           return result;
         }
         else {
-          network.askRoundData(from, this.id, roundIndex, dataToSend).catch(e => {});
+          // REZA: should it be synced?
+          // or need to remove await?
+          await network.askRoundData(from, this.id, roundIndex, dataToSend).catch(e => {});
           return null;
         }
         break;
