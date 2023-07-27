@@ -553,7 +553,6 @@ class BaseAppPlugin extends CallablePlugin {
 
     // let sign = this.keyManager.sign(null, party);
     return {
-      noncePublicKey: nonce.publicKey.encode('hex', true),
       nonceAddress: TssModule.pub2addr(nonce.publicKey),
     }
   }
@@ -594,8 +593,6 @@ class BaseAppPlugin extends CallablePlugin {
     const ownersIndex = owners.map(wallet => this.nodeManager.getNodeInfo(wallet)!.id);
     let aggregatedSign = TssModule.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
     let resultHash = this.hashAppSignParams(newRequest, newRequest.data.signParams, false)
-
-    const noncePublicKey:PublicKey = TssModule.keyFromPublic(newRequest.data.init.noncePublicKey);
 
     // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
     let confirmed = TssModule.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
