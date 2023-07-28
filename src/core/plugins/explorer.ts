@@ -186,6 +186,7 @@ class Explorer extends CallablePlugin {
       return {
         status,
         hasTssKey,
+        key: this.appManager.getAppTssKey(context.appId, context.seed)?.keyShare,
         isBuiltIn: context.isBuiltIn,
         deployedTime: context.deploymentRequest?.data.timestamp,
         previousSeed: context.previousSeed,
