@@ -143,7 +143,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     const r1Msg = this.getRoundReceives('round1')
 
     const nonQualifiedList: string[] = []
-    const malignant: string[] = [];
+    const malicious: MapOf<string> = {};
 
     /** check each node's commitments sent to all nodes are the same. */
     qualified.forEach(sender => {
@@ -169,7 +169,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
         signature
       );
       if(!verified) {
-        malignant.push(sender)
+        malicious[sender] = `proof of possession not verified`
         return;
       }
     })
@@ -178,9 +178,9 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
      * Propagate data
      */
 
-    /** exclude malignant from qualified list */
+    /** exclude malicious from qualified list */
     const newQualified = qualified
-      .filter(id => (!malignant.includes(id) && !nonQualifiedList.includes(id)))
+      .filter(id => (!malicious[id] && !nonQualifiedList.includes(id)))
 
     const store = {}
     const send = {}
@@ -197,7 +197,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
         broadcast.allPartiesFxHash[id] = muonSha3(...prevStepBroadcast[id].Fx.map(v => ({t: 'bytes', v})))
       }
     })
-    return {store, send, broadcast, qualifieds: newQualified}
+    return {store, send, broadcast, qualifieds: newQualified, malicious}
   }
 
   round3(prevStepOutput: MapOf<Round2Result>, preStepBroadcast: MapOf<Round2Broadcast>, networkId: string, qualified: string[]):
@@ -208,7 +208,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
     const r1Msgs = this.getRoundReceives('round1')
     const r2Msgs = this.getRoundReceives('round2')
 
-    const malicious: string[] = []
+    const malicious: MapOf<string> = {}
 
     /** verify round2.broadcast.Fx received from all partners */
     qualified.map(sender => {
@@ -220,7 +220,7 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
         const senderFxSentToReceiver = r2Msgs[receiver].broadcast.allPartiesFxHash[sender]
         if(senderFxHash !== senderFxSentToReceiver) {
           console.log(`partner [${sender}] founded malignant at round2 comparing commitment with others`)
-          malicious.push(sender)
+          malicious[sender] = `comparing commitment with others`;
           return false
         }
         return true;
@@ -231,22 +231,22 @@ export class DistributedKeyGeneration extends MultiPartyComputation {
       const p2 = TssModule.curve.g.mul(toBN(r2Msgs[sender].send.f))
       if(!p1.eq(p2)) {
         console.log(`partner [${sender}] founded malignant at round3 Fx check`)
-        malicious.push(sender);
+        malicious[sender] = `round3 Fx check`;
       }
     })
 
     /**
      * Propagate data
      */
-    const newQualified = qualified.filter(id => !malicious.includes(id));
+    const newQualified = qualified.filter(id => !malicious[id]);
 
     const store = {}
     const send = {}
     const broadcast= {
-      malicious,
+      malicious: Object.keys(malicious),
     }
 
-    return {store, send, broadcast, qualifieds: newQualified}
+    return {store, send, broadcast, qualifieds: newQualified, malicious}
   }
 
   onComplete(roundsArrivedMessages: MapOf<MapOf<{send: any, broadcast: any}>>, networkId: string, qualified: string[]): any {

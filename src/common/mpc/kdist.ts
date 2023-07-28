@@ -33,22 +33,23 @@ export class KeyRedistribution extends DistributedKeyGeneration {
     const result = super.round2(prevStepOutput, prevStepBroadcast, networkId, qualified);
 
     const {qualifieds=qualified} = result
-    const malignant:string[] = [];
+    const malicious:MapOf<string> = {};
 
     const previousFx:PublicKey[] = this.previousPolynomial.Fx.map(pub => TssModule.keyFromPublic(pub));
     for(const sender of qualifieds){
       const broadcast:Round1Broadcast = prevStepBroadcast[sender];
       const {Fx} = broadcast;
 
-      const sendersPreviousSharePubKey = TssModule.calcPolyPoint(sender, previousFx).encode("hex", true);
+      const prevPubKey = TssModule.calcPolyPoint(sender, previousFx).encode("hex", true);
       /** Ensure that the sender has shared its own previous share. */
-      if(Fx[0] !== sendersPreviousSharePubKey)
-        malignant.push(sender)
+      if(Fx[0] !== prevPubKey)
+        malicious[sender] = `previous share publicKey mismatch. expected: ${prevPubKey}, broadcast: ${Fx[0]}`
     }
 
     return {
       ...result,
-      qualifieds: qualifieds.filter(id => !malignant.includes(id)),
+      qualifieds: qualifieds.filter(id => !malicious[id]),
+      malicious,
     };
   }
 

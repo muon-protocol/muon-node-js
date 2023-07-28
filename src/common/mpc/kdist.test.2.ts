@@ -13,6 +13,7 @@ import lodash from 'lodash'
 import {DistKeyJson} from "./dist-key.js";
 import {toBN} from "../../utils/helpers.js";
 import {MapOf} from "./types";
+import {KeyConstructionData, KeyReDistributeData} from "./kdist.test.js";
 
 const {range, uniq} = lodash
 
@@ -25,16 +26,6 @@ const threshold = 2;
 const partyCount = 12
 const allPartners = range(partyCount).map(i => `${i+1}`)
 const random = () => Math.floor(Math.random()*9999999)
-
-export type KeyConstructionData = {
-  id: string,
-  partners: string[],
-  dealers?: string[],
-  t: number,
-  pk?: string,
-}
-
-export type KeyReDistributeData = KeyConstructionData & {previousT: number};
 
 function resultOk(realKey: string|null, realPubKey: string|null, resultPubKey: string, reconstructedKey, reconstructedPubKey) {
   if(resultPubKey !== reconstructedPubKey)
@@ -92,7 +83,8 @@ async function keyRedistribute(
     partners: cData.partners,
     dealers: cData.dealers,
     t: cData.t,
-    previousT: cData.previousT,
+    publicKey: cData.publicKey,
+    previousPolynomial: cData.previousPolynomial,
   }
   let keyReDists = partners.map(p => {
     const index = (cData.dealers||cData.partners).findIndex(id => id===p);
@@ -151,7 +143,8 @@ async function run() {
         id: `kredist-${Date.now()}${random()}`,
         partners,
         dealers,
-        previousT: threshold,
+        publicKey: prevKeyShares[0].publicKey,
+        previousPolynomial: prevKeyShares[0].polynomial!,
         t: threshold,
       },
       prevKeyShares,

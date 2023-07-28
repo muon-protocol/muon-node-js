@@ -162,20 +162,6 @@ export function schnorrSign(signingShare:BN|string, signingPubKey:PublicKey, non
   return {s, e}
 }
 
-export function stringifySignature(sign: {s: BN, e: BN}): string {
-  return `0x${sign.e.toString('hex' ,64)}${sign.s.toString('hex',64)}`
-}
-
-export function splitSignature(signature: string): {s: BN, e: BN} {
-  const bytes = signature.replace('0x','');
-  if(bytes.length !== 128)
-    throw `invalid schnorr signature string`;
-  return {
-    e: toBN(`0x${bytes.substr(0, 64)}`),
-    s: toBN(`0x${bytes.substr(64, 64)}`),
-  }
-}
-
 export function schnorrVerify(signingPublicKey: PublicKey, msg, sig:{s: BN, e: BN}|string) {
   if(typeof sig === 'string')
     sig = splitSignature(sig);
@@ -211,6 +197,20 @@ export function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, sig
   const addr    = ethJsUtil.bufferToHex(addrBuf);
 
   return nonceAddress === addr;
+}
+
+export function stringifySignature(sign: {s: BN, e: BN}): string {
+  return `0x${sign.e.toString('hex' ,64)}${sign.s.toString('hex',64)}`
+}
+
+export function splitSignature(signature: string): {s: BN, e: BN} {
+  const bytes = signature.replace('0x','');
+  if(bytes.length !== 128)
+    throw `invalid schnorr signature string`;
+  return {
+    e: toBN(`0x${bytes.substr(0, 64)}`),
+    s: toBN(`0x${bytes.substr(64, 64)}`),
+  }
 }
 
 export function schnorrAggregateSigs(t, sigs, indices): {s: BN, e: BN}{
