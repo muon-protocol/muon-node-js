@@ -81,7 +81,8 @@ export default class ReshareCronJob extends BaseCronJob{
 
     this.log(`starting ${pendingContexts.length} apps key reshare ...`)
     const rotatedContexts = await Promise.all(pendingContexts.map(ctx => {
-      return this.rotateQueue.add(() => this.rotateAppContext(ctx).catch(e => null))
+      return this.rotateQueue.add(() => this.rotateAppContext(ctx)
+        .catch(e => null))
     }))
 
     //@ts-ignore
@@ -89,6 +90,7 @@ export default class ReshareCronJob extends BaseCronJob{
     this.log(`starting ${contextToReshare.length} apps key reshare ...`)
     await Promise.all(contextToReshare.map(ctx => {
       return this.rotateQueue.add(() => this.reshareAppTss(ctx))
+        .catch(e => {})
     }))
 
     this.log(`all ${pendingContexts.length} reshare done.`)
@@ -169,6 +171,9 @@ export default class ReshareCronJob extends BaseCronJob{
       }
     })
       .catch(e => {
+        if(!!e.mpcExecDebugs) {
+          this.log(`mpcExecDebug >> %s`, JSON.stringify(e.mpcExecDebugs));
+        }
         this.log.error("tss-reshare failed %o %o", {appId, seed}, e)
         throw e;
       });
