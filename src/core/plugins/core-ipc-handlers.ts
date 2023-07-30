@@ -6,6 +6,7 @@ import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import NodeManagerPlugin from "./node-manager";
+import DbSynchronizer from "./db-synchronizer";
 
 export const IpcMethods = {
   ExecRemoteCall: "exec-remote-call",
@@ -20,7 +21,8 @@ export const IpcMethods = {
   EnsureAppTssKeyExist: "ensure-app-tss-key-exist",
   FindNAvailablePartners: "find-n-available-partner",
   VerifyRequestSignature: "verify-req-sign",
-  GetNodeLastContextTime: "get-node-last-ctx-time"
+  GetNodeLastContextTime: "get-node-last-ctx-time",
+  IsDbSynced: "is-db-synced",
 } as const;
 type IpcKeys = keyof typeof IpcMethods;
 export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
@@ -167,6 +169,12 @@ class CoreIpcHandlers extends CallablePlugin {
     if(!node)
       return undefined;
     return this.appManager.getNodeLastTimestamp(node);
+  }
+
+  @ipcMethod(IpcMethods.IsDbSynced)
+  async __isDbSynced(): Promise<boolean> {
+    const dbSync: DbSynchronizer = this.muon.getPlugin("db-synchronizer");
+    return dbSync.isSynced
   }
 }
 

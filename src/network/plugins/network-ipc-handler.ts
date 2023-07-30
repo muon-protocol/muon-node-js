@@ -454,8 +454,14 @@ class NetworkIpcHandler extends CallablePlugin {
     /** If current node is not in the network */
     if(!currentNode) {
       const deployers:string[] = this.nodeManager.filterNodes({isDeployer: true}).map(n => n.id);
-      /** forward to a random deployer */
-      return this.forwardGatewayCallToOtherNode(_.shuffle(deployers)[0], requestData, options.timeout);
+      const onlineList: string[] = await this.nodeManager.findNOnline(
+        _.shuffle(deployers).slice(0, Math.ceil(deployers.length/2)),
+        1,
+        {timeout: 2000},
+      )
+      if(onlineList.length <= 0)
+        throw `no online deployer to forward the request`;
+      return this.forwardGatewayCallToOtherNode(onlineList[0], requestData, options.timeout);
     }
 
     const context: AppContext|undefined = await CoreIpc.getAppOldestContext(app);

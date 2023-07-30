@@ -30,6 +30,7 @@ const RemoteMethods = {
 @remoteApp
 export default class DbSynchronizer extends CallablePlugin {
   private readonly apis: AxiosInstance[];
+  private isDbSynced:boolean = false;
 
   constructor(muon, configs) {
     super(muon, configs)
@@ -75,6 +76,10 @@ export default class DbSynchronizer extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
+  get isSynced():boolean {
+    return this.isDbSynced;
+  }
+
   private async nonDeployersSyncLoop() {
     const {monitor: {startDelay, interval}} = this.muon.configs.net.synchronizer;
     log(`non-deployers sync loop start %o`, {startDelay, interval})
@@ -110,7 +115,7 @@ export default class DbSynchronizer extends CallablePlugin {
    may miss some contexts. This method detects and retrieves the missing contexts from
    other deployers and updates the own context list accordingly.
    */
-  async deployersSyncLoop() {
+  private async deployersSyncLoop() {
     const {monitor: {startDelay, interval}} = this.muon.configs.net.synchronizer;
     log(`deployers sync loop start %o`, {startDelay, interval})
 
@@ -205,6 +210,8 @@ export default class DbSynchronizer extends CallablePlugin {
           if(uniqueList.length < DEPLOYER_SYNC_ITEM_PER_PAGE)
             break;
         }
+
+        this.isDbSynced = true;
       }
 
       await timeout(Math.floor((0.5 + Math.random()) * interval));

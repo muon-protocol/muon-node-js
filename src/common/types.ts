@@ -21,6 +21,7 @@ export type RemoteCallOptions = {
 
 export type RemoteMethodOptions = {
     allowShieldNode?: boolean,
+    middlewares?: any[],
 }
 
 export type Constructor<T> = new (...args: any[]) => T;

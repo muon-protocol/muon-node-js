@@ -240,7 +240,15 @@ class RemoteCall extends BaseNetworkPlugin {
     if(options.allowShieldNode)
       this.shieldNodeAllowedMethods[method] = options;
     // @ts-ignore
-    super.on(method, handler)
+    super.on(method, async (...args) => {
+      /** apply remote call middlewares */
+      if(options.middlewares && options.middlewares.length > 0){
+        for(const middleware of options.middlewares) {
+          await middleware(this.network, ...args)
+        }
+      }
+      return handler(...args)
+    })
   }
 
   allowCallByShieldNode(method, options) {

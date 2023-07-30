@@ -104,3 +104,7 @@ export async function getAppDeploymentInfo(appId: string, seed: string): Promise
 export async function getNodeLastContextTime(node: string): Promise<number|undefined> {
   return call(IpcMethods.GetNodeLastContextTime, node);
 }
+
+export async function isDbSynced(): Promise<boolean> {
+  return call(IpcMethods.IsDbSynced, {});
+}
