@@ -1,6 +1,6 @@
 import {GlobalBroadcastChannel, RemoteMethodOptions} from "../../../common/types";
 import NetworkBroadcastPlugin from "../network-broadcast";
-import {RemoteCallMiddleware} from "../../remotecall-middleware";
+import {NetworkRemoteCallMiddleware} from "../../remotecall-middleware";
 
 function classNames(target): string[]{
   let names: string[] = []
@@ -12,7 +12,7 @@ function classNames(target): string[]{
   return names;
 }
 
-export function remoteMethod (title, ...middlewares:RemoteCallMiddleware[]) {
+export function remoteMethod (title, ...middlewares: NetworkRemoteCallMiddleware[]) {
   return function (target, property, descriptor) {
     if(!target.__remoteMethods)
       target.__remoteMethods = []
