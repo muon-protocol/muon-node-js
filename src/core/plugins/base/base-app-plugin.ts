@@ -28,7 +28,7 @@ import {MapOf} from "../../../common/mpc/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
 import {reportInsufficientPartners} from "../../../common/analitics-reporter.js";
 import {createAjv} from "../../../common/ajv.js";
-import ethSigUtil from 'eth-sig-util';
+import ethSigUtil from '@metamask/eth-sig-util'
 
 const { omit } = lodash;
 
@@ -444,7 +444,7 @@ class BaseAppPlugin extends CallablePlugin {
       };
 
       // @ts-ignore
-      let signer = ethSigUtil.recoverTypedSignature_v4({data: eip712TypedData, sig: spender.signature});
+      let signer = ethSigUtil.recoverTypedSignature({data: eip712TypedData, signature: spender.signature, version: "V4"});
 
       signer = signer.toLowerCase();
       if(signer !== spender.address)
