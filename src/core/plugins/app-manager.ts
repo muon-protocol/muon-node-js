@@ -942,11 +942,9 @@ export default class AppManager extends CallablePlugin {
    * @param count {number} - The number of outputs that the user wants. The actual number of outputs may be higher than the value of this parameter.
    */
   getSortedContexts(fromTimestamp: number, count: number): AppContext[] {
-    const currentTime = getTimestamp()
     let list = Object.values(this.appContexts)
       .filter((ctx:AppContext) => {
-        return (!ctx.expiration || ctx.expiration > currentTime)
-          && !!ctx.deploymentRequest
+        return !!ctx.deploymentRequest
           && ctx.deploymentRequest.data.timestamp >= fromTimestamp
       })
       .sort((a,b) => {
