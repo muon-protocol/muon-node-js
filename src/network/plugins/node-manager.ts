@@ -16,6 +16,7 @@ import {
 import {remoteApp, remoteMethod} from "./base/app-decorators.js";
 import lodash from "lodash";
 import {Network} from "../index";
+import {ifSynced} from "../remotecall-middleware.js";
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
@@ -360,7 +361,7 @@ export default class NodeManagerPlugin extends CallablePlugin{
     return response === "OK"
   }
 
-  @remoteMethod(RemoteMethods.CheckOnline)
+  @remoteMethod(RemoteMethods.CheckOnline, ifSynced)
   async __checkOnline(): Promise<string> {
     return "OK";
   }

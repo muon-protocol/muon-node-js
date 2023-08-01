@@ -1,5 +1,6 @@
 import {GlobalBroadcastChannel, RemoteMethodOptions} from "../../../common/types";
 import NetworkBroadcastPlugin from "../network-broadcast";
+import {NetworkRemoteCallMiddleware} from "../../remotecall-middleware";
 
 function classNames(target): string[]{
   let names: string[] = []
@@ -11,11 +12,11 @@ function classNames(target): string[]{
   return names;
 }
 
-export function remoteMethod (title, options: RemoteMethodOptions={}) {
+export function remoteMethod (title, ...middlewares: NetworkRemoteCallMiddleware[]) {
   return function (target, property, descriptor) {
     if(!target.__remoteMethods)
       target.__remoteMethods = []
-    target.__remoteMethods.push({title, property, options})
+    target.__remoteMethods.push({title, property, middlewares})
     return descriptor
   }
 }
@@ -70,7 +71,7 @@ export function remoteApp (constructor): any {
             /** default options */
             allowShieldNode: false,
             /** override options */
-            ...item.options,
+            middlewares: item.middlewares,
             /** other props */
             method: item.title,
             appName: this.APP_NAME,
