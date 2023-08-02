@@ -43,7 +43,7 @@
     "/ip4/209.250.252.247/tcp/5000/p2p/QmbAGW4ddya254cAXKz2FnarpFv1odaJuisgCdPZrYfVxE"
   ],
   "fee": {
-    "endpoint": "http://fee.muon.net/sign",
+    "endpoint": "https://fees.muon.net/sign",
     "signers": [
       "0x968cB8308E052E9fDce45D1F8a384a9881e829A0"
     ]
