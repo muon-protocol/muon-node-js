@@ -725,7 +725,7 @@ class KeyManager extends CallablePlugin {
             n.peerId,
             RemoteMethods.KeyShareProof,
             {keyId},
-            {timeout: 2000},
+            {timeout: 5000},
           )
         )
           .then(signature => {
