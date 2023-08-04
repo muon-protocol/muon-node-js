@@ -65,7 +65,7 @@ export default class BaseNetworkPlugin extends Events {
         };
       }
       this.defaultLogger(`peer not found local %p`, peerId);
-      let routingPeer = await this.network.libp2p.peerRouting.findPeer(peerId);
+      let routingPeer = await this.network.libp2p.peerRouting.findPeer(peerId, {timeout: 5000});
 
       // There is a bug on libp2p 0.45.x
       // When a node dial another node, peer.addresses does not
