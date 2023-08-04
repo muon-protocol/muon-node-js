@@ -33,7 +33,7 @@ const { omit } = lodash;
 
 const ajv = createAjv();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
-const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
+const requestConfirmationCache: RedisCache = new RedisCache('req-confirm', 3600)
 
 const RemoteMethods = {
   AskSignature: 'AskSign',
