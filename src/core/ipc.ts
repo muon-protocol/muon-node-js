@@ -97,7 +97,7 @@ export async function getAppDeploymentInfo(appId: string, seed: string): Promise
   return call(IpcMethods.GetAppDeploymentInfo, {appId, seed});
 }
 
-export async function getNodeLastContextTime(node: string): Promise<number|undefined> {
+export async function getNodeLastContextTime(node: string): Promise<number|null> {
   return call(IpcMethods.GetNodeLastContextTime, node);
 }
 

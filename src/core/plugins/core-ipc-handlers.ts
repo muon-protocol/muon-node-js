@@ -155,10 +155,10 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.GetNodeLastContextTime)
-  async __getNodeLastContextTime(nodeIndex: string): Promise<number|undefined> {
+  async __getNodeLastContextTime(nodeIndex: string): Promise<number|null> {
     const node: MuonNodeInfo = this.nodeManager.getNodeInfo(nodeIndex)!;
     if(!node)
-      return undefined;
+      return null;
     return this.appManager.getNodeLastTimestamp(node);
   }
 
