@@ -79,11 +79,7 @@ export function getCurrentNodeInfo(options?: IpcCallOptions): Promise<MuonNodeIn
   return call(IpcMethods.GetCurrentNodeInfo, null, options);
 }
 
-export function allowRemoteCallByShieldNode(method, options) {
-  return call(IpcMethods.AllowRemoteCallByShieldNode, {method, options})
-}
-
-export function isCurrentNodeInNetwork() {
+export function isCurrentNodeInNetwork(): Promise<boolean> {
   return call(IpcMethods.IsCurrentNodeInNetwork)
 }
 

@@ -791,14 +791,6 @@ class BaseAppPlugin extends CallablePlugin {
     return plugin[method](...otherArgs)
   }
 
-  async shieldConfirmedRequest(request) {
-    const [result, hash] = await this.preProcessRemoteRequest(request);
-    return {
-      result,
-      hash
-    }
-  }
-
   async preProcessRemoteRequest(request, validation:boolean=true) {
     const {method, data: {params={}}} = request
     /**

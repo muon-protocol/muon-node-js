@@ -81,10 +81,6 @@ export async function isDeploymentExcerpt(appName, method) {
   return await call(IpcMethods.IsDeploymentExcerpt, {appName, method})
 }
 
-export async function shieldConfirmedRequest(request) {
-  return await call(IpcMethods.ShieldConfirmedRequest, request);
-}
-
 export async function ensureAppTssKeyExist(appId: string, seed: string) {
   return await call(IpcMethods.EnsureAppTssKeyExist, {appId, seed});
 }

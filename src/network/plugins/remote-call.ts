@@ -29,8 +29,6 @@ export type RemoteCallOptions = {
 
 class RemoteCall extends BaseNetworkPlugin {
 
-  private shieldNodeAllowedMethods = {}
-
   async onStart() {
     this.network.libp2p.handle(
       PROTOCOL,
@@ -237,8 +235,6 @@ class RemoteCall extends BaseNetworkPlugin {
   }
 
   on(method, handler, options: RemoteMethodOptions) {
-    if(options.allowShieldNode)
-      this.shieldNodeAllowedMethods[method] = options;
     // @ts-ignore
     super.on(method, async (...args) => {
       /** apply remote call middlewares */
@@ -249,10 +245,6 @@ class RemoteCall extends BaseNetworkPlugin {
       }
       return handler(...args)
     })
-  }
-
-  allowCallByShieldNode(method, options) {
-    this.shieldNodeAllowedMethods[method] = options;
   }
 }
 
