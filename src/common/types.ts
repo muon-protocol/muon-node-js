@@ -16,11 +16,7 @@ export type JsonPublicKey = {
     yParity: string
 }
 
-export type RemoteCallOptions = {
-}
-
 export type RemoteMethodOptions = {
-    allowShieldNode?: boolean,
     middlewares?: any[],
 }
 

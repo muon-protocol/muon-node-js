@@ -34,7 +34,7 @@ const { omit } = lodash;
 
 const ajv = createAjv();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
-const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
+const requestConfirmationCache: RedisCache = new RedisCache('req-confirm', 3600)
 
 const RemoteMethods = {
   AskSignature: 'AskSign',
@@ -803,14 +803,6 @@ class BaseAppPlugin extends CallablePlugin {
     if(!plugin.__appApiExports[method])
       throw `Method ${pluginName}.${method} not exported as API method.`
     return plugin[method](...otherArgs)
-  }
-
-  async shieldConfirmedRequest(request) {
-    const [result, hash] = await this.preProcessRemoteRequest(request);
-    return {
-      result,
-      hash
-    }
   }
 
   async preProcessRemoteRequest(request, validation:boolean=true) {

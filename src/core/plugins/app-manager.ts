@@ -70,11 +70,6 @@ export default class AppManager extends CallablePlugin {
   private appTssConfigs: MapOf<AppTssConfig> = {}
   private loading: TimeoutPromise = new TimeoutPromise();
   private deploymentPublicKey: PublicKey | null = null;
-  /**
-   Map each nodeId to last context timestamp that the node included.
-   nodeId => timestamp
-   */
-  private nodesLastTimestamp: MapOf<number> = {}
 
   async onStart() {
     await super.onStart()
@@ -163,8 +158,6 @@ export default class AppManager extends CallablePlugin {
         if(ctx.party.partners.includes(currentNode.id) && (!ctx.expiration || Date.now() < ctx.expiration*1000)) {
           NetworkIpc.addContextToLatencyCheck(ctx).catch(e => {})
         }
-
-        this.updateNodesLastTimestamp(ctx);
       })
       log('apps contexts loaded.')
 
@@ -186,20 +179,11 @@ export default class AppManager extends CallablePlugin {
     }
   }
 
-  private updateNodesLastTimestamp(ctx: AppContext) {
-    const {deploymentRequest} = ctx;
-    if(deploymentRequest) {
-      const deployTime: number = deploymentRequest.data.timestamp;
-      for (const node of ctx.party.partners) {
-        if (this.nodesLastTimestamp[node] === undefined || this.nodesLastTimestamp[node] < deployTime) {
-          this.nodesLastTimestamp[node] = deployTime;
-        }
-      }
-    }
-  }
-
-  getNodeLastTimestamp(node: MuonNodeInfo): number|undefined {
-    return this.nodesLastTimestamp[node.id];
+  getNodeLastTimestamp(node: MuonNodeInfo): number|null {
+    const max = Object.values(this.appContexts)
+      .filter(ctx => ctx.appId!=="1" && ctx.party.partners.includes(node.id))
+      .reduce((max, ctx)=>Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
+    return max > 0 ? max : null
   }
 
   async onDeploymentTssKeyGenerate(tssKey) {
@@ -274,8 +258,6 @@ export default class AppManager extends CallablePlugin {
       ...this.getAppSeeds(appId),
       seed
     ]) as string[]
-
-    this.updateNodesLastTimestamp(ctx);
   }
 
   private async onAppContextUpdate(doc) {

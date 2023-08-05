@@ -1,4 +1,4 @@
-import {GlobalBroadcastChannel, RemoteMethodOptions} from '../../../common/types'
+import {GlobalBroadcastChannel} from '../../../common/types'
 import CoreBroadcastPlugin from "../../../core/plugins/broadcast.js";
 import {CoreRemoteCallMiddleware} from "../../remotecall-middleware";
 
@@ -107,8 +107,6 @@ export function remoteApp (constructor): any {
           let item = constructor.prototype.__remoteMethods[i];
           // console.log('########## registering remote method', item, this.remoteMethodEndpoint(item.title))
           this.registerRemoteMethod(item.title, this[item.property].bind(this), {
-            /** default options */
-            allowShieldNode: false,
             /** override options */
             middlewares: item.middlewares,
             /** other props */

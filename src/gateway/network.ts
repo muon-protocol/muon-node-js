@@ -27,9 +27,9 @@ router.use('/last-context-time',mixGetPost, asyncHandler(async (req, res, next) 
     throw `Invalid signature`;
   }
 
-  const lastTime: number|undefined = await CoreIpc.getNodeLastContextTime(wallet);
+  const lastTime: number|null = await CoreIpc.getNodeLastContextTime(wallet);
   res.json({
-    timestamp: lastTime || null,
+    timestamp: lastTime
   })
 }));
 

@@ -3,29 +3,17 @@ import asyncHandler from 'express-async-handler'
 import RequestLog from '../../common/db-models/RequestLog.js'
 import {QueueProducer} from '../../common/message-bus/index.js'
 import {parseBool} from '../../utils/helpers.js'
-import {muonSha3} from '../../utils/sha3.js'
 import * as CoreIpc from '../../core/ipc.js'
 import * as NetworkIpc from '../../network/ipc.js'
-import axios from 'axios'
-import * as crypto from '../../utils/crypto.js'
 import {logger} from '@libp2p/logger'
 import Ajv from "ajv"
 import {mixGetPost} from "../middlewares.js";
 import {AppContext, MuonNodeInfo} from "../../common/types";
 import {GatewayCallParams} from "../types";
-import _ from 'lodash'
 
 const log = logger('muon:gateway:api')
 const ajv = new Ajv({coerceTypes: true})
 let requestQueue = new QueueProducer(`gateway-requests`);
-
-const SHIELD_FORWARD_URL = process.env.SHIELD_FORWARD_URL
-const appIsShielded = (process.env.SHIELDED_APPS || "")
-  .split('|')
-  .reduce((acc, curr) => {
-    acc[curr] = true
-    return acc
-  }, {});
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)
@@ -56,11 +44,13 @@ function extraLogs(req, result?: any) {
 
 let cachedNetworkCheck = {
   time: 0,
-  result: undefined
+  result: false
 };
 async function isCurrentNodeInNetwork() {
   /** check every 5 minute */
-  if(Date.now() - cachedNetworkCheck.time > 30e3) {
+  const dt = Date.now() - cachedNetworkCheck.time
+  /** cache true for 5 minutes and false for 5 seconds*/
+  if((cachedNetworkCheck.result && dt > 300e3) || (!cachedNetworkCheck.result && dt > 5e3)) {
     cachedNetworkCheck.time = Date.now()
     cachedNetworkCheck.result = await NetworkIpc.isCurrentNodeInNetwork()
   }
@@ -90,18 +80,6 @@ async function callProperNode(requestData: GatewayCallParams) {
 
   log('forwarding request to a proper node. %o', requestData)
   return await NetworkIpc.forwardRequest(requestData);
-}
-
-async function shieldConfirmedResult(requestData, request) {
-  log(`Shield applying %o`, requestData)
-  const {hash: shieldHash} = await CoreIpc.shieldConfirmedRequest(request);
-  const requestHash = muonSha3(...request.data.signParams)
-  if(shieldHash !== requestHash)
-    throw `Shield result mismatch.`
-  request.shieldAddress = process.env.SIGN_WALLET_ADDRESS;
-  let cryptoSign = crypto.sign(shieldHash);
-  request.shieldSignature = cryptoSign;
-  request.nodeSignature = cryptoSign;
 }
 
 const MUON_REQUEST_SCHEMA = {
@@ -157,42 +135,18 @@ router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
 
   if(!await isCurrentNodeInNetwork()){
     log("This node in not in the network.")
-    if(!SHIELD_FORWARD_URL) {
-      log("Env variable 'SHIELD_FORWARD_URL' not specified.")
-      const appId = await CoreIpc.getAppId(app);
-      return res.json({
-        success: false,
-        appId,
-        error: {
-          message: `Shield forward url (SHIELD_FORWARD_URL) not configured.`
-        }
-      })
-    }
-    if(!appIsShielded[app]) {
-      log("This app is not shielded.")
-      return res.json({success: false, error: {message: `The '${app}' app is neither shielded nor included in the network.`}});
-    }
-    log(`forwarding request to ${SHIELD_FORWARD_URL}`, requestData);
-    const result = await axios.post(SHIELD_FORWARD_URL, requestData)
-      .then(({data}) => data)
-    if(result.success) {
-      await shieldConfirmedResult(requestData, result.result)
-    }
-    return res.json(result);
+    const appId = await CoreIpc.getAppId(app);
+    return res.json({
+      success: false,
+      appId,
+      error: {
+        message: `The node has no connection to the Muon network.`
+      }
+    })
   }
   else {
     callProperNode(requestData)
       .then(async result => {
-        /**
-         If request forwarded to other node
-         When client calling @gatewayMethod of any plugin, appId is 0
-         */
-        if(result?.appId !== '0' && result?.gwAddress !== process.env.SIGN_WALLET_ADDRESS) {
-          if(appIsShielded[app]) {
-            await shieldConfirmedResult(requestData, result)
-          }
-        }
-
         storeRequestLog({
           app,
           method,

@@ -79,7 +79,6 @@ export const IpcMethods = {
   //GetPeerInfoLight: "GPILight",
   ForwardGatewayRequest: "forward-gateway-request",
   GetCurrentNodeInfo: "get-current-node-info",
-  AllowRemoteCallByShieldNode: "allow-remote-call-by-shield-node",
   IsCurrentNodeInNetwork: "is-current-node-in-network",
   GetUptime: "get-uptime",
   FindNOnlinePeer: "FNOP",
@@ -307,14 +306,8 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
   }
 
-  @ipcMethod(IpcMethods.AllowRemoteCallByShieldNode)
-  async __allowRemoteCallByShieldNode(data: {method: string, options: any}) {
-    this.remoteCallPlugin.allowCallByShieldNode(data.method, data.options)
-    return true
-  }
-
   @ipcMethod(IpcMethods.IsCurrentNodeInNetwork)
-  async __isCurrentNodeInNetwork() {
+  async __isCurrentNodeInNetwork(): Promise<boolean> {
     const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
     return !!currentNodeInfo;
   }

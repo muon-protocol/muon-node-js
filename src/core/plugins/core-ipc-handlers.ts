@@ -17,7 +17,6 @@ export const IpcMethods = {
   GetAppTimeout: "get-app-timeout",
   QueryAppAllContext: "query-app-all-context",
   IsDeploymentExcerpt: "is-deployment-excerpt",
-  ShieldConfirmedRequest: "shield-confirmed-request",
   EnsureAppTssKeyExist: "ensure-app-tss-key-exist",
   FindNAvailablePartners: "find-n-available-partner",
   VerifyRequestSignature: "verify-req-sign",
@@ -118,14 +117,6 @@ class CoreIpcHandlers extends CallablePlugin {
     return gp.getActualHandlerMethod(data.appName, data.method) !== "default"
   }
 
-  @ipcMethod(IpcMethods.ShieldConfirmedRequest)
-  async __shieldConfirmedRequest(request) {
-    const app: BaseAppPlugin = this.muon.getAppById(request.appId)
-    if(!app)
-      throw `CoreIpcHandler.__shieldConfirmedRequest Error: app not found ${request.appId}`
-    return await app.shieldConfirmedRequest(request)
-  }
-
   @ipcMethod(IpcMethods.EnsureAppTssKeyExist)
   async __ensureAppTssKeyExist(data: {appId: string, seed: string}) {
     const {appId, seed} = data;
@@ -164,10 +155,10 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.GetNodeLastContextTime)
-  async __getNodeLastContextTime(nodeIndex: string): Promise<number|undefined> {
+  async __getNodeLastContextTime(nodeIndex: string): Promise<number|null> {
     const node: MuonNodeInfo = this.nodeManager.getNodeInfo(nodeIndex)!;
     if(!node)
-      return undefined;
+      return null;
     return this.appManager.getNodeLastTimestamp(node);
   }
 

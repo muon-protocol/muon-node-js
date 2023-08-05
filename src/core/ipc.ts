@@ -81,10 +81,6 @@ export async function isDeploymentExcerpt(appName, method) {
   return await call(IpcMethods.IsDeploymentExcerpt, {appName, method})
 }
 
-export async function shieldConfirmedRequest(request) {
-  return await call(IpcMethods.ShieldConfirmedRequest, request);
-}
-
 export async function ensureAppTssKeyExist(appId: string, seed: string) {
   return await call(IpcMethods.EnsureAppTssKeyExist, {appId, seed});
 }
@@ -101,7 +97,7 @@ export async function getAppDeploymentInfo(appId: string, seed: string): Promise
   return call(IpcMethods.GetAppDeploymentInfo, {appId, seed});
 }
 
-export async function getNodeLastContextTime(node: string): Promise<number|undefined> {
+export async function getNodeLastContextTime(node: string): Promise<number|null> {
   return call(IpcMethods.GetNodeLastContextTime, node);
 }
 
