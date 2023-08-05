@@ -232,7 +232,7 @@ class System extends CallablePlugin {
 
     const generatorId = await this.getFirstOnlinePartner(context.party.partners);
     if(!generatorId)
-      throw `key-gen starter node not online`
+      throw {message: `key-gen starter node not online`, generatorId: generatorId || null}
 
     const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
 
