@@ -229,10 +229,20 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId, seed);
     if(!context)
       throw `App deployment info not found.`
+    const {partners} = context.party
 
-    const generatorId = await this.getFirstOnlinePartner(context.party.partners);
-    if(!generatorId)
-      throw {message: `key-gen starter node not online`, generatorId: generatorId || null}
+    const generatorId = await this.getFirstOnlinePartner(partners);
+    if(!generatorId) {
+      let isOnline:any = await Promise.all(
+        context.party.partners.map(id => NetworkIpc.isNodeOnline(id).catch(e => e.message))
+      )
+      isOnline = isOnline.reduce((obj, t, i) => (obj[partners[i]]=t, obj), {})
+      const debug = {
+        generatorId: generatorId || null,
+        isOnline
+      }
+      throw {message: `key-gen starter node not online`, ...debug}
+    }
 
     const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
 
