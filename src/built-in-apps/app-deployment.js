@@ -181,10 +181,7 @@ module.exports = {
     readOnlyMethods: ["init", 'undeploy'],
 
     init: async function(params) {
-        return {
-            success: true,
-            result: await this.callPlugin("system", "initializeDeploymentKey"),
-        }
+        return this.callPlugin("system", "initializeDeploymentKey")
     },
 
     undeploy: async function (params) {

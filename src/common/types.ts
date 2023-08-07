@@ -1,4 +1,3 @@
-import {GlobalBroadcastChannels} from "./contantes";
 import BN from 'bn.js'
 import {PublicKey} from "../utils/tss/types";
 import {MultiPartyComputation} from "./mpc/base";
@@ -75,9 +74,6 @@ export type AppDeploymentInfo = {
     /** hash of context */
     contextHash?: string,
 };
-
-type GlobalBroadcastChannelsKeys = keyof typeof GlobalBroadcastChannels;
-export type GlobalBroadcastChannel = typeof GlobalBroadcastChannels[GlobalBroadcastChannelsKeys];
 
 export type Override<T1, T2> = Omit<T1, keyof T2> & T2;
 

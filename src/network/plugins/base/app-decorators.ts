@@ -1,4 +1,3 @@
-import {GlobalBroadcastChannel, RemoteMethodOptions} from "../../../common/types";
 import NetworkBroadcastPlugin from "../network-broadcast";
 import {NetworkRemoteCallMiddleware} from "../../remotecall-middleware";
 
@@ -45,15 +44,6 @@ export function broadcastHandler (target, property, descriptor) {
   }
   target.__broadcastHandlerMethod = property
   return descriptor
-}
-
-export function globalBroadcastHandler (title: GlobalBroadcastChannel, options={}) {
-  return function (target, property, descriptor) {
-    if(!target.__globalBroadcastHandlers)
-      target.__globalBroadcastHandlers = []
-    target.__globalBroadcastHandlers.push({title, property, options})
-    return descriptor
-  }
 }
 
 export function remoteApp (constructor): any {

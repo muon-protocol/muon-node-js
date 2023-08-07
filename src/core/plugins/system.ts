@@ -94,9 +94,9 @@ class System extends CallablePlugin {
     if(withoutKeyCount<netConfigs.tss.threshold)
       throw `No enough online deployers to create the key.`;
 
-    const key = await this.keyManager.createDeploymentTssKey()
+    const key:AppTssKey = await this.keyManager.createDeploymentTssKey()
 
-    return key;
+    return _.pick(key.toJson(), ["publicKey", "polynomial", "partners"]);
   }
 
   private async getAvailableNodes(): Promise<MuonNodeInfo[]> {
