@@ -48,8 +48,8 @@ const DefaultRpcList = {
   /** ethereum mainnet */
   1: [
     "https://rpc.ankr.com/eth",
-    "https://mainnet.eth.cloud.ava.do",
-    "https://cloudflare-eth.com"
+    //"https://mainnet.eth.cloud.ava.do",
+    //"https://cloudflare-eth.com"
   ],
 
   // /** ethereum ropsten testnet */
