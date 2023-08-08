@@ -1,4 +1,3 @@
-import {GlobalBroadcastChannel} from '../../../common/types'
 import CoreBroadcastPlugin from "../../../core/plugins/broadcast.js";
 import {CoreRemoteCallMiddleware} from "../../remotecall-middleware";
 
@@ -54,15 +53,6 @@ export function broadcastHandler (target, property, descriptor) {
   }
   target.__broadcastHandlerMethod = property
   return descriptor
-}
-
-export function globalBroadcastHandler (title: GlobalBroadcastChannel, options={}) {
-  return function (target, property, descriptor) {
-    if(!target.__globalBroadcastHandlers)
-      target.__globalBroadcastHandlers = []
-    target.__globalBroadcastHandlers.push({title, property, options})
-    return descriptor
-  }
 }
 
 /**

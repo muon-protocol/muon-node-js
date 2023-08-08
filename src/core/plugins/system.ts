@@ -94,9 +94,9 @@ class System extends CallablePlugin {
     if(withoutKeyCount<netConfigs.tss.threshold)
       throw `No enough online deployers to create the key.`;
 
-    const key = await this.keyManager.createDeploymentTssKey()
+    const key:AppTssKey = await this.keyManager.createDeploymentTssKey()
 
-    return key;
+    return _.pick(key.toJson(), ["publicKey", "polynomial", "partners"]);
   }
 
   private async getAvailableNodes(): Promise<MuonNodeInfo[]> {
@@ -229,10 +229,20 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId, seed);
     if(!context)
       throw `App deployment info not found.`
+    const {partners} = context.party
 
-    const generatorId = await this.getFirstOnlinePartner(context.party.partners);
-    if(!generatorId)
-      throw `key-gen starter node not online`
+    const generatorId = await this.getFirstOnlinePartner(partners);
+    if(!generatorId) {
+      let isOnline:any = await Promise.all(
+        context.party.partners.map(id => NetworkIpc.isNodeOnline(id).catch(e => e.message))
+      )
+      isOnline = isOnline.reduce((obj, t, i) => (obj[partners[i]]=t, obj), {})
+      const debug = {
+        generatorId: generatorId || null,
+        isOnline
+      }
+      throw {message: `key-gen starter node not online`, ...debug}
+    }
 
     const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
 
