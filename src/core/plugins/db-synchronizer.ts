@@ -340,14 +340,10 @@ export default class DbSynchronizer extends CallablePlugin {
     }
 
     /** check old TSS_GROUP_SELECTED contexts */
-    const sixHoursAgo = getTimestamp() - 6*3600;
     let groupSelectedContexts:AppContext[] = this.appManager
       .filterContexts({
         deploymentStatus: [APP_STATUS_TSS_GROUP_SELECTED],
-        custom: ctx => {
-          return ctx.deploymentRequest!.data.timestamp < sixHoursAgo
-            && this.appManager.isSeedReshared(ctx.seed)
-        },
+        custom: ctx => this.appManager.isSeedReshared(ctx.seed),
       });
     // TODO: Is it necessary to check the TSS_GROUP_SELECTED list with the deployers before I deleting it?
 
