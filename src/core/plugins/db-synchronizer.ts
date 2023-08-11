@@ -367,7 +367,10 @@ export default class DbSynchronizer extends CallablePlugin {
       ]
     });
     log(`deleting ${seedsToDelete.length} expired contexts from memory of all cluster`)
-    const deleteContextList: AppContext[] = expiredContexts.filter(({seed}) => seedsToDelete.includes(seed))
+    const deleteContextList: AppContext[] = [
+      ... expiredContexts.filter(({seed}) => seedsToDelete.includes(seed)),
+      ... groupSelectedContexts,
+    ];
     CoreIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
     NetworkIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
   }
