@@ -123,7 +123,7 @@ export class MultiPartyComputation {
     return graph;
   }
 
-  private extractQualifiedList(roundReceivedMsgs, defaultQualified) {
+  private extractQualifiedList(roundReceivedMsgs, defaultQualified): string[] {
     /** make graph of connection between nodes */
     let connectionGraph = Object.keys(roundReceivedMsgs).reduce(
       (obj, id) => {
@@ -131,9 +131,10 @@ export class MultiPartyComputation {
         return obj
       }, {});
 
-    /** remove nodes that not connected with starter node */
     if(!Array.isArray(connectionGraph[this.starter]))
-      connectionGraph = {}
+      return []
+
+    /** remove nodes that not connected with starter node */
     Object.keys(connectionGraph).forEach(node => {
       if(!connectionGraph[this.starter].includes(node)) {
         delete connectionGraph[node];
