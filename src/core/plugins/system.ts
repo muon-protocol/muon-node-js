@@ -275,7 +275,8 @@ class System extends CallablePlugin {
       dealers.length,
       {appId, seed: oldContext.seed, return: "id"},
     );
-    const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
+    // const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
+    const generatorId = _.shuffle(dealers.filter(id => readyDealers.includes(id)))[0];
     if(!generatorId)
       throw `key-gen starter node not online`
 
