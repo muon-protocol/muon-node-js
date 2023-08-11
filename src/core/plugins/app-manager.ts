@@ -26,6 +26,7 @@ import {aesDecrypt, isAesEncrypted} from "../../utils/crypto.js";
 import {MapOf} from "../../common/mpc/types";
 import {toBN} from "../../utils/tss/utils.js";
 import * as PromiseLib from "../../common/promise-libs.js"
+import {Mutex} from "../../common/mutex.js";
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -70,6 +71,12 @@ export default class AppManager extends CallablePlugin {
   private appTssConfigs: MapOf<AppTssConfig> = {}
   private loading: TimeoutPromise = new TimeoutPromise();
   private deploymentPublicKey: PublicKey | null = null;
+
+  private mutex:Mutex;
+
+  async onInit() {
+    this.mutex = new Mutex();
+  }
 
   async onStart() {
     await super.onStart()
@@ -193,28 +200,36 @@ export default class AppManager extends CallablePlugin {
 
   async saveAppContext(context: AppContext) {
     context = _.omit(context, ["_id"]) as AppContext;
-    // @ts-ignore
-    const oldDoc = await AppContextModel.findOne({seed: context.seed, appId: context.appId})
-    if (oldDoc) {
-      _.assign(oldDoc, context)
-      oldDoc.dangerousAllowToSave = true
-      await oldDoc.save()
-      CoreIpc.fireEvent({type: "app-context:update", data: context})
-      NetworkIpc.fireEvent({type: "app-context:update", data: context})
-      return oldDoc
-    }
-    else {
-      let newContext = new AppContextModel(context)
-      /**
-       * Do not use this code in any other place
-       * Call this method as the base method for saving AppContextModel.
-       */
-      newContext.dangerousAllowToSave = true
-      await newContext.save()
-      CoreIpc.fireEvent({type: "app-context:add", data: context})
-      NetworkIpc.fireEvent({type: "app-context:add", data: context})
+    const lock = await this.mutex.lock(`ctx-update:${context.seed}`);
+    try {
+      // @ts-ignore
+      const oldDoc = await AppContextModel.findOne({seed: context.seed, appId: context.appId})
+      if (oldDoc) {
+        if(oldDoc.keyGenRequest) {
+          return;
+        }
+        _.assign(oldDoc, context)
+        oldDoc.dangerousAllowToSave = true
+        await oldDoc.save()
+        CoreIpc.fireEvent({type: "app-context:update", data: context})
+        NetworkIpc.fireEvent({type: "app-context:update", data: context})
+        return oldDoc
+      } else {
+        let newContext = new AppContextModel(context)
+        /**
+         * Do not use this code in any other place
+         * Call this method as the base method for saving AppContextModel.
+         */
+        newContext.dangerousAllowToSave = true
+        await newContext.save()
+        CoreIpc.fireEvent({type: "app-context:add", data: context})
+        NetworkIpc.fireEvent({type: "app-context:add", data: context})
 
-      return newContext;
+        return newContext;
+      }
+    }
+    finally {
+      await lock.release()
     }
   }
 

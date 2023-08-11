@@ -267,7 +267,7 @@ class System extends CallablePlugin {
       throw `App's new context not found.`
     const oldContext = this.appManager.getAppContext(appId, newContext.previousSeed);
     if(!oldContext)
-      throw `App's new context not found.`
+      throw `App's old context not found.`
 
     const dealers: string[] = newContext.party.partners.filter(id => oldContext.party.partners.includes(id));
     const readyDealers = await this.appManager.findNAvailablePartners(
