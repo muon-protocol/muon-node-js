@@ -51,6 +51,7 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
         e = {message: e};
       error = {
         message: e.message,
+        stack: e.stack,
         ...e
       };
     }
