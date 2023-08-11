@@ -16,7 +16,7 @@ import _ from 'lodash';
 import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
 import {readSetting, writeSetting} from "../../common/db-models/Settings.js";
-import {APP_STATUS_EXPIRED} from "../constants.js";
+import {APP_STATUS_EXPIRED, APP_STATUS_TSS_GROUP_SELECTED} from "../constants.js";
 
 const DEPLOYER_SYNC_ITEM_PER_PAGE = 100;
 const log = logger("muon:core:plugins:synchronizer")
@@ -25,6 +25,7 @@ const RemoteMethods = {
   GetAllContexts: "get-all-ctx",
   IsSeedListReshared: "is-seed-list-reshared",
   GetMissingContext: "get-missing-context",
+  CanSeedsBeDeleted: "can-seeds-be-deleted",
 }
 
 @remoteApp
@@ -172,7 +173,9 @@ export default class DbSynchronizer extends CallablePlugin {
           );
 
           if (uniqueList.length > 0) {
-            const lastContextTime: number = uniqueList.reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
+            const lastContextTime: number = uniqueList
+              .filter(ctx => !!ctx.keyGenRequest)
+              .reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
 
             /** filter out locally existing context and keep only missing contexts. */
             uniqueList = uniqueList.filter(ctx => {
@@ -336,6 +339,18 @@ export default class DbSynchronizer extends CallablePlugin {
       }
     }
 
+    /** check old TSS_GROUP_SELECTED contexts */
+    let groupSelectedContexts:AppContext[] = this.appManager
+      .filterContexts({
+        deploymentStatus: [APP_STATUS_TSS_GROUP_SELECTED],
+        custom: ctx => this.appManager.isSeedReshared(ctx.seed),
+      });
+    // TODO: Is it necessary to check the TSS_GROUP_SELECTED list with the deployers before I deleting it?
+
+    for(const {seed} of groupSelectedContexts) {
+      seedsToDelete.push(seed);
+    }
+
     await AppContextModel.deleteMany({
       $or: [
         /** for backward compatibility. old keys may not have this field. */
@@ -402,6 +417,21 @@ export default class DbSynchronizer extends CallablePlugin {
     return seeds.map(seed => {
       return this.appManager.isSeedReshared(seed);
     });
+  }
+
+  @remoteMethod(RemoteMethods.CanSeedsBeDeleted)
+  async __canSeedsBeDeleted(seeds: string[], callerInfo: MuonNodeInfo): Promise<boolean[]> {
+    const currentTime = getTimestamp();
+    return seeds.map(seed => {
+      const context = this.appManager.getSeedContext(seed);
+      if(!context)
+        return true;
+      if(!context.keyGenRequest)
+        return false;
+      if(context.deploymentRequest?.data.expiration > currentTime)
+        return false;
+      return this.appManager.isSeedReshared(seed);
+    })
   }
 
   @remoteMethod(RemoteMethods.GetMissingContext)
