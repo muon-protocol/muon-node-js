@@ -543,7 +543,7 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: 'App party is not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
-    this.log(`generating nonce with ${nonceParticipantsCount} partners.`)
+    this.log(`generating nonce with ${Math.min(nonceParticipantsCount, availablePartners.length)} partners.`)
     let nonce = await this.keyManager.keyGen({appId: this.APP_ID, seed}, {
       id: `nonce-${request.reqId}`,
       partners: availablePartners,
