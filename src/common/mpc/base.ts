@@ -192,23 +192,37 @@ export class MultiPartyComputation {
     return this.roundsOutput[round].store;
   }
 
-  private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any, responseNeeded: boolean) {
-    const NumReTry = 1;
+  /**
+   * Try to get round data from a partner
+   *
+   * @param network {IMpcNetwork} - networking object that handles request and security.
+   * @param from {string} - target node id that asking data from.
+   * @param roundIndex {number} - index of asking round of MPC.
+   * @param dataToSend {any} - construction data wil pass throw this parameters at round 0.
+   * @param currentIsQualified {boolean} - current node is qualified or not.
+   * @param targetIsQualified {boolean} - target node is qualified or not.
+   */
+  private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any,
+                                  currentIsQualified: boolean, targetIsQualified: boolean) {
+    /** Setting the NumReTry parameter to more than one for qualified nodes, causes the key generation time to increase. */
+    const NumReTry = currentIsQualified ? 1 : 3;
     const roundTitle = this.rounds[roundIndex];
     let lastError: any;
     let result: any;
     for(let i=1 ; i<=NumReTry ; i++) {
       lastError = undefined;
       try {
-        if(responseNeeded) {
+        /** if the target node is qualified, we need its response. */
+        if(targetIsQualified) {
           result = await network.askRoundData(from, this.id, roundIndex, dataToSend);
-          return result;
+          break;
         }
+        /** otherwise, no need to wait for it's response */
         else {
-          network.askRoundData(from, this.id, roundIndex, dataToSend).catch(e => {});
+          network.askRoundData(from, this.id, roundIndex, dataToSend)
+            .catch(e => {});
           return null;
         }
-        break;
       }catch (e) {
         lastError = e;
         if(i != NumReTry)
@@ -286,7 +300,7 @@ export class MultiPartyComputation {
 
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
           callingPartners.map(partner => {
-            return this.tryToGetRoundDate(network, partner, r, dataToSend, isQualified[partner])
+            return this.tryToGetRoundDate(network, partner, r, dataToSend, isQualified[network.id], isQualified[partner])
               .catch(e => {
                 mpcExecDebugs[currentRound].roundErrors[partner] = e.message || "unknown error";
                 partyErrors[partner] = JSON.stringify(e);

@@ -35,6 +35,7 @@ export type KeyConstructionData = {
   dealers?: string[],
   t: number,
   pk?: string,
+  starter: string,
 }
 
 export type KeyReDistributeData = KeyConstructionData & {publicKey: string, previousPolynomial: PolynomialInfoJson};
@@ -138,6 +139,7 @@ async function run() {
     const initialPartners = partners.slice(0, nextThreshold+1);
     let initialKeyShares = await keyGen(initialPartners, fakeNets, {
       id: `dkg-${Date.now()}${random()}`,
+      starter: initialPartners[0],
       partners: initialPartners,
       t: threshold,
       pk: realPrivateKey,
@@ -153,6 +155,7 @@ async function run() {
       fakeNets,
       {
         id: `kredist-${Date.now()}${random()}`,
+        starter: initialPartners[0],
         partners,
         dealers: initialPartners,
         publicKey: initialKeyShares[0].publicKey,
