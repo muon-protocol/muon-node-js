@@ -471,7 +471,15 @@ class System extends CallablePlugin {
     if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
-      let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId)!
+      let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId)!;
+      let keyShare:string|undefined;
+      /**
+       prevent storing wrong share.
+       if the key's polynomial is not as same as the context polynomial, the key will be ignored.
+       */
+      if(reshareKey.toJson().polynomial!.Fx.join(',') === resharePolynomial.Fx.join(',')) {
+        keyShare = bn2hex(reshareKey.share!)
+      }
       /**
        Mark the reshareKey as used for app TSS key.
        If anyone tries to use this key for a different purpose, it will cause an error.
@@ -489,7 +497,7 @@ class System extends CallablePlugin {
         seed,
         keyGenRequest: request,
         publicKey,
-        keyShare: bn2hex(reshareKey.share!),
+        keyShare,
         polynomial,
         expiration,
       })
