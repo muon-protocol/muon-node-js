@@ -21,10 +21,8 @@ export type CoreGlobalEvent = {
 }
 
 export async function enqueueAppRequest(requestData: GatewayCallParams, defaultOptions:IpcCallOptions={}): Promise<any> {
-  const {app} = requestData;
-  const timeout: number = defaultOptions.timeout === undefined ? await getAppTimeout(app) : 0;
   const options:IpcCallOptions = {
-    timeout: Math.ceil(timeout * 1.2),
+    timeout: 60e3,
     timeoutMessage: "gateway timed out.",
     ...defaultOptions
   }
