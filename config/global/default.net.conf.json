@@ -7,8 +7,8 @@
   },
   "nodeManager": {
     "network": "bsctest",
-    "address": "0x7D868Fb1C6022bB0f73a89C5ac8DBBbAC494ec5f",
-    "stake": "0x34daa4F5a3d1cCB8eCE74af1c3CB209728A44a5C"
+    "address": "0x8BBBd06c72721fb64554ebdf2FCC8a64653Aa835",
+    "stake": "0xF7688b8104Dfe59B381963582620Cd2d316bA7a5"
   },
   "routing": {
     "delegate": [
