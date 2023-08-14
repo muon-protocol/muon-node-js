@@ -1,7 +1,6 @@
 import {Router} from 'express'
 import asyncHandler from 'express-async-handler'
 import RequestLog from '../../common/db-models/RequestLog.js'
-import {QueueProducer} from '../../common/message-bus/index.js'
 import {parseBool} from '../../utils/helpers.js'
 import * as CoreIpc from '../../core/ipc.js'
 import * as NetworkIpc from '../../network/ipc.js'
@@ -10,10 +9,10 @@ import Ajv from "ajv"
 import {mixGetPost} from "../middlewares.js";
 import {AppContext, MuonNodeInfo} from "../../common/types";
 import {GatewayCallParams} from "../types";
+import {enqueueAppRequest} from "../../core/ipc.js";
 
 const log = logger('muon:gateway:api')
 const ajv = new Ajv({coerceTypes: true})
-let requestQueue = new QueueProducer(`gateway-requests`);
 
 async function storeRequestLog(logData) {
   let log = new RequestLog(logData)
@@ -61,7 +60,7 @@ async function isCurrentNodeInNetwork() {
 async function callProperNode(requestData: GatewayCallParams) {
   if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
     log("Deployment excerpt method call %o", requestData)
-    return await requestQueue.send(requestData)
+    return await enqueueAppRequest(requestData)
   }
 
   let context: AppContext|undefined = await CoreIpc.getAppOldestContext(requestData.app);
@@ -73,7 +72,7 @@ async function callProperNode(requestData: GatewayCallParams) {
       if(context.keyGenRequest?.data?.init?.shareProofs)
         partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs)
       if(partners.includes(currentNode.id)) {
-        return await requestQueue.send(requestData)
+        return await enqueueAppRequest(requestData)
       }
     }
   }

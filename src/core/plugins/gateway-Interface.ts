@@ -1,43 +1,17 @@
 import BasePlugin from './base/base-plugin.js'
 import { QueueConsumer } from '../../common/message-bus/index.js'
-import { promisify } from "util"
-import Redis from 'redis'
 import { logger } from '@libp2p/logger'
+import {CORE_REQUEST_QUEUE_CHANNEL} from "../ipc.js";
 
 const log = logger('muon:core:plugins:gateway-interface')
-
-const GATEWAY_CALL_REQUEST  = `/muon/gateway/${process.env.GATEWAY_PORT}/call/request`
-const GATEWAY_CALL_RESPONSE = `/muon/gateway/${process.env.GATEWAY_PORT}/call/response`
-
-const redisConfig = {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT || 6379
-}
-
-const redis = Redis.createClient(redisConfig);
-const callRedis = Redis.createClient(redisConfig)
-const responseRedis = Redis.createClient(redisConfig)
-const blpopAsync = promisify(redis.blpop).bind(redis);
-redis.on("error", function(error) {
-  log.error("%o", error);
-});
-callRedis.on("error", function(error) {
-  log.error("%o", error);
-});
-responseRedis.on('error', function(error) {
-  log.error("%o", error);
-})
-
 let gatewayRequests;
 
 export default class GatewayInterface extends BasePlugin{
 
   async onStart(){
     if(!!process.env.GATEWAY_PORT) {
-      gatewayRequests = new QueueConsumer(`gateway-requests`);
+      gatewayRequests = new QueueConsumer(CORE_REQUEST_QUEUE_CHANNEL);
       gatewayRequests.on("message", this.__onGatewayCall.bind(this));
-      // callRedis.subscribe(GATEWAY_CALL_REQUEST)
-      // callRedis.on('message', this.__onGatewayCall.bind(this))
     }
   }
 
