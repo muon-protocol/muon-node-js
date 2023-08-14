@@ -300,6 +300,7 @@ class BaseAppPlugin extends CallablePlugin {
       newRequest.reqId = this.calculateRequestId(newRequest, resultHashWithoutSecurityParams)
       newRequest.data.signParams = this.appendSecurityParams(newRequest, appSignParams)
       resultHash = this.hashAppSignParams(newRequest, appSignParams)
+      newRequest.data.resultHash = resultHash;
 
       let isDuplicateRequest = false;
       if(this.requestManager.hasRequest(newRequest.reqId)){
@@ -654,6 +655,20 @@ class BaseAppPlugin extends CallablePlugin {
     return p1 === p2 ? owner : null;
   }
 
+  async verifyPartialSignature(request: AppRequest, owner:MuonNodeInfo, signature: string): Promise<boolean> {
+    const appTssKey = this.getTss(request.deploymentSeed)!
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)
+
+    return TssModule.schnorrVerifyPartial(
+      appTssKey.getPubKey(owner.id),
+      appTssKey.publicKey,
+      nonce.getPubKey(owner.id),
+      nonce.publicKey,
+      request.data.resultHash,
+      signature,
+    );
+  }
+
   async verify(hash: string, signature: string, nonceAddress: string): Promise<boolean> {
     const signingPubKey: MapOf<PublicKey> = await this.appManager.findAppPublicKeys(this.APP_ID);
     if(Object.keys(signingPubKey).length < 1)
@@ -769,23 +784,16 @@ class BaseAppPlugin extends CallablePlugin {
     try {
       this.log(`node ${remoteNode.id} signed the request.`)
       let {reqId, sign} = data!;
-      // let request = await Request.findOne({_id: sign.request})
       let request:AppRequest = this.requestManager.getRequest(reqId) as AppRequest
       if (request) {
-        // TODO: check response similarity
-        // let signer = await this.recoverSignature(request, remoteNode.wallet, sign)
-        // if (signer && signer === sign.owner) {
-          // @ts-ignore
+        let signatureVerified = await this.verifyPartialSignature(request, remoteNode, sign)
+        if (signatureVerified) {
           this.requestManager.addSignature(request.reqId, remoteNode.wallet, sign)
-          // // let newSignature = new Signature(sign)
-          // // await newSignature.save()
-        // } else {
-        //   console.log('signature mismatch', {
-        //     request: request.hash,
-        //     signer,
-        //     sigOwner: sign.owner
-        //   })
-        // }
+        }
+        else {
+          this.log.error('partial signature mismatch %o', {reqId: request.reqId, sign, signer: remoteNode.id})
+          this.requestManager.addError(reqId, remoteNode.wallet, {message: "partial signature mismatch"});
+        }
       }
       else{
         console.log(`BaseAppPlugin.__onRemoteSignTheRequest >> Request not found id:${reqId}`)

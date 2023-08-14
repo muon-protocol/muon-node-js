@@ -107,6 +107,7 @@ export type AppRequest = {
         params: any,
         timestamp: number,
         result: any,
+        resultHash: string,
         signParams: TypedValue[],
         init: {
             nonceAddress: string,

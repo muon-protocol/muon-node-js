@@ -174,6 +174,38 @@ export function schnorrVerify(signingPublicKey: PublicKey, msg, sig:{s: BN, e: B
   return toBN(e_v).eq(sig.e);
 }
 
+export function schnorrVerifyPartial(
+  /** key share public */
+  partialPubKey: PublicKey,
+  /** key public */
+  pubKey: PublicKey,
+  /** nonce share public */
+  partialNoncePubKey: PublicKey,
+  /** nonce public */
+  noncePubKey: PublicKey,
+  /** message */
+  msg,
+  /** signature */
+  sig:{s: BN, e: BN}|string
+) {
+  if(typeof sig === 'string')
+    sig = splitSignature(sig);
+  if(
+    !validatePublicKey(partialPubKey)
+    || !validatePublicKey(pubKey)
+    || !validatePublicKey(partialNoncePubKey)
+    || !validatePublicKey(noncePubKey)
+  )
+    return false
+
+  let nonceTimesGeneratorAddress = pub2addr(noncePubKey)
+  let e = toBN(schnorrHash(pubKey, nonceTimesGeneratorAddress, msg))
+
+  const s = sig.s.umod(curve.n!)
+  let r_v = pointAdd(curve.g.mul(s), partialPubKey.mul(e))
+  return e.eq(sig.e) && r_v.eq(partialNoncePubKey);
+}
+
 export function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey) {
   nonceAddress = nonceAddress.toLowerCase();
   signature = toBN(signature).umod(curve.n!);
