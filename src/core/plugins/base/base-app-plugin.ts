@@ -772,7 +772,11 @@ class BaseAppPlugin extends CallablePlugin {
       let {reqId, sign} = data!;
       let request:AppRequest = this.requestManager.getRequest(reqId) as AppRequest
       if (request) {
-        let signatureVerified = await this.verifyPartialSignature(request, remoteNode, sign)
+        /**
+         * alice-v1 deployment key is old and does not have polynomial info.
+         * disable verification temporarily for deployment.
+         * */
+        let signatureVerified = request.appId === "1" || (await this.verifyPartialSignature(request, remoteNode, sign))
         if (signatureVerified) {
           this.requestManager.addSignature(request.reqId, remoteNode.wallet, sign)
         }
@@ -782,11 +786,11 @@ class BaseAppPlugin extends CallablePlugin {
         }
       }
       else{
-        console.log(`BaseAppPlugin.__onRemoteSignTheRequest >> Request not found id:${reqId}`)
+        this.log(`Request not found id:${reqId}`)
       }
     }
     catch (e) {
-      console.error('BaseAppPlugin.__onRemoteSignTheRequest', e);
+      this.log.error('onRemoteSignTheRequest', e);
     }
   }
 
