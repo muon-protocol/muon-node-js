@@ -92,8 +92,8 @@ class CoreIpcHandlers extends CallablePlugin {
    * @param appName
    */
   @ipcMethod(IpcMethods.GetAppTimeout)
-  async __getAppTimeout(appName: string) {
-    const app = await this.muon.getAppByName(appName)
+  async __getAppTimeout(appName: string): Promise<number> {
+    const app:BaseAppPlugin = await this.muon.getAppByName(appName)
     if(!app)
       return 0;
     return app.requestTimeout || 0

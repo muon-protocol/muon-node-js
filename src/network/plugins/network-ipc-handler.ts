@@ -3,7 +3,7 @@ import {PeerInfo} from "@libp2p/interface-peer-info";
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
 import {AppContext, AppRequest, IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
 import NodeManagerPlugin, {NodeFilterOptions} from "./node-manager.js";
-import {QueueProducer, MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
+import {MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
@@ -16,6 +16,7 @@ import {isPrivate} from "../utils.js";
 import {GatewayCallParams} from "../../gateway/types";
 import LatencyCheckPlugin from "./latency-check.js";
 import {MapOf} from "../../common/mpc/types";
+import {enqueueAppRequest} from "../../core/ipc.js";
 
 class AggregatorBus extends MessagePublisher {
   async send(message:any){
@@ -42,7 +43,6 @@ if(!!REQUESTS_PUB_SUB_CHANNEL) {
 }
 
 const log = logger('muon:network:plugins:ipc-handler')
-let requestQueue = new QueueProducer(`gateway-requests`);
 
 const tasksCache = new NodeCache({
   stdTTL: 6 * 60, // Keep distributed keys in memory for 6 minutes
@@ -466,7 +466,7 @@ class NetworkIpcHandler extends CallablePlugin {
       /** When the context exists, the node can either process it or send it to the appropriate node. */
       if(partners.includes(currentNode.id)) {
         /** Process the request */
-        return await requestQueue.send(requestData)
+        return await enqueueAppRequest(requestData)
       }
       else {
         /** Forward request to the appropriate node. */
