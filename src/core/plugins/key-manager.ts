@@ -28,6 +28,16 @@ const log = logger('muon:core:plugins:tss')
 
 const LEADER_ID = process.env.LEADER_ID || '1';
 
+type KeyUsageTypeApp = {
+  type: "app",
+  seed: string,
+}
+
+type KeyUsageTypeNonce = {
+  type: "nonce",
+  message: string,
+}
+
 export type KeyGenOptions = {
   /**
    key ID
@@ -56,6 +66,11 @@ export type KeyGenOptions = {
   value?: string,
 
   lowerThanHalfN?: boolean,
+  /**
+   * Before generating a key, you need to specify what the key will be used for.
+
+   */
+  usage: KeyUsageTypeApp | KeyUsageTypeNonce,
 }
 
 const RemoteMethods = {
@@ -438,7 +453,8 @@ class KeyManager extends CallablePlugin {
       {
         partners: deployers.map(n => n.id),
         dealers: onlineDeployers,
-        lowerThanHalfN: true
+        lowerThanHalfN: true,
+        usage: {type: "app", seed: "1"},
       }
     )
 
@@ -478,7 +494,7 @@ class KeyManager extends CallablePlugin {
    * @param options.maxPartners: create key that shared with at most `maxPartners` participants.
    * @returns {Promise<AppTssKey>}
    */
-  async keyGen(partyInfo: PartyInfo, options: KeyGenOptions={}): Promise<AppTssKey> {
+  async keyGen(partyInfo: PartyInfo, options: KeyGenOptions): Promise<AppTssKey> {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, partners: oPartners, maxPartners, timeout=60000, value} = options;
 
@@ -532,6 +548,7 @@ class KeyManager extends CallablePlugin {
         /** extra values usable in DKG */
         extra: {
           mpcType: "DistributedKeyGeneration",
+          usage: options.usage,
           partyInfo,
             keyId,
             lowerThanHalfN
@@ -545,7 +562,15 @@ class KeyManager extends CallablePlugin {
 
     let key = new AppTssKey(party, keyGen.extraParams.keyId!, dKey)
 
-    await SharedMemory.set(keyGen.extraParams.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+    await SharedMemory.set(
+      keyGen.extraParams.keyId,
+      {
+        usage: options.usage,
+        partyInfo,
+        key: key.toJson()
+      },
+      30*60*1000
+    )
     return key;
   }
 
@@ -564,7 +589,14 @@ class KeyManager extends CallablePlugin {
           throw `party[${extra.party}] not found`
 
         let key = new AppTssKey(party, extra.keyId, dKey)
-        await SharedMemory.set(extra.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+        await SharedMemory.set(
+          extra.keyId, {
+            usage: extra.usage,
+            partyInfo,
+            key: key.toJson()
+          },
+          30*60*1000
+        )
       })
       .catch(e => {
         // TODO
@@ -612,7 +644,15 @@ class KeyManager extends CallablePlugin {
           throw `party[${extra.party}] not found`
 
         let key = new AppTssKey(party, extra.keyId, dKey)
-        await SharedMemory.set(extra.keyId, {partyInfo, key: key.toJson()}, 30*60*1000)
+        await SharedMemory.set(
+          extra.keyId,
+          {
+            usage: extra.usage,
+            partyInfo,
+            key: key.toJson()
+          },
+          30*60*1000
+        );
       })
       .catch(e => {
         // TODO
@@ -622,7 +662,7 @@ class KeyManager extends CallablePlugin {
     return keyRedist;
   }
 
-  async redistributeKey(prevPartyInfo: PartyInfo, newPartyInfo: PartyInfo, options: KeyGenOptions={}): Promise<AppTssKey> {
+  async redistributeKey(prevPartyInfo: PartyInfo, newPartyInfo: PartyInfo, options: KeyGenOptions): Promise<AppTssKey> {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, timeout=60000} = options;
 
@@ -676,6 +716,7 @@ class KeyManager extends CallablePlugin {
         /** extra values usable in DKG */
         extra: {
           mpcType: "KeyRedistribution",
+          usage: options.usage,
           prevPartyInfo: prevPartyInfo,
           partyInfo: newPartyInfo,
           keyId,
@@ -688,12 +729,41 @@ class KeyManager extends CallablePlugin {
 
     let key = new AppTssKey(newParty, keyRedist.extraParams.keyId!, dKey)
 
-    await SharedMemory.set(keyRedist.extraParams.keyId, {partyInfo: newPartyInfo, key: key.toJson()}, 30*60*1000)
+    await SharedMemory.set(
+      keyRedist.extraParams.keyId,
+      {
+        usage: options.usage,
+        partyInfo: newPartyInfo,
+        key: key.toJson()
+      },
+      30*60*1000
+    );
     return key;
   }
 
-  async getSharedKey(id: string, timeout:number=5000): Promise<AppTssKey> {
-    let {partyInfo, key} = await SharedMemory.waitAndGet(id, timeout)
+  async getSharedKey(id: string, timeout:number=5000, expectedUsage:KeyUsageTypeApp|KeyUsageTypeNonce): Promise<AppTssKey> {
+    let {partyInfo, key, usage} = await SharedMemory.waitAndGet(id, timeout)
+    if(usage.type !== expectedUsage.type) {
+      throw `tss key usage mismatch.`
+    }
+    else {
+      switch (usage.type) {
+        case "app": {
+          // @ts-ignore
+          if(!usage.seed || usage.seed !== expectedUsage.seed)
+            throw `tss key usage mismatch.`
+          break;
+        }
+        case "nonce": {
+          // @ts-ignore
+          if(!usage.message || usage.message !== expectedUsage.message)
+            throw `tss key usage mismatch.`
+          break;
+        }
+        default:
+          throw `incorrect tss key usage`
+      }
+    }
     let party = this.getAppParty(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
     if(!party)
       throw `party [${key.party}] not found`
@@ -708,23 +778,24 @@ class KeyManager extends CallablePlugin {
    * @param keyId {string} - the unique id of the key
    * @param Fx {string[]} - public polynomial of the key
    */
-  async getKeyShareProofs(partners: string[], keyId: string, Fx: PublicKey[]) {
+  async getKeyShareProofs(seed: string, partners: string[], keyId: string, Fx: PublicKey[]) {
     let nodeInfos = this.nodeManager.filterNodes({list: partners});
     /** nodes must sign hash of publicKey */
     const keyPublicHash = muonSha3(Fx[0].encode("hex", true));
 
+    const usage:KeyUsageTypeApp = {type: "app", seed}
     const signatures = await Promise.all(
       nodeInfos.map(n => {
         const isCurrentNode = n.id === this.nodeManager.currentNodeInfo!.id;
         return (
           isCurrentNode
           ?
-          this.__keyShareProof({keyId}, this.nodeManager.currentNodeInfo!)
+          this.__keyShareProof({keyId, usage}, this.nodeManager.currentNodeInfo!)
           :
           this.remoteCall(
             n.peerId,
             RemoteMethods.KeyShareProof,
-            {keyId},
+            {keyId, usage},
             {timeout: 5000},
           )
         )
@@ -772,7 +843,7 @@ class KeyManager extends CallablePlugin {
     // TODO: problem condition: request arrive when tss is ready
     let {party: partyId, key: keyId} = data
     let party = this.getParty(partyId)
-    let key: AppTssKey = await this.getSharedKey(keyId);
+    let key: AppTssKey = await this.getSharedKey(keyId, undefined, {type: "app", seed: "1"});
     if (!party)
       throw {message: 'KeyManager.storeDeploymentTssKey: party not found.'}
     if (!key)
@@ -793,8 +864,8 @@ class KeyManager extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.KeyShareProof)
-  async __keyShareProof(data: {keyId: string}, callerInfo:MuonNodeInfo): Promise<string> {
-    const key = await this.getSharedKey(data.keyId);
+  async __keyShareProof(data: {keyId: string, usage: KeyUsageTypeApp|KeyUsageTypeNonce}, callerInfo:MuonNodeInfo): Promise<string> {
+    const key = await this.getSharedKey(data.keyId, undefined, data.usage);
     const keyPublicHash = muonSha3(key.publicKey.encode('hex', true));
     return crypto.signWithPrivateKey(keyPublicHash, bn2hex(key.share));
   }

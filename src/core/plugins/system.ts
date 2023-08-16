@@ -302,16 +302,6 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod({})
-  async getAppTss(appId): Promise<AppTssKey> {
-    const context = await AppContextModel.findOne({appId}).exec();
-    if(!context)
-      throw `App deployment info not found.`
-    const id = this.getAppTssKeyId(appId, context.seed)
-    let key: AppTssKey = await this.keyManager.getSharedKey(id)
-    return key
-  }
-
-  @appApiMethod({})
   async findAndGetAppTssPublicInfo(appId: string, seed: string, keyId: string): Promise<any> {
     const context = this.appManager.getAppContext(appId, seed)
     if(!context)
@@ -424,9 +414,8 @@ class System extends CallablePlugin {
     const currentNode = this.nodeManager.currentNodeInfo!;
     if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
-      let key: AppTssKey = await this.keyManager.getSharedKey(keyId)!
+      let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed})!
       /** store tss key */
-      await useOneTime("key", key.publicKey!.encode('hex', true), `app-${appId}-tss`)
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
@@ -471,7 +460,7 @@ class System extends CallablePlugin {
     if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
-      let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId)!;
+      let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId, undefined, {type: "app", seed})!;
       let keyShare:string|undefined;
       /**
        prevent storing wrong share.
@@ -624,9 +613,17 @@ class System extends CallablePlugin {
       throw `App context already has key`
     }
 
-    let key = await this.keyManager.keyGen({appId, seed}, {timeout: 65e3, lowerThanHalfN: true})
+    let key = await this.keyManager.keyGen(
+      {appId, seed},
+      {
+          timeout: 65e3,
+          lowerThanHalfN: true,
+          usage: {type: "app", seed}
+        }
+      )
 
     const shareProofs = await this.keyManager.getKeyShareProofs(
+      seed,
       key.partners,
       key.id,
       key.polynomial!.Fx
@@ -660,11 +657,13 @@ class System extends CallablePlugin {
       {appId, seed: newContext.seed},
       {
         id: `resharing-${uuid()}`,
+        usage: {type: "app", seed}
       }
     );
     log(`Key redistribution done for app[${appId}] tss key.`)
 
     const shareProofs = await this.keyManager.getKeyShareProofs(
+      seed,
       keyRedist.partners,
       keyRedist.id,
       keyRedist.polynomial!.Fx
@@ -725,7 +724,7 @@ class System extends CallablePlugin {
     const context:AppContext = this.appManager.getAppContext(appId, seed)
     if(!context)
       throw `App deployment info not found.`
-    let key: AppTssKey = await this.keyManager.getSharedKey(keyId)
+    let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed});
     // let key = await this.keyManager.getAppTssKey(appId, seed)
     if(!key)
       throw `App tss key not found.`
