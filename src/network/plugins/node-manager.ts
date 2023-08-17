@@ -361,7 +361,7 @@ export default class NodeManagerPlugin extends CallablePlugin{
     return response === "OK"
   }
 
-  @remoteMethod(RemoteMethods.CheckOnline)
+  @remoteMethod(RemoteMethods.CheckOnline, ifSynced)
   async __checkOnline(): Promise<string> {
     return "OK";
   }
