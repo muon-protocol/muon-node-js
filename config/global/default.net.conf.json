@@ -2,8 +2,8 @@
   "tss": {
     "threshold": 7,
     "max": 20,
-    "defaultTTL": 604800,
-    "pendingPeriod": 86400
+    "defaultTTL": 43200,
+    "pendingPeriod": 43200
   },
   "nodeManager": {
     "network": "bsctest",
