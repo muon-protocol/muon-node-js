@@ -608,14 +608,36 @@ class KeyManager extends CallablePlugin {
 
   async keyRedistInitHandler(constructData: KeyReDistOpts, network:MpcNetworkPlugin): Promise<KeyRedistribution> {
     const {extra} = constructData
-    const {prevPartyInfo: {appId, seed}} = extra;
+    const {prevPartyInfo, partyInfo} = extra;
 
     const currentNode = this.nodeManager.currentNodeInfo!;
     if(!currentNode)
       throw `Current node not added to network`;
 
-    const key = this.appManager.getAppTssKey(appId, seed);
-    const isDealer = !!key && constructData.dealers!.includes(currentNode.id);
+    const prevContext:AppContext|undefined = this.appManager.getSeedContext(prevPartyInfo.seed);
+    const newContext:AppContext|undefined = this.appManager.getSeedContext(partyInfo.seed);
+
+    if(!newContext)
+      throw `missing new context info when trying to reshare`;
+    if(lodash.difference(constructData.partners, newContext.party.partners).length > 0) {
+      throw `An unknown partner in the reshare party`
+    }
+    if(!!this.appManager.getAppTssKey(newContext.appId, newContext.seed)) {
+      throw `App tss key already reshared`;
+    }
+
+    if(prevContext) {
+      if(newContext.previousSeed !== prevContext.seed)
+        throw `The new context of reshare not related to the previous context.`;
+
+      if(lodash.difference(constructData.dealers, prevContext.party.partners).length > 0) {
+        throw `An unknown dealer in the reshare party`
+      }
+    }
+
+    const key = this.appManager.getAppTssKey(prevPartyInfo.appId, prevPartyInfo.seed);
+    const isDealer:boolean = !!key && constructData.dealers!.includes(currentNode.id);
+
 
     const _constructData: KeyReDistOpts = {...constructData}
 
@@ -666,19 +688,22 @@ class KeyManager extends CallablePlugin {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, timeout=60000} = options;
 
-    const prevParty = this.getAppParty(prevPartyInfo.appId, prevPartyInfo.seed)
-    if(!prevParty)
-      throw {message: `party not found`, prevPartyInfo}
+    const prevContext = this.appManager.getAppContext(prevPartyInfo.appId, prevPartyInfo.seed)
+    if(!prevContext)
+      throw {message: `reshare previous context not found`, prevPartyInfo}
 
-    const newParty = this.getAppParty(newPartyInfo.appId, newPartyInfo.seed)
-    if(!newParty)
-      throw {message: `party not found`, newPartyInfo};
+    const newContext = this.appManager.getAppContext(newPartyInfo.appId, newPartyInfo.seed)
+    if(!newContext)
+      throw {message: `reshare new context not found`, newPartyInfo};
+
+    if(newContext.previousSeed !== prevContext.seed)
+      throw `The new context of reshare not related to the previous context.`
 
     if(!this.appManager.appHasTssKey(prevPartyInfo.appId, prevPartyInfo.seed))
       throw {message: `the previous party doesn't have the tss key.`}
 
     let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({
-      list: newParty.partners,
+      list: newContext.party.partners,
     })
 
     const keyId = id || uuid()
@@ -702,13 +727,13 @@ class KeyManager extends CallablePlugin {
          */
         starter: this.nodeManager.currentNodeInfo!.id,
         /** partners of the old party, that redistribute the key to the new partners. */
-        dealers: lodash.intersection(prevParty.partners, newParty.partners),
+        dealers: lodash.intersection(prevContext.party.partners, newContext.party.partners),
         /** partners list */
         partners: partners.map(p => p.id),
         /** Previous party threshold */
         previousPolynomial: appKey.polynomial,
         /** DKG threshold */
-        t: newParty.t,
+        t: newContext.party.t,
         /** DKG value to be shared between partners */
         value: appKey.keyShare,
         /** public key of distributed key */
@@ -727,7 +752,11 @@ class KeyManager extends CallablePlugin {
     }
     while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
 
-    let key = new AppTssKey(newParty, keyRedist.extraParams.keyId!, dKey)
+    let key = new AppTssKey(
+      this.getAppParty(newPartyInfo.appId, newPartyInfo.seed),
+      keyRedist.extraParams.keyId!,
+      dKey
+    )
 
     await SharedMemory.set(
       keyRedist.extraParams.keyId,
