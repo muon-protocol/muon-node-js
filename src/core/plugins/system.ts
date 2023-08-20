@@ -91,6 +91,8 @@ class System extends CallablePlugin {
 
     if(withKeyCount>netConfigs.tss.threshold)
       throw `There is t deployer node with deployment keys`;
+    if(withKeyCount > 0)
+      throw `Some nodes has deployment key`;
     if(withoutKeyCount<netConfigs.tss.threshold)
       throw `No enough online deployers to create the key.`;
 
