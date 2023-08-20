@@ -25,6 +25,7 @@
     "peerStoreTTL": 1200000
   },
   "nodes": {
+    "onlineList": "https://alice-v2.muon.net/monitor/nodes",
     "aggregators": ["1", "2"]
   },
   "bootstrap": [
