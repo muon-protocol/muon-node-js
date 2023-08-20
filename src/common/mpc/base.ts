@@ -123,7 +123,7 @@ export class MultiPartyComputation {
     return graph;
   }
 
-  private extractQualifiedList(roundReceivedMsgs, defaultQualified) {
+  private extractQualifiedList(roundReceivedMsgs, defaultQualified): string[] {
     /** make graph of connection between nodes */
     let connectionGraph = Object.keys(roundReceivedMsgs).reduce(
       (obj, id) => {
@@ -131,9 +131,10 @@ export class MultiPartyComputation {
         return obj
       }, {});
 
-    /** remove nodes that not connected with starter node */
     if(!Array.isArray(connectionGraph[this.starter]))
-      connectionGraph = {}
+      return []
+
+    /** remove nodes that not connected with starter node */
     Object.keys(connectionGraph).forEach(node => {
       if(!connectionGraph[this.starter].includes(node)) {
         delete connectionGraph[node];
@@ -191,23 +192,37 @@ export class MultiPartyComputation {
     return this.roundsOutput[round].store;
   }
 
-  private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any, responseNeeded: boolean) {
-    const NumReTry = 1;
+  /**
+   * Try to get round data from a partner
+   *
+   * @param network {IMpcNetwork} - networking object that handles request and security.
+   * @param from {string} - target node id that asking data from.
+   * @param roundIndex {number} - index of asking round of MPC.
+   * @param dataToSend {any} - construction data wil pass throw this parameters at round 0.
+   * @param currentIsQualified {boolean} - current node is qualified or not.
+   * @param targetIsQualified {boolean} - target node is qualified or not.
+   */
+  private async tryToGetRoundDate(network: IMpcNetwork, from: string, roundIndex: number, dataToSend: any,
+                                  currentIsQualified: boolean, targetIsQualified: boolean) {
+    /** Setting the NumReTry parameter to more than one for qualified nodes, causes the key generation time to increase. */
+    const NumReTry = currentIsQualified ? 1 : 3;
     const roundTitle = this.rounds[roundIndex];
     let lastError: any;
     let result: any;
     for(let i=1 ; i<=NumReTry ; i++) {
       lastError = undefined;
       try {
-        if(responseNeeded) {
+        /** if the target node is qualified, we need its response. */
+        if(targetIsQualified) {
           result = await network.askRoundData(from, this.id, roundIndex, dataToSend);
-          return result;
+          break;
         }
+        /** otherwise, no need to wait for it's response */
         else {
-          network.askRoundData(from, this.id, roundIndex, dataToSend).catch(e => {});
+          network.askRoundData(from, this.id, roundIndex, dataToSend)
+            .catch(e => {});
           return null;
         }
-        break;
       }catch (e) {
         lastError = e;
         if(i != NumReTry)
@@ -232,10 +247,13 @@ export class MultiPartyComputation {
 
   private async process(network: IMpcNetwork, timeout: number) {
     this.log = logger(`muon:common:mpc:${this.ConstructorName}`);
+    const mpcExecDebugs = {}
     try {
       /** Some partners may be excluded during the MPC process. */
       let qualifiedPartners = this.getInitialQualifieds();
       this.log(`${this.ConstructorName}[${this.id}] start with partners %o`, qualifiedPartners)
+
+      mpcExecDebugs['start'] = {qualifiedPartners};
 
       for (let r = 0; r < this.rounds.length; r++) {
         Object.freeze(qualifiedPartners);
@@ -243,6 +261,9 @@ export class MultiPartyComputation {
 
         const currentRound = this.rounds[r], previousRound = r>0 ? this.rounds[r-1] : null;
         this.log(`processing round mpc[${this.id}].${currentRound} ...`)
+
+        mpcExecDebugs[currentRound] = {roundErrors: {}}
+
         /** prepare round handler inputs */
         let inputs: MapOf<any> = {}, broadcasts: MapOf<any> = {}
         if(r > 0) {
@@ -260,6 +281,7 @@ export class MultiPartyComputation {
         /** execute MPC round */
         if(isQualified[network.id]) {
           this.roundsOutput[currentRound] = await this.processRound(r, inputs, broadcasts, network.id, qualifiedPartners);
+          mpcExecDebugs[currentRound].malicious = this.roundsOutput[currentRound].malicious;
           this.log(`round executed [${network.id}].mpc[${this.id}].${currentRound}`)
         }
         this.roundsPromise.resolve(r, true);
@@ -278,8 +300,9 @@ export class MultiPartyComputation {
 
         let allPartiesResult: (PartnerRoundReceive|null)[] = await Promise.all(
           callingPartners.map(partner => {
-            return this.tryToGetRoundDate(network, partner, r, dataToSend, isQualified[partner])
+            return this.tryToGetRoundDate(network, partner, r, dataToSend, isQualified[network.id], isQualified[partner])
               .catch(e => {
+                mpcExecDebugs[currentRound].roundErrors[partner] = e.message || "unknown error";
                 partyErrors[partner] = JSON.stringify(e);
                 this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
                 return null
@@ -296,6 +319,7 @@ export class MultiPartyComputation {
 
         /** update qualified list based on current round outputs */
         qualifiedPartners = this.extractQualifiedList(this.roundsArrivedMessages[currentRound!], qualifiedPartners);
+        mpcExecDebugs[currentRound].qualifieds = qualifiedPartners;
         this.log(
           `MPC[${this.id}][${currentRound}] complete in %d ms with qualified list: %o`,
           Date.now() - roundStartTime,
@@ -303,7 +327,10 @@ export class MultiPartyComputation {
         );
 
         if(qualifiedPartners.length < this.t) {
-          throw `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified. partners=[${this.partners.join(',')}], round=${currentRound}, partyErrors=${JSON.stringify(partyErrors)}`
+          throw {
+            message: `${this.ConstructorName} needs ${this.t} partners but only [${qualifiedPartners.join(',')}] are qualified. partners=[${this.partners.join(',')}], round=${currentRound}, partyErrors=${JSON.stringify(partyErrors)} currentNode=${process.env.SIGN_WALLET_ADDRESS}`,
+            mpcExecDebugs,
+          }
         }
       }
 

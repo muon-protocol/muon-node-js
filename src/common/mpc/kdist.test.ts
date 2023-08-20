@@ -13,6 +13,7 @@ import * as TssModule from "../../utils/tss/index.js";
 import lodash from 'lodash'
 import {DistKeyJson} from "./dist-key.js";
 import {toBN} from "../../utils/helpers.js";
+import {PolynomialInfoJson} from "../types";
 
 const {range, uniq} = lodash
 const {randomHex} = Web3.utils
@@ -34,9 +35,10 @@ export type KeyConstructionData = {
   dealers?: string[],
   t: number,
   pk?: string,
+  starter: string,
 }
 
-export type KeyReDistributeData = KeyConstructionData & {previousT: number};
+export type KeyReDistributeData = KeyConstructionData & {publicKey: string, previousPolynomial: PolynomialInfoJson};
 
 function resultOk(realKey: string|null, realPubKey: string|null, resultPubKey: string, reconstructedKey, reconstructedPubKey) {
   if(resultPubKey !== reconstructedPubKey)
@@ -94,7 +96,8 @@ async function keyRedistribute(
     partners: cData.partners,
     dealers: cData.dealers,
     t: cData.t,
-    previousT: cData.previousT,
+    publicKey: cData.publicKey,
+    previousPolynomial: cData.previousPolynomial,
   }
   let keyReDists = partners.map((p, index) => {
     return new KeyRedistribution({...keyReDistOpts, value: shares[index]?.share})
@@ -136,6 +139,7 @@ async function run() {
     const initialPartners = partners.slice(0, nextThreshold+1);
     let initialKeyShares = await keyGen(initialPartners, fakeNets, {
       id: `dkg-${Date.now()}${random()}`,
+      starter: initialPartners[0],
       partners: initialPartners,
       t: threshold,
       pk: realPrivateKey,
@@ -151,9 +155,11 @@ async function run() {
       fakeNets,
       {
         id: `kredist-${Date.now()}${random()}`,
+        starter: initialPartners[0],
         partners,
         dealers: initialPartners,
-        previousT: threshold,
+        publicKey: initialKeyShares[0].publicKey,
+        previousPolynomial: initialKeyShares[0].polynomial!,
         t: nextThreshold,
       },
       initialKeyShares

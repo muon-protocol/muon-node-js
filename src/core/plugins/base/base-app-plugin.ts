@@ -28,12 +28,13 @@ import {MapOf} from "../../../common/mpc/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
 import {reportInsufficientPartners} from "../../../common/analitics-reporter.js";
 import {createAjv} from "../../../common/ajv.js";
+import ethSigUtil from '@metamask/eth-sig-util'
 
 const { omit } = lodash;
 
 const ajv = createAjv();
 const clone = (obj) => JSON.parse(JSON.stringify(obj))
-const requestConfirmationCache: RedisCache = new RedisCache('req-confirm')
+const requestConfirmationCache: RedisCache = new RedisCache('req-confirm', 3600)
 
 const RemoteMethods = {
   AskSignature: 'AskSign',
@@ -299,6 +300,7 @@ class BaseAppPlugin extends CallablePlugin {
       newRequest.reqId = this.calculateRequestId(newRequest, resultHashWithoutSecurityParams)
       newRequest.data.signParams = this.appendSecurityParams(newRequest, appSignParams)
       resultHash = this.hashAppSignParams(newRequest, appSignParams)
+      newRequest.data.resultHash = resultHash;
 
       let isDuplicateRequest = false;
       if(this.requestManager.hasRequest(newRequest.reqId)){
@@ -421,20 +423,33 @@ class BaseAppPlugin extends CallablePlugin {
     if(fee && feeConfigs) {
       this.log(`spending fee %o`, fee)
       const {spender} = fee;
+      spender.address = spender.address.toLowerCase();
       const appId = this.APP_ID;
 
       /** fee signature is valid for 5 minutes */
       if(spender.timestamp/1000 < request.data.timestamp-5*60)
         throw `fee spend time has been expired.`
 
-      const hash = muonSha3(
-        {t: "address", v: spender.address},
-        {t: 'uint64', v: spender.timestamp},
-        {t: 'uint256', v: appId},
-      )
-      const signer = crypto.recover(hash, spender.signature);
+      const eip712TypedData = {
+        types: {
+          EIP712Domain: [{name: 'name', type: 'string'}],
+          Message: [
+            {type: 'address', name: 'address'},
+            {type: 'uint64', name: 'timestamp'},
+            {type: 'uint256', name: 'appId'},
+          ]
+        },
+        domain: {name: 'Muonize'},
+        primaryType: 'Message',
+        message: {address: spender.address, timestamp: spender.timestamp, appId}
+      };
+
+      // @ts-ignore
+      let signer = ethSigUtil.recoverTypedSignature({data: eip712TypedData, signature: spender.signature, version: "V4"});
+
+      signer = signer.toLowerCase();
       if(signer !== spender.address)
-        throw `fee spender not matched with signer.`
+        throw `fee spender not matched with signer.`;
 
       /** spend fee */
       const {endpoint, signers: feeSigners} = feeConfigs
@@ -543,7 +558,7 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: 'App party is not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
-    this.log(`generating nonce with ${nonceParticipantsCount} partners.`)
+    this.log(`generating nonce with ${Math.min(nonceParticipantsCount, availablePartners.length)} partners.`)
     let nonce = await this.keyManager.keyGen({appId: this.APP_ID, seed}, {
       id: `nonce-${request.reqId}`,
       partners: availablePartners,
@@ -553,7 +568,6 @@ class BaseAppPlugin extends CallablePlugin {
 
     // let sign = this.keyManager.sign(null, party);
     return {
-      // noncePub: nonce.publicKey.encode('hex'),
       nonceAddress: TssModule.pub2addr(nonce.publicKey),
     }
   }
@@ -639,6 +653,20 @@ class BaseAppPlugin extends CallablePlugin {
     let p1 = TssModule.pointAdd(K_i, Z_i.mul(eInv)).encode('hex', true)
     let p2 = TssModule.curve.g.multiply(s).encode("hex", true);
     return p1 === p2 ? owner : null;
+  }
+
+  async verifyPartialSignature(request: AppRequest, owner:MuonNodeInfo, signature: string): Promise<boolean> {
+    const appTssKey = this.getTss(request.deploymentSeed)!
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)
+
+    return TssModule.schnorrVerifyPartial(
+      appTssKey.getPubKey(owner.id),
+      appTssKey.publicKey,
+      nonce.getPubKey(owner.id),
+      nonce.publicKey,
+      request.data.resultHash,
+      signature,
+    );
   }
 
   async verify(hash: string, signature: string, nonceAddress: string): Promise<boolean> {
@@ -734,7 +762,7 @@ class BaseAppPlugin extends CallablePlugin {
      */
     await useOneTime("key", K.encode('hex', true), `app-${this.APP_ID}-nonce-${resultHash}`, 3600)
     // TODO: remove nonce after sign
-    let signature = TssModule.schnorrSign(tssKey.share!, k_i!, K, resultHash)
+    let signature = TssModule.schnorrSign(tssKey.share!, tssKey.publicKey, k_i!, K, resultHash)
 
     if(!process.env.SIGN_WALLET_ADDRESS){
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
@@ -756,30 +784,27 @@ class BaseAppPlugin extends CallablePlugin {
     try {
       this.log(`node ${remoteNode.id} signed the request.`)
       let {reqId, sign} = data!;
-      // let request = await Request.findOne({_id: sign.request})
       let request:AppRequest = this.requestManager.getRequest(reqId) as AppRequest
       if (request) {
-        // TODO: check response similarity
-        // let signer = await this.recoverSignature(request, remoteNode.wallet, sign)
-        // if (signer && signer === sign.owner) {
-          // @ts-ignore
+        /**
+         * alice-v1 deployment key is old and does not have polynomial info.
+         * disable verification temporarily for deployment.
+         * */
+        let signatureVerified = request.appId === "1" || (await this.verifyPartialSignature(request, remoteNode, sign))
+        if (signatureVerified) {
           this.requestManager.addSignature(request.reqId, remoteNode.wallet, sign)
-          // // let newSignature = new Signature(sign)
-          // // await newSignature.save()
-        // } else {
-        //   console.log('signature mismatch', {
-        //     request: request.hash,
-        //     signer,
-        //     sigOwner: sign.owner
-        //   })
-        // }
+        }
+        else {
+          this.log.error('partial signature mismatch %o', {reqId: request.reqId, sign, signer: remoteNode.id})
+          this.requestManager.addError(reqId, remoteNode.wallet, {message: "partial signature mismatch"});
+        }
       }
       else{
-        console.log(`BaseAppPlugin.__onRemoteSignTheRequest >> Request not found id:${reqId}`)
+        this.log(`Request not found id:${reqId}`)
       }
     }
     catch (e) {
-      console.error('BaseAppPlugin.__onRemoteSignTheRequest', e);
+      this.log.error('onRemoteSignTheRequest', e);
     }
   }
 
@@ -790,14 +815,6 @@ class BaseAppPlugin extends CallablePlugin {
     if(!plugin.__appApiExports[method])
       throw `Method ${pluginName}.${method} not exported as API method.`
     return plugin[method](...otherArgs)
-  }
-
-  async shieldConfirmedRequest(request) {
-    const [result, hash] = await this.preProcessRemoteRequest(request);
-    return {
-      result,
-      hash
-    }
   }
 
   async preProcessRemoteRequest(request, validation:boolean=true) {
@@ -858,7 +875,7 @@ class BaseAppPlugin extends CallablePlugin {
    * @param _request
    */
   async verifyRequestSignature(_request: AppRequest): Promise<boolean> {
-    const request = clone(_request)
+    const request:AppRequest = clone(_request)
     deepFreeze(request);
 
     // const [result, hash] = await this.preProcessRemoteRequest(request);

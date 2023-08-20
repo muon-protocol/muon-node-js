@@ -16,7 +16,7 @@ import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from "../../common/mpc/dist-key.js";
 import {logger} from '@libp2p/logger'
 import {useOneTime} from "../../utils/tss/use-one-time.js";
-import {KeyRedistribution} from "../../common/mpc/kdist.js";
+import {KeyReDistOpts, KeyRedistribution} from "../../common/mpc/kdist.js";
 import MpcNetworkPlugin from "./mpc-network";
 import {PublicKey} from "../../utils/tss/types";
 import * as crypto from "../../utils/crypto.js";
@@ -574,16 +574,32 @@ class KeyManager extends CallablePlugin {
     return dkg;
   }
 
-  async keyRedistInitHandler(constructData, network:MpcNetworkPlugin): Promise<KeyRedistribution> {
+  async keyRedistInitHandler(constructData: KeyReDistOpts, network:MpcNetworkPlugin): Promise<KeyRedistribution> {
     const {extra} = constructData
     const {prevPartyInfo: {appId, seed}} = extra;
+
     const currentNode = this.nodeManager.currentNodeInfo!;
+    if(!currentNode)
+      throw `Current node not added to network`;
+
     const key = this.appManager.getAppTssKey(appId, seed);
-    const keyRedist = new KeyRedistribution({
-      ...constructData,
-      dealers: !!key ? constructData.dealers : constructData.dealers.filter(id => id !== currentNode.id),
-      value: !!key ? key.keyShare : undefined
-    });
+    const isDealer = !!key && constructData.dealers!.includes(currentNode.id);
+
+    const _constructData: KeyReDistOpts = {...constructData}
+
+    if(isDealer) {
+      if(!key.polynomial)
+        throw `The app's TSS key doesn't have any polynomial info to be reshared.`
+      _constructData.publicKey = key.publicKey.encoded!;
+      _constructData.previousPolynomial = key.polynomial;
+      _constructData.value = key.keyShare
+    }
+    else {
+      _constructData.dealers = constructData.dealers!.filter(id => id !== currentNode.id)
+      _constructData.value = undefined;
+    }
+
+    const keyRedist = new KeyRedistribution(_constructData);
 
     keyRedist.runByNetwork(network)
       .then(async (dKey: DistKey) => {
@@ -630,6 +646,10 @@ class KeyManager extends CallablePlugin {
     log(`creating key with partners: %o`, partners.map(p => p.id))
 
     const appKey = this.appManager.getAppTssKey(prevPartyInfo.appId, prevPartyInfo.seed);
+    if(!appKey)
+      throw `The app's TSS key was not found.`
+    if(!appKey.polynomial)
+      throw `The app's TSS key doesn't have any polynomial info to be reshared.`
 
     let keyRedist: KeyRedistribution, dKey: DistKey;
     do {
@@ -646,7 +666,7 @@ class KeyManager extends CallablePlugin {
         /** partners list */
         partners: partners.map(p => p.id),
         /** Previous party threshold */
-        previousT: prevParty.t,
+        previousPolynomial: appKey.polynomial,
         /** DKG threshold */
         t: newParty.t,
         /** DKG value to be shared between partners */
@@ -705,7 +725,7 @@ class KeyManager extends CallablePlugin {
             n.peerId,
             RemoteMethods.KeyShareProof,
             {keyId},
-            {timeout: 2000},
+            {timeout: 5000},
           )
         )
           .then(signature => {

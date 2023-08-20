@@ -26,6 +26,7 @@ import {aesDecrypt, isAesEncrypted} from "../../utils/crypto.js";
 import {MapOf} from "../../common/mpc/types";
 import {toBN} from "../../utils/tss/utils.js";
 import * as PromiseLib from "../../common/promise-libs.js"
+import {Mutex} from "../../common/mutex.js";
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -70,11 +71,12 @@ export default class AppManager extends CallablePlugin {
   private appTssConfigs: MapOf<AppTssConfig> = {}
   private loading: TimeoutPromise = new TimeoutPromise();
   private deploymentPublicKey: PublicKey | null = null;
-  /**
-   Map each nodeId to last context timestamp that the node included.
-   nodeId => timestamp
-   */
-  private nodesLastTimestamp: MapOf<number> = {}
+
+  private mutex:Mutex;
+
+  async onInit() {
+    this.mutex = new Mutex();
+  }
 
   async onStart() {
     await super.onStart()
@@ -163,8 +165,6 @@ export default class AppManager extends CallablePlugin {
         if(ctx.party.partners.includes(currentNode.id) && (!ctx.expiration || Date.now() < ctx.expiration*1000)) {
           NetworkIpc.addContextToLatencyCheck(ctx).catch(e => {})
         }
-
-        this.updateNodesLastTimestamp(ctx);
       })
       log('apps contexts loaded.')
 
@@ -186,20 +186,11 @@ export default class AppManager extends CallablePlugin {
     }
   }
 
-  private updateNodesLastTimestamp(ctx: AppContext) {
-    const {deploymentRequest} = ctx;
-    if(deploymentRequest) {
-      const deployTime: number = deploymentRequest.data.timestamp;
-      for (const node of ctx.party.partners) {
-        if (this.nodesLastTimestamp[node] === undefined || this.nodesLastTimestamp[node] < deployTime) {
-          this.nodesLastTimestamp[node] = deployTime;
-        }
-      }
-    }
-  }
-
-  getNodeLastTimestamp(node: MuonNodeInfo): number|undefined {
-    return this.nodesLastTimestamp[node.id];
+  getNodeLastTimestamp(node: MuonNodeInfo): number|null {
+    const max = Object.values(this.appContexts)
+      .filter(ctx => ctx.appId!=="1" && ctx.party.partners.includes(node.id))
+      .reduce((max, ctx)=>Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
+    return max > 0 ? max : null
   }
 
   async onDeploymentTssKeyGenerate(tssKey) {
@@ -209,28 +200,36 @@ export default class AppManager extends CallablePlugin {
 
   async saveAppContext(context: AppContext) {
     context = _.omit(context, ["_id"]) as AppContext;
-    // @ts-ignore
-    const oldDoc = await AppContextModel.findOne({seed: context.seed, appId: context.appId})
-    if (oldDoc) {
-      _.assign(oldDoc, context)
-      oldDoc.dangerousAllowToSave = true
-      await oldDoc.save()
-      CoreIpc.fireEvent({type: "app-context:update", data: context})
-      NetworkIpc.fireEvent({type: "app-context:update", data: context})
-      return oldDoc
-    }
-    else {
-      let newContext = new AppContextModel(context)
-      /**
-       * Do not use this code in any other place
-       * Call this method as the base method for saving AppContextModel.
-       */
-      newContext.dangerousAllowToSave = true
-      await newContext.save()
-      CoreIpc.fireEvent({type: "app-context:add", data: context})
-      NetworkIpc.fireEvent({type: "app-context:add", data: context})
+    const lock = await this.mutex.lock(`ctx-update:${context.seed}`);
+    try {
+      // @ts-ignore
+      const oldDoc = await AppContextModel.findOne({seed: context.seed, appId: context.appId})
+      if (oldDoc) {
+        if(oldDoc.keyGenRequest) {
+          return;
+        }
+        _.assign(oldDoc, context)
+        oldDoc.dangerousAllowToSave = true
+        await oldDoc.save()
+        CoreIpc.fireEvent({type: "app-context:update", data: context})
+        NetworkIpc.fireEvent({type: "app-context:update", data: context})
+        return oldDoc
+      } else {
+        let newContext = new AppContextModel(context)
+        /**
+         * Do not use this code in any other place
+         * Call this method as the base method for saving AppContextModel.
+         */
+        newContext.dangerousAllowToSave = true
+        await newContext.save()
+        CoreIpc.fireEvent({type: "app-context:add", data: context})
+        NetworkIpc.fireEvent({type: "app-context:add", data: context})
 
-      return newContext;
+        return newContext;
+      }
+    }
+    finally {
+      await lock.release()
     }
   }
 
@@ -274,8 +273,6 @@ export default class AppManager extends CallablePlugin {
       ...this.getAppSeeds(appId),
       seed
     ]) as string[]
-
-    this.updateNodesLastTimestamp(ctx);
   }
 
   private async onAppContextUpdate(doc) {
@@ -942,11 +939,9 @@ export default class AppManager extends CallablePlugin {
    * @param count {number} - The number of outputs that the user wants. The actual number of outputs may be higher than the value of this parameter.
    */
   getSortedContexts(fromTimestamp: number, count: number): AppContext[] {
-    const currentTime = getTimestamp()
     let list = Object.values(this.appContexts)
       .filter((ctx:AppContext) => {
-        return (!ctx.expiration || ctx.expiration > currentTime)
-          && !!ctx.deploymentRequest
+        return !!ctx.deploymentRequest
           && ctx.deploymentRequest.data.timestamp >= fromTimestamp
       })
       .sort((a,b) => {

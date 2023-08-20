@@ -6,6 +6,7 @@ import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import NodeManagerPlugin from "./node-manager";
+import DbSynchronizer from "./db-synchronizer";
 
 export const IpcMethods = {
   ExecRemoteCall: "exec-remote-call",
@@ -16,11 +17,11 @@ export const IpcMethods = {
   GetAppTimeout: "get-app-timeout",
   QueryAppAllContext: "query-app-all-context",
   IsDeploymentExcerpt: "is-deployment-excerpt",
-  ShieldConfirmedRequest: "shield-confirmed-request",
   EnsureAppTssKeyExist: "ensure-app-tss-key-exist",
   FindNAvailablePartners: "find-n-available-partner",
   VerifyRequestSignature: "verify-req-sign",
-  GetNodeLastContextTime: "get-node-last-ctx-time"
+  GetNodeLastContextTime: "get-node-last-ctx-time",
+  IsDbSynced: "is-db-synced",
 } as const;
 type IpcKeys = keyof typeof IpcMethods;
 export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
@@ -91,8 +92,8 @@ class CoreIpcHandlers extends CallablePlugin {
    * @param appName
    */
   @ipcMethod(IpcMethods.GetAppTimeout)
-  async __getAppTimeout(appName: string) {
-    const app = await this.muon.getAppByName(appName)
+  async __getAppTimeout(appName: string): Promise<number> {
+    const app:BaseAppPlugin = await this.muon.getAppByName(appName)
     if(!app)
       return 0;
     return app.requestTimeout || 0
@@ -114,14 +115,6 @@ class CoreIpcHandlers extends CallablePlugin {
   async __isDeploymentExcerpt(data: {appName: string, method: string}) {
     const gp: GatewayInterface = this.muon.getPlugin("gateway-interface")
     return gp.getActualHandlerMethod(data.appName, data.method) !== "default"
-  }
-
-  @ipcMethod(IpcMethods.ShieldConfirmedRequest)
-  async __shieldConfirmedRequest(request) {
-    const app: BaseAppPlugin = this.muon.getAppById(request.appId)
-    if(!app)
-      throw `CoreIpcHandler.__shieldConfirmedRequest Error: app not found ${request.appId}`
-    return await app.shieldConfirmedRequest(request)
   }
 
   @ipcMethod(IpcMethods.EnsureAppTssKeyExist)
@@ -162,11 +155,17 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.GetNodeLastContextTime)
-  async __getNodeLastContextTime(nodeIndex: string): Promise<number|undefined> {
+  async __getNodeLastContextTime(nodeIndex: string): Promise<number|null> {
     const node: MuonNodeInfo = this.nodeManager.getNodeInfo(nodeIndex)!;
     if(!node)
-      return undefined;
+      return null;
     return this.appManager.getNodeLastTimestamp(node);
+  }
+
+  @ipcMethod(IpcMethods.IsDbSynced)
+  async __isDbSynced(): Promise<boolean> {
+    const dbSync: DbSynchronizer = this.muon.getPlugin("db-synchronizer");
+    return dbSync.isSynced
   }
 }
 

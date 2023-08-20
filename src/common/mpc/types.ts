@@ -39,7 +39,12 @@ export type RoundOutput<ResultT, BroadcastT> = {
   /**
    * non-responding and malignant partners excluded from mail list
    */
-  qualifieds?: string[]
+  qualifieds?: string[],
+  /**
+   A map object that links network id to the explanation of this node's malicious behavior.
+   networkID => explanation
+   */
+  malicious?: MapOf<string>,
 }
 
 export type PartyConnectivityGraph = {[index: string]: string[]}

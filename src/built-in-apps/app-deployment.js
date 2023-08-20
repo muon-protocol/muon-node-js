@@ -181,10 +181,7 @@ module.exports = {
     readOnlyMethods: ["init", 'undeploy'],
 
     init: async function(params) {
-        return {
-            success: true,
-            result: await this.callPlugin("system", "initializeDeploymentKey"),
-        }
+        return this.callPlugin("system", "initializeDeploymentKey")
     },
 
     undeploy: async function (params) {
@@ -197,6 +194,66 @@ module.exports = {
         return {
             success: true,
         }
+    },
+
+    selectPartyNodes: async function(request) {
+        let {
+            method,
+            data: { params }
+        } = request
+        const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
+        let {
+            appId,
+            previousSeed,
+            seed: {value: seed},
+            t=tssConfigs.threshold,
+            n=tssConfigs.max,
+            nodes,
+        } = params;
+
+        t = Math.max(t, tssConfigs.threshold);
+
+        let prevContext;
+        if(method === Methods.TssRotate) {
+            prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
+            if (!prevContext)
+                throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
+
+            /** threshold will not change when rotating the party */
+            t = prevContext.party.t
+        }
+
+        /** Choose a few nodes at random to join the party */
+        let selectedNodes;
+        if(!!nodes) {
+            selectedNodes = nodes
+        }
+        else {
+            selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
+            selectedNodes = selectedNodes.map(({id}) => id)
+        }
+
+        if(method === Methods.TssRotate) {
+            let countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
+            let previousNodes = prevContext.party.partners
+            if(!!prevContext.keyGenRequest?.data?.init?.shareProofs) {
+                const nodesWithProof = Object.keys(prevContext.keyGenRequest?.data?.init?.shareProofs);
+                if(nodesWithProof.length < countToKeep) {
+                    /** select all nodes with proof and add some other random nodes */
+                    selectedNodes = [...nodesWithProof, ...selectedNodes];
+                    previousNodes = prevContext.party.partners.filter(id => !nodesWithProof.includes(id))
+                    countToKeep -= nodesWithProof.length
+                }
+                else{
+                    previousNodes = nodesWithProof;
+                }
+            }
+            /** Pick some nodes to retain in the new party */
+            const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
+            /** Merge nodes and retain n nodes */
+            selectedNodes = lodash.uniq([...nodesToKeep, ...selectedNodes]).slice(0, n);
+        }
+        return selectedNodes;
     },
 
     /**
@@ -328,45 +385,7 @@ module.exports = {
         switch (method) {
             case Methods.Deploy:
             case Methods.TssRotate: {
-                const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                let {
-                    appId,
-                    previousSeed,
-                    seed: {value: seed},
-                    t=tssConfigs.threshold,
-                    n=tssConfigs.max,
-                    nodes,
-                } = params;
-
-                t = Math.max(t, tssConfigs.threshold);
-
-                let prevContext;
-                if(method === Methods.TssRotate) {
-                    prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
-                    if (!prevContext)
-                        throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
-
-                    /** threshold will not change when rotating the party */
-                    t = prevContext.party.t
-                }
-
-                /** Choose a few nodes at random to join the party */
-                let selectedNodes;
-                if(!!nodes) {
-                    selectedNodes = nodes
-                }
-                else {
-                    selectedNodes = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
-                    selectedNodes = selectedNodes.map(({id}) => id)
-                }
-                if(method === Methods.TssRotate) {
-                    const previousNodes = prevContext.party.partners
-                    /** Pick some nodes to retain in the new party */
-                    const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
-                    const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
-                    /** Merge nodes and retain n nodes */
-                    selectedNodes = lodash.uniq([...nodesToKeep, ...selectedNodes]).slice(0, n);
-                }
+                const selectedNodes = await this.selectPartyNodes(request);
                 return {
                     selectedNodes,
                 }
@@ -430,7 +449,6 @@ module.exports = {
                     seed: {value: seed},
                     t=tssConfigs.threshold,
                     n=tssConfigs.max,
-                    nodes,
                     ttl: userDefinedTTL,
                     pendingPeriod: pending,
                 } = params
@@ -440,16 +458,10 @@ module.exports = {
 
                 /** check selected nodes */
 
-                let selectedNodes2;
-                if(!!nodes) {
-                    selectedNodes2 = nodes
-                }
-                else {
-                    selectedNodes2 = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
-                    selectedNodes2 = selectedNodes2.map(({id}) => id)
-                }
+                let selectedNodes2 = await this.selectPartyNodes(request);
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
+                
                 if(difference > NODES_SELECTION_TOLERANCE)
                     throw `selected nodes mismatched.`
 
@@ -476,7 +488,6 @@ module.exports = {
                     seed: {value: seed},
                     t=tssConfigs.threshold,
                     n=tssConfigs.max,
-                    nodes,
                     ttl: userDefinedTTL,
                     pendingPeriod: pending,
                 } = params
@@ -487,22 +498,10 @@ module.exports = {
 
                 /** check selected nodes */
 
-                let selectedNodes2;
-                if(!!nodes) {
-                    selectedNodes2 = nodes
-                }
-                else {
-                    selectedNodes2 = await this.callPlugin("system", "selectRandomNodes", seed, t, n);
-                    selectedNodes2 = selectedNodes2.map(({id}) => id)
-                }
-                const previousNodes = prevContext.party.partners
-                /** Pick some nodes to retain in the new party */
-                const countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
-                const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
-                /** Merge nodes and retain n nodes */
-                selectedNodes2 = lodash.uniq([...nodesToKeep, ...selectedNodes2]).slice(0, n);
+                let selectedNodes2 = await this.selectPartyNodes(request);
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
+                
                 if(difference > NODES_SELECTION_TOLERANCE)
                     throw `selected nodes mismatched.`
 

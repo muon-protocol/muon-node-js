@@ -1,4 +1,3 @@
-import {GlobalBroadcastChannels} from "./contantes";
 import BN from 'bn.js'
 import {PublicKey} from "../utils/tss/types";
 import {MultiPartyComputation} from "./mpc/base";
@@ -16,11 +15,8 @@ export type JsonPublicKey = {
     yParity: string
 }
 
-export type RemoteCallOptions = {
-}
-
 export type RemoteMethodOptions = {
-    allowShieldNode?: boolean,
+    middlewares?: any[],
 }
 
 export type Constructor<T> = new (...args: any[]) => T;
@@ -81,9 +77,6 @@ export type AppDeploymentInfo = {
     contextHash?: string,
 };
 
-type GlobalBroadcastChannelsKeys = keyof typeof GlobalBroadcastChannels;
-export type GlobalBroadcastChannel = typeof GlobalBroadcastChannels[GlobalBroadcastChannelsKeys];
-
 export type Override<T1, T2> = Omit<T1, keyof T2> & T2;
 
 export type TypedValue =
@@ -116,6 +109,7 @@ export type AppRequest = {
         params: any,
         timestamp: number,
         result: any,
+        resultHash: string,
         signParams: TypedValue[],
         init: {
             nonceAddress: string,

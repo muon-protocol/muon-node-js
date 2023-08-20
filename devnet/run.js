@@ -2,7 +2,6 @@ import dotenv from 'dotenv'
 dotenv.config()
 import fs from 'fs'
 import path from 'path'
-import emoji from 'node-emoji'
 import {spawn} from 'child_process'
 import parseArgv from '../src/utils/parseArgv.js'
 import {filePathInfo} from "../src/utils/helpers.js";
@@ -47,7 +46,7 @@ async function start() {
       .find((item) => item.trim().startsWith('SIGN_WALLET_ADDRESS'))
       .split('=')
     console.log(
-      emoji.get('o'),
+      "⭕",
       `Node-${index} Ethereum Address: `,
       `${address[1]}\n`
     )

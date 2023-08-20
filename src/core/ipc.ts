@@ -4,6 +4,7 @@ import { BROADCAST_CHANNEL } from './plugins/broadcast.js'
 import { IPC_CHANNEL } from './plugins/core-ipc-plugin.js'
 import {MessageOptions} from "../common/message-bus/msg-publisher.js";
 import {IpcMethods, CoreIpcMethod} from "./plugins/core-ipc-handlers.js";
+import {GatewayCallParams} from "../gateway/types";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 const broadcastQueue = new QueueProducer(BROADCAST_CHANNEL)
@@ -11,9 +12,23 @@ const broadcastQueue = new QueueProducer(BROADCAST_CHANNEL)
 export const GLOBAL_EVENT_CHANNEL = 'core-global-events'
 const coreGlobalEvents = new MessagePublisher(GLOBAL_EVENT_CHANNEL)
 
+export const CORE_REQUEST_QUEUE_CHANNEL = `core-request-queue`
+let requestQueue = new QueueProducer(CORE_REQUEST_QUEUE_CHANNEL);
+
 export type CoreGlobalEvent = {
   type: string,
   data: any
+}
+
+export async function enqueueAppRequest(requestData: GatewayCallParams, defaultOptions:IpcCallOptions={}): Promise<any> {
+  const {app} = requestData;
+  const timeout: number = defaultOptions.timeout === undefined ? await getAppTimeout(app) : 0;
+  const options:IpcCallOptions = {
+    timeout: Math.ceil(timeout * 1.2),
+    timeoutMessage: "gateway timed out.",
+    ...defaultOptions
+  }
+  return requestQueue.send(requestData, options);
 }
 
 /**
@@ -65,7 +80,7 @@ export async function getAppOldestContext(appName: string): Promise<AppContext|u
  * Return minimum time the app needs to confirm the request
  * @param appName
  */
-export async function getAppTimeout(appName) {
+export async function getAppTimeout(appName): Promise<number> {
   return await call(IpcMethods.GetAppTimeout, appName)
 }
 
@@ -79,10 +94,6 @@ export async function queryAppAllContext(appName): Promise<AppContext[]> {
 
 export async function isDeploymentExcerpt(appName, method) {
   return await call(IpcMethods.IsDeploymentExcerpt, {appName, method})
-}
-
-export async function shieldConfirmedRequest(request) {
-  return await call(IpcMethods.ShieldConfirmedRequest, request);
 }
 
 export async function ensureAppTssKeyExist(appId: string, seed: string) {
@@ -101,6 +112,10 @@ export async function getAppDeploymentInfo(appId: string, seed: string): Promise
   return call(IpcMethods.GetAppDeploymentInfo, {appId, seed});
 }
 
-export async function getNodeLastContextTime(node: string): Promise<number|undefined> {
+export async function getNodeLastContextTime(node: string): Promise<number|null> {
   return call(IpcMethods.GetNodeLastContextTime, node);
+}
+
+export async function isDbSynced(): Promise<boolean> {
+  return call(IpcMethods.IsDbSynced, {});
 }

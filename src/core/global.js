@@ -8,9 +8,7 @@ import * as tron from '../utils/tron.js'
 import lodash from 'lodash'
 import { toBaseUnit } from '../utils/crypto.js'
 import { timeout, floatToBN } from '../utils/helpers.js'
-import util from 'ethereumjs-util'
-import ws from 'ws'
-import ethSigUtil from 'eth-sig-util'
+import ethSigUtil from '@metamask/eth-sig-util'
 import {
   getBlock as ethGetBlock,
   getBlockNumber as ethGetBlockNumber,
@@ -40,7 +38,6 @@ global.MuonAppUtils = {
   flatten,
   groupBy,
   tron,
-  ws,
   timeout,
   BN,
   toBN,
@@ -57,6 +54,5 @@ global.MuonAppUtils = {
   toBaseUnit,
   ecRecover,
   recoverTypedSignature: ethSigUtil.recoverTypedSignature,
-  recoverTypedMessage: ethSigUtil.recoverTypedMessage,
   BNSqrt: BNSqrt
 }

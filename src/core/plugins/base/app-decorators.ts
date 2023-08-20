@@ -1,5 +1,5 @@
-import {GlobalBroadcastChannel, RemoteMethodOptions} from '../../../common/types'
 import CoreBroadcastPlugin from "../../../core/plugins/broadcast.js";
+import {CoreRemoteCallMiddleware} from "../../remotecall-middleware";
 
 function classNames(target): string[] {
   let names: string[] = []
@@ -11,11 +11,11 @@ function classNames(target): string[] {
   return names;
 }
 
-export function remoteMethod (title, options: RemoteMethodOptions={}) {
+export function remoteMethod (title, ...middlewares: CoreRemoteCallMiddleware[]) {
   return function (target, property, descriptor) {
     if(!target.__remoteMethods)
       target.__remoteMethods = []
-    target.__remoteMethods.push({title, property, options})
+    target.__remoteMethods.push({title, property, middlewares})
     return descriptor
   }
 }
@@ -53,15 +53,6 @@ export function broadcastHandler (target, property, descriptor) {
   }
   target.__broadcastHandlerMethod = property
   return descriptor
-}
-
-export function globalBroadcastHandler (title: GlobalBroadcastChannel, options={}) {
-  return function (target, property, descriptor) {
-    if(!target.__globalBroadcastHandlers)
-      target.__globalBroadcastHandlers = []
-    target.__globalBroadcastHandlers.push({title, property, options})
-    return descriptor
-  }
 }
 
 /**
@@ -106,10 +97,8 @@ export function remoteApp (constructor): any {
           let item = constructor.prototype.__remoteMethods[i];
           // console.log('########## registering remote method', item, this.remoteMethodEndpoint(item.title))
           this.registerRemoteMethod(item.title, this[item.property].bind(this), {
-            /** default options */
-            allowShieldNode: false,
             /** override options */
-            ...item.options,
+            middlewares: item.middlewares,
             /** other props */
             method: item.title,
             appName: this.APP_NAME,

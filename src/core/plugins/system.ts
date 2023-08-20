@@ -96,9 +96,9 @@ class System extends CallablePlugin {
     if(withoutKeyCount<netConfigs.tss.threshold)
       throw `No enough online deployers to create the key.`;
 
-    const key = await this.keyManager.createDeploymentTssKey()
+    const key:AppTssKey = await this.keyManager.createDeploymentTssKey()
 
-    return key;
+    return _.pick(key.toJson(), ["publicKey", "polynomial", "partners"]);
   }
 
   private async getAvailableNodes(): Promise<MuonNodeInfo[]> {
@@ -231,10 +231,20 @@ class System extends CallablePlugin {
     const context = this.appManager.getAppContext(appId, seed);
     if(!context)
       throw `App deployment info not found.`
+    const {partners} = context.party
 
-    const generatorId = await this.getFirstOnlinePartner(context.party.partners);
-    if(!generatorId)
-      throw `key-gen starter node not online`
+    const generatorId = await this.getFirstOnlinePartner(partners);
+    if(!generatorId) {
+      let isOnline:any = await Promise.all(
+        context.party.partners.map(id => NetworkIpc.isNodeOnline(id).catch(e => e.message))
+      )
+      isOnline = isOnline.reduce((obj, t, i) => (obj[partners[i]]=t, obj), {})
+      const debug = {
+        generatorId: generatorId || null,
+        isOnline
+      }
+      throw {message: `key-gen starter node not online`, ...debug}
+    }
 
     const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
 
@@ -259,7 +269,7 @@ class System extends CallablePlugin {
       throw `App's new context not found.`
     const oldContext = this.appManager.getAppContext(appId, newContext.previousSeed);
     if(!oldContext)
-      throw `App's new context not found.`
+      throw `App's old context not found.`
 
     const dealers: string[] = newContext.party.partners.filter(id => oldContext.party.partners.includes(id));
     const readyDealers = await this.appManager.findNAvailablePartners(
@@ -267,7 +277,8 @@ class System extends CallablePlugin {
       dealers.length,
       {appId, seed: oldContext.seed, return: "id"},
     );
-    const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
+    // const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
+    const generatorId = _.shuffle(dealers.filter(id => readyDealers.includes(id)))[0];
     if(!generatorId)
       throw `key-gen starter node not online`
 
@@ -472,7 +483,15 @@ class System extends CallablePlugin {
     if(context.party.partners.includes(currentNode.id)) {
       // TODO: check context has key or not ?
 
-      let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId)!
+      let reshareKey: AppTssKey = await this.keyManager.getSharedKey(reshareKeyId)!;
+      let keyShare:string|undefined;
+      /**
+       prevent storing wrong share.
+       if the key's polynomial is not as same as the context polynomial, the key will be ignored.
+       */
+      if(reshareKey.toJson().polynomial!.Fx.join(',') === resharePolynomial.Fx.join(',')) {
+        keyShare = bn2hex(reshareKey.share!)
+      }
       /**
        Mark the reshareKey as used for app TSS key.
        If anyone tries to use this key for a different purpose, it will cause an error.
@@ -490,7 +509,7 @@ class System extends CallablePlugin {
         seed,
         keyGenRequest: request,
         publicKey,
-        keyShare: bn2hex(reshareKey.share!),
+        keyShare,
         polynomial,
         expiration,
       })

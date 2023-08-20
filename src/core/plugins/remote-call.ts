@@ -32,12 +32,15 @@ export default class RemoteCall extends BasePlugin {
 
   on(method, handler, options) {
     // console.log(`core.RemoteCall registering call handler`, {method, options})
-    if(options.allowShieldNode) {
-      NetworkIpc.allowRemoteCallByShieldNode(method, options).catch(e => {
-        log.error(`network.RemoteCall.on: IPC call failed`, e)
-      })
-    }
     // @ts-ignore
-    super.on(method, handler)
+    super.on(method, async (...args) => {
+      /** apply remote call middlewares */
+      if(options.middlewares && options.middlewares.length > 0){
+        for(const middleware of options.middlewares) {
+          await middleware(this.muon, ...args)
+        }
+      }
+      return handler(...args)
+    })
   }
 }

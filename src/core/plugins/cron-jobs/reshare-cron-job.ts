@@ -1,6 +1,5 @@
 import BaseCronJob from "./base-cron-job.js";
 import PQueue from "p-queue";
-import {QueueProducer} from "../../../common/message-bus/index.js";
 import AppManagerPlugin from "../app-manager.js";
 import {AppContext} from "../../../common/types";
 import {APP_STATUS_EXPIRED, APP_STATUS_PENDING, APP_STATUS_TSS_GROUP_SELECTED} from "../../constants.js";
@@ -9,9 +8,9 @@ import {GatewayCallParams} from "../../../gateway/types";
 import {AnnounceCheckOptions, muonCall} from "../../../cmd/utils.js";
 import {getTimestamp, timeout} from "../../../utils/helpers.js";
 import * as crypto from "../../../utils/crypto.js";
+import {enqueueAppRequest} from "../../ipc.js";
 
 const CONCURRENT_RESHARE = 5;
-let requestQueue = new QueueProducer(`gateway-requests`);
 
 function isRequestAnnounced(explorerResult, options:AnnounceCheckOptions={}) {
   // console.dir(check, {depth: 6});
@@ -81,7 +80,8 @@ export default class ReshareCronJob extends BaseCronJob{
 
     this.log(`starting ${pendingContexts.length} apps key reshare ...`)
     const rotatedContexts = await Promise.all(pendingContexts.map(ctx => {
-      return this.rotateQueue.add(() => this.rotateAppContext(ctx).catch(e => null))
+      return this.rotateQueue.add(() => this.rotateAppContext(ctx)
+        .catch(e => null))
     }))
 
     //@ts-ignore
@@ -89,6 +89,7 @@ export default class ReshareCronJob extends BaseCronJob{
     this.log(`starting ${contextToReshare.length} apps key reshare ...`)
     await Promise.all(contextToReshare.map(ctx => {
       return this.rotateQueue.add(() => this.reshareAppTss(ctx))
+        .catch(e => {})
     }))
 
     this.log(`all ${pendingContexts.length} reshare done.`)
@@ -102,7 +103,7 @@ export default class ReshareCronJob extends BaseCronJob{
     const {appId, seed} = ctx;
 
     this.log("calling random-seed request %o", {appId, seed});
-    const randomSeedResponse = await requestQueue.send({
+    const randomSeedResponse = await enqueueAppRequest({
       app: 'deployment',
       method: `random-seed`,
       params: {
@@ -122,7 +123,7 @@ export default class ReshareCronJob extends BaseCronJob{
 
     this.log('Selecting new party ...')
     const leaderSignature = crypto.sign(randomSeedResponse.signatures[0].signature)
-    const reshareResponse = await requestQueue.send({
+    const reshareResponse = await enqueueAppRequest({
       app: 'deployment',
       method: `tss-rotate`,
       params: {
@@ -159,7 +160,7 @@ export default class ReshareCronJob extends BaseCronJob{
     const {appId, seed} = ctx;
 
     this.log('Generating app tss key ... %o', {appId, seed})
-    const keyGenResponse = await requestQueue.send({
+    const keyGenResponse = await enqueueAppRequest({
       app: `deployment`,
       method: "tss-reshare",
       params: {
@@ -169,6 +170,9 @@ export default class ReshareCronJob extends BaseCronJob{
       }
     })
       .catch(e => {
+        if(!!e.mpcExecDebugs) {
+          this.log(`mpcExecDebug >> %s`, JSON.stringify(e.mpcExecDebugs));
+        }
         this.log.error("tss-reshare failed %o %o", {appId, seed}, e)
         throw e;
       });
@@ -205,7 +209,7 @@ export default class ReshareCronJob extends BaseCronJob{
       /** check every 5 seconds */
       await timeout(n === 1 ? 1000 : 5000);
 
-      const check = await requestQueue.send({
+      const check = await enqueueAppRequest({
         app: 'explorer',
         method: 'req-check',
         params: {request}

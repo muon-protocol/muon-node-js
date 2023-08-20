@@ -3,7 +3,7 @@ import {PeerInfo} from "@libp2p/interface-peer-info";
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
 import {AppContext, AppRequest, IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
 import NodeManagerPlugin, {NodeFilterOptions} from "./node-manager.js";
-import {QueueProducer, MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
+import {MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
@@ -16,6 +16,7 @@ import {isPrivate} from "../utils.js";
 import {GatewayCallParams} from "../../gateway/types";
 import LatencyCheckPlugin from "./latency-check.js";
 import {MapOf} from "../../common/mpc/types";
+import {enqueueAppRequest} from "../../core/ipc.js";
 
 class AggregatorBus extends MessagePublisher {
   async send(message:any){
@@ -42,7 +43,6 @@ if(!!REQUESTS_PUB_SUB_CHANNEL) {
 }
 
 const log = logger('muon:network:plugins:ipc-handler')
-let requestQueue = new QueueProducer(`gateway-requests`);
 
 const tasksCache = new NodeCache({
   stdTTL: 6 * 60, // Keep distributed keys in memory for 6 minutes
@@ -54,6 +54,14 @@ const tasksCache = new NodeCache({
   checkperiod: 60,
   useClones: false,
 });
+
+const appTimeouts = {}
+async function getAppTimeout(app) {
+  if(appTimeouts[app] === undefined) {
+    appTimeouts[app] = await CoreIpc.getAppTimeout(app);
+  }
+  return appTimeouts[app];
+}
 
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
@@ -71,7 +79,6 @@ export const IpcMethods = {
   //GetPeerInfoLight: "GPILight",
   ForwardGatewayRequest: "forward-gateway-request",
   GetCurrentNodeInfo: "get-current-node-info",
-  AllowRemoteCallByShieldNode: "allow-remote-call-by-shield-node",
   IsCurrentNodeInNetwork: "is-current-node-in-network",
   GetUptime: "get-uptime",
   FindNOnlinePeer: "FNOP",
@@ -266,9 +273,22 @@ class NetworkIpcHandler extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
-  async __ipcForwardGateWayRequest(data: {id: string, requestData: GatewayCallParams, appTimeout: number}) {
-    const timeout = data.appTimeout || 35000
-    return this.forwardGatewayCallToOtherNode(data.id, data.requestData, timeout);
+  async __ipcForwardGateWayRequest(data: {requestData: GatewayCallParams, appTimeout: number}) {
+    const timeout = await getAppTimeout(data.requestData.app);
+    return this.__rcForwardGatewayRequest(data.requestData, this.nodeManager.currentNodeInfo, {timeout})
+  }
+
+  private async forwardGatewayRequestToOnlinePartner(partners: string[], requestData: GatewayCallParams, timeout?:number) {
+    const n = partners.length;
+    const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(n/2));
+    const onlines: string[] = await this.nodeManager.findNOnline(candidatePartners, 1, {timeout: 5000});
+    if(onlines.length < 1)
+      throw `The request cannot be forwarded because there is no online partner`;
+    return this.forwardGatewayCallToOtherNode(
+      onlines[0],
+      requestData,
+      timeout,
+    )
   }
 
   private async forwardGatewayCallToOtherNode(nodeId: string, requestData: GatewayCallParams, timeout?: number) {
@@ -286,14 +306,8 @@ class NetworkIpcHandler extends CallablePlugin {
     return this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
   }
 
-  @ipcMethod(IpcMethods.AllowRemoteCallByShieldNode)
-  async __allowRemoteCallByShieldNode(data: {method: string, options: any}) {
-    this.remoteCallPlugin.allowCallByShieldNode(data.method, data.options)
-    return true
-  }
-
   @ipcMethod(IpcMethods.IsCurrentNodeInNetwork)
-  async __isCurrentNodeInNetwork() {
+  async __isCurrentNodeInNetwork(): Promise<boolean> {
     const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
     return !!currentNodeInfo;
   }
@@ -428,23 +442,40 @@ class NetworkIpcHandler extends CallablePlugin {
   async __rcForwardGatewayRequest(requestData: GatewayCallParams, callerInfo, options:{timeout?: number}={}) {
     let {app} = requestData
 
-    const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
+    const currentNode: MuonNodeInfo|undefined = this.nodeManager.currentNodeInfo;
+
+    /** If current node is not in the network */
+    if(!currentNode) {
+      const deployers:string[] = this.nodeManager.filterNodes({isDeployer: true}).map(n => n.id);
+      const onlineList: string[] = await this.nodeManager.findNOnline(
+        _.shuffle(deployers).slice(0, Math.ceil(deployers.length/2)),
+        1,
+        {timeout: 2000},
+      )
+      if(onlineList.length <= 0)
+        throw `no online deployer to forward the request`;
+      return this.forwardGatewayCallToOtherNode(onlineList[0], requestData, options.timeout);
+    }
+
     const context: AppContext|undefined = await CoreIpc.getAppOldestContext(app);
     if(context) {
+      let partners = context.party.partners;
+      if(!!context.keyGenRequest?.data?.init?.shareProofs) {
+        partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs);
+      }
       /** When the context exists, the node can either process it or send it to the appropriate node. */
-      if(context.party.partners.includes(currentNode.id)) {
+      if(partners.includes(currentNode.id)) {
         /** Process the request */
-        return await requestQueue.send(requestData)
+        return await enqueueAppRequest(requestData)
       }
       else {
         /** Forward request to the appropriate node. */
-        const onlines: string[] = await this.nodeManager.findNOnline(context.party.partners, 2, {timeout: 5000});
-        const randomIndex = Math.floor(Math.random() * onlines.length);
-        return this.forwardGatewayCallToOtherNode(
-          onlines[randomIndex],
-          requestData,
-          options.timeout,
-        )
+        const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(partners.length/2));
+        /** find an online node that has the app's tss key */
+        const availables: string[] = await CoreIpc.findNAvailablePartners(context.appId, context.seed, candidatePartners, 1);
+        if(availables.length <= 0)
+          throw "The request cannot be forwarded because there is no available partner";
+        return this.forwardGatewayCallToOtherNode(availables[0], requestData, options.timeout);
       }
     }
     else {
@@ -461,13 +492,7 @@ class NetworkIpcHandler extends CallablePlugin {
          The deployer nodes know the members of the app party and can forward the request to the suitable one.
          */
         let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id);
-        const onlines: string[] = await this.nodeManager.findNOnline(deployers, 2, {timeout: 5000});
-        const randomIndex = Math.floor(Math.random() * onlines.length);
-        return this.forwardGatewayCallToOtherNode(
-          onlines[randomIndex],
-          requestData,
-          options.timeout,
-        )
+        return this.forwardGatewayRequestToOnlinePartner(deployers, requestData, options.timeout);
       }
     }
   }
