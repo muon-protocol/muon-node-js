@@ -149,8 +149,9 @@ const createEnv = async () => {
         "max": 100
       },
       nodeManager: {
-        "network": "mumbai",
-        "address": "0x3112a7D5b3960d2C528cd83217E3170f8d252432"
+        "network": "bsctest",
+        "address": "0xc00070E1126e9B7C4c48c56B03ef149BaB6C3bfc",
+        "stake": "0x87388c515C3EAF988798a28ec86b060981D5E7BE"
       },
       routing: {
         "delegate": [
