@@ -88,6 +88,7 @@ export default class GatewayInterface extends BasePlugin{
   }
 
   registerAppCall(app, method, callback){
+    log(`registering gateway method ... %o`, {app, method})
     // @ts-ignore
     this.on(`call/${app}/${method}`, callback)
   }

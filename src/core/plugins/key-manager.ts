@@ -351,10 +351,10 @@ class KeyManager extends CallablePlugin {
     const deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.peerId)
     const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
       deployers,
-      Math.ceil(this.tssParty!.t*1.2),
+      Math.ceil(this.netConfigs.tss.threshold*1.2),
       {timeout: 10000, return: 'peerId'}
     )
-    if(onlineDeployers.length < this.tssParty!.t) {
+    if(onlineDeployers.length < this.netConfigs.tss.threshold) {
       log("no enough online deployers to check the key creation ...")
       return false;
     }
@@ -422,11 +422,11 @@ class KeyManager extends CallablePlugin {
     const deployers: MuonNodeInfo[] = this.nodeManager.filterNodes({isDeployer: true})
     const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
       deployers.map(n => n.peerId),
-      Math.ceil(this.tssParty!.t*1.2),
+      Math.ceil(this.netConfigs.tss.threshold*1.2),
       {timeout: 10000}
     )
-    if(onlineDeployers.length < this.tssParty!.t) {
-      log(`Its need ${this.tssParty!.t} deployer to create deployment tss but only ${onlineDeployers.length} are available`)
+    if(onlineDeployers.length < this.netConfigs.tss.threshold) {
+      log(`Its need ${this.netConfigs.tss.threshold} deployer to create deployment tss but only ${onlineDeployers.length} are available`)
       throw `No enough online deployers to create the deployment tss key.`
     }
     log(`Deployers %o are available to create deployment tss`, onlineDeployers)
