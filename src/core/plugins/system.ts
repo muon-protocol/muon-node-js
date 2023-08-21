@@ -30,6 +30,7 @@ import { createRequire } from "module";
 import ReshareCronJob from "./cron-jobs/reshare-cron-job";
 import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
+import {NODE_ROLE_DEPLOYER} from "../../common/contantes.js";
 const require = createRequire(import.meta.url);
 const Rand = require('rand-seed').default;
 
@@ -115,7 +116,7 @@ class System extends CallablePlugin {
       let availables = response.result.filter(item => {
         /** active nodes that has uptime more than 1 hour */
         // return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
-        return item.isDeployer || (
+        return item.roles.includes(NODE_ROLE_DEPLOYER) || (
           item.active &&
           item.tests.peerInfo &&
           item.uptime >= 5*60 &&
