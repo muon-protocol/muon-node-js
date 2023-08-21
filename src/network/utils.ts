@@ -77,6 +77,7 @@ function convertToCoreObject(item): MuonNodeInfo {
 }
 
 export async function getNodeManagerDataFromCache(configs: NodeManagerConfigs): Promise<NodeManagerData> {
+  const contractInfo = await getContractInfo(configs);
   let dataStr = await redisGet(nodeManagerDataCacheKey(configs));
   if(!dataStr)
     throw "cached data not found."
@@ -85,6 +86,8 @@ export async function getNodeManagerDataFromCache(configs: NodeManagerConfigs): 
     // @ts-ignore
     throw ajv.errors.map(e => e.message).join("\n");
   }
+  if(data.lastUpdateTime !== contractInfo.lastUpdateTime)
+    throw `cache data expired`;
   return data;
 }
 
