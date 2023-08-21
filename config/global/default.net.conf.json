@@ -12,8 +12,8 @@
   },
   "routing": {
     "delegate": [
-      "http://188.166.73.132:8011/delegate",
-      "http://89.106.206.214:8011/delegate"
+      "https://alice-n1.muon.net/delegate",
+      "http://188.166.73.132:8011/delegate"
     ],
     "ifconfig":[
       "http://188.166.73.132:8011/ifconfig",
