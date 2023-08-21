@@ -26,8 +26,6 @@ import {bn2hex} from "../../utils/tss/utils.js";
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
 
-const LEADER_ID = process.env.LEADER_ID || '1';
-
 export type KeyGenOptions = {
   /**
    key ID
@@ -777,7 +775,7 @@ class KeyManager extends CallablePlugin {
       throw {message: 'KeyManager.storeDeploymentTssKey: party not found.'}
     if (!key)
       throw {message: 'KeyManager.storeDeploymentTssKey: key not found.'};
-    if(callerInfo.id==LEADER_ID && await this.isNeedToCreateKey()) {
+    if(callerInfo.id == this.netConfigs.defaultLeader && await this.isNeedToCreateKey()) {
       await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
       this.saveTssConfig(party, key);
       this.tssKey = key

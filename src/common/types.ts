@@ -209,6 +209,7 @@ export type NodeManagerConfigs = {
 }
 
 export type NetConfigs = {
+    defaultLeader: string,
     tss: {
         threshold: number,
         max: number,
