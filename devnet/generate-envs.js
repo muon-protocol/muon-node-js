@@ -150,8 +150,8 @@ const createEnv = async () => {
       },
       nodeManager: {
         "network": "bsctest",
-        "address": "0xc00070E1126e9B7C4c48c56B03ef149BaB6C3bfc",
-        "stake": "0x87388c515C3EAF988798a28ec86b060981D5E7BE"
+        "address": "0x965814CFd2E0Ea3bD57B62182e51E21503a5E7F5",
+        "stake": "0x327E044a3303A6572cDc3ec9EA0998d8138b468e"
       },
       routing: {
         "delegate": [
