@@ -120,25 +120,6 @@
     "inputs": [
       {
         "indexed": true,
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "roleId",
-        "type": "uint64"
-      }
-    ],
-    "name": "NodeRoleAdded",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
         "internalType": "uint64",
         "name": "nodeId",
         "type": "uint64"
@@ -329,19 +310,6 @@
       }
     ],
     "name": "addNode",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      }
-    ],
-    "name": "addNodeRole",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -590,11 +558,6 @@
         "type": "uint64"
       },
       {
-        "internalType": "uint64",
-        "name": "",
-        "type": "uint64"
-      },
-      {
         "internalType": "string[]",
         "name": "",
         "type": "string[]"
@@ -776,19 +739,6 @@
   },
   {
     "inputs": [],
-    "name": "lastRoleId",
-    "outputs": [
-      {
-        "internalType": "uint64",
-        "name": "",
-        "type": "uint64"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "lastUpdateTime",
     "outputs": [
       {
@@ -898,9 +848,9 @@
         "type": "uint64"
       },
       {
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
+        "internalType": "uint64",
+        "name": "roleId",
+        "type": "uint64"
       }
     ],
     "name": "nodeHasRole",
@@ -1031,25 +981,6 @@
     "name": "revokeRole",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "name": "roleIds",
-    "outputs": [
-      {
-        "internalType": "uint64",
-        "name": "",
-        "type": "uint64"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
