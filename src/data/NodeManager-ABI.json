@@ -309,22 +309,22 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_nodeAddress",
+        "name": "nodeAddress",
         "type": "address"
       },
       {
         "internalType": "address",
-        "name": "_stakerAddress",
+        "name": "stakerAddress",
         "type": "address"
       },
       {
         "internalType": "string",
-        "name": "_peerId",
+        "name": "peerId",
         "type": "string"
       },
       {
         "internalType": "bool",
-        "name": "_active",
+        "name": "active",
         "type": "bool"
       }
     ],
@@ -406,17 +406,17 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "_lastEditTime",
+        "name": "lastEditTime",
         "type": "uint256"
       },
       {
         "internalType": "uint64",
-        "name": "_from",
+        "name": "startId",
         "type": "uint64"
       },
       {
         "internalType": "uint64",
-        "name": "_to",
+        "name": "endId",
         "type": "uint64"
       }
     ],
@@ -487,7 +487,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "_lastEditTime",
+        "name": "lastEditTime",
         "type": "uint256"
       },
       {
@@ -497,7 +497,7 @@
       },
       {
         "internalType": "uint16",
-        "name": "_max",
+        "name": "maxNodesToRetrieve",
         "type": "uint16"
       }
     ],
@@ -823,7 +823,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_addr",
+        "name": "nodeAddress",
         "type": "address"
       }
     ],
@@ -1129,7 +1129,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_addr",
+        "name": "stakerAddress",
         "type": "address"
       }
     ],
