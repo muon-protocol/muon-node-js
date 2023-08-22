@@ -13,10 +13,6 @@ const Methods = {
     TssReshare: "tss-reshare"
 }
 
-const owners = [
-  "0x340C978265378998D589B41F1f51F137c344C22a"
-]
-
 const NODES_SELECTION_TOLERANCE = 0.07;
 const ROTATION_COEFFICIENT = 1.5;
 
@@ -176,7 +172,6 @@ module.exports = {
     REMOTE_CALL_TIMEOUT: 120e3,
     METHOD_PARAMS_SCHEMA,
     APP_ID: 1,
-    owners,
 
     readOnlyMethods: ["init", 'undeploy'],
 

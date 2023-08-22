@@ -360,7 +360,7 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`confirmation done with %s`, confirmed)
       t5 = Date.now()
 
-      let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
+      let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${newRequest.reqId}`, 15000, {type: "nonce", message: resultHash})
       this.log(`request signed with %o`, nonce.partners);
       this.log('request time parts %o',{
         "req exec time": t1-t0,
@@ -488,7 +488,7 @@ class BaseAppPlugin extends CallablePlugin {
   async informRequestConfirmation(request: AppRequest) {
     request = clone(request)
     // await this.onConfirm(request)
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)!;
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})!;
 
     let announceList = this.getParty(request.deploymentSeed)!.partners;
     if(!!this.getConfirmAnnounceGroups) {
@@ -562,7 +562,8 @@ class BaseAppPlugin extends CallablePlugin {
     let nonce = await this.keyManager.keyGen({appId: this.APP_ID, seed}, {
       id: `nonce-${request.reqId}`,
       partners: availablePartners,
-      maxPartners: nonceParticipantsCount
+      maxPartners: nonceParticipantsCount,
+      usage: {type: "nonce", message: request.data.resultHash},
     })
     this.log(`nonce generation has ben completed with address %s.`, TssModule.pub2addr(nonce.publicKey))
 
@@ -639,7 +640,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     let {s, e} = splitSignature(signature)
     //
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})
 
     const ownerInfo = this.nodeManager.getNodeInfo(owner)
     if(!ownerInfo){
@@ -657,7 +658,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async verifyPartialSignature(request: AppRequest, owner:MuonNodeInfo, signature: string): Promise<boolean> {
     const appTssKey = this.getTss(request.deploymentSeed)!
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})
 
     return TssModule.schnorrVerifyPartial(
       appTssKey.getPubKey(owner.id),
@@ -682,7 +683,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async broadcastNewRequest(request: AppRequest) {
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, 15000)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, 15000, {type: "nonce", message: request.data.resultHash})
     let party = this.getParty(request.deploymentSeed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
@@ -742,7 +743,11 @@ class BaseAppPlugin extends CallablePlugin {
 
   async makeSignature(request: AppRequest, result: any, resultHash): Promise<string> {
     let {reqId} = request;
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${reqId}`, 15000)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(
+      `nonce-${reqId}`,
+      15000,
+      {type: "nonce", message: request.data.resultHash},
+    );
     if(!nonce)
       throw `nonce not found for request ${reqId}`
 

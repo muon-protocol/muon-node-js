@@ -1,6 +1,5 @@
 import {Router} from 'express'
 import asyncHandler from 'express-async-handler'
-import RequestLog from '../../common/db-models/RequestLog.js'
 import {parseBool} from '../../utils/helpers.js'
 import * as CoreIpc from '../../core/ipc.js'
 import * as NetworkIpc from '../../network/ipc.js'
@@ -13,33 +12,6 @@ import {enqueueAppRequest} from "../../core/ipc.js";
 
 const log = logger('muon:gateway:api')
 const ajv = new Ajv({coerceTypes: true})
-
-async function storeRequestLog(logData) {
-  let log = new RequestLog(logData)
-  await log.save();
-}
-
-function extraLogs(req, result?: any) {
-  let logs: any = {
-    time: Date.now(),
-    ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress,
-    extra: {
-      referrer: req.get('Referer'),
-      cra: req.connection.remoteAddress,
-      sra: req.socket.remoteAddress,
-      csra: req.connection.socket?.remoteAddress,
-      headers: req.headers,
-    }
-  }
-  if (result?.confirmed) {
-    logs.extra = {
-      ...logs.extra,
-      nonce: result.data?.init?.nonceAddress,
-      reqId: result.reqId
-    }
-  }
-  return logs;
-}
 
 let cachedNetworkCheck = {
   time: 0,
@@ -146,17 +118,6 @@ router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
   else {
     callProperNode(requestData)
       .then(async result => {
-        storeRequestLog({
-          app,
-          method,
-          params,
-          mode,
-          gwSign,
-          success: true,
-          confirmed: result?.confirmed,
-          errorMessage: result?.confirmed ? "" : "",
-          ...extraLogs(req, result),
-        });
         res.json({success: true, result})
       })
       .catch(async error => {
@@ -168,17 +129,6 @@ router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
         } catch (e) {
           log("gateway.api error %o", e)
         }
-        storeRequestLog({
-          app,
-          method,
-          params,
-          mode,
-          gwSign,
-          success: false,
-          confirmed: false,
-          errorMessage: error.message || error.error,
-          ...extraLogs(req),
-        });
         const {message, ...otherProps} = error;
         res.json({
           success: false,
