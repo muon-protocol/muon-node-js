@@ -27,7 +27,7 @@
   },
   "nodes": {
     "onlineList": "https://alice-v2.muon.net/monitor/nodes",
-    "aggregators": ["1", "2"]
+    "aggregators": ["1", "3"]
   },
   "bootstrap": [
     "/ip4/89.106.206.214/tcp/9011/p2p/QmYiFkHGFsJZH1S3z8H4K2kYZ7R932krgKgWA76eYjUDKV",
