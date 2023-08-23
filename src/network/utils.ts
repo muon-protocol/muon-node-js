@@ -121,7 +121,7 @@ export async function getNodeManagerData(nodeManagerConfigs: NodeManagerConfigs)
   lastNodeId = parseInt(lastNodeId);
   lastUpdateTime = parseInt(lastUpdateTime);
 
-  const itemPerPage = 1000;
+  const itemPerPage = 150;
   const pagesToRequest = new Array(Math.ceil(lastNodeId / itemPerPage)).fill(0).map((_,i) => i)
   log(`loading NodeManager data: size: ${itemPerPage}, pages: [${pagesToRequest.join(',')}]`)
 
