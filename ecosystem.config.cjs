@@ -8,6 +8,14 @@ module.exports = {
     "log_date_format" : "YYYY-MM-DD HH:mm",
     "autorestart": false,
     "max_memory_restart": "2G",
-    "node_args": "--max_old_space_size=2048"
+    "node_args": "--max_old_space_size=3072",
+
+    "env": {
+      "NODE_ENV": "production"
+    },
+    "env_production" : {
+       "NODE_ENV": "production"
+    }
+
   }]
 }
