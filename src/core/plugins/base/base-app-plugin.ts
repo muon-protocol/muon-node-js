@@ -474,6 +474,8 @@ class BaseAppPlugin extends CallablePlugin {
       if(feeResponse.error)
         throw feeResponse.error;
 
+      this.verifyFeeSig(request.reqId, feeResponse.amount, feeResponse.sign);
+
       /** check fee server response */
       const feeAmount: number = parseInt(feeResponse.amount)
       if(feeAmount <= 0)
@@ -943,16 +945,8 @@ class BaseAppPlugin extends CallablePlugin {
 
     /** fee checking */
     if(request.data.fee) {
-      const feeConfigs = this.muon.configs.net.fee;
       let {amount, signature} = request.data.fee;
-      const hash = muonSha3(
-        { type: "uint256", value: request.reqId },
-        { type: "uint256", value: amount }
-      )
-      const signer = crypto.recover(hash, signature)
-      if(feeConfigs && !feeConfigs.signers.includes(signer)) {
-        throw `fee consumption signature mismatched.`
-      }
+      this.verifyFeeSig(request.reqId, amount, signature);
       await useOneTime('fee', signature, request.reqId);
     }
 
@@ -992,6 +986,18 @@ class BaseAppPlugin extends CallablePlugin {
     await requestConfirmationCache.set(request.reqId, '1');
 
     return `OK`;
+  }
+
+  verifyFeeSig(requestId, amount, signature) {
+    const feeConfigs = this.muon.configs.net.fee;
+    const hash = muonSha3(
+      {type: "uint256", value: requestId},
+      {type: "uint256", value: amount}
+    );
+    const recoveredSigner = crypto.recover(hash, signature);
+    if (feeConfigs && !feeConfigs.signers.includes(recoveredSigner)) {
+      throw `fee signature mismatched.`
+    }
   }
 }
 
