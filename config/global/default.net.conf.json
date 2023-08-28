@@ -17,8 +17,8 @@
       "http://188.166.73.132:8011/delegate"
     ],
     "ifconfig":[
-      "http://188.166.73.132:8011/ifconfig",
-      "http://89.106.206.214:8011/ifconfig"
+      "http://alice-n2.muon.net/ifconfig",
+      "http://188.166.73.132:8011/ifconfig"
     ],
     "discoveryValidPeriod": 30000,
     "findPeerValidPeriod": 30000,
@@ -30,7 +30,6 @@
     "aggregators": ["1", "3"]
   },
   "bootstrap": [
-    "/ip4/89.106.206.214/tcp/9011/p2p/QmYiFkHGFsJZH1S3z8H4K2kYZ7R932krgKgWA76eYjUDKV",
     "/ip4/188.166.73.132/tcp/9011/p2p/QmYPbLuwy7CWqsMrZM6W9VZGSu7oM9PGRfVe1kssKcjjpj"
   ],
   "fee": {
@@ -43,7 +42,7 @@
     "monitor": {
       "providers": [
         "http://188.166.73.132:8011/network",
-        "http://89.106.206.214:8011/network"
+        "https://alice-n2.muon.net/network"
       ],
       "startDelay": 120e3,
       "interval": 3600e3

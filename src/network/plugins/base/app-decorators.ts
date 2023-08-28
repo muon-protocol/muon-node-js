@@ -1,4 +1,3 @@
-import NetworkBroadcastPlugin from "../network-broadcast";
 import {NetworkRemoteCallMiddleware} from "../../remotecall-middleware";
 
 function classNames(target): string[]{
@@ -65,16 +64,6 @@ export function remoteApp (constructor): any {
             appName: this.APP_NAME,
             appId: this.APP_ID,
           })
-        }
-      }
-
-      if(constructor.prototype.__globalBroadcastHandlers) {
-        const broadcastPlugin: NetworkBroadcastPlugin = this.network.getPlugin('broadcast')
-        for (let i = 0; i < constructor.prototype.__globalBroadcastHandlers.length; i++) {
-          let item = constructor.prototype.__globalBroadcastHandlers[i];
-          await broadcastPlugin.subscribe(item.title)
-          // @ts-ignore
-          broadcastPlugin.on(item.title, this[item.property].bind(this))
         }
       }
 

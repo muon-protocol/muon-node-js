@@ -125,7 +125,7 @@ export default class AppManager extends CallablePlugin {
   async loadAppsInfo() {
     log('loading apps info ...')
     await this.nodeManager.waitToLoad();
-    const currentNode = this.nodeManager.currentNodeInfo!;
+    const currentNode:MuonNodeInfo|undefined = this.nodeManager.currentNodeInfo;
     let deploymentTssPublicKey: any = undefined;
     const netConfigs:NetConfigs = this.netConfigs;
     if (currentNode && currentNode.isDeployer) {
@@ -134,56 +134,52 @@ export default class AppManager extends CallablePlugin {
         deploymentTssPublicKey = pub2json(this.keyManager.tssKey.publicKey!)
       }
     }
-    try {
-      const allAppContexts: AppContext[] = [
-        /** deployment app context */
-        {
-          appId: '1',
-          appName: "deployment",
-          isBuiltIn: true,
-          seed: "1",
-          rotationEnabled: false,
-          // ttl: 0,
-          party: {
-            partners: this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id),
-            t: netConfigs.tss.threshold,
-            max: netConfigs.tss.max
-          },
-          publicKey: deploymentTssPublicKey,
+
+    const allAppContexts: AppContext[] = [
+      /** deployment app context */
+      {
+        appId: '1',
+        appName: "deployment",
+        isBuiltIn: true,
+        seed: "1",
+        rotationEnabled: false,
+        // ttl: 0,
+        party: {
+          partners: this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id),
+          t: netConfigs.tss.threshold,
+          max: netConfigs.tss.max
         },
-        /** other apps contexts */
-        ...await AppContextModel.find({})
-      ]
+        publicKey: deploymentTssPublicKey,
+      },
+      /** other apps contexts */
+      ...await AppContextModel.find({})
+    ]
 
-      allAppContexts.forEach(ctx => {
-        const {appId, seed} = ctx;
-        this.appContexts[seed] = ctx;
-        if(this.appSeeds[appId] === undefined)
-          this.appSeeds[appId] = [seed]
-        else
-          this.appSeeds[appId].push(seed);
-        if(ctx.party.partners.includes(currentNode.id) && (!ctx.expiration || Date.now() < ctx.expiration*1000)) {
-          NetworkIpc.addContextToLatencyCheck(ctx).catch(e => {})
-        }
-      })
-      log('apps contexts loaded.')
+    allAppContexts.forEach(ctx => {
+      const {appId, seed} = ctx;
+      this.appContexts[seed] = ctx;
+      if(this.appSeeds[appId] === undefined)
+        this.appSeeds[appId] = [seed]
+      else
+        this.appSeeds[appId].push(seed);
+      if(currentNode && ctx.party.partners.includes(currentNode.id) && (!ctx.expiration || Date.now() < ctx.expiration*1000)) {
+        NetworkIpc.addContextToLatencyCheck(ctx).catch(e => {})
+      }
+    })
+    log('apps contexts loaded.')
 
-      const allTssKeys = await AppTssConfigModel.find({});
-      allTssKeys.forEach(key => {
-        const {seed} = key;
-        if (seed) {
-          if(isAesEncrypted(key.keyShare))
-            key.keyShare = aesDecrypt(key.keyShare, process.env.SIGN_WALLET_PRIVATE_KEY);
-          this.appTssConfigs[seed] = key;
-        }
-      })
-      log('apps tss keys loaded.')
+    const allTssKeys = await AppTssConfigModel.find({});
+    allTssKeys.forEach(key => {
+      const {seed} = key;
+      if (seed) {
+        if(isAesEncrypted(key.keyShare))
+          key.keyShare = aesDecrypt(key.keyShare, process.env.SIGN_WALLET_PRIVATE_KEY);
+        this.appTssConfigs[seed] = key;
+      }
+    })
+    log('apps tss keys loaded.')
 
-      this.loading.resolve(true);
-    }
-    catch (e) {
-      console.error(`core.AppManager.loadAppsInfo`, e);
-    }
+    this.loading.resolve(true);
   }
 
   getNodeLastTimestamp(node: MuonNodeInfo): number|null {

@@ -96,7 +96,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onStart() {
-    super.onStart();
+    await super.onStart();
     // console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
 
     /**
