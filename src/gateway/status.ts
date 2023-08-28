@@ -51,6 +51,7 @@ router.use('/', asyncHandler(async (req, res, next) => {
       uptime,
       commitId,
       autoUpdateLogs,
+      timestamp: Date.now()
     },
     managerContract: {
       network: netConfig?.nodeManager?.network,
