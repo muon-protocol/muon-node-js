@@ -265,7 +265,7 @@ module.exports = {
       const seedResult = await this.onRequest(randomSeedRequest)
       const seedSignParams = this.signParams(randomSeedRequest, seedResult)
       const hash = this.hashAppSignParams(randomSeedRequest, seedSignParams)
-      if(!await this.verify(hash, seed, nonce))
+      if(!await this.verify(request.deploymentSeed, hash, seed, nonce))
         throw `seed not verified`
     },
 
@@ -456,7 +456,7 @@ module.exports = {
                 let selectedNodes2 = await this.selectPartyNodes(request);
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
-                
+
                 if(difference > NODES_SELECTION_TOLERANCE)
                     throw `selected nodes mismatched.`
 
@@ -496,7 +496,7 @@ module.exports = {
                 let selectedNodes2 = await this.selectPartyNodes(request);
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
-                
+
                 if(difference > NODES_SELECTION_TOLERANCE)
                     throw `selected nodes mismatched.`
 

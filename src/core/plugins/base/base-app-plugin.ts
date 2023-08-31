@@ -185,24 +185,17 @@ class BaseAppPlugin extends CallablePlugin {
     let startedAt = getTimestamp()
     let deploymentSeed;
 
-    if(this.APP_ID === '1') {
-      if (!this.keyManager.isReady)
-        throw {message: "Deployment tss is not initialized"}
-      /**
-       deployer list load's from contract and has'nt deployment request and seed.
-       default seed for deployment context is `1`
-       */
-      deploymentSeed = "1"
-    }
-    else{
-      if(!this.appManager.appIsDeployed(this.APP_ID))
-        throw `App not deployed`;
-      const oldestContext: AppContext = this.appManager.getAppOldestContext(this.APP_ID)!
-      if(!this.appManager.appHasTssKey(this.APP_ID, oldestContext.seed)) {
-        throw `App tss not initialized currentNode: ${process.env.SIGN_WALLET_ADDRESS} seed: ${oldestContext.seed}`
+    if(!this.appManager.appIsDeployed(this.APP_ID))
+      throw `App not deployed`;
+    const oldestContext: AppContext = this.appManager.getAppOldestContext(this.APP_ID)!
+    if(!this.appManager.appHasTssKey(this.APP_ID, oldestContext.seed)) {
+      throw {
+        message: `App tss not initialized`,
+        node: this.currentNodeInfo?.id ?? null,
+        seed: oldestContext?.seed ?? null
       }
-      deploymentSeed = oldestContext.seed;
     }
+    deploymentSeed = oldestContext.seed;
 
     const nSign = this.getParty(deploymentSeed)!.t;
 
@@ -670,16 +663,17 @@ class BaseAppPlugin extends CallablePlugin {
     );
   }
 
-  async verify(hash: string, signature: string, nonceAddress: string): Promise<boolean> {
-    const signingPubKey: MapOf<PublicKey> = await this.appManager.findAppPublicKeys(this.APP_ID);
-    if(Object.keys(signingPubKey).length < 1)
-      throw `app[${this.APP_NAME}] tss publicKey not found`
-    // @ts-ignore
-    for(const publicKey of Object.values(signingPubKey)) {
-      if(TssModule.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, publicKey))
-        return true;
+  async verify(deploymentSeed: string, hash: string, signature: string, nonceAddress: string): Promise<boolean> {
+    const signingPubKey: PublicKey|null = await this.appManager.findAppPublicKey(this.APP_ID, deploymentSeed);
+    if(!signingPubKey) {
+      throw {
+        message: `app[${this.APP_NAME}] tss publicKey not found`,
+        node: this.currentNodeInfo?.id ?? null,
+        appId: this.APP_ID,
+        seed: deploymentSeed
+      }
     }
-    return false
+    return TssModule.schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, signingPubKey);
   }
 
   async broadcastNewRequest(request: AppRequest) {
@@ -888,7 +882,7 @@ class BaseAppPlugin extends CallablePlugin {
     const hash = this.hashAppSignParams(request, signParams, false)!
 
     for(let i=0 ; i<request.signatures.length ; i++) {
-      if(!await this.verify(hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
+      if(!await this.verify(_request.deploymentSeed, hash, request.signatures[i].signature, request.data.init.nonceAddress)) {
         throw `TSS signature not verified`
       }
     }
@@ -908,7 +902,7 @@ class BaseAppPlugin extends CallablePlugin {
     const hash = this.hashAppSignParams(request, signParams)
 
     for(let i=0 ; i<request.signatures.length ; i++) {
-      if(!await this.verify(hash!, request.signatures[i].signature, request.data.init.nonceAddress)) {
+      if(!await this.verify(request.deploymentSeed, hash!, request.signatures[i].signature, request.data.init.nonceAddress)) {
         return false
       }
     }

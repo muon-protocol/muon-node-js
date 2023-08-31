@@ -137,7 +137,7 @@ async function start() {
   log(`MongoDB successfully connected.`);
 
   let config = await loadConfigs();
-  let { net, tss } = config;
+  let { net } = config;
   try {
     // const nodeVersion = process.versions.node.split('.');
     // if(nodeVersion[0] < '16')
@@ -230,8 +230,6 @@ async function start() {
         ...getBuiltInApps(),
       ],
       net,
-      // TODO: pass it into the key-manager
-      tss,
     });
 
     await muon.initialize();

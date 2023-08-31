@@ -7,7 +7,6 @@ import {remoteApp, remoteMethod} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
-import * as CoreIpc from '../ipc.js'
 import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import TssParty from "../../utils/tss/party.js";
@@ -15,13 +14,13 @@ import {IMpcNetwork} from "../../common/mpc/types";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from "../../common/mpc/dist-key.js";
 import {logger} from '@libp2p/logger'
-import {useOneTime} from "../../utils/tss/use-one-time.js";
 import {KeyReDistOpts, KeyRedistribution} from "../../common/mpc/kdist.js";
 import MpcNetworkPlugin from "./mpc-network";
 import {PublicKey} from "../../utils/tss/types";
 import * as crypto from "../../utils/crypto.js";
 import {muonSha3} from "../../utils/sha3.js";
 import {bn2hex} from "../../utils/tss/utils.js";
+import {DEPLOYMENT_APP_ID, GENESIS_SEED} from "../../common/contantes.js";
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -72,7 +71,6 @@ export type KeyGenOptions = {
 }
 
 const RemoteMethods = {
-  storeDeploymentTssKey: 'storeDeploymentTssKey',
   KeyShareProof: "keyShareProof",
 }
 
@@ -80,8 +78,6 @@ const RemoteMethods = {
 class KeyManager extends CallablePlugin {
   isReady = false
   parties:{[index: string]: TssParty} = {}
-  tssKey: AppTssKey | null = null;
-  tssParty: TssParty | null = null;
   /**
    map appId and seed to App TSS key
    example: appTss[appId][seed] = AppTssKey
@@ -89,21 +85,19 @@ class KeyManager extends CallablePlugin {
   appTss:{[index: string]: {[index: string]: AppTssKey}} = {}
 
   async onStart() {
-    super.onStart();
+    await super.onStart();
 
     this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
     this.muon.on("contract:node:edit", this.onNodeEdit.bind(this));
     this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
 
     this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
-    this.muon.on('deployment-tss-key:generate', this.onDeploymentTssKeyGenerate.bind(this));
 
     // @ts-ignore
     this.appManager.on('app-tss:delete', this.onAppTssDelete.bind(this))
 
     await this.nodeManager.waitToLoad()
     await this.appManager.waitToLoad();
-    this.loadDeploymentTss();
 
     const mpcNetwork:MpcNetworkPlugin = this.muon.getPlugin('mpcnet');
     mpcNetwork.registerMpcInitHandler("DistributedKeyGeneration", this.dkgInitializeHandler.bind(this))
@@ -113,22 +107,11 @@ class KeyManager extends CallablePlugin {
   async onNodeAdd(nodeInfo: MuonNodeInfo) {
     log(`node add %o`, nodeInfo)
 
-    //await timeout(5000);
-
-    const selfInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!);
-    if(!selfInfo) {
-      log(`current node not in the network yet.`)
-      return;
-    }
-
-    if(selfInfo.id === nodeInfo.id){
-      log(`current node added to the network and loading tss info.`)
-      this.loadDeploymentTss()
-    }
-    else {
-      if(nodeInfo.isDeployer) {
-        log(`adding the new node [%s] into the tss party.`, nodeInfo.id);
-        this.tssParty!.addPartner(nodeInfo.id)
+    if(nodeInfo.isDeployer) {
+      log(`adding the new node [%s] into the deployers party.`, nodeInfo.id);
+      const genesisParty = this.getAppParty(DEPLOYMENT_APP_ID, GENESIS_SEED)!;
+      if(genesisParty) {
+        genesisParty.addPartner(nodeInfo.id)
       }
     }
   }
@@ -148,27 +131,13 @@ class KeyManager extends CallablePlugin {
       if(!selfInfo)
         return ;
 
-      if(nodeInfo.isDeployer) {
-        if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
-          await this.loadDeploymentTss()
-        }
-        else {
-          if(nodeInfo.isDeployer)
-            this.tssParty!.addPartner(nodeInfo.id)
-        }
-      }
-      else {
-        if(nodeInfo.wallet === process.env.SIGN_WALLET_ADDRESS){
-          this.isReady = false
-          this.tssKey = null
-          if(this.tssParty) {
-            const p = this.tssParty
-            delete this.parties[p.id];
-          }
-        }
-        else {
-          if(this.tssParty)
-            this.tssParty.deletePartner(nodeInfo.id);
+      const genesisParty = this.getAppParty(DEPLOYMENT_APP_ID, GENESIS_SEED)!;
+
+      if(genesisParty) {
+        if (nodeInfo.isDeployer) {
+          genesisParty.addPartner(nodeInfo.id)
+        } else {
+          genesisParty.deletePartner(nodeInfo.id);
         }
       }
     }
@@ -190,64 +159,7 @@ class KeyManager extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
-  getDeploymentTssConfig(){
-    let {tss: tssConfig} = this.muon.configs;
-    if(!tssConfig)
-      return null;
-
-    if(!tssConfig.party.t) {
-      return null;
-    }
-
-    return tssConfig;
-  }
-
-  async loadDeploymentTss() {
-
-    const currentNodeInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
-
-    /** current node not in the network */
-    if(!currentNodeInfo || !currentNodeInfo.isDeployer) {
-      return;
-    }
-    log(`loading deployment tss info ...`)
-
-    //TODO: handle {isValid: false};
-
-    this.tssParty = this.getAppParty("1", "1")!;
-    log(`tss party loaded.`)
-
-    // @ts-ignore
-    this.emit('party-load');
-
-    // this.tryToFindOthers(3);
-
-    // validate tssConfig
-    let tssConfig = this.getDeploymentTssConfig();
-
-    if(tssConfig && tssConfig.party.t == this.netConfigs.tss.threshold){
-      let key = AppTssKey.fromJson(
-        this.tssParty,
-        this.nodeManager.currentNodeInfo!.id,
-        {
-          id: tssConfig.key.id,
-          share: tssConfig.key.share,
-          publicKey: tssConfig.key.publicKey,
-          partners: this.tssParty.partners,
-          polynomial: tssConfig.key.polynomial,
-        }
-      );
-      await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
-      this.tssKey = key;
-      this.isReady = true
-      log('deployment tss is ready.');
-    }
-  }
-
   getAppTssKey(appId: string, seed: string): AppTssKey | null {
-    if(appId == '1') {
-      return this.tssKey;
-    }
     if(!this.appTss[appId]) {
       this.appTss[appId] = {}
     }
@@ -383,31 +295,6 @@ class KeyManager extends CallablePlugin {
     return readyDeployers.length < this.netConfigs.tss.threshold;
   }
 
-  saveTssConfig(party, key) {
-    let tssConfig = {
-      party: {
-        id: party.id,
-        t: party.t,
-        max: party.max
-      },
-      key: {
-        id: key.id,
-        // shared part of tss key
-        share: `0x${key.share.toString(16)}`,
-        // public of tss key
-        publicKey: `${key.publicKey.encode('hex', true)}`,
-        // distributed key address
-        address: TssModule.pub2addr(key.publicKey),
-        // tss key's polynomial info
-        ...(!!key.polynomial ? {polynomial: key.toJson().polynomial} : {}),
-      }
-    }
-
-    this.muon.backupConfigFile('tss.conf.json');
-    // console.log('save config temporarily disabled for test.');
-    this.muon.saveConfig(tssConfig, 'tss.conf.json')
-  }
-
   loadParty(party) {
     // console.log(`KeyManager.loadParty`, party)
     if(party.partners.lengh > 0 && typeof party.partners[0] !== "string") {
@@ -423,65 +310,6 @@ class KeyManager extends CallablePlugin {
       console.log('partners info: ', party);
       console.log(`KeyManager.loadParty ERROR:`, e)
     }
-  }
-
-  async onDeploymentTssKeyGenerate(tssKey) {
-    if(!this.isReady) {
-      this.tssKey = AppTssKey.fromJson(this.tssParty!, this.nodeManager.currentNodeInfo!.id, tssKey);
-      this.isReady = true;
-    }
-  }
-
-  async createDeploymentTssKey(): Promise<AppTssKey> {
-    const currentNode = this.nodeManager.currentNodeInfo!;
-    const deployers: MuonNodeInfo[] = this.nodeManager.filterNodes({isDeployer: true})
-    const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
-      deployers.map(n => n.peerId),
-      Math.ceil(this.netConfigs.tss.threshold*1.2),
-      {timeout: 10000}
-    )
-    if(onlineDeployers.length < this.netConfigs.tss.threshold) {
-      log(`Its need ${this.netConfigs.tss.threshold} deployer to create deployment tss but only ${onlineDeployers.length} are available`)
-      throw `No enough online deployers to create the deployment tss key.`
-    }
-    log(`Deployers %o are available to create deployment tss`, onlineDeployers)
-
-    let key: AppTssKey = await this.keyGen(
-      {appId: "1", seed: "1"},
-      {
-        partners: deployers.map(n => n.id),
-        dealers: onlineDeployers,
-        lowerThanHalfN: true,
-        usage: {type: "app", seed: "1"},
-      }
-    )
-
-    let keyPartners = deployers.filter(n => (n.id !== currentNode.id));
-    let callResult = await Promise.all(keyPartners.map(({wallet, peerId}) => {
-      return this.remoteCall(
-        peerId,
-        RemoteMethods.storeDeploymentTssKey,
-        {
-          party: this.tssParty!.id,
-          key: key.id,
-        },
-        {timeout: 120e3}
-        // {taskId: `keygen-${key.id}`}
-      ).catch(e=>{
-        console.log("RemoteCall.storeDeploymentTssKey", e);
-        return false
-      });
-    }))
-    if (callResult.filter(r => r === true).length+1 < this.netConfigs.tss.threshold)
-      throw `Tss creation failed.`
-    await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
-    this.saveTssConfig(this.tssParty, key)
-
-    this.tssKey = key;
-    this.isReady = true;
-    CoreIpc.fireEvent({type: "deployment-tss-key:generate", data: key.toJson()});
-
-    return this.tssKey!
   }
 
   /**
@@ -854,41 +682,6 @@ class KeyManager extends CallablePlugin {
    *           Remote Methods
    *
    *===================================*/
-
-  /**
-   * Node with ID:[1] inform other nodes that tss creation completed.
-   *
-   * @param data
-   * @param callerInfo: caller node information
-   * @param callerInfo.wallet: collateral wallet of caller node
-   * @param callerInfo.peerId: PeerID of caller node
-   * @returns {Promise<boolean>}
-   * @private
-   */
-  @remoteMethod(RemoteMethods.storeDeploymentTssKey)
-  async __storeDeploymentTssKey(data: {party: string, key: string}, callerInfo) {
-    // TODO: problem condition: request arrive when tss is ready
-    let {party: partyId, key: keyId} = data
-    let party = this.getParty(partyId)
-    let key: AppTssKey = await this.getSharedKey(keyId, undefined, {type: "app", seed: "1"});
-    if (!party)
-      throw {message: 'KeyManager.storeDeploymentTssKey: party not found.'}
-    if (!key)
-      throw {message: 'KeyManager.storeDeploymentTssKey: key not found.'};
-    if(callerInfo.id == this.netConfigs.defaultLeader && await this.isNeedToCreateKey()) {
-      await useOneTime("key", key.publicKey!.encode('hex', true), `app-1-tss`)
-      this.saveTssConfig(party, key);
-      this.tssKey = key
-      this.isReady = true;
-      CoreIpc.fireEvent({type: "deployment-tss-key:generate", data: key.toJson()});
-      log('save done')
-      // CoreIpc.fireEvent({type: "tss:generate", })
-      return true;
-    }
-    else{
-      throw "Not permitted to create tss key"
-    }
-  }
 
   @remoteMethod(RemoteMethods.KeyShareProof)
   async __keyShareProof(data: {keyId: string, usage: KeyUsageTypeApp|KeyUsageTypeNonce}, callerInfo:MuonNodeInfo): Promise<string> {

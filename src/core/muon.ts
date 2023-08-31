@@ -10,7 +10,7 @@ import * as NetworkIpc from '../network/ipc.js'
 import MuonBasePlugin from './plugins/base/base-plugin.js';
 import BaseAppPlugin from "./plugins/base/base-app-plugin.js";
 import BasePlugin from "./plugins/base/base-plugin.js";
-import {Constructor, DeploymentTssConfigs, NetConfigs, PolynomialInfoJson} from "../common/types";
+import {Constructor, NetConfigs} from "../common/types";
 
 export type MuonPluginConfigs = any
 
@@ -22,7 +22,6 @@ export type MuonPlugin = {
 
 export type MuonConfigs = {
   plugins: MuonPlugin[],
-  tss: DeploymentTssConfigs,
   net: NetConfigs,
 }
 

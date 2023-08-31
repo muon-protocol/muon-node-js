@@ -1,7 +1,7 @@
 import {PeerInfo} from "@libp2p/interface-peer-info";
 export { PeerId, isPeerId } from '@libp2p/interface-peer-id';
 import { Peer } from '@libp2p/interface-peer-store';
-import {DeploymentTssConfigs, NetConfigs} from "../common/types";
+import {NetConfigs} from "../common/types";
 
 export type Libp2pPeerInfo = PeerInfo
 export type Libp2pPeer = Peer;
@@ -35,5 +35,4 @@ export type NetworkProcessConfigs = {
     libp2p: Libp2pConfig,
     plugins: {[index: string]: [INetworkPlugin, any]},
     net: NetConfigs,
-    tss: DeploymentTssConfigs
 }
