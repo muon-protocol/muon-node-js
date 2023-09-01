@@ -206,6 +206,9 @@ module.exports = {
             nodes,
         } = params;
 
+        if(appId === "1")
+            return this.callPlugin("system", "getAvailableDeployers");
+
         t = Math.max(t, tssConfigs.threshold);
 
         let prevContext;
@@ -533,8 +536,6 @@ module.exports = {
                 if(!context)
                     throw `The app's deployment info was not found`
 
-                const {ttl, pendingPeriod} = context;
-
                 if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
                     throw `deployed partners mismatched with key-gen partners`
                 }
@@ -568,9 +569,9 @@ module.exports = {
                     throw `Insufficient share holder.`
 
                 return {
-                    rotationEnabled: true,
-                    ttl,
-                    expiration: request.data.timestamp + ttl + pendingPeriod,
+                    rotationEnabled: context.rotationEnabled,
+                    ttl: context.ttl,
+                    expiration: context.expiration,
                     seed: context.seed,
                     publicKey,
                     polynomial,

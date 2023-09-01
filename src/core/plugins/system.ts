@@ -198,6 +198,15 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod()
+  async getAvailableDeployers(): Promise<string[]> {
+    return this.getAvailableNodes()
+      .then(list => {
+        return list.filter(n => n.isDeployer)
+          .map(n => n.id);
+      })
+  }
+
+  @appApiMethod()
   getNetworkConfigs() {
     return this.muon.configs.net;
   }
