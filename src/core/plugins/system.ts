@@ -652,24 +652,23 @@ class System extends CallablePlugin {
   async __storeDeploymentTssKey(data: {key: string}, callerInfo) {
     // TODO: problem condition: request arrive when tss is ready
     let {key: keyId} = data
-    const seed = GENESIS_SEED;
     // let party = this.getParty(partyId)
-    let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed})!;
+    let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed: GENESIS_SEED})!;
     if (!key)
       throw {message: 'KeyManager.storeDeploymentTssKey: key not found.'};
     if(callerInfo.id == this.netConfigs.defaultLeader && await this.keyManager.isNeedToCreateKey()) {
       const currentNode = this.nodeManager.currentNodeInfo!;
-      const context = this.appManager.getSeedContext(seed)!;
+
+      const context = this.appManager.getSeedContext(GENESIS_SEED)!;
       if(context.party.partners.includes(currentNode.id)) {
         // TODO: check context has key or not ?
         /** store tss key */
         await this.appManager.saveAppTssConfig({
           appId: DEPLOYMENT_APP_ID,
-          seed,
+          seed: GENESIS_SEED,
           publicKey: pub2json(key.publicKey!),
           keyShare: bn2hex(key.share!),
-          polynomial: key.toJson().polynomial!,
-          expiration: context.expiration,
+          polynomial: key.toJson().polynomial!
         })
       }
       return true;

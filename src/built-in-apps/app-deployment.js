@@ -277,8 +277,9 @@ module.exports = {
         switch (method) {
             case Methods.RandomSeed: {
                 const {appId} = params
-                const {deployed, status} = this.callPlugin('system', "getAppLastDeploymentInfo", appId)
-                if(deployed && status !== 'PENDING')
+                const {deployed, status, seed} = this.callPlugin('system', "getAppLastDeploymentInfo", appId)
+                /** ignore deployment genesis context */
+                if(deployed && status !== 'PENDING' && seed !== '0x01')
                     throw `App already deployed`
                 break;
             }

@@ -45,6 +45,8 @@ export type AppContextQueryOptions = {
 
 export type ContextFilterOptions = {
   appId?: string,
+  excludeExpired?: boolean,
+  excludeGenesis?: boolean,
   deploymentStatus?: AppDeploymentStatus[],
   hasKeyGenRequest?: boolean,
   custom?: (ctx: AppContext) => boolean,
@@ -136,7 +138,7 @@ export default class AppManager extends CallablePlugin {
         appName: "deployment",
         isBuiltIn: true,
         seed: GENESIS_SEED,
-        rotationEnabled: true,
+        rotationEnabled: false,
         ttl: netConfigs.tss.defaultTTL,
         pendingPeriod: netConfigs.tss.pendingPeriod,
         party: {
@@ -227,7 +229,9 @@ export default class AppManager extends CallablePlugin {
        * Call this method as the base method for saving AppTssConfigModel.
        */
       newConfig.dangerousAllowToSave = true
-      await newConfig.save()
+      if(appTssConfig.seed !== GENESIS_SEED) {
+        await newConfig.save()
+      }
       CoreIpc.fireEvent({type: "app-tss-key:add", data: newConfig})
     }
 
@@ -248,7 +252,9 @@ export default class AppManager extends CallablePlugin {
     context.publicKey = publicKey
     context.polynomial = polynomial
     context.dangerousAllowToSave = true
-    await context.save();
+    if(context.seed !== GENESIS_SEED) {
+      await context.save();
+    }
     CoreIpc.fireEvent({type: "app-context:update", data: context,})
     NetworkIpc.fireEvent({type: "app-context:update", data: context,})
   }
@@ -516,13 +522,15 @@ export default class AppManager extends CallablePlugin {
       contexts = contexts.filter(ctx => ((ctx.expiration ?? Infinity) > now))
     }
     return contexts.reduce((first: AppContext|null, ctx: AppContext): AppContext|null => {
-        if(!first)
-          return ctx
-        if((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (first.deploymentRequest?.data.timestamp ?? Infinity))
-          return ctx
-        else
-          return first
-      }, null)
+      if(!ctx.publicKey)
+        return first;
+      if(!first)
+        return ctx
+      if((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (first.deploymentRequest?.data.timestamp ?? Infinity))
+        return ctx
+      else
+        return first
+    }, null)
   }
 
   getAppLastContext(appId: string): AppContext|undefined {
@@ -531,7 +539,7 @@ export default class AppManager extends CallablePlugin {
       .reduce((last:AppContext|undefined, ctx): AppContext|undefined => {
         if(!last)
           return ctx
-        if(ctx.deploymentRequest!.data.timestamp > last.deploymentRequest!.data.timestamp)
+        if((ctx.deploymentRequest?.data.timestamp ?? 0) > (last.deploymentRequest?.data.timestamp ?? 0))
           return ctx
         else
           return last
@@ -543,9 +551,19 @@ export default class AppManager extends CallablePlugin {
       ? this.getAppSeeds(options.appId).map(seed => this.appContexts[seed])
       : Object.values(this.appContexts);
 
+    const currentTime = getTimestamp();
+
     return contexts
       .filter(ctx => {
         const {appId, seed} = ctx;
+        if(options.excludeExpired) {
+          if(ctx.expiration !== undefined && ctx.expiration < currentTime)
+            return false
+        }
+        if(options.excludeGenesis) {
+          if(seed === GENESIS_SEED)
+            return false;
+        }
         if(options.deploymentStatus && options.deploymentStatus.length>0) {
           if(!options.deploymentStatus.includes(this.getAppDeploymentStatus(appId, seed)))
             return false
@@ -610,26 +628,21 @@ export default class AppManager extends CallablePlugin {
     if (!!context) {
       status = "TSS_GROUP_SELECTED";
 
-      if(appId === DEPLOYMENT_APP_ID) {
-        if(this.keyManager.isReady)
-          status = "DEPLOYED";
+      if(!!context.publicKey) {
+        status = "DEPLOYED";
       }
-      else {
-        if(!!context.publicKey) {
-          status = "DEPLOYED";
-        }
 
-        if (status === "DEPLOYED") {
-          if (!!context.ttl) {
-            const deploymentTime = context.deploymentRequest!.data.timestamp
-            const pendingTime = deploymentTime + context.ttl;
-            const currentTime = getTimestamp();
+      if (status === "DEPLOYED") {
+        if (!!context.rotationEnabled) {
+          const {expiration, ttl, pendingPeriod, deploymentRequest} = context
+          const deploymentTime = !!deploymentRequest ? deploymentRequest!.data.timestamp : (expiration! - (ttl! + pendingPeriod!))
+          const pendingTime = deploymentTime + ttl!;
+          const currentTime = getTimestamp();
 
-            if (currentTime > pendingTime) {
-              status = "PENDING";
-              if (context.expiration! < currentTime)
-                status = "EXPIRED";
-            }
+          if (currentTime > pendingTime) {
+            status = "PENDING";
+            if (context.expiration! < currentTime)
+              status = "EXPIRED";
           }
         }
       }
@@ -685,16 +698,16 @@ export default class AppManager extends CallablePlugin {
 
   /** useful when current node is not in the app party */
   async findAppPublicKey(appId: string, seed:string): Promise<PublicKey|null> {
-    const cachedPubKey = await this.publicKeyCache.get(seed);
-    if(cachedPubKey){
-      return TssModule.keyFromPublic(cachedPubKey);
-    }
     const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
     let ctx:AppContext = this.getAppContext(appId, seed);
     if(!ctx) {
-      if (currentNode.isDeployer)
-        return null
-      const deployers: MuonNodeInfo[] = _.shuffle(this.nodeManager.filterNodes({isDeployer: true}));
+      // if (currentNode.isDeployer)
+      //   return null
+      const cachedPubKey = await this.publicKeyCache.get(seed);
+      if(cachedPubKey){
+        return TssModule.keyFromPublic(cachedPubKey);
+      }
+      const deployers: MuonNodeInfo[] = _.shuffle(this.nodeManager.filterNodes({isDeployer: true, excludeSelf: true}));
       // @ts-ignore
       const publicKeyStr:string|null = await Promise.any(
         deployers.slice(0, 3).map(n => {
@@ -720,7 +733,6 @@ export default class AppManager extends CallablePlugin {
       if(!ctx.publicKey?.encoded) {
         return null;
       }
-      await this.publicKeyCache.set(seed, ctx.publicKey.encoded)
       return TssModule.keyFromPublic(ctx.publicKey.encoded);
     }
   }

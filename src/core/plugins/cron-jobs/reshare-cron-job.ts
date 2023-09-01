@@ -58,12 +58,20 @@ export default class ReshareCronJob extends BaseCronJob{
     const tenMinutesAgo = getTimestamp() - 600;
     let list0: AppContext[] = this.appManager.filterContexts({
       deploymentStatus: [APP_STATUS_TSS_GROUP_SELECTED],
-      custom: ctx => ctx.deploymentRequest?.data.result.timestamp < tenMinutesAgo,
+      custom: ctx => {
+        /** This is rotated context */
+        return !!ctx.previousSeed
+          /** Rotation enabled for this context */
+          && ctx.rotationEnabled === true
+          /** Ten minutes have passed since the context creation */
+          && ctx.deploymentRequest?.data.result.timestamp < tenMinutesAgo
+      },
     })
     this.log(`there is ${list0.length} context rotated but not reshared.`)
 
     let pendingContexts: AppContext[] = this.appManager.filterContexts({
       deploymentStatus: [APP_STATUS_PENDING, APP_STATUS_EXPIRED],
+      custom: ctx => ctx.rotationEnabled === true
     })
     /** All context of pending Apps */
     const appsContexts: MapOf<AppContext[]> = {}
