@@ -1,7 +1,6 @@
 import dotenv from 'dotenv'
 import path from 'path'
 dotenv.config()
-import emoji from 'node-emoji'
 import fs from 'fs'
 import Web3 from 'web3'
 import parseArgv from '../src/utils/parseArgv.js'
@@ -135,7 +134,7 @@ const createEnv = async () => {
     })
 
     fs.writeFileSync(`${BASE_PATH}/devnet/nodes/dev-node-${index + 1}.env`, envContent)
-    console.log(emoji.get('o'), `Node-${index + 1} Ethereum Address: `, account.address)
+    console.log("⭕", `Node-${index + 1} Ethereum Address: `, account.address)
   }
 
   /***** Create Other net.conf.json ******/
@@ -150,8 +149,9 @@ const createEnv = async () => {
         "max": 100
       },
       nodeManager: {
-        "network": "mumbai",
-        "address": "0x3112a7D5b3960d2C528cd83217E3170f8d252432"
+        "network": "bsctest",
+        "address": "0x965814CFd2E0Ea3bD57B62182e51E21503a5E7F5",
+        "stake": "0x327E044a3303A6572cDc3ec9EA0998d8138b468e"
       },
       routing: {
         "delegate": [
@@ -176,7 +176,7 @@ const createEnv = async () => {
   // reload. For example, when address of NodeManager is updating
   // net.conf still refers to the old address
   fs.writeFileSync(`${BASE_PATH}/config/global/net.conf.json`, netConf)
-  console.log(emoji.get('o'), `net.conf.json is created`)
+  console.log("⭕", `net.conf.json is created`)
   // console.log('Environment is created successfully for run nodes')
 }
 

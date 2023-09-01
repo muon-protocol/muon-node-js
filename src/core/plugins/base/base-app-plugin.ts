@@ -28,6 +28,7 @@ import {MapOf} from "../../../common/mpc/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
 import {reportInsufficientPartners} from "../../../common/analitics-reporter.js";
 import {createAjv} from "../../../common/ajv.js";
+import ethSigUtil from '@metamask/eth-sig-util'
 
 const { omit } = lodash;
 
@@ -95,7 +96,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async onStart() {
-    super.onStart();
+    await super.onStart();
     // console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
 
     /**
@@ -359,7 +360,7 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`confirmation done with %s`, confirmed)
       t5 = Date.now()
 
-      let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${newRequest.reqId}`, 15000)
+      let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${newRequest.reqId}`, 15000, {type: "nonce", message: resultHash})
       this.log(`request signed with %o`, nonce.partners);
       this.log('request time parts %o',{
         "req exec time": t1-t0,
@@ -422,20 +423,33 @@ class BaseAppPlugin extends CallablePlugin {
     if(fee && feeConfigs) {
       this.log(`spending fee %o`, fee)
       const {spender} = fee;
+      spender.address = spender.address.toLowerCase();
       const appId = this.APP_ID;
 
       /** fee signature is valid for 5 minutes */
       if(spender.timestamp/1000 < request.data.timestamp-5*60)
         throw `fee spend time has been expired.`
 
-      const hash = muonSha3(
-        {t: "address", v: spender.address},
-        {t: 'uint64', v: spender.timestamp},
-        {t: 'uint256', v: appId},
-      )
-      const signer = crypto.recover(hash, spender.signature);
+      const eip712TypedData = {
+        types: {
+          EIP712Domain: [{name: 'name', type: 'string'}],
+          Message: [
+            {type: 'address', name: 'address'},
+            {type: 'uint64', name: 'timestamp'},
+            {type: 'uint256', name: 'appId'},
+          ]
+        },
+        domain: {name: 'Muonize'},
+        primaryType: 'Message',
+        message: {address: spender.address, timestamp: spender.timestamp, appId}
+      };
+
+      // @ts-ignore
+      let signer = ethSigUtil.recoverTypedSignature({data: eip712TypedData, signature: spender.signature, version: "V4"});
+
+      signer = signer.toLowerCase();
       if(signer !== spender.address)
-        throw `fee spender not matched with signer.`
+        throw `fee spender not matched with signer.`;
 
       /** spend fee */
       const {endpoint, signers: feeSigners} = feeConfigs
@@ -460,6 +474,8 @@ class BaseAppPlugin extends CallablePlugin {
       if(feeResponse.error)
         throw feeResponse.error;
 
+      this.verifyFeeSig(request.reqId, feeResponse.amount, feeResponse.sign);
+
       /** check fee server response */
       const feeAmount: number = parseInt(feeResponse.amount)
       if(feeAmount <= 0)
@@ -474,7 +490,7 @@ class BaseAppPlugin extends CallablePlugin {
   async informRequestConfirmation(request: AppRequest) {
     request = clone(request)
     // await this.onConfirm(request)
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)!;
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})!;
 
     let announceList = this.getParty(request.deploymentSeed)!.partners;
     if(!!this.getConfirmAnnounceGroups) {
@@ -548,7 +564,8 @@ class BaseAppPlugin extends CallablePlugin {
     let nonce = await this.keyManager.keyGen({appId: this.APP_ID, seed}, {
       id: `nonce-${request.reqId}`,
       partners: availablePartners,
-      maxPartners: nonceParticipantsCount
+      maxPartners: nonceParticipantsCount,
+      usage: {type: "nonce", message: request.data.resultHash},
     })
     this.log(`nonce generation has ben completed with address %s.`, TssModule.pub2addr(nonce.publicKey))
 
@@ -625,7 +642,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     let {s, e} = splitSignature(signature)
     //
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})
 
     const ownerInfo = this.nodeManager.getNodeInfo(owner)
     if(!ownerInfo){
@@ -643,7 +660,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async verifyPartialSignature(request: AppRequest, owner:MuonNodeInfo, signature: string): Promise<boolean> {
     const appTssKey = this.getTss(request.deploymentSeed)!
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})
 
     return TssModule.schnorrVerifyPartial(
       appTssKey.getPubKey(owner.id),
@@ -668,7 +685,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async broadcastNewRequest(request: AppRequest) {
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, 15000)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, 15000, {type: "nonce", message: request.data.resultHash})
     let party = this.getParty(request.deploymentSeed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
@@ -728,7 +745,11 @@ class BaseAppPlugin extends CallablePlugin {
 
   async makeSignature(request: AppRequest, result: any, resultHash): Promise<string> {
     let {reqId} = request;
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${reqId}`, 15000)
+    let nonce: AppTssKey = await this.keyManager.getSharedKey(
+      `nonce-${reqId}`,
+      15000,
+      {type: "nonce", message: request.data.resultHash},
+    );
     if(!nonce)
       throw `nonce not found for request ${reqId}`
 
@@ -924,16 +945,8 @@ class BaseAppPlugin extends CallablePlugin {
 
     /** fee checking */
     if(request.data.fee) {
-      const feeConfigs = this.muon.configs.net.fee;
       let {amount, signature} = request.data.fee;
-      const hash = muonSha3(
-        { type: "uint256", value: request.reqId },
-        { type: "uint256", value: amount }
-      )
-      const signer = crypto.recover(hash, signature)
-      if(feeConfigs && !feeConfigs.signers.includes(signer)) {
-        throw `fee consumption signature mismatched.`
-      }
+      this.verifyFeeSig(request.reqId, amount, signature);
       await useOneTime('fee', signature, request.reqId);
     }
 
@@ -973,6 +986,18 @@ class BaseAppPlugin extends CallablePlugin {
     await requestConfirmationCache.set(request.reqId, '1');
 
     return `OK`;
+  }
+
+  verifyFeeSig(requestId, amount, signature) {
+    const feeConfigs = this.muon.configs.net.fee;
+    const hash = muonSha3(
+      {type: "uint256", value: requestId},
+      {type: "uint256", value: amount}
+    );
+    const recoveredSigner = crypto.recover(hash, signature);
+    if (feeConfigs && !feeConfigs.signers.includes(recoveredSigner)) {
+      throw `fee signature mismatched.`
+    }
   }
 }
 

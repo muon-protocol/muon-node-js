@@ -3,7 +3,6 @@
 import {CoreGlobalEvent} from "./ipc.js";
 import Events from 'events'
 import chalk from 'chalk'
-import emoji from 'node-emoji'
 import fs from 'fs'
 import { MessagePublisher, MessageSubscriber } from '../common/message-bus/index.js'
 import { GLOBAL_EVENT_CHANNEL, fireEvent } from './ipc.js'
@@ -46,19 +45,23 @@ export default class Muon extends Events {
 
   async _initializePlugin(plugins: MuonPlugin[]) {
     for (let plugin of plugins) {
+      try {
+        const pluginInstance = new plugin.module(this, plugin.config)
+        this._plugins[plugin.name] = pluginInstance
+        await pluginInstance.onInit();
 
-      const pluginInstance = new plugin.module(this, plugin.config)
-      this._plugins[plugin.name] = pluginInstance
-      await pluginInstance.onInit();
-
-      if(pluginInstance instanceof BaseAppPlugin) {
-        if(pluginInstance.APP_NAME) {
-          if(this.appNameToIdMap[pluginInstance.APP_NAME])
-            throw `There is two app with same APP_NAME: ${pluginInstance.APP_NAME}`
-          this._apps[pluginInstance.APP_ID] = pluginInstance;
-          this.appIdToNameMap[pluginInstance.APP_ID] = pluginInstance.APP_NAME
-          this.appNameToIdMap[pluginInstance.APP_NAME] = pluginInstance.APP_ID
+        if (pluginInstance instanceof BaseAppPlugin) {
+          if (pluginInstance.APP_NAME) {
+            if (this.appNameToIdMap[pluginInstance.APP_NAME])
+              throw `There is two app with same APP_NAME: ${pluginInstance.APP_NAME}`
+            this._apps[pluginInstance.APP_ID] = pluginInstance;
+            this.appIdToNameMap[pluginInstance.APP_ID] = pluginInstance.APP_NAME
+            this.appNameToIdMap[pluginInstance.APP_NAME] = pluginInstance.APP_ID
+          }
         }
+      }
+      catch (e) {
+        console.error(`error on initializing plugin [${plugin.name}]`, e);
       }
     }
     // console.log('plugins initialized.')
@@ -103,7 +106,12 @@ export default class Muon extends Events {
 
   async _onceStarted() {
     for (let pluginName in this._plugins) {
-      await this._plugins[pluginName].onStart()
+      try {
+        await this._plugins[pluginName].onStart()
+      }
+      catch (e) {
+        console.error(`error on core plugin [${pluginName}].onStart()`, e)
+      }
     }
   }
 

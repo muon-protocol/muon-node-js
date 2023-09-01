@@ -133,7 +133,7 @@ export function pub2json(pubkey: PublicKey, minimal: boolean=false): JsonPublicK
   }
 }
 
-export async function findMyIp(): Promise<string> {
+export async function findMyIp(): Promise<string|undefined> {
 
   const checkValidIp = str => {
     if(!isIP(str))
@@ -149,6 +149,9 @@ export async function findMyIp(): Promise<string> {
 
   let configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');
   let ifconfigURLs = configs.routing.ifconfig;
+  if(!ifconfigURLs || !Array.isArray(ifconfigURLs) || ifconfigURLs.length===0)
+    return undefined;
+
   // @ts-ignore
   let ip = await Promise.any(ifconfigURLs.map(ifconfigURL => {
       return axios.get(ifconfigURL)

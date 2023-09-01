@@ -1,4 +1,4 @@
-FROM node:16.14
+FROM node:18.17.0
 
 ## Create app directory
 WORKDIR /usr/src/muon-node-js
@@ -10,7 +10,6 @@ RUN npm install
 
 ## If you are building your code for production
 ## RUN npm ci --only=production
-#
 ## Bundle app source
 COPY . .
 
@@ -33,7 +32,7 @@ RUN npm i -g pm2
 RUN pm2 install pm2-logrotate
 
 RUN apt-get update && apt-get -y install cron
-RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-testnet'
+RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-alice2'
 
 CMD [ "bash", "-c", "node testnet-generate-env.js; service cron start; pm2 start ecosystem.config.cjs; sleep infinity" ]
 #

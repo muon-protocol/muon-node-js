@@ -2,7 +2,7 @@ version: '3'
 services:
   muon_api:
     container_name: muon-node
-    image: muonnode/muon-node-js
+    image: muonnode/alice-v2:latest
     restart: always
     network_mode: host
     depends_on:
@@ -11,12 +11,14 @@ services:
 
   muon_mongo:
     network_mode: host
+    restart: always
     container_name: mongo
     image: mongo:4.4.18
     command: mongod --bind_ip 127.0.0.1
 
   muon_redis:
     network_mode: host
+    restart: always
     container_name: redis
     image: redis:6
     command: redis-server --bind 127.0.0.1

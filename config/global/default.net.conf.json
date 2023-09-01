@@ -1,31 +1,24 @@
 {
+  "defaultLeader": "1",
   "tss": {
-    "threshold": 7,
+    "threshold": 2,
     "max": 20,
     "defaultTTL": 604800,
     "pendingPeriod": 86400
   },
   "nodeManager": {
     "network": "bsctest",
-    "address": "0x2efB53c11FC935f6114B3fC37AaFa6a76B263a4E",
-    "pagination": "0x35fccb153e862b0af8f66192c43a4b0dea132691"
+    "address": "0x25B019d98CF6FBcD73C92C468A352449e2BB39C2",
+    "stake": "0xd788C2276A6f75a8B9360E9695028329C925b0AB"
   },
   "routing": {
     "delegate": [
-      "http://104.131.177.195:8080/delegate",
-      "http://3.130.24.220:8080/delegate",
-      "http://194.195.211.27:8080/delegate",
-      "http://209.250.252.247:8080/delegate",
-      "http://188.166.73.132:8000/delegate"
+      "https://alice-n2.muon.net/delegate",
+      "http://188.166.73.132:8011/delegate"
     ],
     "ifconfig":[
-      "http://104.131.177.195:8080/ifconfig",
-      "http://3.130.24.220:8080/ifconfig",
-      "http://194.195.211.27:8080/ifconfig",
-      "http://209.250.252.247:8080/ifconfig",
-      "http://188.166.73.132:8000/ifconfig",
-      "https://ifconfig.muon.net/",
-      "https://ifconfig.me/all.json"
+      "http://alice-n2.muon.net/ifconfig",
+      "http://188.166.73.132:8011/ifconfig"
     ],
     "discoveryValidPeriod": 30000,
     "findPeerValidPeriod": 30000,
@@ -33,14 +26,11 @@
     "peerStoreTTL": 1200000
   },
   "nodes": {
-    "onlineList": "https://monitor1.muon.net/nodes",
-    "aggregators": ["4", "22408"]
+    "onlineList": "https://alice-v2.muon.net/monitor/nodes",
+    "aggregators": ["1", "3"]
   },
   "bootstrap": [
-    "/ip4/104.131.177.195/tcp/5000/p2p/Qma3GsJmB47xYuyahPZPSadh1avvxfyYQwk8R3UnFrQ6aP",
-    "/ip4/3.130.24.220/tcp/5000/p2p/Qmcrx17xt1vENkbedPjgeQdZWhRRKCLbtqJr9z8E76nztz",
-    "/ip4/194.195.211.27/tcp/5000/p2p/QmTLpbUrFJap7FNQhUo8RqRCXSDhdKjXmXAyCpNCd8YtMm",
-    "/ip4/209.250.252.247/tcp/5000/p2p/QmbAGW4ddya254cAXKz2FnarpFv1odaJuisgCdPZrYfVxE"
+    "/ip4/188.166.73.132/tcp/9011/p2p/QmYPbLuwy7CWqsMrZM6W9VZGSu7oM9PGRfVe1kssKcjjpj"
   ],
   "fee": {
     "endpoint": "http://70.34.217.65:3000/sign",
@@ -51,10 +41,8 @@
   "synchronizer": {
     "monitor": {
       "providers": [
-        "http://104.131.177.195:8080/network",
-        "http://3.130.24.220:8080/network",
-        "http://194.195.211.27:8080/network",
-        "http://209.250.252.247:8080/network"
+        "http://188.166.73.132:8011/network",
+        "https://alice-n2.muon.net/network"
       ],
       "startDelay": 120e3,
       "interval": 3600e3

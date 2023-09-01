@@ -35,7 +35,7 @@ check_for_update (){
     current_branch=`git rev-parse --abbrev-ref HEAD`
     `git checkout package-lock.json package.json`
 
-    git reset --hard origin/testnet
+    `git reset --hard origin/"$current_branch"`
 
     # restart services
     if [[ -z $_NODE ]]
@@ -52,7 +52,7 @@ check_for_update (){
 
     git checkout package.json package-lock.json
     update_check=`git pull --recurse-submodules origin "$current_branch" 2>&1`
-    
+
     #log `$_NODE  $_NPM install 2>&1`
 
     if [ $? -ne 0 ]; then

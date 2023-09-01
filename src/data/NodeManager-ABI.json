@@ -1,47 +1,4 @@
 [
-  { "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint64",
-        "name": "nodeId",
-        "type": "uint64"
-      },
-      {
-        "components": [
-          { "internalType": "uint64", "name": "id", "type": "uint64" },
-          {
-            "internalType": "address",
-            "name": "nodeAddress",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "stakerAddress",
-            "type": "address"
-          },
-          { "internalType": "string", "name": "peerId", "type": "string" },
-          { "internalType": "bool", "name": "active", "type": "bool" },
-          { "internalType": "uint256", "name": "startTime", "type": "uint256" },
-          { "internalType": "uint256", "name": "endTime", "type": "uint256" },
-          {
-            "internalType": "uint256",
-            "name": "lastEditTime",
-            "type": "uint256"
-          },
-          { "internalType": "bool", "name": "isDeployer", "type": "bool" }
-        ],
-        "indexed": false,
-        "internalType": "struct MuonNodeManager.Node",
-        "name": "node",
-        "type": "tuple"
-      }
-    ],
-    "name": "AddNode",
-    "type": "event"
-  },
   {
     "anonymous": false,
     "inputs": [
@@ -58,45 +15,20 @@
         "type": "string"
       }
     ],
-    "name": "Config",
+    "name": "ConfigSet",
     "type": "event"
   },
   {
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
-        "internalType": "uint64",
-        "name": "nodeId",
-        "type": "uint64"
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "version",
+        "type": "uint8"
       }
     ],
-    "name": "DeactiveNode",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint64",
-        "name": "nodeId",
-        "type": "uint64"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "oldAddr",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "newAddr",
-        "type": "address"
-      }
-    ],
-    "name": "EditNodeAddress",
+    "name": "Initialized",
     "type": "event"
   },
   {
@@ -109,19 +41,65 @@
         "type": "uint64"
       },
       {
+        "components": [
+          {
+            "internalType": "uint64",
+            "name": "id",
+            "type": "uint64"
+          },
+          {
+            "internalType": "address",
+            "name": "nodeAddress",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "stakerAddress",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "peerId",
+            "type": "string"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint8",
+            "name": "tier",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64[]",
+            "name": "roles",
+            "type": "uint64[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "lastEditTime",
+            "type": "uint256"
+          }
+        ],
         "indexed": false,
-        "internalType": "string",
-        "name": "oldId",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "newId",
-        "type": "string"
+        "internalType": "struct IMuonNodeManager.Node",
+        "name": "node",
+        "type": "tuple"
       }
     ],
-    "name": "EditPeerId",
+    "name": "NodeAdded",
     "type": "event"
   },
   {
@@ -134,7 +112,45 @@
         "type": "uint64"
       }
     ],
-    "name": "RemoveNode",
+    "name": "NodeDeactivated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint64",
+        "name": "roleId",
+        "type": "uint64"
+      }
+    ],
+    "name": "NodeRoleSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint64",
+        "name": "roleId",
+        "type": "uint64"
+      }
+    ],
+    "name": "NodeRoleUnset",
     "type": "event"
   },
   {
@@ -213,36 +229,85 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint8",
+        "name": "tier",
+        "type": "uint8"
+      }
+    ],
+    "name": "TierSet",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "ADMIN_ROLE",
-    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
     "name": "DAO_ROLE",
-    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
     "name": "DEFAULT_ADMIN_ROLE",
-    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "address", "name": "_nodeAddress", "type": "address" },
       {
         "internalType": "address",
-        "name": "_stakerAddress",
+        "name": "nodeAddress",
         "type": "address"
       },
-      { "internalType": "string", "name": "_peerId", "type": "string" },
-      { "internalType": "bool", "name": "_active", "type": "bool" }
+      {
+        "internalType": "address",
+        "name": "stakerAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "peerId",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "active",
+        "type": "bool"
+      }
     ],
     "name": "addNode",
     "outputs": [],
@@ -250,15 +315,31 @@
     "type": "function"
   },
   {
-    "inputs": [{ "internalType": "string", "name": "", "type": "string" }],
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
     "name": "configs",
-    "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "uint64", "name": "nodeId", "type": "uint64" }
+      {
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      }
     ],
     "name": "deactiveNode",
     "outputs": [],
@@ -267,31 +348,55 @@
   },
   {
     "inputs": [
-      { "internalType": "uint64", "name": "nodeId", "type": "uint64" },
-      { "internalType": "address", "name": "nodeAddress", "type": "address" }
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    "name": "editNodeAddress",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "editLogs",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint256",
+        "name": "editTime",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "uint64", "name": "nodeId", "type": "uint64" },
-      { "internalType": "string", "name": "peerId", "type": "string" }
+      {
+        "internalType": "uint256",
+        "name": "lastEditTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "startId",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "endId",
+        "type": "uint64"
+      }
     ],
-    "name": "editPeerId",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "getAllNodes",
     "outputs": [
       {
         "components": [
-          { "internalType": "uint64", "name": "id", "type": "uint64" },
+          {
+            "internalType": "uint64",
+            "name": "id",
+            "type": "uint64"
+          },
           {
             "internalType": "address",
             "name": "nodeAddress",
@@ -302,19 +407,44 @@
             "name": "stakerAddress",
             "type": "address"
           },
-          { "internalType": "string", "name": "peerId", "type": "string" },
-          { "internalType": "bool", "name": "active", "type": "bool" },
-          { "internalType": "uint256", "name": "startTime", "type": "uint256" },
-          { "internalType": "uint256", "name": "endTime", "type": "uint256" },
+          {
+            "internalType": "string",
+            "name": "peerId",
+            "type": "string"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint8",
+            "name": "tier",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64[]",
+            "name": "roles",
+            "type": "uint64[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
           {
             "internalType": "uint256",
             "name": "lastEditTime",
             "type": "uint256"
-          },
-          { "internalType": "bool", "name": "isDeployer", "type": "bool" }
+          }
         ],
-        "internalType": "struct MuonNodeManager.Node[]",
-        "name": "allNodes",
+        "internalType": "struct IMuonNodeManager.Node[]",
+        "name": "nodesList",
         "type": "tuple[]"
       }
     ],
@@ -323,17 +453,240 @@
   },
   {
     "inputs": [
-      { "internalType": "bytes32", "name": "role", "type": "bytes32" }
+      {
+        "internalType": "uint256",
+        "name": "lastEditTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint16",
+        "name": "maxNodesToRetrieve",
+        "type": "uint16"
+      }
     ],
-    "name": "getRoleAdmin",
-    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "name": "getEditedNodes",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint64",
+            "name": "id",
+            "type": "uint64"
+          },
+          {
+            "internalType": "address",
+            "name": "nodeAddress",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "stakerAddress",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "peerId",
+            "type": "string"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint8",
+            "name": "tier",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64[]",
+            "name": "roles",
+            "type": "uint64[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "lastEditTime",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IMuonNodeManager.Node[]",
+        "name": "nodesList",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "lastIndex",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
-      { "internalType": "address", "name": "account", "type": "address" }
+      {
+        "internalType": "string[]",
+        "name": "configKeys",
+        "type": "string[]"
+      }
+    ],
+    "name": "getInfo",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      },
+      {
+        "internalType": "string[]",
+        "name": "",
+        "type": "string[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      }
+    ],
+    "name": "getNode",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint64",
+            "name": "id",
+            "type": "uint64"
+          },
+          {
+            "internalType": "address",
+            "name": "nodeAddress",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "stakerAddress",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "peerId",
+            "type": "string"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint8",
+            "name": "tier",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64[]",
+            "name": "roles",
+            "type": "uint64[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "lastEditTime",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IMuonNodeManager.Node",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      }
+    ],
+    "name": "getNodeRoles",
+    "outputs": [
+      {
+        "internalType": "uint64[]",
+        "name": "",
+        "type": "uint64[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getRoleAdmin",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
     "name": "grantRole",
     "outputs": [],
@@ -342,50 +695,23 @@
   },
   {
     "inputs": [
-      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
-      { "internalType": "address", "name": "account", "type": "address" }
-    ],
-    "name": "hasRole",
-    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "info",
-    "outputs": [
       {
-        "components": [
-          { "internalType": "uint64", "name": "id", "type": "uint64" },
-          {
-            "internalType": "address",
-            "name": "nodeAddress",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "stakerAddress",
-            "type": "address"
-          },
-          { "internalType": "string", "name": "peerId", "type": "string" },
-          { "internalType": "bool", "name": "active", "type": "bool" },
-          { "internalType": "uint256", "name": "startTime", "type": "uint256" },
-          { "internalType": "uint256", "name": "endTime", "type": "uint256" },
-          {
-            "internalType": "uint256",
-            "name": "lastEditTime",
-            "type": "uint256"
-          },
-          { "internalType": "bool", "name": "isDeployer", "type": "bool" }
-        ],
-        "internalType": "struct MuonNodeManager.Node[]",
-        "name": "_nodes",
-        "type": "tuple[]"
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
       },
       {
-        "internalType": "uint256",
-        "name": "_lastUpdateTime",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "hasRole",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -393,34 +719,73 @@
   },
   {
     "inputs": [],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "lastNodeId",
-    "outputs": [{ "internalType": "uint64", "name": "", "type": "uint64" }],
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
     "name": "lastUpdateTime",
-    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "name": "nodeAddressIds",
-    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "address", "name": "_addr", "type": "address" }
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "nodeAddressIds",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "nodeAddress",
+        "type": "address"
+      }
     ],
     "name": "nodeAddressInfo",
     "outputs": [
       {
         "components": [
-          { "internalType": "uint64", "name": "id", "type": "uint64" },
+          {
+            "internalType": "uint64",
+            "name": "id",
+            "type": "uint64"
+          },
           {
             "internalType": "address",
             "name": "nodeAddress",
@@ -431,18 +796,43 @@
             "name": "stakerAddress",
             "type": "address"
           },
-          { "internalType": "string", "name": "peerId", "type": "string" },
-          { "internalType": "bool", "name": "active", "type": "bool" },
-          { "internalType": "uint256", "name": "startTime", "type": "uint256" },
-          { "internalType": "uint256", "name": "endTime", "type": "uint256" },
+          {
+            "internalType": "string",
+            "name": "peerId",
+            "type": "string"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint8",
+            "name": "tier",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64[]",
+            "name": "roles",
+            "type": "uint64[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
           {
             "internalType": "uint256",
             "name": "lastEditTime",
             "type": "uint256"
-          },
-          { "internalType": "bool", "name": "isDeployer", "type": "bool" }
+          }
         ],
-        "internalType": "struct MuonNodeManager.Node",
+        "internalType": "struct IMuonNodeManager.Node",
         "name": "node",
         "type": "tuple"
       }
@@ -451,35 +841,124 @@
     "type": "function"
   },
   {
-    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-    "name": "nodes",
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "roleId",
+        "type": "uint64"
+      }
+    ],
+    "name": "nodeHasRole",
     "outputs": [
-      { "internalType": "uint64", "name": "id", "type": "uint64" },
-      { "internalType": "address", "name": "nodeAddress", "type": "address" },
-      { "internalType": "address", "name": "stakerAddress", "type": "address" },
-      { "internalType": "string", "name": "peerId", "type": "string" },
-      { "internalType": "bool", "name": "active", "type": "bool" },
-      { "internalType": "uint256", "name": "startTime", "type": "uint256" },
-      { "internalType": "uint256", "name": "endTime", "type": "uint256" },
-      { "internalType": "uint256", "name": "lastEditTime", "type": "uint256" },
-      { "internalType": "bool", "name": "isDeployer", "type": "bool" }
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "uint64", "name": "nodeId", "type": "uint64" }
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
     ],
-    "name": "removeNode",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "nodes",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "id",
+        "type": "uint64"
+      },
+      {
+        "internalType": "address",
+        "name": "nodeAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "stakerAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "peerId",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "active",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint8",
+        "name": "tier",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "startTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "endTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "lastEditTime",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
-      { "internalType": "address", "name": "account", "type": "address" }
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "name": "nodesRoles",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
     "name": "renounceRole",
     "outputs": [],
@@ -488,8 +967,16 @@
   },
   {
     "inputs": [
-      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
-      { "internalType": "address", "name": "account", "type": "address" }
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
     "name": "revokeRole",
     "outputs": [],
@@ -498,8 +985,16 @@
   },
   {
     "inputs": [
-      { "internalType": "string", "name": "key", "type": "string" },
-      { "internalType": "string", "name": "val", "type": "string" }
+      {
+        "internalType": "string",
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "val",
+        "type": "string"
+      }
     ],
     "name": "setConfig",
     "outputs": [],
@@ -508,30 +1003,76 @@
   },
   {
     "inputs": [
-      { "internalType": "uint64", "name": "nodeId", "type": "uint64" },
-      { "internalType": "bool", "name": "_isDeployer", "type": "bool" }
+      {
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "roleId",
+        "type": "uint64"
+      }
     ],
-    "name": "setIsDeployer",
+    "name": "setNodeRole",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint8",
+        "name": "tier",
+        "type": "uint8"
+      }
+    ],
+    "name": "setTier",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
     "name": "stakerAddressIds",
-    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "address", "name": "_addr", "type": "address" }
+      {
+        "internalType": "address",
+        "name": "stakerAddress",
+        "type": "address"
+      }
     ],
     "name": "stakerAddressInfo",
     "outputs": [
       {
         "components": [
-          { "internalType": "uint64", "name": "id", "type": "uint64" },
+          {
+            "internalType": "uint64",
+            "name": "id",
+            "type": "uint64"
+          },
           {
             "internalType": "address",
             "name": "nodeAddress",
@@ -542,18 +1083,43 @@
             "name": "stakerAddress",
             "type": "address"
           },
-          { "internalType": "string", "name": "peerId", "type": "string" },
-          { "internalType": "bool", "name": "active", "type": "bool" },
-          { "internalType": "uint256", "name": "startTime", "type": "uint256" },
-          { "internalType": "uint256", "name": "endTime", "type": "uint256" },
+          {
+            "internalType": "string",
+            "name": "peerId",
+            "type": "string"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint8",
+            "name": "tier",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64[]",
+            "name": "roles",
+            "type": "uint64[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
           {
             "internalType": "uint256",
             "name": "lastEditTime",
             "type": "uint256"
-          },
-          { "internalType": "bool", "name": "isDeployer", "type": "bool" }
+          }
         ],
-        "internalType": "struct MuonNodeManager.Node",
+        "internalType": "struct IMuonNodeManager.Node",
         "name": "node",
         "type": "tuple"
       }
@@ -563,11 +1129,39 @@
   },
   {
     "inputs": [
-      { "internalType": "bytes4", "name": "interfaceId", "type": "bytes4" }
+      {
+        "internalType": "bytes4",
+        "name": "interfaceId",
+        "type": "bytes4"
+      }
     ],
     "name": "supportsInterface",
-    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "nodeId",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "roleId",
+        "type": "uint64"
+      }
+    ],
+    "name": "unsetNodeRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   }
 ]
