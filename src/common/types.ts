@@ -233,7 +233,8 @@ export type NetConfigs = {
             "providers": string[],
             "startDelay": number,
             "interval": number
-        }
+        },
+        "dbSyncOnlineThreshold": number
     }
 }
 

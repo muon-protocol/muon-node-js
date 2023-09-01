@@ -167,6 +167,7 @@ const createEnv = async () => {
       ],
       fee: undefined,
       synchronizer: undefined,
+      dbSyncOnlineThreshold: 1
     },
     null,
     2

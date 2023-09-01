@@ -117,7 +117,7 @@ export default class DbSynchronizer extends CallablePlugin {
    other deployers and updates the own context list accordingly.
    */
   private async deployersSyncLoop() {
-    const {monitor: {startDelay, interval}} = this.muon.configs.net.synchronizer;
+    const {monitor: {startDelay, interval},dbSyncOnlineThreshold} = this.muon.configs.net.synchronizer;
     log(`deployers sync loop start %o`, {startDelay, interval})
 
     await timeout(Math.floor((0.5 + Math.random()) * startDelay));
@@ -142,79 +142,83 @@ export default class DbSynchronizer extends CallablePlugin {
 
         const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
           candidateDeployers,
-          3,
+          dbSyncOnlineThreshold,
           {
             timeout: 3000,
             return: 'peerId'
           },
         );
+        if (onlineDeployers.length < dbSyncOnlineThreshold){
+          log(`Cannot perform dbSync, Insufficient online deployers ${onlineDeployers.length}/${dbSyncOnlineThreshold}`);
+        } else {
+          log(`${onlineDeployers.length} online deployers found, performing dbSync`);
+          /** loop while there is more contexts to sync */
+          while(true) {
+            /** paginate and get missing contexts */
+            let res: AppContext[][] = await Promise.all(
+              onlineDeployers.map(peerId => {
+                return this.remoteCall(
+                  peerId,
+                  RemoteMethods.GetMissingContext,
+                  {
+                    from: lastTimestamp + 1,
+                    count: DEPLOYER_SYNC_ITEM_PER_PAGE
+                  },
+                )
+                  .catch(e => [])
+              })
+            );
+            let uniqueList: AppContext[] = Object.values(
+              _.flatten(res).reduce((obj: MapOf<AppContext>, ctx: AppContext): MapOf<AppContext> => {
+                obj[ctx.deploymentRequest!.reqId] = ctx
+                return obj;
+              }, {})
+            );
 
-        /** loop while there is more contexts to sync */
-        while(true) {
-          /** paginate and get missing contexts */
-          let res: AppContext[][] = await Promise.all(
-            onlineDeployers.map(peerId => {
-              return this.remoteCall(
-                peerId,
-                RemoteMethods.GetMissingContext,
-                {
-                  from: lastTimestamp + 1,
-                  count: DEPLOYER_SYNC_ITEM_PER_PAGE
-                },
-              )
-                .catch(e => [])
-            })
-          );
-          let uniqueList: AppContext[] = Object.values(
-            _.flatten(res).reduce((obj: MapOf<AppContext>, ctx: AppContext): MapOf<AppContext> => {
-              obj[ctx.deploymentRequest!.reqId] = ctx
-              return obj;
-            }, {})
-          );
+            if (uniqueList.length > 0) {
+              const lastContextTime: number = uniqueList
+                .filter(ctx => !!ctx.keyGenRequest)
+                .reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
 
-          if (uniqueList.length > 0) {
-            const lastContextTime: number = uniqueList
-              .filter(ctx => !!ctx.keyGenRequest)
-              .reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
+              /** filter out locally existing context and keep only missing contexts. */
+              uniqueList = uniqueList.filter(ctx => {
+                const {appId, seed} = ctx
 
-            /** filter out locally existing context and keep only missing contexts. */
-            uniqueList = uniqueList.filter(ctx => {
-              const {appId, seed} = ctx
+                if(appId === "1")
+                  return false;
 
-              if(appId === "1")
-                return false;
+                /** if ctx exist locally */
+                if(!!this.appManager.getAppContext(appId, seed))
+                  return false
 
-              /** if ctx exist locally */
-              if(!!this.appManager.getAppContext(appId, seed))
-                return false
+                const lastContext = this.appManager.getAppLastContext(appId);
+                /** if newer rotated context of app exist locally */
+                if(!!lastContext && lastContext.deploymentRequest!.data.result.timestamp > ctx.deploymentRequest?.data.result.timestamp)
+                  return false;
 
-              const lastContext = this.appManager.getAppLastContext(appId);
-              /** if newer rotated context of app exist locally */
-              if(!!lastContext && lastContext.deploymentRequest!.data.result.timestamp > ctx.deploymentRequest?.data.result.timestamp)
-                return false;
+                return true;
+              })
 
-              return true;
-            })
+              for (const ctx of uniqueList) {
+                await this.appManager.saveAppContext(ctx);
+              }
 
-            for (const ctx of uniqueList) {
-              await this.appManager.saveAppContext(ctx);
+              log(`deployer-sync: there is ${uniqueList.length} missing contexts.`)
+
+              if (lastContextTime > lastTimestamp) {
+                lastTimestamp = lastContextTime
+                log('updating lastTimestamp setting %o', {lastTimestamp})
+                await writeSetting("deployers-sync.lastTimestamp", lastTimestamp);
+              }
             }
 
-            log(`deployer-sync: there is ${uniqueList.length} missing contexts.`)
-
-            if (lastContextTime > lastTimestamp) {
-              lastTimestamp = lastContextTime
-              log('updating lastTimestamp setting %o', {lastTimestamp})
-              await writeSetting("deployers-sync.lastTimestamp", lastTimestamp);
-            }
+            /** break the loop if no more contexts */
+            if(uniqueList.length < DEPLOYER_SYNC_ITEM_PER_PAGE)
+              break;
           }
 
-          /** break the loop if no more contexts */
-          if(uniqueList.length < DEPLOYER_SYNC_ITEM_PER_PAGE)
-            break;
+          this.isDbSynced = true;
         }
-
-        this.isDbSynced = true;
       }
 
       await timeout(Math.floor((0.5 + Math.random()) * interval));
