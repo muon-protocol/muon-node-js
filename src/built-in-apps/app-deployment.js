@@ -272,8 +272,13 @@ module.exports = {
     validateRequest: async function(request) {
         let {
             method,
+            deploymentSeed,
             data: { params }
         } = request
+
+        if(params.appId !== "1" && deploymentSeed === "0x01")
+          throw `The genesis key only will be used for deploying 'deployment' app itself.`
+
         switch (method) {
             case Methods.RandomSeed: {
                 const {appId} = params
