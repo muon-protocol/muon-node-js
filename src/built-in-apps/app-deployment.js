@@ -15,6 +15,7 @@ const Methods = {
 
 const NODES_SELECTION_TOLERANCE = 0.07;
 const ROTATION_COEFFICIENT = 1.5;
+const DEPLOYMENT_APP_ID = "1"
 
 function shuffleNodes(nodes, seed) {
     let unsorted = nodes.map(id => {
@@ -171,7 +172,7 @@ module.exports = {
     APP_NAME: "deployment",
     REMOTE_CALL_TIMEOUT: 120e3,
     METHOD_PARAMS_SCHEMA,
-    APP_ID: 1,
+    APP_ID: "1",
 
     readOnlyMethods: ["init", 'undeploy'],
 
@@ -206,7 +207,7 @@ module.exports = {
             nodes,
         } = params;
 
-        if(appId === "1")
+        if(appId === DEPLOYMENT_APP_ID)
             return this.callPlugin("system", "getAvailableDeployers");
 
         t = Math.max(t, tssConfigs.threshold);
@@ -218,7 +219,7 @@ module.exports = {
                 throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
 
             /** threshold will not change when rotating the party */
-            t = prevContext.party.t
+            t = appId === DEPLOYMENT_APP_ID ? tssConfigs.thresholds : prevContext.party.t
         }
 
         /** Choose a few nodes at random to join the party */
@@ -279,7 +280,7 @@ module.exports = {
             data: { params }
         } = request
 
-        if(params.appId !== "1" && deploymentSeed === "0x01")
+        if(params.appId !== DEPLOYMENT_APP_ID && deploymentSeed === "0x01")
           throw `The genesis key only will be used for deploying 'deployment' app itself.`
 
         switch (method) {
@@ -513,7 +514,7 @@ module.exports = {
                 const pendingPeriod = !!pending ? pending : prevContext.pendingPeriod;
 
                 /** TSS threshold will not change when rotating the app party */
-                t = prevContext.party.t;
+                t = appId === DEPLOYMENT_APP_ID ? tssConfigs.threshold : prevContext.party.t;
 
                 return {
                     rotationEnabled: true,
