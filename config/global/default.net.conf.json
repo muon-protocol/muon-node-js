@@ -46,6 +46,7 @@
       ],
       "startDelay": 120e3,
       "interval": 3600e3
-    }
+    },
+    "dbSyncOnlineThreshold": 3
   }
 }
