@@ -19,7 +19,7 @@ import * as CoreIpc from '../ipc.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import {useOneTime} from "../../utils/tss/use-one-time.js";
 import {logger} from '@libp2p/logger'
-import {pub2json, timeout, uuid} from '../../utils/helpers.js'
+import {getTimestamp, pub2json, timeout, uuid} from '../../utils/helpers.js'
 import {bn2hex, toBN} from "../../utils/tss/utils.js";
 import axios from 'axios'
 import {MapOf} from "../../common/mpc/types";
@@ -30,13 +30,14 @@ import { createRequire } from "module";
 import ReshareCronJob from "./cron-jobs/reshare-cron-job";
 import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
-import {NODE_ROLE_DEPLOYER} from "../../common/contantes.js";
+import {DEPLOYMENT_APP_ID, GENESIS_SEED, NODE_ROLE_DEPLOYER} from "../../common/contantes.js";
 const require = createRequire(import.meta.url);
 const Rand = require('rand-seed').default;
 
 const log = logger("muon:core:plugins:system");
 
 const RemoteMethods = {
+  storeDeploymentTssKey: 'storeDeploymentTssKey',
   GenerateAppTss: "generateAppTss",
   Undeploy: "undeploy",
   GetAppPublicKey: "getAppPubKey",
@@ -97,7 +98,51 @@ class System extends CallablePlugin {
     if(withoutKeyCount<netConfigs.tss.threshold)
       throw `No enough online deployers to create the key.`;
 
-    const key:AppTssKey = await this.keyManager.createDeploymentTssKey()
+    const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
+      deployers.map(n => n.peerId),
+      Math.ceil(this.netConfigs.tss.threshold*1.2),
+      {timeout: 10000}
+    )
+    if(onlineDeployers.length < this.netConfigs.tss.threshold) {
+      log(`Its need ${this.netConfigs.tss.threshold} deployer to create deployment tss but only ${onlineDeployers.length} are available`)
+      throw `No enough online deployers to create the deployment tss key.`
+    }
+    log(`Deployers %o are available to create deployment tss`, onlineDeployers)
+
+    let key: AppTssKey = await this.keyManager.keyGen(
+      {appId: "1", seed: GENESIS_SEED},
+      {
+        partners: deployers.map(n => n.id),
+        dealers: onlineDeployers,
+        lowerThanHalfN: true,
+        usage: {type: "app", seed: GENESIS_SEED},
+      }
+    )
+
+    let callResult = await Promise.all(deployers.map(({wallet, peerId}) => {
+      return (
+        wallet === process.env.SIGN_WALLET_ADDRESS
+          ?
+          this.__storeDeploymentTssKey({key: key.id}, this.nodeManager.currentNodeInfo)
+          :
+          this.remoteCall(
+            peerId,
+            RemoteMethods.storeDeploymentTssKey,
+            {
+              key: key.id,
+            },
+            {timeout: 120e3}
+            // {taskId: `keygen-${key.id}`}
+          )
+      )
+        .catch(e=>{
+          console.log("RemoteCall.storeDeploymentTssKey", e);
+          return false
+        });
+    }))
+
+    if (callResult.filter(r => r === true).length+1 < this.netConfigs.tss.threshold)
+      throw `Tss creation failed.`
 
     return _.pick(key.toJson(), ["publicKey", "polynomial", "partners"]);
   }
@@ -152,19 +197,13 @@ class System extends CallablePlugin {
     ]
   }
 
-  @broadcastHandler
-  async __broadcastHandler(data, callerInfo: MuonNodeInfo) {
-    const {type, details} = data||{};
-    switch (type) {
-      case 'undeploy': {
-        if(!callerInfo.isDeployer)
-          return;
-        const {appId, deploymentTimestamp} = details || {}
-        this.__undeployApp({appId, deploymentTimestamp}, callerInfo)
-          .catch(e => {})
-        break;
-      }
-    }
+  @appApiMethod()
+  async getAvailableDeployers(): Promise<string[]> {
+    return this.getAvailableNodes()
+      .then(list => {
+        return list.filter(n => n.isDeployer)
+          .map(n => n.id);
+      })
   }
 
   @appApiMethod()
@@ -530,15 +569,13 @@ class System extends CallablePlugin {
       throw `App not found by identifier: ${appNameOrId}`
     const appId = app.APP_ID
 
-    /** check app to be deployed */
-    const seeds = this.appManager.getAppSeeds(appId);
-
     /** check app context */
     let allContexts: AppContext[] = this.appManager.getAppAllContext(appId, true);
 
     /** most recent deployment time */
+    const currentTime = getTimestamp();
     const deploymentTimestamp = allContexts
-      .map(ctx => ctx.deploymentRequest?.data.timestamp!)
+      .map(ctx => ctx.deploymentRequest?.data.timestamp! || currentTime)
       .sort((a, b) => b - a)[0]
 
     let appPartners: string[] = [].concat(
@@ -554,7 +591,11 @@ class System extends CallablePlugin {
         ...appPartners
       ]
     })
-    log(`removing app contexts from nodes %o`, partnersToCall.map(p => p.id))
+    log(`removing app contexts %o`, {
+      appId,
+      timeThreshold: deploymentTimestamp,
+      fromPartners: partnersToCall.map(p => p.id),
+    })
     await Promise.all(partnersToCall.map(node => {
       if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
         return this.__undeployApp({appId, deploymentTimestamp}, this.nodeManager.currentNodeInfo)
@@ -576,11 +617,6 @@ class System extends CallablePlugin {
           });
       }
     }))
-
-    this.broadcast({type: "undeploy", details: {
-        appId,
-        deploymentTimestamp
-    }})
   }
 
   @appApiMethod({})
@@ -610,6 +646,46 @@ class System extends CallablePlugin {
   /**
    * Remote methods
    */
+
+  /**
+   * Node with ID:[1] inform other nodes that tss creation completed.
+   *
+   * @param data
+   * @param callerInfo: caller node information
+   * @param callerInfo.wallet: collateral wallet of caller node
+   * @param callerInfo.peerId: PeerID of caller node
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  @remoteMethod(RemoteMethods.storeDeploymentTssKey)
+  async __storeDeploymentTssKey(data: {key: string}, callerInfo) {
+    // TODO: problem condition: request arrive when tss is ready
+    let {key: keyId} = data
+    // let party = this.getParty(partyId)
+    let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed: GENESIS_SEED})!;
+    if (!key)
+      throw {message: 'KeyManager.storeDeploymentTssKey: key not found.'};
+    if(callerInfo.id == this.netConfigs.defaultLeader && await this.keyManager.isNeedToCreateKey()) {
+      const currentNode = this.nodeManager.currentNodeInfo!;
+
+      const context = this.appManager.getSeedContext(GENESIS_SEED)!;
+      if(context.party.partners.includes(currentNode.id)) {
+        // TODO: check context has key or not ?
+        /** store tss key */
+        await this.appManager.saveAppTssConfig({
+          appId: DEPLOYMENT_APP_ID,
+          seed: GENESIS_SEED,
+          publicKey: pub2json(key.publicKey!),
+          keyShare: bn2hex(key.share!),
+          polynomial: key.toJson().polynomial!
+        })
+      }
+      return true;
+    }
+    else{
+      throw "Not permitted to create tss key"
+    }
+  }
 
   @remoteMethod(RemoteMethods.GenerateAppTss)
   async __generateAppTss({appId, seed}, callerInfo) {
@@ -704,7 +780,7 @@ class System extends CallablePlugin {
 
     for(let context of allContexts) {
       /** select context to be deleted */
-      if(context.deploymentRequest.data.timestamp <= deploymentTimestamp) {
+      if(!context.deploymentRequest || context.deploymentRequest.data.timestamp <= deploymentTimestamp) {
         deleteContextList.push(context)
       }
     }
@@ -751,7 +827,8 @@ class System extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.DeploymentAppStatus)
   async __deploymentAppStatus(data, callerInfo: MuonNodeInfo): Promise<AppDeploymentInfo> {
-    return this.appManager.getAppDeploymentInfo("1", "1");
+    let ctx = this.appManager.getAppLastContext(DEPLOYMENT_APP_ID)
+    return this.appManager.getAppDeploymentInfo(DEPLOYMENT_APP_ID, ctx?.seed ?? GENESIS_SEED);
   }
 
 }

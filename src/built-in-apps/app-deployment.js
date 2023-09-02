@@ -15,6 +15,7 @@ const Methods = {
 
 const NODES_SELECTION_TOLERANCE = 0.07;
 const ROTATION_COEFFICIENT = 1.5;
+const DEPLOYMENT_APP_ID = "1"
 
 function shuffleNodes(nodes, seed) {
     let unsorted = nodes.map(id => {
@@ -171,7 +172,7 @@ module.exports = {
     APP_NAME: "deployment",
     REMOTE_CALL_TIMEOUT: 120e3,
     METHOD_PARAMS_SCHEMA,
-    APP_ID: 1,
+    APP_ID: "1",
 
     readOnlyMethods: ["init", 'undeploy'],
 
@@ -206,6 +207,9 @@ module.exports = {
             nodes,
         } = params;
 
+        if(appId === DEPLOYMENT_APP_ID)
+            return this.callPlugin("system", "getAvailableDeployers");
+
         t = Math.max(t, tssConfigs.threshold);
 
         let prevContext;
@@ -215,7 +219,7 @@ module.exports = {
                 throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
 
             /** threshold will not change when rotating the party */
-            t = prevContext.party.t
+            t = appId === DEPLOYMENT_APP_ID ? tssConfigs.thresholds : prevContext.party.t
         }
 
         /** Choose a few nodes at random to join the party */
@@ -265,20 +269,26 @@ module.exports = {
       const seedResult = await this.onRequest(randomSeedRequest)
       const seedSignParams = this.signParams(randomSeedRequest, seedResult)
       const hash = this.hashAppSignParams(randomSeedRequest, seedSignParams)
-      if(!await this.verify(hash, seed, nonce))
+      if(!await this.verify(request.deploymentSeed, hash, seed, nonce))
         throw `seed not verified`
     },
 
     validateRequest: async function(request) {
         let {
             method,
+            deploymentSeed,
             data: { params }
         } = request
+
+        if(params.appId !== DEPLOYMENT_APP_ID && deploymentSeed === "0x01")
+          throw `The genesis key only will be used for deploying 'deployment' app itself.`
+
         switch (method) {
             case Methods.RandomSeed: {
                 const {appId} = params
-                const {deployed, status} = this.callPlugin('system', "getAppLastDeploymentInfo", appId)
-                if(deployed && status !== 'PENDING')
+                const {deployed, status, seed} = this.callPlugin('system', "getAppLastDeploymentInfo", appId)
+                /** ignore deployment genesis context */
+                if(deployed && status !== 'PENDING' && seed !== '0x01')
                     throw `App already deployed`
                 break;
             }
@@ -456,7 +466,7 @@ module.exports = {
                 let selectedNodes2 = await this.selectPartyNodes(request);
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
-                
+
                 if(difference > NODES_SELECTION_TOLERANCE)
                     throw `selected nodes mismatched.`
 
@@ -496,7 +506,7 @@ module.exports = {
                 let selectedNodes2 = await this.selectPartyNodes(request);
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
-                
+
                 if(difference > NODES_SELECTION_TOLERANCE)
                     throw `selected nodes mismatched.`
 
@@ -504,7 +514,7 @@ module.exports = {
                 const pendingPeriod = !!pending ? pending : prevContext.pendingPeriod;
 
                 /** TSS threshold will not change when rotating the app party */
-                t = prevContext.party.t;
+                t = appId === DEPLOYMENT_APP_ID ? tssConfigs.threshold : prevContext.party.t;
 
                 return {
                     rotationEnabled: true,
@@ -526,8 +536,6 @@ module.exports = {
                 let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
                 if(!context)
                     throw `The app's deployment info was not found`
-
-                const {ttl, pendingPeriod} = context;
 
                 if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
                     throw `deployed partners mismatched with key-gen partners`
@@ -562,9 +570,9 @@ module.exports = {
                     throw `Insufficient share holder.`
 
                 return {
-                    rotationEnabled: true,
-                    ttl,
-                    expiration: request.data.timestamp + ttl + pendingPeriod,
+                    rotationEnabled: context.rotationEnabled,
+                    ttl: context.ttl,
+                    expiration: context.expiration,
                     seed: context.seed,
                     publicKey,
                     polynomial,

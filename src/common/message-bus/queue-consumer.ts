@@ -46,7 +46,7 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
       // @ts-ignore
       response = await this.emit("message", data, {pid, uid})
     } catch (e) {
-      log.error(`QueueConsumer.onMessageReceived %o`, e);
+      log.error(`QueueConsumer [${this.busName}] error: %o`, e);
       if(typeof e === "string")
         e = {message: e};
       error = {

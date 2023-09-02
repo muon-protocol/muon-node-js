@@ -480,11 +480,22 @@ class NetworkIpcHandler extends CallablePlugin {
     }
     else {
       if(currentNode.isDeployer) {
-        /**
-         The deployer node should contain all the contexts.
-         If it lacks any context, it means that the context does not exist at all.
-         */
-        throw `App's context not found.`
+        if(app === 'deployment') {
+          /**
+           * If deployment context is not exist, it means that genesis key is not initialized.
+           * Two steps are required need to do:
+           * 1) initialize genesis key (calling deployment app init method)
+           * 2) deploy the `deployment` app itself using genesis key.
+           * */
+          throw `Genesis key not initialized`
+        }
+        else {
+          /**
+           The deployer node should contain all the contexts.
+           If it lacks any context, it means that the context does not exist at all.
+           */
+          throw `App's context not found.`
+        }
       }
       else {
         /**

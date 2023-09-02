@@ -13,23 +13,23 @@ import {enqueueAppRequest} from "../../core/ipc.js";
 const log = logger('muon:gateway:api')
 const ajv = new Ajv({coerceTypes: true})
 
-let cachedNetworkCheck = {
+let cachedNetworkCheck:{time: number, result: MuonNodeInfo|undefined} = {
   time: 0,
-  result: false
+  result: undefined
 };
-async function isCurrentNodeInNetwork() {
+async function getCurrentNode() {
   /** check every 5 minute */
   const dt = Date.now() - cachedNetworkCheck.time
   /** cache true for 5 minutes and false for 5 seconds*/
   if((cachedNetworkCheck.result && dt > 300e3) || (!cachedNetworkCheck.result && dt > 5e3)) {
     cachedNetworkCheck.time = Date.now()
-    cachedNetworkCheck.result = await NetworkIpc.isCurrentNodeInNetwork()
+    cachedNetworkCheck.result = await NetworkIpc.getCurrentNodeInfo()
   }
 
   return cachedNetworkCheck.result;
 }
 
-async function callProperNode(requestData: GatewayCallParams) {
+async function callProperNode(requestData: GatewayCallParams, currentNode: MuonNodeInfo) {
   if(await CoreIpc.isDeploymentExcerpt(requestData.app, requestData.method)) {
     log("Deployment excerpt method call %o", requestData)
     return await enqueueAppRequest(requestData)
@@ -38,14 +38,11 @@ async function callProperNode(requestData: GatewayCallParams) {
   let context: AppContext|undefined = await CoreIpc.getAppOldestContext(requestData.app);
 
   if (context) {
-    const currentNode: MuonNodeInfo|undefined = await NetworkIpc.getCurrentNodeInfo();
-    if(currentNode) {
-      let partners = context.party.partners;
-      if(context.keyGenRequest?.data?.init?.shareProofs)
-        partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs)
-      if(partners.includes(currentNode.id)) {
-        return await enqueueAppRequest(requestData)
-      }
+    let partners = context.party.partners;
+    if(context.keyGenRequest?.data?.init?.shareProofs)
+      partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs)
+    if(partners.includes(currentNode.id)) {
+      return await enqueueAppRequest(requestData)
     }
   }
 
@@ -104,7 +101,9 @@ router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
     })
   }
 
-  if(!await isCurrentNodeInNetwork()){
+  const currentNode:MuonNodeInfo|undefined = await getCurrentNode();
+
+  if(!currentNode){
     log("This node in not in the network.")
     const appId = await CoreIpc.getAppId(app);
     return res.json({
@@ -116,7 +115,7 @@ router.use('/', mixGetPost, asyncHandler(async (req, res, next) => {
     })
   }
   else {
-    callProperNode(requestData)
+    callProperNode(requestData, currentNode)
       .then(async result => {
         res.json({success: true, result})
       })

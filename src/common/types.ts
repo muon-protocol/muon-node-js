@@ -183,7 +183,7 @@ export type PolynomialInfoJson = {
 export type AppTssConfig = {
     appId: string,
     seed: string,
-    keyGenRequest: AppRequest,
+    keyGenRequest?: AppRequest,
     publicKey: JsonPublicKey,
     keyShare?: string,
     expiration?: number,
@@ -235,24 +235,6 @@ export type NetConfigs = {
             "interval": number
         },
         "dbSyncOnlineThreshold": number
-    }
-}
-
-export type DeploymentTssConfigs = {
-    party: {
-        id: string
-        t: number,
-        max: number
-    },
-    key: {
-        id: string,
-        share: string,
-        publicKey: string,
-        address: string,
-        polynomial?: {
-            t: number,
-            Fx: string[]
-        }
     }
 }
 

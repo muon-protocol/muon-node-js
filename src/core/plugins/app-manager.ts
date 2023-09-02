@@ -24,9 +24,10 @@ import {findMinFullyConnectedSubGraph} from "../../common/graph-utils/index.js";
 import {PublicKey} from "../../utils/tss/types";
 import {aesDecrypt, isAesEncrypted} from "../../utils/crypto.js";
 import {MapOf} from "../../common/mpc/types";
-import {toBN} from "../../utils/tss/utils.js";
 import * as PromiseLib from "../../common/promise-libs.js"
 import {Mutex} from "../../common/mutex.js";
+import {DEPLOYMENT_APP_ID, GENESIS_SEED} from "../../common/contantes.js";
+import {RedisCache} from "../../common/redis-cache.js";
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -44,6 +45,8 @@ export type AppContextQueryOptions = {
 
 export type ContextFilterOptions = {
   appId?: string,
+  excludeExpired?: boolean,
+  excludeGenesis?: boolean,
   deploymentStatus?: AppDeploymentStatus[],
   hasKeyGenRequest?: boolean,
   custom?: (ctx: AppContext) => boolean,
@@ -71,6 +74,7 @@ export default class AppManager extends CallablePlugin {
   private appTssConfigs: MapOf<AppTssConfig> = {}
   private loading: TimeoutPromise = new TimeoutPromise();
   private deploymentPublicKey: PublicKey | null = null;
+  private readonly publicKeyCache:RedisCache = new RedisCache("app-seed-pub-key");
 
   private mutex:Mutex;
 
@@ -85,7 +89,6 @@ export default class AppManager extends CallablePlugin {
     this.muon.on("app-context:update", this.onAppContextUpdate.bind(this))
     this.muon.on("app-context:delete", this.onAppContextDelete.bind(this))
     this.muon.on("app-tss-key:add", this.onAppTssConfigAdd.bind(this))
-    this.muon.on("deployment-tss-key:generate", this.onDeploymentTssKeyGenerate.bind(this));
 
     this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
     this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
@@ -97,7 +100,7 @@ export default class AppManager extends CallablePlugin {
     if (!this.isLoaded())
       return;
     if (nodeInfo.isDeployer) {
-      let deploymentContext = this.appContexts['1'];
+      let deploymentContext = this.appContexts[GENESIS_SEED];
       deploymentContext.party.partners = [
         ...deploymentContext.party.partners,
         nodeInfo.id
@@ -109,7 +112,7 @@ export default class AppManager extends CallablePlugin {
     if (!this.isLoaded())
       return;
     if (nodeInfo.isDeployer) {
-      let deploymentContext = this.appContexts['1'];
+      let deploymentContext = this.appContexts[GENESIS_SEED];
       deploymentContext.party.partners = deploymentContext.party.partners.filter(id => id != nodeInfo.id)
     }
   }
@@ -126,30 +129,23 @@ export default class AppManager extends CallablePlugin {
     log('loading apps info ...')
     await this.nodeManager.waitToLoad();
     const currentNode:MuonNodeInfo|undefined = this.nodeManager.currentNodeInfo;
-    let deploymentTssPublicKey: any = undefined;
     const netConfigs:NetConfigs = this.netConfigs;
-    if (currentNode && currentNode.isDeployer) {
-      // TODO: keyManager is not loaded yet, so the tssKey is null.
-      if (!!this.keyManager.tssKey) {
-        deploymentTssPublicKey = pub2json(this.keyManager.tssKey.publicKey!)
-      }
-    }
 
     const allAppContexts: AppContext[] = [
-      /** deployment app context */
+      /** all deployers context */
       {
-        appId: '1',
+        appId: DEPLOYMENT_APP_ID,
         appName: "deployment",
         isBuiltIn: true,
-        seed: "1",
+        seed: GENESIS_SEED,
         rotationEnabled: false,
-        // ttl: 0,
+        ttl: netConfigs.tss.defaultTTL,
+        pendingPeriod: netConfigs.tss.pendingPeriod,
         party: {
           partners: this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id),
           t: netConfigs.tss.threshold,
           max: netConfigs.tss.max
         },
-        publicKey: deploymentTssPublicKey,
       },
       /** other apps contexts */
       ...await AppContextModel.find({})
@@ -184,14 +180,9 @@ export default class AppManager extends CallablePlugin {
 
   getNodeLastTimestamp(node: MuonNodeInfo): number|null {
     const max = Object.values(this.appContexts)
-      .filter(ctx => ctx.appId!=="1" && ctx.party.partners.includes(node.id))
+      .filter(ctx => ctx.appId!==DEPLOYMENT_APP_ID && ctx.party.partners.includes(node.id))
       .reduce((max, ctx)=>Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
     return max > 0 ? max : null
-  }
-
-  async onDeploymentTssKeyGenerate(tssKey) {
-    const publicKey = TssModule.keyFromPublic(tssKey.publicKey);
-    this.appContexts['1'].publicKey = pub2json(publicKey);
   }
 
   async saveAppContext(context: AppContext) {
@@ -238,13 +229,18 @@ export default class AppManager extends CallablePlugin {
        * Call this method as the base method for saving AppTssConfigModel.
        */
       newConfig.dangerousAllowToSave = true
-      await newConfig.save()
+      if(appTssConfig.seed !== GENESIS_SEED) {
+        await newConfig.save()
+      }
       CoreIpc.fireEvent({type: "app-tss-key:add", data: newConfig})
     }
 
     // @ts-ignore
     const {appId, seed, keyGenRequest, publicKey, polynomial} = appTssConfig;
-    const context = await AppContextModel.findOne({seed}).exec();
+    let context = await AppContextModel.findOne({seed}).exec();
+    if(!context) {
+      context = new AppContextModel(this.getAppContext(appId, seed))
+    }
 
     if(context.appId !== appId) {
       log.error(`AppManager.saveAppTssConfig appId mismatch %o`, {"appTssConfig.appId": appId, "context.appId": context.appId})
@@ -256,7 +252,9 @@ export default class AppManager extends CallablePlugin {
     context.publicKey = publicKey
     context.polynomial = polynomial
     context.dangerousAllowToSave = true
-    await context.save();
+    if(context.seed !== GENESIS_SEED) {
+      await context.save();
+    }
     CoreIpc.fireEvent({type: "app-context:update", data: context,})
     NetworkIpc.fireEvent({type: "app-context:update", data: context,})
   }
@@ -328,7 +326,7 @@ export default class AppManager extends CallablePlugin {
     const context = seed ? this.getAppContext(appId, seed) : null
     if(context) {
       result.hasKeyGenRequest = !!context.keyGenRequest;
-      result.reqId = appId === '1' ? undefined : context.deploymentRequest?.reqId;
+      result.reqId = appId === DEPLOYMENT_APP_ID ? undefined : context.deploymentRequest?.reqId;
       result.contextHash = hashAppContext(context);
     }
     return result
@@ -472,7 +470,7 @@ export default class AppManager extends CallablePlugin {
   }
 
   appIsDeployed(appId: string): boolean {
-    return appId == '1' || this.getAppAllContext(appId).length > 0
+    return appId == DEPLOYMENT_APP_ID || this.getAppAllContext(appId).length > 0
   }
 
   appIsBuiltIn(appId: string): boolean {
@@ -524,13 +522,15 @@ export default class AppManager extends CallablePlugin {
       contexts = contexts.filter(ctx => ((ctx.expiration ?? Infinity) > now))
     }
     return contexts.reduce((first: AppContext|null, ctx: AppContext): AppContext|null => {
-        if(!first)
-          return ctx
-        if((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (first.deploymentRequest?.data.timestamp ?? Infinity))
-          return ctx
-        else
-          return first
-      }, null)
+      if(!ctx.publicKey)
+        return first;
+      if(!first)
+        return ctx
+      if((ctx.deploymentRequest?.data.timestamp ?? Infinity) < (first.deploymentRequest?.data.timestamp ?? Infinity))
+        return ctx
+      else
+        return first
+    }, null)
   }
 
   getAppLastContext(appId: string): AppContext|undefined {
@@ -539,7 +539,7 @@ export default class AppManager extends CallablePlugin {
       .reduce((last:AppContext|undefined, ctx): AppContext|undefined => {
         if(!last)
           return ctx
-        if(ctx.deploymentRequest!.data.timestamp > last.deploymentRequest!.data.timestamp)
+        if((ctx.deploymentRequest?.data.timestamp ?? 0) > (last.deploymentRequest?.data.timestamp ?? 0))
           return ctx
         else
           return last
@@ -551,9 +551,19 @@ export default class AppManager extends CallablePlugin {
       ? this.getAppSeeds(options.appId).map(seed => this.appContexts[seed])
       : Object.values(this.appContexts);
 
+    const currentTime = getTimestamp();
+
     return contexts
       .filter(ctx => {
         const {appId, seed} = ctx;
+        if(options.excludeExpired) {
+          if(ctx.expiration !== undefined && ctx.expiration < currentTime)
+            return false
+        }
+        if(options.excludeGenesis) {
+          if(seed === GENESIS_SEED)
+            return false;
+        }
         if(options.deploymentStatus && options.deploymentStatus.length>0) {
           if(!options.deploymentStatus.includes(this.getAppDeploymentStatus(appId, seed)))
             return false
@@ -618,26 +628,21 @@ export default class AppManager extends CallablePlugin {
     if (!!context) {
       status = "TSS_GROUP_SELECTED";
 
-      if(appId === "1") {
-        if(this.keyManager.isReady)
-          status = "DEPLOYED";
+      if(!!context.publicKey) {
+        status = "DEPLOYED";
       }
-      else {
-        if(!!context.publicKey) {
-          status = "DEPLOYED";
-        }
 
-        if (status === "DEPLOYED") {
-          if (!!context.ttl) {
-            const deploymentTime = context.deploymentRequest!.data.timestamp
-            const pendingTime = deploymentTime + context.ttl;
-            const currentTime = getTimestamp();
+      if (status === "DEPLOYED") {
+        if (!!context.rotationEnabled) {
+          const {expiration, ttl, pendingPeriod, deploymentRequest} = context
+          const deploymentTime = !!deploymentRequest ? deploymentRequest!.data.timestamp : (expiration! - (ttl! + pendingPeriod!))
+          const pendingTime = deploymentTime + ttl!;
+          const currentTime = getTimestamp();
 
-            if (currentTime > pendingTime) {
-              status = "PENDING";
-              if (context.expiration! < currentTime)
-                status = "EXPIRED";
-            }
+          if (currentTime > pendingTime) {
+            status = "PENDING";
+            if (context.expiration! < currentTime)
+              status = "EXPIRED";
           }
         }
       }
@@ -664,7 +669,7 @@ export default class AppManager extends CallablePlugin {
       .reduce((obj, seed) => (obj[seed]=true, obj), {});
     return Object.values(this.appContexts)
       /** Remove the contexts that have a key */
-      .filter(({seed, appId}) => (appId!=="1" && !hasKey[seed]))
+      .filter(({seed, appId}) => (appId!==DEPLOYMENT_APP_ID && !hasKey[seed]))
       .filter(ctx => {
         return ctx.party.partners.includes(currentNode.id)
           /** Remove new contexts. */
@@ -684,12 +689,7 @@ export default class AppManager extends CallablePlugin {
   }
 
   appHasTssKey(appId: string, seed: string): boolean {
-    if (appId == '1') {
-      const nodeInfo = this.nodeManager.currentNodeInfo!
-      return nodeInfo?.isDeployer && !!this.keyManager.tssKey
-    } else {
-      return !!this.appTssConfigs[seed];
-    }
+    return !!this.appTssConfigs[seed];
   }
 
   getAppTssKey(appId: string, seed: string) {
@@ -697,64 +697,43 @@ export default class AppManager extends CallablePlugin {
   }
 
   /** useful when current node is not in the app party */
-  publicKeyQueryTime = 0;
-  async findAppPublicKeys(appId: string): Promise<MapOf<PublicKey>> {
-    if(appId === '1') {
-      const deploymentContextSeed = this.appSeeds["1"][0]
-      const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
-      if(currentNode.isDeployer) {
-        if(this.keyManager.tssKey) {
-          return {
-            [deploymentContextSeed]:this.keyManager.tssKey.publicKey!
-          };
-        }
-        else
-          return {}
+  async findAppPublicKey(appId: string, seed:string): Promise<PublicKey|null> {
+    const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
+    let ctx:AppContext = this.getAppContext(appId, seed);
+    if(!ctx) {
+      // if (currentNode.isDeployer)
+      //   return null
+      const cachedPubKey = await this.publicKeyCache.get(seed);
+      if(cachedPubKey){
+        return TssModule.keyFromPublic(cachedPubKey);
       }
-      else {
-        // TODO: needs refresh when deployment key reshared/recreated
-        if(!this.deploymentPublicKey && this.publicKeyQueryTime + 2*60e3 < Date.now()) {
-          this.publicKeyQueryTime = Date.now();
-
-          const deployers: MuonNodeInfo[] = _.shuffle(this.nodeManager.filterNodes({isDeployer: true}));
-          // @ts-ignore
-          const publicKeyStr = await Promise.any(
-            deployers.slice(0, 3).map(n => {
-              return this.remoteCall(
-                n.peerId,
-                RemoteMethods.GetAppTss,
-                {appId, seed: null},
-                {timeout: 5000}
-              )
-                .then(result => {
-                  if(!result)
-                    throw `missing publicKey`
-                  return result.publicKey
-                })
-            })
+      const deployers: MuonNodeInfo[] = _.shuffle(this.nodeManager.filterNodes({isDeployer: true, excludeSelf: true}));
+      // @ts-ignore
+      const publicKeyStr:string|null = await Promise.any(
+        deployers.slice(0, 3).map(n => {
+          return this.remoteCall(
+            n.peerId,
+            RemoteMethods.GetAppTss,
+            {appId, seed},
+            {timeout: 5000}
           )
-          this.deploymentPublicKey = TssModule.keyFromPublic(publicKeyStr);
-        }
-        if(this.deploymentPublicKey) {
-          return {
-            [deploymentContextSeed]: this.deploymentPublicKey
-          }
-        }
-        else
-          return {}
-      }
+            .then(result => {
+              if(!result)
+                throw `missing publicKey`
+              return result.publicKey
+            })
+        })
+      ).catch(e => null)
+      if(!publicKeyStr)
+        return null;
+      await this.publicKeyCache.set(seed, publicKeyStr);
+      return TssModule.keyFromPublic(publicKeyStr);
     }
-    else {
-      /** if key exist in current node */
-      let appContests: any[] = this.getAppAllContext(appId)
-
-      if (appContests.length < 1)
-        appContests = await this.queryAndLoadAppContext(appId)
-
-      return appContests.reduce((obj, ctx) => {
-        obj[ctx.seed] = (ctx?.publicKey) ? TssModule.keyFromPublic(ctx.publicKey.encoded) : null;
-        return obj
-      }, {})
+    else{
+      if(!ctx.publicKey?.encoded) {
+        return null;
+      }
+      return TssModule.keyFromPublic(ctx.publicKey.encoded);
     }
   }
 
@@ -993,15 +972,8 @@ export default class AppManager extends CallablePlugin {
   @remoteMethod(RemoteMethods.GetAppTss)
   async __getAppTss(data: {appId: string, seed: string}, callerInfo) {
     const {appId, seed} = data;
-    let publicKey:JsonPublicKey|null = null;
 
-    if(appId === '1') {
-      const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!
-      publicKey = currentNode.isDeployer ? pub2json(this.keyManager.tssKey?.publicKey!) : null
-    }
-    else {
-      publicKey = this.getAppTssKey(appId, seed)?.publicKey;
-    }
+    let publicKey:JsonPublicKey|null = this.getAppTssKey(appId, seed)?.publicKey;
 
     if (!publicKey)
       return null;
@@ -1009,7 +981,6 @@ export default class AppManager extends CallablePlugin {
     return {
       appId,
       seed,
-      // deploymentRequest: "",
       publicKey: publicKey.encoded,
     }
   }

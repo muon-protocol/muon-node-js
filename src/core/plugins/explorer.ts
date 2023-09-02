@@ -8,10 +8,11 @@ import {GatewayCallParams} from "../../gateway/types";
 import AppManager from "./app-manager.js";
 import * as NetworkIpc from '../../network/ipc.js'
 import NodeManagerPlugin from "./node-manager.js";
-import {timeout} from '../../utils/helpers.js'
 import {RedisCache} from "../../common/redis-cache.js";
 import BaseAppPlugin from "./base/base-app-plugin";
 import {MapOf} from "../../common/mpc/types";
+import {APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_PENDING, APP_STATUS_TSS_GROUP_SELECTED} from "../constants.js";
+import {GENESIS_SEED} from "../../common/contantes.js";
 
 const requestConfirmCache: RedisCache = new RedisCache('req-confirm')
 
@@ -204,8 +205,17 @@ class Explorer extends CallablePlugin {
 
     let appStatus = "NEW";
     if(contextStatuses.length > 0) {
-      const context = this.appManager.getAppLastContext(appId);
-      appStatus = this.appManager.getAppDeploymentStatus(appId, context!.seed);
+      const statusList = contextStatuses
+        .filter(ctx => ctx.seed !== GENESIS_SEED)
+        .map(({status}) => status)
+      if(statusList.includes(APP_STATUS_DEPLOYED))
+        appStatus = APP_STATUS_DEPLOYED;
+      else if(statusList.includes(APP_STATUS_PENDING))
+        appStatus = APP_STATUS_PENDING
+      else if(statusList.includes(APP_STATUS_TSS_GROUP_SELECTED))
+        appStatus = APP_STATUS_TSS_GROUP_SELECTED
+      else if(statusList.includes(APP_STATUS_EXPIRED))
+        appStatus = APP_STATUS_EXPIRED
     }
 
     return {
