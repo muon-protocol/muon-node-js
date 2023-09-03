@@ -21,7 +21,7 @@ export const describe = 'Deploy/re-share app tss'
 export const builder = {
   action: {
     describe: "action",
-    choices: ['deploy', 'reshare'],
+    choices: ['deploy', 'undeploy', 'reshare'],
     type: 'string',
   },
   app: {
@@ -39,6 +39,10 @@ export async function handler(argv) {
   switch (action) {
     case 'deploy': {
       await deployApp(argv, configs)
+      break;
+    }
+    case 'undeploy': {
+      await undeployApp(argv, configs)
       break;
     }
     case "reshare": {
@@ -132,6 +136,23 @@ async function deployApp(argv, configs) {
   await waitToRequestBeAnnounced(configs.url, tssResponse.result);
   console.log(`tss key generating done with this generators: [${tssResponse.result.data.init.keyGenerators}].`, tssResponse.result.data.result)
 
+}
+
+async function undeployApp(argv, configs) {
+  const {app} = argv;
+  let deployers = ["http://127.0.0.1:8000/v1/", "http://127.0.0.1:8001/v1/"];
+
+  for (let i = 0; i < deployers.length; i++) {
+    let deployer = deployers[i];
+    let statusResult = await muonCall(deployer, {
+      app: 'deployment',
+      method: `undeploy`,
+      params: {
+        app: app,
+      }
+    });
+    console.log(deployer, statusResult);
+  }
 }
 
 async function reshareApp(argv, configs) {

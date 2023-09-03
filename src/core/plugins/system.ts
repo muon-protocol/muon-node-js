@@ -767,44 +767,32 @@ class System extends CallablePlugin {
     }
   }
 
-  @remoteMethod(RemoteMethods.Undeploy)
-  async __undeployApp(data: {appId, deploymentTimestamp}, callerInfo) {
-    if(!callerInfo.isDeployer)
-      throw `Only deployer can call this method`;
-    let {appId, deploymentTimestamp} = data;
+  @appApiMethod({})
+  async undeployApp(appNameOrId: string) {
+    let app = this.muon.getAppById(appNameOrId) || this.muon.getAppByName(appNameOrId);
+    if(!app)
+      throw `App not found by identifier: ${appNameOrId}`
+    const appId = app.APP_ID
 
-    log(`deleting app from persistent db %s`, appId);
-    /** get list of old contexts */
-    const allContexts = await AppContextModel.find({appId})
-    const deleteContextList: any[] = []
+    /** check app to be deployed */
+    const seeds = this.appManager.getAppSeeds(appId);
 
-    for(let context of allContexts) {
-      /** select context to be deleted */
-      if(!context.deploymentRequest || context.deploymentRequest.data.timestamp <= deploymentTimestamp) {
-        deleteContextList.push(context)
-      }
-    }
-    const seedsToDelete = deleteContextList.map(c => c.seed)
-    await AppContextModel.deleteMany({
-      $or: [
-        /** for backward compatibility. old keys may not have this field. */
-        {seed: { "$exists" : false }},
-        {seed: {$in: seedsToDelete}},
-      ]
-    });
+    /** check app context */
+    let allContexts: AppContext[] = this.appManager.getAppAllContext(appId, true);
 
-    await AppTssConfigModel.deleteMany({
-      appId,
-      $or: [
-        /** for backward compatibility. old keys may not have this field. */
-        {seed: { "$exists" : false }},
-        {seed: {$in: seedsToDelete}},
-      ]
-    });
-    log(`deleting app from memory of all cluster %s`, appId)
-    CoreIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
-    NetworkIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
+    /** most recent deployment time */
+    const deploymentTimestamp = allContexts
+      .map(ctx => ctx.deploymentRequest?.data.timestamp!)
+      .sort((a, b) => b - a)[0]
+
+    log(`undeploying ${appId}`)
+    return this.__undeployApp({appId, deploymentTimestamp}, this.nodeManager.currentNodeInfo)
+      .catch(e => {
+        log.error(`error when undeploy at current node: %O`, e)
+        return e?.message || "unknown error occurred"
+      });
   }
+
 
   @remoteMethod(RemoteMethods.GetAppPublicKey)
   async __getAppPublicKey(data: {appId: string, seed: string, keyId}, callerInfo): Promise<AppTssPublicInfo> {
