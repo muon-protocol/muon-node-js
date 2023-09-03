@@ -39,7 +39,6 @@ const log = logger("muon:core:plugins:system");
 const RemoteMethods = {
   storeDeploymentTssKey: 'storeDeploymentTssKey',
   GenerateAppTss: "generateAppTss",
-  Undeploy: "undeploy",
   GetAppPublicKey: "getAppPubKey",
   StartAppTssReshare: "startAppTssReshare",
   DeploymentAppStatus: "deploymentAppStatus",
@@ -578,47 +577,13 @@ class System extends CallablePlugin {
       .map(ctx => ctx.deploymentRequest?.data.timestamp! || currentTime)
       .sort((a, b) => b - a)[0]
 
-    let appPartners: string[] = [].concat(
-      // @ts-ignore
-      ...allContexts.map(ctx => ctx.party.partners),
-    )
-
-    let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.id)
-
-    const partnersToCall: MuonNodeInfo[] = this.nodeManager.filterNodes({
-      list: [
-        ...deployers,
-        ...appPartners
-      ]
-    })
-    log(`removing app contexts %o`, {
-      appId,
-      timeThreshold: deploymentTimestamp,
-      fromPartners: partnersToCall.map(p => p.id),
-    })
-    await Promise.all(partnersToCall.map(node => {
-      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__undeployApp({appId, deploymentTimestamp}, this.nodeManager.currentNodeInfo)
-          .catch(e => {
-            log.error(`error when undeploy at current node: %O`, e)
-            return e?.message || "unknown error occurred"
-          });
-      }
-      else{
-        return this.remoteCall(
-          node.peerId,
-          RemoteMethods.Undeploy,
-          {appId, deploymentTimestamp},
-          {timeout: 5000},
-        )
-          .catch(e => {
-            log.error(`error when undeploy at ${node.peerId}: %O`, e)
-            return e?.message || "unknown error occurred"
-          });
-      }
-    }))
+    log(`undeploying ${appId}`)
+    return this.__undeployApp({appId, deploymentTimestamp}, this.nodeManager.currentNodeInfo)
+      .catch(e => {
+        log.error(`error when undeploy at current node: %O`, e)
+        return e?.message || "unknown error occurred"
+      });
   }
-
   @appApiMethod({})
   async getAppContext(appId, seed, tryFromNetwork:boolean=false) {
     return this.appManager.getAppContextAsync(appId, seed, tryFromNetwork)
@@ -767,30 +732,42 @@ class System extends CallablePlugin {
     }
   }
 
-  @appApiMethod({})
-  async undeployApp(appNameOrId: string) {
-    let app = this.muon.getAppById(appNameOrId) || this.muon.getAppByName(appNameOrId);
-    if(!app)
-      throw `App not found by identifier: ${appNameOrId}`
-    const appId = app.APP_ID
+  async __undeployApp(data: {appId, deploymentTimestamp}, callerInfo) {
+    if(!callerInfo.isDeployer)
+      throw `Only deployer can call this method`;
+    let {appId, deploymentTimestamp} = data;
 
-    /** check app to be deployed */
-    const seeds = this.appManager.getAppSeeds(appId);
+    log(`deleting app from persistent db %s`, appId);
+    /** get list of old contexts */
+    const allContexts = await AppContextModel.find({appId})
+    const deleteContextList: any[] = []
 
-    /** check app context */
-    let allContexts: AppContext[] = this.appManager.getAppAllContext(appId, true);
+    for(let context of allContexts) {
+      /** select context to be deleted */
+      if(!context.deploymentRequest || context.deploymentRequest.data.timestamp <= deploymentTimestamp) {
+        deleteContextList.push(context)
+      }
+    }
+    const seedsToDelete = deleteContextList.map(c => c.seed)
+    await AppContextModel.deleteMany({
+      $or: [
+        /** for backward compatibility. old keys may not have this field. */
+        {seed: { "$exists" : false }},
+        {seed: {$in: seedsToDelete}},
+      ]
+    });
 
-    /** most recent deployment time */
-    const deploymentTimestamp = allContexts
-      .map(ctx => ctx.deploymentRequest?.data.timestamp!)
-      .sort((a, b) => b - a)[0]
-
-    log(`undeploying ${appId}`)
-    return this.__undeployApp({appId, deploymentTimestamp}, this.nodeManager.currentNodeInfo)
-      .catch(e => {
-        log.error(`error when undeploy at current node: %O`, e)
-        return e?.message || "unknown error occurred"
-      });
+    await AppTssConfigModel.deleteMany({
+      appId,
+      $or: [
+        /** for backward compatibility. old keys may not have this field. */
+        {seed: { "$exists" : false }},
+        {seed: {$in: seedsToDelete}},
+      ]
+    });
+    log(`deleting app from memory of all cluster %s`, appId)
+    CoreIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
+    NetworkIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
   }
 
 
