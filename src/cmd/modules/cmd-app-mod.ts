@@ -140,7 +140,9 @@ async function deployApp(argv, configs) {
 
 async function undeployApp(argv, configs) {
   const {app} = argv;
-  let deployers = ["http://127.0.0.1:8000/v1/", "http://127.0.0.1:8001/v1/"];
+  let deployers = configs.deployers;
+  if (!deployers || deployers.length == 0)
+    throw `deployers not defined in cmd.conf.json`;
 
   for (let i = 0; i < deployers.length; i++) {
     let deployer = deployers[i];
