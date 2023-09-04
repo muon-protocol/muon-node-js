@@ -198,7 +198,14 @@ export type AppTssPublicInfo = {
 export type PartyInfo = {
     appId: string,
     seed: string,
-    isForReshare?: boolean
+}
+
+export type Party = {
+    appId: string,
+    seed: string,
+    t: number,
+    max?: number,
+    partners: string[]
 }
 
 export type NodeManagerConfigs = {

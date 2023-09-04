@@ -7,7 +7,7 @@ type PartyLoadParams = {
   partners: string[]
 }
 
-export default class TssParty {
+export class TssParty {
   t: number = 0
   max: number = 0;
   id: string;
