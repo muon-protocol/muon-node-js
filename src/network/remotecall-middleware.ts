@@ -11,9 +11,10 @@ export const isDeployer:NetworkRemoteCallMiddleware = async (plugin:BaseNetworkP
 }
 
 export const ifSynced:NetworkRemoteCallMiddleware = async (network:Network, args: any, callerInfo) => {
+  if (callerInfo.isDeployer)
+    return;
   const currentNode = network.getPlugin('node-manager').currentNodeInfo!;
-  const uptime = process.uptime();
-  if (!currentNode.isDeployer || uptime < 2 * 60)
+  if (!currentNode.isDeployer)
     return;
   const dbIsSynced = await CoreIpc.isDbSynced();
   if(!dbIsSynced)
