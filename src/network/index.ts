@@ -102,12 +102,8 @@ class Network extends Events {
           );
           log(`announce public address: %s`, announce[0]);
         }
-        else {
-          throw `unable to find node's public ip.`
-        }
       } catch (e) {
         log.error(`error when loading public ip %s`, e.message);
-        throw `unable to find node's public ip.`
       }
     }
 
