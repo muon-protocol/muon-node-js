@@ -3,16 +3,23 @@ import {muonSha3} from "../utils/sha3.js";
 import * as crypto from "../utils/crypto.js";
 import {MapOf} from "./mpc/types";
 import {logger} from "@libp2p/logger"
+import loadNetworkConfigs from '../network/configurations.js'
+import {NetConfigs} from "./types";
 
 const log = logger('muon:analytic:reporter')
 
-const BaseUrls = [
-  "https://testnet.muon.net",
-  // "http://localhost:8000",
-]
+let netConfigs:NetConfigs;
 
 const axiosConfigs: AxiosRequestConfig = {
   timeout: 3000
+}
+
+async function getConfigs(): Promise<NetConfigs> {
+  if(!netConfigs) {
+    const configs = await loadNetworkConfigs()
+    netConfigs = configs.net;
+  }
+  return netConfigs;
 }
 
 export type CrashAnalyticData = {
@@ -27,6 +34,11 @@ export type CrashAnalyticData = {
 }
 
 export async function reportCrash(reportData: Omit<CrashAnalyticData, "signature" | "wallet" | "timestamp">) {
+  const netConfigs = await getConfigs();
+  if((netConfigs.analytics?.baseUrls || []).length < 1)
+    return;
+  const baseUrls:string[] = netConfigs.analytics!.baseUrls!;
+
   const report = {
     timestamp: Date.now(),
     wallet: process.env.SIGN_WALLET_ADDRESS,
@@ -42,7 +54,7 @@ export async function reportCrash(reportData: Omit<CrashAnalyticData, "signature
   // @ts-ignore
   report.signature = crypto.sign(hash)
   log("crash report data", report)
-  return Promise.all(BaseUrls.map(url => axios.post(`${url}/analytics/crash/report`, report, axiosConfigs)))
+  return Promise.all(baseUrls.map(url => axios.post(`${url}/analytics/crash/report`, report, axiosConfigs)))
 }
 
 export type InsufficientPartnersAnalyticData = {
@@ -55,6 +67,11 @@ export type InsufficientPartnersAnalyticData = {
 }
 
 export async function reportInsufficientPartners(reportData: Omit<InsufficientPartnersAnalyticData, "timestamp" | "wallet" | "signature">) {
+  const netConfigs = await getConfigs();
+  if((netConfigs.analytics?.baseUrls || []).length < 1)
+    return;
+  const baseUrls:string[] = netConfigs.analytics!.baseUrls!;
+
   const report = {
     timestamp: Date.now(),
     wallet: process.env.SIGN_WALLET_ADDRESS!,
@@ -70,5 +87,5 @@ export async function reportInsufficientPartners(reportData: Omit<InsufficientPa
   // @ts-ignore
   report.signature = crypto.sign(hash)
   log("insufficient partners report data", report)
-  return Promise.all(BaseUrls.map(url => axios.post(`${url}/analytics/insufficient/report`, report, axiosConfigs)))
+  return Promise.all(baseUrls.map(url => axios.post(`${url}/analytics/insufficient/report`, report, axiosConfigs)))
 }

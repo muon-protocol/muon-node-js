@@ -242,6 +242,9 @@ export type NetConfigs = {
             "interval": number
         },
         "dbSyncOnlineThreshold": number
+    },
+    analytics?:{
+        baseUrls?: string[]
     }
 }
 
