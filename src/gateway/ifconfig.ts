@@ -6,8 +6,10 @@ const router = Router();
 
 router.use('/', mixGetPost, (req, res, next) => {
   let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  if (!ip)
+  if (!ip) {
+    res.send({success: false, message: "IP is undefined"});
     throw "ip is undefined";
+  }
   ip = ip!.toString();
   if (ip.includes(','))
     ip = ip.substring(0, ip.indexOf(','));
