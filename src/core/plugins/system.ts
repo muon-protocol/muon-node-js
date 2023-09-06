@@ -733,8 +733,6 @@ class System extends CallablePlugin {
   }
 
   async __undeployApp(data: {appId, deploymentTimestamp}, callerInfo) {
-    if(!callerInfo.isDeployer)
-      throw `Only deployer can call this method`;
     let {appId, deploymentTimestamp} = data;
 
     log(`deleting app from persistent db %s`, appId);
