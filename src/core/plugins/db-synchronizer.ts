@@ -317,42 +317,36 @@ export default class DbSynchronizer extends CallablePlugin {
     const currentNode: MuonNodeInfo = this.currentNodeInfo!;
 
     /** Get all local contexts that expired */
-    let expiredContexts:AppContext[] = this.appManager.filterContexts({deploymentStatus: [APP_STATUS_EXPIRED]});
-    log(`there is ${expiredContexts.length} expired context`)
+    let expiredSeeds:string[] = this.appManager
+      .filterContexts({deploymentStatus: [APP_STATUS_EXPIRED]})
+      .map(({seed}) => seed);
+    log(`there is ${expiredSeeds.length} expired context`)
 
-    const seedsToDelete: string[] = []
-    const seedsToCheck: string[] = []
+    const localCheck = await this.__canSeedsBeDeleted(expiredSeeds, currentNode);
 
-    for(const ctx of expiredContexts) {
-      const {seed} = ctx;
-      /** delete the context, if context rotated */
-      if(this.appManager.isSeedReshared(seed))
-        /** If a context rotated and next context is exist, so we dont need it (the old one) any more. */
-        seedsToDelete.push(seed);
-      else if(!currentNode.isDeployer)
-        /** If a rotated version of a context not found locally, it need to check it by deployers. */
-        seedsToCheck.push(seed);
-    }
-    log(`there is ${seedsToCheck.length} context that is not rotated.`)
-    if(seedsToCheck.length > 0) {
-      const seedsRotated: boolean[] = await this.isSeedListReshared(seedsToCheck);
-      for (const [i, seed] of seedsToCheck.entries()) {
-        /** If a rotated version found on deployers, this context should be remover. */
-        if (seedsRotated[i])
-          seedsToDelete.push(seed);
-      }
-    }
+    let seedsToDelete: string[] = expiredSeeds.filter((s, i) => localCheck[i]);
+    let seedsToCheck: string[] = expiredSeeds.filter((s, i) => !localCheck[i]);
 
     /** check old TSS_GROUP_SELECTED contexts */
-    let groupSelectedContexts:AppContext[] = this.appManager
+    const groupSelectedSeeds:string[] = this.appManager
       .filterContexts({
         deploymentStatus: [APP_STATUS_TSS_GROUP_SELECTED],
         custom: ctx => this.appManager.isSeedReshared(ctx.seed),
-      });
-    // TODO: Is it necessary to check the TSS_GROUP_SELECTED list with the deployers before I deleting it?
+      })
+      .map(({seed}) => seed);
 
-    for(const {seed} of groupSelectedContexts) {
-      seedsToDelete.push(seed);
+    seedsToCheck = [
+      ...seedsToCheck,
+      ...groupSelectedSeeds,
+    ]
+
+    if(seedsToCheck.length > 0 && !currentNode.isDeployer) {
+      log(`there is ${seedsToCheck.length} expired context that is need to check with deployers to be deleted.`)
+      const check2: boolean[] = await this.canSeedListBeDeleted(seedsToCheck);
+      seedsToDelete = [
+        ...seedsToDelete,
+        ...seedsToCheck.filter((_, i) => check2[i])
+      ]
     }
 
     await AppContextModel.deleteMany({
@@ -370,22 +364,23 @@ export default class DbSynchronizer extends CallablePlugin {
         {seed: {$in: seedsToDelete}},
       ]
     });
+
     log(`deleting ${seedsToDelete.length} expired contexts from memory of all cluster`)
-    const deleteContextList: AppContext[] = [
-      ... expiredContexts.filter(({seed}) => seedsToDelete.includes(seed)),
-      ... groupSelectedContexts,
-    ];
+    const deleteContextList: AppContext[] = seedsToDelete
+      .map(seed => this.appManager.getSeedContext(seed)!)
+      .filter(ctx => !!ctx);
+
     CoreIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
     NetworkIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
   }
 
-  private async isSeedListReshared(seeds: string[]): Promise<boolean[]> {
+  private async canSeedListBeDeleted(seeds: string[]): Promise<boolean[]> {
     const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
     if(currentNode.isDeployer) {
-      return this.__isSeedListReshared({seeds})
+      return this.__canSeedsBeDeleted(seeds, currentNode)
     }
     else {
-      log(`query deployers to find if seeds are rotated or not ...`)
+      log(`query deployers to find if seeds can be deleted ...`)
       let deployersList: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id);
       let peerIds = await NetworkIpc.findNOnlinePeer(deployersList, 2, {timeout: 5000, return: "peerId"});
       // @ts-ignore
@@ -393,8 +388,8 @@ export default class DbSynchronizer extends CallablePlugin {
         peerIds.map(peerId => {
           return this.remoteCall(
             peerId,
-            RemoteMethods.IsSeedListReshared,
-            {seeds}
+            RemoteMethods.CanSeedsBeDeleted,
+            seeds
           )
         })
       )
