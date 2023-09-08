@@ -2,14 +2,13 @@ import CallablePlugin from './base/callable-plugin.js'
 import AppTssKey from "../../utils/tss/app-tss-key.js";
 import lodash from 'lodash'
 import * as TssModule from '../../utils/tss/index.js'
-import {timeout, stackTrace, uuid} from '../../utils/helpers.js'
+import {uuid} from '../../utils/helpers.js'
 import {remoteApp, remoteMethod} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
-import TssParty from "../../utils/tss/party.js";
 import {IMpcNetwork} from "../../common/mpc/types";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from "../../common/mpc/dist-key.js";
@@ -20,7 +19,6 @@ import {PublicKey} from "../../utils/tss/types";
 import * as crypto from "../../utils/crypto.js";
 import {muonSha3} from "../../utils/sha3.js";
 import {bn2hex} from "../../utils/tss/utils.js";
-import {DEPLOYMENT_APP_ID, GENESIS_SEED} from "../../common/contantes.js";
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -76,8 +74,6 @@ const RemoteMethods = {
 
 @remoteApp
 class KeyManager extends CallablePlugin {
-  isReady = false
-  parties:{[index: string]: TssParty} = {}
   /**
    map appId and seed to App TSS key
    example: appTss[appId][seed] = AppTssKey
@@ -86,10 +82,6 @@ class KeyManager extends CallablePlugin {
 
   async onStart() {
     await super.onStart();
-
-    this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
-    this.muon.on("contract:node:edit", this.onNodeEdit.bind(this));
-    this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
 
     this.muon.on('app-context:delete', this.onAppContextDelete.bind(this))
 
@@ -102,53 +94,6 @@ class KeyManager extends CallablePlugin {
     const mpcNetwork:MpcNetworkPlugin = this.muon.getPlugin('mpcnet');
     mpcNetwork.registerMpcInitHandler("DistributedKeyGeneration", this.dkgInitializeHandler.bind(this))
     mpcNetwork.registerMpcInitHandler("KeyRedistribution", this.keyRedistInitHandler.bind(this))
-  }
-
-  async onNodeAdd(nodeInfo: MuonNodeInfo) {
-    log(`node add %o`, nodeInfo)
-
-    if(nodeInfo.isDeployer) {
-      log(`adding the new node [%s] into the deployers party.`, nodeInfo.id);
-      const genesisParty = this.getAppParty(DEPLOYMENT_APP_ID, GENESIS_SEED)!;
-      if(genesisParty) {
-        genesisParty.addPartner(nodeInfo.id)
-      }
-    }
-  }
-
-  async onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
-    const {nodeInfo, oldNodeInfo} = data
-    log(`node edit %o`, {nodeInfo, oldNodeInfo})
-
-    /**
-     * if the current node is edited, its needs some time to tssParty be updated
-     */
-    log("onNodeEdit timeout(5000)")
-    await timeout(5000);
-
-    if(nodeInfo.isDeployer !== oldNodeInfo.isDeployer) {
-      const selfInfo = this.nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
-      if(!selfInfo)
-        return ;
-
-      const genesisParty = this.getAppParty(DEPLOYMENT_APP_ID, GENESIS_SEED)!;
-
-      if(genesisParty) {
-        if (nodeInfo.isDeployer) {
-          genesisParty.addPartner(nodeInfo.id)
-        } else {
-          genesisParty.deletePartner(nodeInfo.id);
-        }
-      }
-    }
-  }
-
-  onNodeDelete(nodeInfo: MuonNodeInfo) {
-    log(`Node delete %o`, nodeInfo)
-    Object.keys(this.parties).forEach(partyId => {
-      const party = this.parties[partyId]
-      party.deletePartner(nodeInfo.id);
-    })
   }
 
   private get nodeManager(): NodeManagerPlugin {
@@ -172,7 +117,7 @@ class KeyManager extends CallablePlugin {
       if (!_key)
         return null
 
-      let party = this.getAppParty(appId, seed)
+      let party = this.appManager.getAppParty(appId, seed)
       if(!party)
         return null;
 
@@ -196,8 +141,6 @@ class KeyManager extends CallablePlugin {
     let {contexts} = data
     for(const context of contexts) {
       const {appId, seed} = context
-      const partyId = this.getAppPartyId(context);
-      delete this.parties[partyId]
       if(!!this.appTss[appId])
         delete this.appTss[appId][seed]
     }
@@ -208,69 +151,6 @@ class KeyManager extends CallablePlugin {
     const {seed} = appTssConfig
     if(!!this.appTss[appId])
       delete this.appTss[appId][seed]
-  }
-
-  getAppPartyId(context, isForReshare:boolean=false) {
-    const {seed, previousSeed} = context
-    return isForReshare ? `app-${seed}-${previousSeed}-party` : `app-${seed}-party`;
-  }
-
-  getAppParty(appId: string, seed: string, isForReshare:boolean=false): TssParty|undefined {
-    const _context:AppContext = this.appManager.getAppContext(appId, seed)
-    /** is app deployed? return if not. */
-    if(!_context)
-      return undefined;
-
-    const partyId = this.getAppPartyId(_context, isForReshare);
-
-    if(!this.parties[partyId]) {
-      let partners = _context.party.partners
-      if(isForReshare){
-        const previousContext: AppContext = this.appManager.getAppContext(appId, _context.previousSeed)
-        if(!previousContext)
-          return undefined;
-        partners = lodash.uniq([
-          ..._context.party.partners,
-          ...previousContext.party.partners
-        ])
-      }
-      this.loadParty({
-        id: partyId,
-        t: _context.party.t,
-        max: _context.party.max,
-        partners
-      })
-    }
-    return this.parties[partyId];
-  }
-
-  async getAppPartyAsync(appId: string, seed: string, isForReshare:boolean=false) {
-    const _context:AppContext|undefined = await this.appManager.getAppContextAsync(appId, seed, true)
-    /** is app deployed? return if not. */
-    if(!_context)
-      return undefined;
-
-    const partyId = this.getAppPartyId(_context, isForReshare);
-
-    if(!this.parties[partyId]) {
-      let partners = _context.party.partners
-      if(isForReshare){
-        const previousContext: AppContext|undefined = await this.appManager.getAppContextAsync(appId, _context.previousSeed, true)
-        if(!previousContext)
-          return undefined;
-        partners = lodash.uniq([
-          ..._context.party.partners,
-          ...previousContext.party.partners
-        ])
-      }
-      this.loadParty({
-        id: partyId,
-        t: _context.party.t,
-        max: _context.party.max,
-        partners
-      })
-    }
-    return this.parties[partyId];
   }
 
   async isNeedToCreateKey(){
@@ -295,23 +175,6 @@ class KeyManager extends CallablePlugin {
     return readyDeployers.length < this.netConfigs.tss.threshold;
   }
 
-  loadParty(party) {
-    // console.log(`KeyManager.loadParty`, party)
-    if(party.partners.lengh > 0 && typeof party.partners[0] !== "string") {
-      console.log("KeyManager.loadParty.partners most be string array", party.partners)
-      console.log(stackTrace())
-    }
-    try {
-      let p = TssParty.load(party)
-      this.parties[p.id] = p
-    }
-    catch (e) {
-      console.log('loading party: ', party);
-      console.log('partners info: ', party);
-      console.log(`KeyManager.loadParty ERROR:`, e)
-    }
-  }
-
   /**
    *
    * @param party
@@ -324,7 +187,7 @@ class KeyManager extends CallablePlugin {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, partners: oPartners, maxPartners, timeout=60000, value} = options;
 
-    const party = this.getAppParty(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare)
+    const party = this.appManager.getAppParty(partyInfo.appId, partyInfo.seed)
 
     if(!party)
       throw {message: `party not found`, partyInfo}
@@ -410,7 +273,7 @@ class KeyManager extends CallablePlugin {
           return;
 
         const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
-        const party = await this.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+        const party = this.appManager.getAppParty(partyInfo.appId, partyInfo.seed);
         if(!party)
           throw `party[${extra.party}] not found`
 
@@ -487,7 +350,7 @@ class KeyManager extends CallablePlugin {
           return;
 
         const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
-        const party = await this.getAppPartyAsync(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+        const party = await this.appManager.getAppParty(partyInfo.appId, partyInfo.seed);
         if(!party)
           throw `party[${extra.party}] not found`
 
@@ -579,7 +442,7 @@ class KeyManager extends CallablePlugin {
     while(options.lowerThanHalfN && dKey.publicKeyLargerThanHalfN());
 
     let key = new AppTssKey(
-      this.getAppParty(newPartyInfo.appId, newPartyInfo.seed),
+      this.appManager.getAppParty(newPartyInfo.appId, newPartyInfo.seed)!,
       keyRedist.extraParams.keyId!,
       dKey
     )
@@ -619,7 +482,7 @@ class KeyManager extends CallablePlugin {
           throw `incorrect tss key usage`
       }
     }
-    let party = this.getAppParty(partyInfo.appId, partyInfo.seed, partyInfo.isForReshare);
+    let party = this.appManager.getAppParty(partyInfo.appId, partyInfo.seed);
     if(!party)
       throw `party [${key.party}] not found`
 
@@ -671,10 +534,6 @@ class KeyManager extends CallablePlugin {
         obj[n.id]=signatures[i]
       return obj;
     }, {});
-  }
-
-  getParty(id) {
-    return this.parties[id];
   }
 
   /**==================================

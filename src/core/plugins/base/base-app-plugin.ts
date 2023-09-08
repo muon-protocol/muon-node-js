@@ -12,9 +12,8 @@ import { isArrowFn, deepFreeze } from '../../../utils/helpers.js'
 import AppTssKey from "../../../utils/tss/app-tss-key.js";
 import KeyManager from "../key-manager.js";
 import AppManager from "../app-manager.js";
-import TssParty from "../../../utils/tss/party.js";
 import NodeManagerPlugin from "../node-manager.js";
-import {AppContext, AppRequest, MuonNodeInfo} from "../../../common/types";
+import {AppContext, AppRequest, MuonNodeInfo, Party} from "../../../common/types";
 import {useOneTime} from "../../../utils/tss/use-one-time.js";
 import chalk from 'chalk'
 import {logger} from '@libp2p/logger'
@@ -113,13 +112,6 @@ class BaseAppPlugin extends CallablePlugin {
     /** load app party on start */
     await this.appManager.waitToLoad();
     await this.nodeManager.waitToLoad();
-
-    for(const seed of this.appManager.getAppSeeds(this.APP_ID)) {
-      const appParty = this.keyManager.getAppParty(this.APP_ID, seed);
-      if(appParty) {
-        this.log(`App party loaded %s`, appParty.id)
-      }
-    }
   }
 
   get keyManager(): KeyManager{
@@ -149,8 +141,8 @@ class BaseAppPlugin extends CallablePlugin {
     return this.APP_NAME ? super.BROADCAST_CHANNEL : null
   }
 
-  private getParty(seed: string): TssParty | null | undefined {
-    return this.keyManager.getAppParty(this.APP_ID, seed);
+  private getParty(seed: string): Party | undefined {
+    return this.appManager.getAppParty(this.APP_ID, seed);
   }
 
   private getTss(seed: string): AppTssKey | null {

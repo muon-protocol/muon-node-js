@@ -1,15 +1,15 @@
-import Party from './party.js'
 import BN from 'bn.js';
 import { PublicKey } from './types'
 import {DistKey} from "../../common/mpc/dist-key.js";
 import * as tssModule from "./index.js";
 import {bn2hex} from "./utils.js";
+import {Party, PartyInfo} from "../../common/types";
 
 const random = () => Math.floor(Math.random()*9999999)
 
 export type AppTssKeyJson = {
   id: string,
-  party: string,
+  party?: PartyInfo,
   share: string,
   publicKey: string,
   partners: string[],
@@ -38,7 +38,7 @@ export default class AppTssKey {
 
   private partnersPubKey = {}
 
-  constructor(party, id, distKey: DistKey){
+  constructor(party: Party, id, distKey: DistKey){
     this.id = id || `K${Date.now()}${random()}`
     if(!!party) {
       this.party = party;
@@ -69,7 +69,7 @@ export default class AppTssKey {
   toJson(): AppTssKeyJson {
     return {
       id: this.id,
-      party: this.party!.id,
+      party: !!this.party ? {appId: this.party.appId, seed: this.party.seed} : undefined,
       share: bn2hex(this.share),
       publicKey: this.publicKey.encode('hex', true),
       partners: [...this.partners],

@@ -47,7 +47,13 @@ function resultOk(realKey: string|null, realPubKey: string|null, resultPubKey: s
 
 async function keyGen(partners: string[], networks: FakeNetwork[], cData: KeyConstructionData): Promise<DistKeyJson[]> {
 
-  let keyGens = partners.map(p => new DistributedKeyGeneration(cData.id, '1', cData.partners, cData.t, cData.pk))
+  let keyGens = partners.map(p => new DistributedKeyGeneration({
+    id: cData.id,
+    starter: "1",
+    partners: cData.partners,
+    t: cData.t,
+    value: cData.pk
+  }));
 
   let allNodeResults: any[] = await Promise.all(
     partners.map(
