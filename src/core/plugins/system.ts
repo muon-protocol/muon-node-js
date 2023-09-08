@@ -527,7 +527,7 @@ class System extends CallablePlugin {
        */
       await useOneTime("key", reshareKey.publicKey!.encode('hex', true), `app-${appId}-tss`)
 
-      const appParty = this.keyManager.getAppParty(appId, seed)!
+      const appParty = this.appManager.getAppParty(appId, seed)!
       if (!appParty)
         throw `App party not found`;
 

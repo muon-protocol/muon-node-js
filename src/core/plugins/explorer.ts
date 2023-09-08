@@ -84,7 +84,7 @@ class Explorer extends CallablePlugin {
     if(!request)
       throw `request undefined`
     // @ts-ignore
-    const appParty = this.keyManager.getAppParty(request.appId, request.deploymentSeed)
+    const appParty = this.appManager.getAppParty(request.appId, request.deploymentSeed)
     if(!appParty)
       throw `App party not found`;
 

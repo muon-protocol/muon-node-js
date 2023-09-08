@@ -12,7 +12,7 @@ function isPeerId(input: string): boolean {
 }
 
 function isHex(input: string): boolean {
-  return /^(0x|0X)?[0-9A-Fa-f]+$/.test(input);
+  return typeof input === "string" && /^(0x|0X)?[0-9A-Fa-f]+$/.test(input);
 }
 
 function isDecimal(input: string): boolean {
@@ -20,18 +20,22 @@ function isDecimal(input: string): boolean {
 }
 
 function isEthAddress(input: string): boolean {
-  return /^0x[0-9A-Fa-f]{40}$/.test(input)
+  return typeof input === "string" && /^0x[0-9A-Fa-f]{40}$/.test(input)
 }
 
 function isUint32(input: string): boolean {
-  return /^0x[0-9A-Fa-f]{1,64}$/.test(input)
+  return typeof input === "string" && /^0x[0-9A-Fa-f]{1,64}$/.test(input)
 }
 
 function isEthSignature(input: string): boolean {
-  return /^0x[0-9A-Fa-f]{130}$/.test(input)
+  return typeof input === "string" && /^0x[0-9A-Fa-f]{130}$/.test(input)
 }
 
-const rangeKeywork: KeywordDefinition = {
+function isEpoch(input) {
+  return input > 0 && input <= 2147483647;
+}
+
+const rangeKeyword: KeywordDefinition = {
   keyword: "range",
   type: "number",
   compile([min, max], parentSchema) {
@@ -50,25 +54,24 @@ const rangeKeywork: KeywordDefinition = {
 
 const customType: KeywordDefinition = {
   keyword: "customType",
-  type: "string",
-  compile: (t, parentSchema) => {
-    return input => {
-      switch (t) {
-        case "peerId":
-          return isPeerId(input);
-        case "hex":
-          return isHex(input);
-        case "decimal":
-          return isDecimal(input);
-        case "ethAddress":
-          return isEthAddress(input);
-        case "ethSignature":
-          return isEthSignature(input);
-        case "uint32":
-          return isUint32(input);
-        default:
-          return false;
-      }
+  validate: function (t, input): boolean {
+    switch (t) {
+      case "peerId":
+        return isPeerId(input);
+      case "hex":
+        return isHex(input);
+      case "decimal":
+        return isDecimal(input);
+      case "ethAddress":
+        return isEthAddress(input);
+      case "ethSignature":
+        return isEthSignature(input);
+      case "uint32":
+        return isUint32(input);
+      case "epoch":
+        return isEpoch(input);
+      default:
+        return false;
     }
   },
   errors: true,
@@ -92,7 +95,7 @@ export function createAjv(): Ajv {
   const ajv = new Ajv({strict: false, allErrors: true})
   ajvErrors(ajv);
 
-  ajv.addKeyword(rangeKeywork);
+  ajv.addKeyword(rangeKeyword);
   ajv.addKeyword(customType);
 
   return ajv

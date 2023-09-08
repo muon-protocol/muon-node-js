@@ -255,7 +255,7 @@ async function start() {
   log("starting ...");
   await clearMessageBus();
 
-  let { net, tss } = await loadConfigs();
+  let { net } = await loadConfigs();
 
   // Waits a random time(0-5 secs) to avoid calling
   // RPC nodes by all network nodes at the same time
@@ -313,8 +313,6 @@ async function start() {
       // dht: [NetworkDHTPlugin, {}]
     },
     net,
-    // TODO: pass it into the key-manager
-    tss,
   };
   const network = new Network(configs);
   // TODO: check this two line swap

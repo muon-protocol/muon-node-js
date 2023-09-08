@@ -7,7 +7,7 @@ import {
   AppDeploymentStatus,
   AppTssConfig,
   JsonPublicKey,
-  MuonNodeInfo, NetConfigs, PolynomialInfoJson, WithRequired
+  MuonNodeInfo, NetConfigs, Party, WithRequired
 } from "../../common/types";
 import KeyManager from "./key-manager.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
@@ -91,6 +91,7 @@ export default class AppManager extends CallablePlugin {
     this.muon.on("app-tss-key:add", this.onAppTssConfigAdd.bind(this))
 
     this.muon.on("contract:node:add", this.onNodeAdd.bind(this));
+    this.muon.on("contract:node:edit", this.onNodeEdit.bind(this));
     this.muon.on("contract:node:delete", this.onNodeDelete.bind(this));
 
     await this.loadAppsInfo()
@@ -105,6 +106,23 @@ export default class AppManager extends CallablePlugin {
         ...deploymentContext.party.partners,
         nodeInfo.id
       ]
+    }
+  }
+
+  onNodeEdit(data: {nodeInfo: MuonNodeInfo, oldNodeInfo: MuonNodeInfo}) {
+    const {nodeInfo, oldNodeInfo} = data
+
+    if(nodeInfo.isDeployer !== oldNodeInfo.isDeployer) {
+
+      const genesisParty = this.getAppParty(DEPLOYMENT_APP_ID, GENESIS_SEED)!;
+
+      if(genesisParty) {
+        if (nodeInfo.isDeployer) {
+          genesisParty.partners.push(nodeInfo.id)
+        } else {
+          genesisParty.partners = genesisParty.partners.filter(id => id !== nodeInfo.id)
+        }
+      }
     }
   }
 
@@ -496,6 +514,19 @@ export default class AppManager extends CallablePlugin {
 
   getAppContext(appId: string, seed: string) {
     return this.appContexts[seed];
+  }
+
+  getAppParty(appId:string, seed: string):Party|undefined {
+    let ctx: AppContext = this.getAppContext(appId, seed);
+    if(!ctx)
+      return ;
+    return {
+      appId,
+      seed,
+      t: ctx.party.t,
+      max: ctx.party.max,
+      partners: ctx.party.partners,
+    }
   }
 
   getSeedContext(seed: string): AppContext | undefined {
