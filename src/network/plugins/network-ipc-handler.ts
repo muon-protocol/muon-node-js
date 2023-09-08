@@ -497,13 +497,19 @@ class NetworkIpcHandler extends CallablePlugin {
           throw `App's context not found.`
         }
       }
-      else {
+      else if(!callerInfo.isDeployer) {
         /**
          If a non-deployer node does not have a context, it should send the request to one of the deployer nodes.
          The deployer nodes know the members of the app party and can forward the request to the suitable one.
          */
         let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id);
         return this.forwardGatewayRequestToOnlinePartner(deployers, requestData, options.timeout);
+      }
+      else {
+        /**
+         * If the request is forwarded from a deployer and it is missed, throw an error.
+         */
+        throw `App's context not found.`
       }
     }
   }
