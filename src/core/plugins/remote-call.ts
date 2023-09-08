@@ -1,6 +1,7 @@
 import BasePlugin from'./base/base-plugin.js'
 import * as NetworkIpc from '../../network/ipc.js'
 import {logger} from '@libp2p/logger'
+import {MuonNodeInfo} from "../../common/types";
 
 const log = logger('muon:core:plugins:remote-call')
 
@@ -35,9 +36,10 @@ export default class RemoteCall extends BasePlugin {
     // @ts-ignore
     super.on(method, async (...args) => {
       /** apply remote call middlewares */
+      const callerInfo:MuonNodeInfo = args[1];
       if(options.middlewares && options.middlewares.length > 0){
         for(const middleware of options.middlewares) {
-          await middleware(this.muon, ...args)
+          await middleware({muon: this.muon, method, options, callerInfo, args})
         }
       }
       return handler(...args)

@@ -51,3 +51,77 @@ export const NodeManagerDataSchema = {
   },
   required: ["lastUpdateTime", "nodes"]
 }
+
+export const MuonSignatureSchema = {
+  type: "object",
+  properties: {
+    owner: {customType: "ethAddress"},
+    ownerPublicKey: {
+      x: {customType: "uint32"},
+      yParity: {
+        enum: ['0', '1']
+      },
+    },
+    signature: {
+      type: "array",
+      items: {customType: "uint32"}
+    },
+  },
+  required: ["owner", "ownerPublicKey", "signatures"]
+}
+
+export const AppRequestSchema = {
+  type: "object",
+  properties: {
+    confirmed: {type: "boolean"},
+    reqId: {type: "string"},
+    app: {type: "string"},
+    appId: {type: "string"},
+    method: {type: "string"},
+    deploymentSeed: {type: "string"},
+    gwAddress: {customType: "ethAddress"},
+    data: {
+      type: "object",
+      properties: {
+        uid: {type: "string"},
+        // params: any,
+        timestamp: {customType: "epoch"},
+        // result: any,
+        resultHash: {customType: "uint32"},
+        // signParams: TypedValue[],
+        init: {
+          type: "object",
+          properties: {
+            nonceAddress: {customType: "ethAddress"},
+          },
+          require: ["nonceAddress"],
+        },
+        fee: {
+          type: "object",
+          properties: {
+            amount: {type: "number"},
+            spender: {
+              type: "object",
+              properties:{
+                address: {customType: "ethAddress"},
+                timestamp: {customType: "epoch"},
+                signature: {customType: "ethSignature"},
+              },
+              required: ["address", "timestamp", "signature"],
+            },
+            signature: {customType: "ethSignature"},
+          },
+          required: ["amount", "spender", "signature"]
+        }
+      },
+      required: ["uid", "timestamp", "resultHash"]
+    },
+    startedAt: {customType: "epoch"},
+    confirmedAt: {customType: "epoch"},
+    signatures: {
+      type: "array",
+      item: MuonSignatureSchema
+    },
+  },
+  required: ["reqId", "app", "appId", "method", "deploymentSeed", "data"]
+}

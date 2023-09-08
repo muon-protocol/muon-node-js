@@ -1,4 +1,4 @@
-import {CoreRemoteCallMiddleware} from "../../remotecall-middleware";
+import {CoreRemoteCallMiddleware} from "../../remotecall-middlewares.js";
 import {Constructor} from "../../../common/types";
 import CallablePlugin from "./callable-plugin";
 
