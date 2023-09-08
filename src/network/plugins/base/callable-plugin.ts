@@ -18,7 +18,7 @@ export default class CallablePlugin extends BaseNetworkPlugin {
   }
 
   registerRemoteMethod(title, method, options){
-    let remoteCall = this.network.getPlugin('remote-call')
+    let remoteCall:RemoteCallPlugin = this.network.getPlugin('remote-call')
     log(`Registering remote method: ${this.remoteMethodEndpoint(title)}`)
     remoteCall.on(`${this.remoteMethodEndpoint(title)}`, method, options)
   }

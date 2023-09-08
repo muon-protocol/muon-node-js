@@ -1,4 +1,6 @@
-import {NetworkRemoteCallMiddleware} from "../../remotecall-middleware";
+import {NetworkRemoteCallMiddleware} from "../../remotecall-middlewares.js";
+import {Constructor} from "../../../common/types";
+import CallablePlugin from "./callable-plugin.js";
 
 function classNames(target): string[]{
   let names: string[] = []
@@ -45,7 +47,7 @@ export function broadcastHandler (target, property, descriptor) {
   return descriptor
 }
 
-export function remoteApp (constructor): any {
+export function remoteApp (constructor: Constructor<CallablePlugin>): any {
   if(!classNames(constructor).includes('CallablePlugin'))
     throw {message: 'RemoteApp should be CallablePlugin.'}
   let extended = class extends constructor {
@@ -61,7 +63,9 @@ export function remoteApp (constructor): any {
             middlewares: item.middlewares,
             /** other props */
             method: item.title,
+            // @ts-ignore
             appName: this.APP_NAME,
+            // @ts-ignore
             appId: this.APP_ID,
           })
         }
