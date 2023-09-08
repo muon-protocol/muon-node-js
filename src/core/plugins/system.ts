@@ -31,6 +31,7 @@ import ReshareCronJob from "./cron-jobs/reshare-cron-job";
 import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
 import {DEPLOYMENT_APP_ID, GENESIS_SEED, NODE_ROLE_DEPLOYER} from "../../common/contantes.js";
+import {APP_STATUS_EXPIRED} from "../constants.js";
 const require = createRequire(import.meta.url);
 const Rand = require('rand-seed').default;
 
@@ -87,8 +88,10 @@ class System extends CallablePlugin {
       })
     )
 
-    let withoutKeyCount = responses.filter(s => (!!s && !s.hasTssKey)).length;
-    let withKeyCount = responses.filter(s => (!!s && s.hasTssKey)).length
+    let withoutKeyCount = responses.filter(s => (!!s && (!s.hasTssKey || s.status === APP_STATUS_EXPIRED))).length;
+    let withKeyCount = responses.filter(s => (!!s && s.hasTssKey && s.status !== APP_STATUS_EXPIRED)).length
+
+    log('initializing genesis key %o', {withoutKeyCount, withKeyCount})
 
     if(withKeyCount>netConfigs.tss.threshold)
       throw `There is t deployer node with deployment keys`;
