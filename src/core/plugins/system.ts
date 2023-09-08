@@ -39,7 +39,6 @@ const log = logger("muon:core:plugins:system");
 const RemoteMethods = {
   storeDeploymentTssKey: 'storeDeploymentTssKey',
   GenerateAppTss: "generateAppTss",
-  Undeploy: "undeploy",
   GetAppPublicKey: "getAppPubKey",
   StartAppTssReshare: "startAppTssReshare",
   DeploymentAppStatus: "deploymentAppStatus",
@@ -578,47 +577,13 @@ class System extends CallablePlugin {
       .map(ctx => ctx.deploymentRequest?.data.timestamp! || currentTime)
       .sort((a, b) => b - a)[0]
 
-    let appPartners: string[] = [].concat(
-      // @ts-ignore
-      ...allContexts.map(ctx => ctx.party.partners),
-    )
-
-    let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(p => p.id)
-
-    const partnersToCall: MuonNodeInfo[] = this.nodeManager.filterNodes({
-      list: [
-        ...deployers,
-        ...appPartners
-      ]
-    })
-    log(`removing app contexts %o`, {
-      appId,
-      timeThreshold: deploymentTimestamp,
-      fromPartners: partnersToCall.map(p => p.id),
-    })
-    await Promise.all(partnersToCall.map(node => {
-      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__undeployApp({appId, deploymentTimestamp}, this.nodeManager.currentNodeInfo)
-          .catch(e => {
-            log.error(`error when undeploy at current node: %O`, e)
-            return e?.message || "unknown error occurred"
-          });
-      }
-      else{
-        return this.remoteCall(
-          node.peerId,
-          RemoteMethods.Undeploy,
-          {appId, deploymentTimestamp},
-          {timeout: 5000},
-        )
-          .catch(e => {
-            log.error(`error when undeploy at ${node.peerId}: %O`, e)
-            return e?.message || "unknown error occurred"
-          });
-      }
-    }))
+    log(`undeploying ${appId}`)
+    return this.__undeployApp({appId, deploymentTimestamp}, this.nodeManager.currentNodeInfo)
+      .catch(e => {
+        log.error(`error when undeploy at current node: %O`, e)
+        return e?.message || "unknown error occurred"
+      });
   }
-
   @appApiMethod({})
   async getAppContext(appId, seed, tryFromNetwork:boolean=false) {
     return this.appManager.getAppContextAsync(appId, seed, tryFromNetwork)
@@ -767,10 +732,7 @@ class System extends CallablePlugin {
     }
   }
 
-  @remoteMethod(RemoteMethods.Undeploy)
   async __undeployApp(data: {appId, deploymentTimestamp}, callerInfo) {
-    if(!callerInfo.isDeployer)
-      throw `Only deployer can call this method`;
     let {appId, deploymentTimestamp} = data;
 
     log(`deleting app from persistent db %s`, appId);
@@ -805,6 +767,7 @@ class System extends CallablePlugin {
     CoreIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
     NetworkIpc.fireEvent({type: "app-context:delete", data: {contexts: deleteContextList}})
   }
+
 
   @remoteMethod(RemoteMethods.GetAppPublicKey)
   async __getAppPublicKey(data: {appId: string, seed: string, keyId}, callerInfo): Promise<AppTssPublicInfo> {
