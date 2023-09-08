@@ -428,9 +428,7 @@ export default class DbSynchronizer extends CallablePlugin {
       const context = this.appManager.getSeedContext(seed);
       if(!context)
         return true;
-      if(!context.keyGenRequest)
-        return false;
-      if(context.deploymentRequest?.data.expiration > currentTime)
+      if((context.deploymentRequest?.data.expiration || Infinity) > currentTime)
         return false;
       return this.appManager.isSeedReshared(seed);
     })
