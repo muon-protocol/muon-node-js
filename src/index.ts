@@ -28,7 +28,7 @@ process.on('unhandledRejection', async function(reason, _promise) {
     },
   })
     .then(() => "OK")
-    .catch(e => "Failed");
+    .catch(e => `Failed: ${e.message}`);
 
   console.log(`reporting crash done ${reportResults}.`)
   process.exit(1);

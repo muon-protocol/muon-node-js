@@ -48,5 +48,10 @@
       "interval": 3600e3
     },
     "dbSyncOnlineThreshold": 3
+  },
+  "analytics": {
+    "baseUrls": [
+      "http://159.69.192.98:8011"
+    ]
   }
 }
