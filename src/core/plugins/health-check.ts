@@ -8,6 +8,7 @@ import OS from 'os'
 import util from 'util'
 import ChildProcess from 'child_process'
 import {peerId2Str} from "../../network/utils.js";
+import {getStatusData} from "../../gateway/status.js"
 
 const shellExec = util.promisify(ChildProcess.exec);
 
@@ -93,6 +94,7 @@ class HealthCheck extends CallablePlugin {
       console.log(`===== HealthCheck._onHealthCheck =====`, new Date());
     return {
       status: "OK",
+      statusData: await getStatusData({}),
       ... await this.collectNodeStatus()
     }
   }
