@@ -29,6 +29,7 @@ import {createAjv} from "../../../common/ajv.js";
 import ethSigUtil from '@metamask/eth-sig-util'
 import {coreRemoteMethodSchema as crms} from "../../remotecall-middlewares.js";
 import {AppRequestSchema} from "../../../common/ajv-schemas.js";
+import { MapOf } from '../../../common/mpc/types.js'
 
 const { omit } = lodash;
 
@@ -497,27 +498,32 @@ class BaseAppPlugin extends CallablePlugin {
     const partners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: announceList})
     this.log(`nodes selected to announce confirmation: %o`, partners.map(p => p.id))
 
-    const responses: string[] = await Promise.all(partners.map(async node => {
-      if(node.wallet === process.env.SIGN_WALLET_ADDRESS) {
-        return this.__onRequestConfirmation(request, node)
-          .catch(e => {
-            this.log.error(`informRequestConfirmation error %o`, e)
-            return 'error'
-          })
-      }
-      else {
-        return this.remoteCall(
+    const responses: string[] = await Promise.all(partners.map(node => (
+      (
+        node.wallet === process.env.SIGN_WALLET_ADDRESS
+        ?
+        this.__onRequestConfirmation(request, node)
+        :
+        this.remoteCall(
           node.peerId,
           RemoteMethods.InformRequestConfirmation,
           request,
           {taskId: `keygen-${nonce.id}`, timeout: 10e3}
         )
-          .catch(e => {
-            this.log.error(`informRequestConfirmation error %o`, e)
-            return 'error'
-          })
-      }
-    }))
+      )
+      .then(() => "OK")
+      .catch(e => {
+        return `error: ${e.message}`
+      })
+    )))
+    const reqConfirmCallErrors:MapOf<string> = partners.reduce((obj, node, i) => {
+      if(responses[i] !== "OK")
+        obj[node.id] = responses[i];
+      return obj;
+    }, {})
+    if(Object.keys(reqConfirmCallErrors).length > 0) {
+      this.log.error(`onConfirm failed on this nodes reqId:%s %o`, request.reqId, reqConfirmCallErrors);
+    }
     const successResponses = responses.filter(r => (r !== 'error'))
     if(successResponses.length < this.getParty(request.deploymentSeed)!.t)
       throw `Error when informing request confirmation.`

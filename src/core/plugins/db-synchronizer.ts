@@ -343,7 +343,7 @@ export default class DbSynchronizer extends CallablePlugin {
     if(seedsToCheck.length > 0 && !currentNode.isDeployer) {
       log(`there is ${seedsToCheck.length} expired context that is need to check with deployers to be deleted.`)
       const check2: boolean[] = await this.canSeedListBeDeleted(seedsToCheck);
-      seedsToDelete = [
+            seedsToDelete = [
         ...seedsToDelete,
         ...seedsToCheck.filter((_, i) => check2[i])
       ]
@@ -428,7 +428,7 @@ export default class DbSynchronizer extends CallablePlugin {
       const context = this.appManager.getSeedContext(seed);
       if(!context)
         return true;
-      if((context.deploymentRequest?.data.expiration || Infinity) > currentTime)
+      if((context.deploymentRequest?.data.result.expiration || Infinity) > currentTime)
         return false;
       return this.appManager.isSeedReshared(seed);
     })
