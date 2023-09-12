@@ -29,6 +29,7 @@ import {createAjv} from "../../../common/ajv.js";
 import ethSigUtil from '@metamask/eth-sig-util'
 import {coreRemoteMethodSchema as crms} from "../../remotecall-middlewares.js";
 import {AppRequestSchema} from "../../../common/ajv-schemas.js";
+import Web3 from 'web3'
 import { MapOf } from '../../../common/mpc/types.js'
 
 const { omit } = lodash;
@@ -206,13 +207,13 @@ class BaseAppPlugin extends CallablePlugin {
       fee: {
         amount: "",
         spender: {
-          address: feeParams.spender,
+          address: Web3.utils.toChecksumAddress(feeParams.spender),
           timestamp: feeParams.timestamp,
           signature: feeParams.signature
         },
         signature: ""
       }
-    } : {}
+    } : {};
 
     let newRequest = new Request({
       reqId: null,

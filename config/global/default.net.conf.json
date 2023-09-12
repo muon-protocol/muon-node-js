@@ -33,9 +33,9 @@
     "/ip4/188.166.73.132/tcp/9011/p2p/QmYPbLuwy7CWqsMrZM6W9VZGSu7oM9PGRfVe1kssKcjjpj"
   ],
   "fee": {
-    "endpoint": "http://70.34.217.65:3000/sign",
+    "endpoint": "https://fees.muon.net/sign",
     "signers": [
-      "0xdc8Df2877338c89Adb26a8b0A63Cf601B2E73184"
+      "0x968cB8308E052E9fDce45D1F8a384a9881e829A0"
     ]
   },
   "synchronizer": {
