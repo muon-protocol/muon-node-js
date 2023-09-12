@@ -340,6 +340,10 @@ export default class DbSynchronizer extends CallablePlugin {
       ...groupSelectedSeeds,
     ]
 
+    /** 
+     * If the current node is a deployer, there is no need to search the network. 
+     * All deployers must be updated and have all active contexts.
+     */
     if(seedsToCheck.length > 0 && !currentNode.isDeployer) {
       log(`there is ${seedsToCheck.length} expired context that is need to check with deployers to be deleted.`)
       const check2: boolean[] = await this.canSeedListBeDeleted(seedsToCheck);
