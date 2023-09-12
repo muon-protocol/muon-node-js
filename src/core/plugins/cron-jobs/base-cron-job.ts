@@ -48,7 +48,7 @@ export default class BaseCronJob extends BasePlugin {
     while (true) {
       let currentNode: MuonNodeInfo|undefined = this.nodeManager.currentNodeInfo;
       const leader = this.getLeader();
-      this.log(`main loop %o`, {leader: this.getLeader()})
+      this.log(`main loop %o`, {leader: this.getLeader(), queue: this.getLeaderQueue()})
       if(currentNode && currentNode?.isDeployer && leader === currentNode.id && this.process !== undefined) {
         try {
           await this.process();
@@ -61,19 +61,7 @@ export default class BaseCronJob extends BasePlugin {
     }
   }
 
-  /**
-   * Who is the leader
-   * @return {string} - nodeId of the leader
-   */
-  getLeader(): string {
-    // return "1";
-    let timestamp: number = Date.now();
-
-    /** There is no leader in the leading gap. */
-    if(timestamp % this.leadingPeriod < this.leadingGap)
-      return "0"
-
-    const periodIndex = Math.floor(timestamp / this.leadingPeriod);
+  protected getLeaderQueue(): string[] {
     let deployers: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(n => n.id);
     /** sort deployers*/
     deployers = deployers
@@ -89,7 +77,25 @@ export default class BaseCronJob extends BasePlugin {
       })
       .sort((a, b) => (a.hash < b.hash ? 1 : -1))
       .map(n => n.id)
-    return deployers[periodIndex % deployers.length];
+    return deployers;
+  }
+
+  /**
+   * Who is the leader
+   * @return {string} - nodeId of the leader
+   */
+  getLeader(): string {
+    return "1";
+    let timestamp: number = Date.now();
+
+    /** There is no leader in the leading gap. */
+    if(timestamp % this.leadingPeriod < this.leadingGap)
+      return "0"
+
+    const list: string[] = this.getLeaderQueue();
+
+    const periodIndex = Math.floor(timestamp / this.leadingPeriod);
+    return list[periodIndex % list.length];
   }
 
   async process() {}
