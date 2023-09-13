@@ -160,7 +160,8 @@ export async function findMyIp(): Promise<string|undefined> {
         })
         .then(checkValidIp)
     })
-  );
+  )
+    .catch(e => undefined)
 
   return ip;
 }

@@ -49,6 +49,7 @@
     "multiformats": "^9.6.4",
     "node-cache": "^5.1.2",
     "number-to-bn": "^1.7.0",
+    "public-ip": "^6.0.1",
     "pure-ipfs-only-hash": "^4.0.2",
     "rand-seed": "^1.0.2",
     "rate-limiter-flexible": "^2.4.1",
