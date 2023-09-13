@@ -595,7 +595,7 @@ export default class AppManager extends CallablePlugin {
           if(seed === GENESIS_SEED)
             return false;
         }
-        if(options.deploymentStatus && options.deploymentStatus.length>0) {
+        if(Array.isArray(options.deploymentStatus) && options.deploymentStatus.length>0) {
           if(!options.deploymentStatus.includes(this.getAppDeploymentStatus(appId, seed)))
             return false
         }
@@ -633,7 +633,7 @@ export default class AppManager extends CallablePlugin {
     const appContexts: AppContext[] = this.filterContexts({appId: context.appId, hasKeyGenRequest: true})
 
     return !!appContexts.find(ctx => {
-      return ctx.deploymentRequest?.data.result.timestamp > deployTimestamp
+      return ctx.deploymentRequest && ctx.deploymentRequest.data.result.timestamp > deployTimestamp
     });
   }
 

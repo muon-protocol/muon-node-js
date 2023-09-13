@@ -87,7 +87,7 @@ const customType: KeywordDefinition = {
   } as KeywordErrorDefinition,
   metaSchema: {
     type: "string",
-    enum: ["peerId", "hex", "decimal", "ethAddress", "ethSignature", "uint32"],
+    enum: ["peerId", "hex", "decimal", "ethAddress", "ethSignature", "uint32", "epoch"],
   },
 }
 

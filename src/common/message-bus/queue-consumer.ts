@@ -49,10 +49,17 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
       log.error(`QueueConsumer [${this.busName}] error: %o`, e);
       if(typeof e === "string")
         e = {message: e};
+      let isSerializable = true;
+      try {
+        JSON.stringify(error);
+      } 
+      catch (e) {
+        isSerializable = false;
+      }
       error = {
         message: e.message,
         stack: e.stack,
-        ...e
+        ...(isSerializable ? e : {})
       };
     }
     this.responseTo(pid, uid, {response, error});
@@ -63,9 +70,23 @@ export default class QueueConsumer<MessageType> extends BaseMessageQueue {
    * @param {Object} options
    * @returns {Promise<void>}
    */
-  responseTo(pid: number, responseId: number | string, data: any, options: IpcCallConfig={}){
+  private responseTo(pid: number, responseId: number | string, data: any, options: IpcCallConfig={}){
     const receivingProcessChannel = this.getProcessResponseChannel(pid);
-    let wMsg = this.wrapData(data, {uid: responseId});
-    this.sendRedis.publish(receivingProcessChannel, JSON.stringify(wMsg));
+    let responseString;
+    try {
+      responseString = JSON.stringify(this.wrapData(data, {uid: responseId}));
+    }
+    catch(e) {
+      responseString = JSON.stringify(
+        this.wrapData({
+          response: null,
+          error: {
+            message: `QueueCunsumer:[${this.busName}] response serialization error: ${e.message}`
+          }
+        }, 
+          {uid: responseId}
+        ))
+    }
+    this.sendRedis.publish(receivingProcessChannel, responseString);
   }
 }
