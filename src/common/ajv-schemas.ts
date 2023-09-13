@@ -85,7 +85,7 @@ export const AppRequestSchema = {
       properties: {
         uid: {type: "string"},
         // params: any,
-        timestamp: {customType: "epoch"},
+        timestamp: {type: "number"},
         // result: any,
         resultHash: {customType: "uint32"},
         // signParams: TypedValue[],
@@ -99,12 +99,12 @@ export const AppRequestSchema = {
         fee: {
           type: "object",
           properties: {
-            amount: {type: "number"},
+            amount: {customType: "bn"},
             spender: {
               type: "object",
-              properties:{
+              properties: {
                 address: {customType: "ethAddress"},
-                timestamp: {customType: "epoch"},
+                timestamp: {type: "number"},
                 signature: {customType: "ethSignature"},
               },
               required: ["address", "timestamp", "signature"],
@@ -116,8 +116,8 @@ export const AppRequestSchema = {
       },
       required: ["uid", "timestamp", "resultHash"]
     },
-    startedAt: {customType: "epoch"},
-    confirmedAt: {customType: "epoch"},
+    startedAt: {type: "number"},
+    confirmedAt: {type: "number"},
     signatures: {
       type: "array",
       item: MuonSignatureSchema

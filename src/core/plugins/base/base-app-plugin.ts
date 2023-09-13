@@ -198,7 +198,7 @@ class BaseAppPlugin extends CallablePlugin {
       if(this.METHOD_PARAMS_SCHEMA[method]){
         if(!ajv.validate(this.METHOD_PARAMS_SCHEMA[method], params)){
           // @ts-ignore
-          throw ajv.errors.map(e => e.message).join("\n");
+          throw ajv.errorsText(ajv.errors);
         }
       }
     }
@@ -834,7 +834,7 @@ class BaseAppPlugin extends CallablePlugin {
       if(this.METHOD_PARAMS_SCHEMA[method]){
         if(!ajv.validate(this.METHOD_PARAMS_SCHEMA[method], params)){
           // @ts-ignore
-          throw ajv.errors.map(e => e.message).join("\n");
+          throw ajv.errorsText(ajv.errors);
         }
       }
     }

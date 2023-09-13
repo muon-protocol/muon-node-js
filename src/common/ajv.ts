@@ -2,6 +2,7 @@ import Ajv, {_,KeywordDefinition, KeywordErrorDefinition, KeywordCxt} from 'ajv'
 import ajvErrors from 'ajv-errors';
 import {peerIdFromString} from "@libp2p/peer-id";
 
+
 function isPeerId(input: string): boolean {
   try {
     peerIdFromString(input)
@@ -33,6 +34,10 @@ function isEthSignature(input: string): boolean {
 
 function isEpoch(input) {
   return input > 0 && input <= 2147483647;
+}
+
+function isBN(input) {
+  return /^\d+$/.test(input);
 }
 
 const rangeKeyword: KeywordDefinition = {
@@ -70,6 +75,8 @@ const customType: KeywordDefinition = {
         return isUint32(input);
       case "epoch":
         return isEpoch(input);
+      case "bn":
+        return isBN(input);
       default:
         return false;
     }
@@ -87,7 +94,7 @@ const customType: KeywordDefinition = {
   } as KeywordErrorDefinition,
   metaSchema: {
     type: "string",
-    enum: ["peerId", "hex", "decimal", "ethAddress", "ethSignature", "uint32", "epoch"],
+    enum: ["peerId", "hex", "decimal", "ethAddress", "ethSignature", "uint32", "epoch", "bn"],
   },
 }
 
