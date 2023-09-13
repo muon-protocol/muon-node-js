@@ -17,7 +17,7 @@
       "http://188.166.73.132:8011/delegate"
     ],
     "ifconfig":[
-      "https://alice-n2.muon.net/ifconfig",
+      "http://159.69.192.98:8011/ifconfig",
       "http://188.166.73.132:8011/ifconfig"
     ],
     "discoveryValidPeriod": 30000,
