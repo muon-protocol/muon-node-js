@@ -85,13 +85,13 @@ class MemoryPlugin extends CallablePlugin {
     this.redisClient = redisClient
   }
 
-  broadcastWrite(memWrite: MemWrite) {
-    this.broadcast({
-      type: 'mem_write',
-      peerId: process.env.PEER_ID,
-      memWrite
-    })
-  }
+  // broadcastWrite(memWrite: MemWrite) {
+  //   this.broadcast({
+  //     type: 'mem_write',
+  //     peerId: process.env.PEER_ID,
+  //     memWrite
+  //   })
+  // }
 
   @broadcastHandler
   async onBroadcastReceived(data) {
@@ -178,7 +178,7 @@ class MemoryPlugin extends CallablePlugin {
     memWrite.signatures = [crypto.sign(memWrite.hash)]
 
     await this.storeMemWrite(memWrite);
-    this.broadcastWrite(memWrite);
+    // this.broadcastWrite(memWrite);
   }
 
   async writeLocalMem(key: string, data: any, ttl: number=0, options:MemWriteOptions={}) {
