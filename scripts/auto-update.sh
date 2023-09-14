@@ -55,14 +55,15 @@ check_for_update (){
 
     #log `$_NODE  $_NPM install 2>&1`
 
+    log "$update_check"
+
     if [ $? -ne 0 ]; then
         log "Git pull error.";
-        log "$update_check;"
         exit;
     fi
 
     if echo $update_check | grep -q 'Already up to date'; then
-        echo "No new updates";
+        log "No new updates";
     else
         log "========== updating detected ===========";
         log "============ update reason =============";
