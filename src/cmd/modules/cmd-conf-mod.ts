@@ -41,14 +41,21 @@ export const builder = {
 }
 
 export async function handler(argv) {
-  const {action, key, value} = argv;
+  const {action, key, value, network} = argv;
+  let selectedNetwork=network;
+  if(!selectedNetwork)
+    console.log(`argument '--network' not defined, setting default network=local`);
+  selectedNetwork = "local";
+
   let configs = getConfigs()
 
   if(action === 'get') {
     return console.log(configs)
   }
   else {
-    _.set(configs, key, value)
+    if(!configs[selectedNetwork])
+      configs[selectedNetwork]={};
+    _.set(configs[selectedNetwork], key, value)
     fs.writeFileSync(CONF_PATH, JSON.stringify(configs, null, 2))
     console.log("Configuration updated successfully", configs);
   }
