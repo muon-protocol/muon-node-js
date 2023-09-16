@@ -31,7 +31,13 @@ export const builder = {
 }
 
 export async function handler(argv) {
-  const configs = getConfigs();
+  let configs = getConfigs();
+  let {network} = argv;
+  if(!network)
+     console.log(`argument '--network' not defined, setting default network=local`);
+  network = "local";
+  configs = configs[network];
+
   if(!configs.url)
     throw `Please set muon api url config`;
   const {action} = argv;
@@ -139,12 +145,11 @@ async function deployApp(argv, configs) {
 }
 
 async function undeployApp(argv, configs) {
-  const {app, network} = argv;
-  if(!network)
-    throw `please define --network argument`;
-  let deployers = configs.deployers[network];
+  const {app} = argv;
+
+  let deployers = configs.deployers;
   if (!deployers || deployers.length == 0)
-    throw `deployers.${network} not defined in cmd.conf.json`;
+    throw `deployers not defined for this network in cmd.conf.json`;
 
   for (let i = 0; i < deployers.length; i++) {
     let deployer = deployers[i];
@@ -258,3 +263,4 @@ async function reshareApp(argv, configs) {
   console.log(`TSS key resharing done with this generators: [${tssResponse.result.data.init.keyGenerators}].`, tssResponse.result.data.result)
 
 }
+
