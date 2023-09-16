@@ -139,10 +139,12 @@ async function deployApp(argv, configs) {
 }
 
 async function undeployApp(argv, configs) {
-  const {app} = argv;
-  let deployers = configs.deployers;
+  const {app, network} = argv;
+  if(!network)
+    throw `please define --network argument`;
+  let deployers = configs.deployers[network];
   if (!deployers || deployers.length == 0)
-    throw `deployers not defined in cmd.conf.json`;
+    throw `deployers.${network} not defined in cmd.conf.json`;
 
   for (let i = 0; i < deployers.length; i++) {
     let deployer = deployers[i];
