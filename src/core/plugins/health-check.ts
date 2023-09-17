@@ -8,7 +8,6 @@ import OS from 'os'
 import {peerId2Str} from "../../network/utils.js";
 import {getStatusData} from "../../gateway/status.js"
 
-const os = require('os');
 
 const RemoteMethods = {
   CheckHealth: 'check-health',
@@ -60,9 +59,9 @@ class HealthCheck extends CallablePlugin {
   // }
 
   private async collectNodeStatus(){
-    const loadAvg = os.loadavg().map(load => Math.round(load * 100) / 100).toString();
-    const freeMem = os.freemem() / 1024;
-    const totalMem = os.totalmem() / 1024;
+    const loadAvg = OS.loadavg().map(load => Math.round(load * 100) / 100).toString();
+    const freeMem = OS.freemem() / 1024;
+    const totalMem = OS.totalmem() / 1024;
 
     return {
       numCpus: OS.cpus().length,
@@ -99,3 +98,4 @@ class HealthCheck extends CallablePlugin {
 }
 
 export default HealthCheck;
+
