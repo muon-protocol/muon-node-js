@@ -5,12 +5,9 @@ import * as NetworkIpc from '../../network/ipc.js'
 import {MuonNodeInfo} from "../../common/types";
 import {timeout} from '../../utils/helpers.js'
 import OS from 'os'
-import util from 'util'
-import ChildProcess from 'child_process'
 import {peerId2Str} from "../../network/utils.js";
 import {getStatusData} from "../../gateway/status.js"
 
-const shellExec = util.promisify(ChildProcess.exec);
 
 const RemoteMethods = {
   CheckHealth: 'check-health',
@@ -62,14 +59,14 @@ class HealthCheck extends CallablePlugin {
   // }
 
   private async collectNodeStatus(){
-    const {stdout: uptimeStdOut, stderr: uptimeStdErr} = await shellExec('uptime');
-    const {stdout: freeStdOut, stderr: freeStdErr} = await shellExec('free');
+    const loadAvg = OS.loadavg().map(load => Math.round(load * 100) / 100).toString();
+    const freeMem = OS.freemem() / 1024;
+    const totalMem = OS.totalmem() / 1024;
 
-    const freeCols = freeStdOut.split("\n")[1].split(' ').filter(i => !!i)
     return {
       numCpus: OS.cpus().length,
-      loadAvg: uptimeStdOut.split('load average')[1].substr(2).trim(),
-      memory: `${freeCols[6]}/${freeCols[1]}`,
+      loadAvg,
+      memory: `${freeMem}/${totalMem}`,
       uptime: await NetworkIpc.getUptime(),
       networkingPort: process.env.PEER_PORT,
       gatewayPort: process.env.GATEWAY_PORT
@@ -101,3 +98,4 @@ class HealthCheck extends CallablePlugin {
 }
 
 export default HealthCheck;
+
