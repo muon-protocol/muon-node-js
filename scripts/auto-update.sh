@@ -64,7 +64,6 @@ check_for_update (){
 
     if echo $update_check | grep -q 'Already up to date'; then
         log "No new updates";
-        log `apt-get -y purge exim4-base`
     else
         log "========== updating detected ===========";
         log "============ update reason =============";
