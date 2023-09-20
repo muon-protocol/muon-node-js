@@ -8,7 +8,7 @@ import {
   AppRequest,
   AppTssPublicInfo,
   JsonPublicKey,
-  MuonNodeInfo, NetConfigs
+  MuonNodeInfo, NetConfigs, Party
 } from "../../common/types";
 import * as TssModule from '../../utils/tss/index.js'
 import AppContextModel from "../../common/db-models/app-context.js"
@@ -32,12 +32,15 @@ import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
 import {DEPLOYMENT_APP_ID, GENESIS_SEED, NODE_ROLE_DEPLOYER} from "../../common/contantes.js";
 import {APP_STATUS_EXPIRED} from "../constants.js";
+import {onlyDeployers, coreRemoteMethodSchema as methodSchema} from "../remotecall-middlewares.js";
+import { AppContextSchema, PartySchema } from '../../common/ajv-schemas.js';
 const require = createRequire(import.meta.url);
 const Rand = require('rand-seed').default;
 
 const log = logger("muon:core:plugins:system");
 
 const RemoteMethods = {
+  InitDeploymentContext: "initDeploymentContext",
   storeDeploymentTssKey: 'storeDeploymentTssKey',
   GenerateAppTss: "generateAppTss",
   GetAppPublicKey: "getAppPubKey",
@@ -59,6 +62,38 @@ class System extends CallablePlugin {
 
   get appManager(): AppManager{
     return this.muon.getPlugin('app-manager');
+  }
+
+  @appApiMethod()
+  async initDeploymentContext(context: AppContext) {
+    const app:BaseAppPlugin = this.muon.getAppById(context.appId);
+    context.appName = app.APP_NAME!;
+    context.isBuiltIn = app.isBuiltInApp;
+
+    const partners:MuonNodeInfo[] = [
+      ...this.nodeManager.filterNodes({isDeployer: true}),
+      ...this.nodeManager.filterNodes({list: context.party.partners}),
+    ]
+
+    const currentNode:MuonNodeInfo|undefined = this.currentNodeInfo;
+    if(!currentNode)
+      throw `Current node is not added to network.`
+
+    return Promise.all(
+      partners.map(p => {
+        if(p.id === currentNode.id) {
+          return this.__initDeploymentContext(context, currentNode)
+            .catch(e => e.message)
+        }
+        return this.remoteCall(
+          p.peerId,
+          RemoteMethods.InitDeploymentContext,
+          context,
+          {timeout: 5000},
+        )
+          .catch(e => e.message);
+      })
+    )
   }
 
   @appApiMethod()
@@ -272,7 +307,7 @@ class System extends CallablePlugin {
   async generateAppTss(appId, seed) {
     const context = this.appManager.getAppContext(appId, seed);
     if(!context)
-      throw `App deployment info not found.`
+      throw `App onboarding info not found.`
     const {partners} = context.party
 
     const generatorId = await this.getFirstOnlinePartner(partners);
@@ -285,7 +320,7 @@ class System extends CallablePlugin {
         generatorId: generatorId || null,
         isOnline
       }
-      throw {message: `key-gen starter node not online`, ...debug}
+      throw {message: `key-gen starter node is not online`, ...debug}
     }
 
     const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
@@ -309,7 +344,7 @@ class System extends CallablePlugin {
     const newContext = this.appManager.getAppContext(appId, seed);
     if(!newContext)
       throw `App's new context not found.`
-    const oldContext = this.appManager.getAppContext(appId, newContext.previousSeed);
+    const oldContext = this.appManager.getAppContext(appId, newContext.previousSeed!);
     if(!oldContext)
       throw `App's old context not found.`
 
@@ -359,7 +394,7 @@ class System extends CallablePlugin {
   async findAndGetAppTssPublicInfo(appId: string, seed: string, keyId: string): Promise<any> {
     const context = this.appManager.getAppContext(appId, seed)
     if(!context)
-      throw `App deployment info not found.`
+      throw `App onboarding info not found.`
     const appPartners: MuonNodeInfo[] = this.nodeManager.filterNodes({
       list: context.party.partners
     })
@@ -437,13 +472,50 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async appDeploymentConfirmed(request: AppRequest, result) {
-    /** store app context */
-    try {
-      const context = await this.writeAppContextIntoDb(request, result);
-    }
-    catch (e) {
-      log.error("error on calling appDeploymentConfirmed %O", e)
-      throw e
+    const {
+      method,
+      data: {
+        params: {appId},
+        init: {key: {id: keyId}},
+        result: {selectedNodes, expiration, previousSeed, seed, publicKey, polynomial},
+      }
+    } = request; 
+    
+  
+    await this.appManager.saveAppContext({
+      appId,
+      appName: this.muon.getAppNameById(appId),
+      isBuiltIn: this.appManager.appIsBuiltIn(appId),
+      previousSeed: method === 'reshare' ? previousSeed : undefined,
+      seed,
+      party: {
+        t: result.tssThreshold,
+        max: result.maxGroupSize,
+        partners: selectedNodes,
+      },
+      rotationEnabled: result.rotationEnabled,
+      ttl: result.ttl,
+      pendingPeriod: result.pendingPeriod,
+      expiration: result.expiration,
+      deploymentRequest: request,
+      publicKey,
+      polynomial,
+    })
+    
+    const currentNode = this.nodeManager.currentNodeInfo!;
+    if(selectedNodes.includes(currentNode.id)) {
+      // TODO: check context has key or not ?
+      let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed})!
+      /** store tss key */
+      await this.appManager.saveAppTssConfig({
+        appId: appId,
+        seed,
+        keyGenRequest: request,
+        publicKey: pub2json(key.publicKey!),
+        keyShare: bn2hex(key.share!),
+        polynomial,
+        expiration,
+      })
     }
 
     return true;
@@ -497,18 +569,17 @@ class System extends CallablePlugin {
     const {
       data: {
         params: {appId},
-        init: {id: reshareKeyId},
-        result: {expiration, seed, publicKey, polynomial: resharePolynomial},
+        init: {key: {id: reshareKeyId}},
+        result: {expiration, seed, publicKey, polynomial},
       }
     } = request;
-
-    const polynomial = resharePolynomial;
 
     /** check context exist */
     const context = await this.appManager.getAppContext(appId, seed);
     if(!context) {
-      throw `App new context not found in app reshare confirmation.`
+      throw `App onboarding context not found in app reshare confirmation.`
     }
+    
 
     const currentNode = this.nodeManager.currentNodeInfo!;
     if(context.party.partners.includes(currentNode.id)) {
@@ -520,7 +591,7 @@ class System extends CallablePlugin {
        prevent storing wrong share.
        if the key's polynomial is not as same as the context polynomial, the key will be ignored.
        */
-      if(reshareKey.toJson().polynomial!.Fx.join(',') === resharePolynomial.Fx.join(',')) {
+      if(reshareKey.toJson().polynomial!.Fx.join(',') === polynomial.Fx.join(',')) {
         keyShare = bn2hex(reshareKey.share!)
       }
       /**
@@ -589,7 +660,8 @@ class System extends CallablePlugin {
   }
   @appApiMethod({})
   async getAppContext(appId, seed, tryFromNetwork:boolean=false) {
-    return this.appManager.getAppContextAsync(appId, seed, tryFromNetwork)
+    // return this.appManager.getAppContextAsync(appId, seed, tryFromNetwork)
+    return this.appManager.getAppContext(appId, seed)
   }
 
   @appApiMethod()
@@ -614,6 +686,12 @@ class System extends CallablePlugin {
   /**
    * Remote methods
    */
+
+  @remoteMethod(RemoteMethods.InitDeploymentContext, onlyDeployers, methodSchema(AppContextSchema))
+  async __initDeploymentContext(ctx: AppContext, callerInfo: MuonNodeInfo): Promise<string> {
+    this.appManager.onboardAppContext(ctx);
+    return "OK"
+  }
 
   /**
    * Node with ID:[1] inform other nodes that tss creation completed.
@@ -655,20 +733,13 @@ class System extends CallablePlugin {
     }
   }
 
-  @remoteMethod(RemoteMethods.GenerateAppTss)
+  @remoteMethod(RemoteMethods.GenerateAppTss, onlyDeployers)
   async __generateAppTss({appId, seed}, callerInfo) {
     // console.log(`System.__generateAppTss`, {appId});
-    if(!callerInfo.isDeployer)
-      throw `Only deployers can call System.__generateAppTss`;
 
     const context = this.appManager.getAppContext(appId, seed);
     if(!context)
-      throw `App deployment info not found.`
-
-    /** check key not created before */
-    if(context.publicKey?.encoded) {
-      throw `App context already has key`
-    }
+      throw `App onboarding info not found.`
 
     let key = await this.keyManager.keyGen(
       {appId, seed},
@@ -689,6 +760,7 @@ class System extends CallablePlugin {
     return {
       id: key.id,
       publicKey: pub2json(key.publicKey!),
+      polynomial: key.toJson().polynomial,
       generators: key.partners,
       shareProofs,
     }
@@ -700,11 +772,11 @@ class System extends CallablePlugin {
     if(!callerInfo.isDeployer)
       throw `Only deployers can call System.__startAppTssReshare`;
 
-    const newContext: AppContext = this.appManager.getAppContext(appId, seed);
+    const newContext: AppContext|undefined = this.appManager.getAppContext(appId, seed);
     if(!newContext)
-      throw `App's new context not found.`
+      throw `App's onboarding context not found.`
 
-    const oldContext: AppContext = this.appManager.getAppContext(appId, newContext.previousSeed);
+    const oldContext: AppContext = this.appManager.getAppContext(appId, newContext.previousSeed!);
     if(!oldContext)
       throw `App's previous context not found.`
 
@@ -776,7 +848,7 @@ class System extends CallablePlugin {
   async __getAppPublicKey(data: {appId: string, seed: string, keyId}, callerInfo): Promise<AppTssPublicInfo> {
     const {appId, seed, keyId} = data;
 
-    const context:AppContext = this.appManager.getAppContext(appId, seed)
+    const context:AppContext|undefined = this.appManager.getAppContext(appId, seed)
     if(!context)
       throw `App deployment info not found.`
     let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed});

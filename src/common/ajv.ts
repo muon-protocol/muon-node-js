@@ -23,8 +23,12 @@ function isEthAddress(input: string): boolean {
   return typeof input === "string" && /^0x[0-9A-Fa-f]{40}$/.test(input)
 }
 
-function isUint32(input: string): boolean {
+function isUint256(input: string): boolean {
   return typeof input === "string" && /^0x[0-9A-Fa-f]{1,64}$/.test(input)
+}
+
+function isEllipticCurvePoint(input: string): boolean {
+  return typeof input === "string" && /^(((02|03)[0-9A-Fa-f]{64})|(04[0-9A-Fa-f]{128}))$/.test(input)
 }
 
 function isEthSignature(input: string): boolean {
@@ -66,8 +70,10 @@ const customType: KeywordDefinition = {
         return isEthAddress(input);
       case "ethSignature":
         return isEthSignature(input);
-      case "uint32":
-        return isUint32(input);
+      case "ecPoint":
+        return isEllipticCurvePoint(input);
+      case "uint256":
+        return isUint256(input);
       case "epoch":
         return isEpoch(input);
       default:
@@ -87,7 +93,7 @@ const customType: KeywordDefinition = {
   } as KeywordErrorDefinition,
   metaSchema: {
     type: "string",
-    enum: ["peerId", "hex", "decimal", "ethAddress", "ethSignature", "uint32", "epoch"],
+    enum: ["peerId", "hex", "decimal", "ethAddress", "ethSignature", "ecPoint", "uint256", "epoch"],
   },
 }
 

@@ -152,7 +152,7 @@ export type AppRequest = {
 export type AppContext = {
     appId: string,
     appName: string,
-    previousSeed: string,
+    previousSeed?: string,
     seed: string,
     isBuiltIn?: boolean,
     party: {

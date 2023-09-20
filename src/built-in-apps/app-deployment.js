@@ -8,9 +8,7 @@ const Methods = {
     Check: "check",
     RandomSeed: "random-seed",
     Deploy: "deploy",
-    TssKeyGen: "tss-key-gen",
-    TssRotate: "tss-rotate",
-    TssReshare: "tss-reshare"
+    Reshare: "reshare"
 }
 
 const NODES_SELECTION_TOLERANCE = 0.07;
@@ -43,9 +41,9 @@ function symmetricDifference(arrA, arrB) {
     return Array.from(_difference);
 }
 
-const uint32Schema = {
+const uint256Schema = {
     type: 'string',
-    customType: "uint32"
+    customType: "uint256"
 };
 const appIdSchema = {
     type: "string",
@@ -63,8 +61,8 @@ const ethAddressSchema = {
 const verifiableSeedSchema = {
     type: "object",
     properties: {
-        value: uint32Schema,
-        reqId: uint32Schema,
+        value: uint256Schema,
+        reqId: uint256Schema,
         nonce: ethAddressSchema,
     },
     required: ["value", "reqId", "nonce"],
@@ -82,7 +80,7 @@ const METHOD_PARAMS_SCHEMA = {
       type: 'object',
       properties: {
           appId: appIdSchema,
-          previousSeed: uint32Schema
+          previousSeed: uint256Schema
       },
       required: ["appId"]
     },
@@ -121,20 +119,12 @@ const METHOD_PARAMS_SCHEMA = {
         },
         required: ["appId", "seed"]
     },
-    [Methods.TssKeyGen]: {
-        type: "object",
-        properties: {
-            appId: appIdSchema,
-            seed: uint32Schema,
-        },
-        required: ["appId", "seed"]
-    },
-    [Methods.TssRotate]: {
+    [Methods.Reshare]: {
         type: "object",
         properties: {
             appId: appIdSchema,
             seed: verifiableSeedSchema,
-            previousSeed: uint32Schema,
+            previousSeed: uint256Schema,
             nodes: {
                 type: "array",
                 items: {
@@ -156,16 +146,7 @@ const METHOD_PARAMS_SCHEMA = {
         },
         required: ["appId", "seed", "previousSeed", "leaderSignature"],
         additionalProperties: false,
-    },
-    [Methods.TssReshare]: {
-        type: "object",
-        properties: {
-            appId: appIdSchema,
-            seed: uint32Schema,
-            leaderSignature: {type: "string", customType: "ethSignature"},
-        },
-        required: ["appId", "seed", "leaderSignature"]
-    },
+    }
 }
 
 module.exports = {
@@ -213,7 +194,7 @@ module.exports = {
         t = Math.max(t, tssConfigs.threshold);
 
         let prevContext;
-        if(method === Methods.TssRotate) {
+        if(method === Methods.Reshare) {
             prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
             if (!prevContext)
                 throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
@@ -232,7 +213,7 @@ module.exports = {
             selectedNodes = selectedNodes.map(({id}) => id)
         }
 
-        if(method === Methods.TssRotate) {
+        if(method === Methods.Reshare) {
             let countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
             let previousNodes = prevContext.party.partners
             if(!!prevContext.keyGenRequest?.data?.init?.shareProofs) {
@@ -253,6 +234,47 @@ module.exports = {
             selectedNodes = lodash.uniq([...nodesToKeep, ...selectedNodes]).slice(0, n);
         }
         return selectedNodes;
+    },
+
+    getDeploymentParams: async function(request) {
+        let {
+            method,
+            data: { params }
+        } = request
+
+        const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
+        let {
+            appId,
+            previousSeed,
+            seed: {value: seed},
+            t=tssConfigs.threshold,
+            n=tssConfigs.max,
+            ttl: userDefinedTTL,
+            pendingPeriod: userDefinedPending,
+        } = params
+
+        let ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
+        let pendingPeriod = !!userDefinedPending ? userDefinedPending : tssConfigs.pendingPeriod
+
+        t = Math.max(t, tssConfigs.threshold);
+        if(method === Methods.Reshare) {
+            const prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
+            if (!prevContext)
+                throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
+
+            if(appId === DEPLOYMENT_APP_ID) {
+                t = tssConfigs.threshold;
+            }
+            else{
+                t = prevContext.party.t;
+            }
+
+            ttl = !!userDefinedTTL ? userDefinedTTL : prevContext.ttl;
+            pendingPeriod = !!userDefinedPending ? userDefinedPending : prevContext.pendingPeriod;
+        }
+        const expiration = request.data.timestamp + ttl + pendingPeriod;
+
+        return {t, n, ttl, pendingPeriod, expiration}
     },
 
     /**
@@ -298,22 +320,14 @@ module.exports = {
                     seed: {value: seed, nonce, reqId},
                 } = params
                 const context = await this.callPlugin('system', "getAppContext", appId, seed)
-                if(!!context) {
-                    throw `App already deployed`;
+                /** ignore onboarding contexts */
+                if(!!context && !!context.deploymentRequest) {
+                    throw {message: `App already deployed`, context};
                 }
                 await this.validateSeed(request, seed, reqId, nonce);
                 break;
             }
-            case Methods.TssKeyGen: {
-                const {appId, seed} = params
-                if(!appId || !seed)
-                    throw { message: `Missing params appId/seed.`, params}
-                const {status} = this.callPlugin('system', "getAppDeploymentInfo", appId, seed)
-                if(status !== "TSS_GROUP_SELECTED")
-                    throw `App context is not in key generation state. The state is currently ${status}.`
-                break;
-            }
-            case Methods.TssRotate: {
+            case Methods.Reshare: {
                 const {
                     appId,
                     previousSeed,
@@ -328,7 +342,7 @@ module.exports = {
 
                 const reshareLeader = await this.callPlugin('system', "getReshareLeader")
                 if(!reshareLeader)
-                    throw `There is no leader to rotate app party.`
+                    throw `There is no leader to resahre the app.`
 
                 const caller = ecRecover(seed, leaderSignature);
                 if(reshareLeader.wallet !== caller)
@@ -337,47 +351,11 @@ module.exports = {
                 /** Most recent status of App should be PENDING (about to expire) */
                 const {status, hasKeyGenRequest} = this.callPlugin('system', "getAppDeploymentInfo", appId, previousSeed)
 
-                if(!hasKeyGenRequest)
-                    throw `App tss key not reshared. call reshare before.`
                 if(status !== 'PENDING' && status !== 'EXPIRED')
                     throw `Previous context status is not PENDING/EXPIRED. It is ${status}`
 
                 await this.validateSeed(request, seed, reqId, nonce);
                 break
-            }
-            case Methods.TssReshare: {
-                const {appId, seed, leaderSignature} = params
-
-                /** ensure the app's context exists */
-                let newContext = await this.callPlugin('system', "getAppContext", appId, seed, true)
-                if(!newContext || !newContext.previousSeed)
-                    throw `The App's new deployment info not found`
-
-                /** ensure the app's previous context exists */
-                let previousContext = await this.callPlugin('system', "getAppContext", appId, newContext.previousSeed, true)
-                if(!previousContext)
-                  throw `The App's previous deployment info not found`
-
-                /** Most recent status of App should be PENDING (about to expire) */
-                const newInfo = this.callPlugin('system', "getAppDeploymentInfo", appId, seed)
-
-                if(!newInfo.deployed || newInfo.status !== 'TSS_GROUP_SELECTED')
-                    throw {message: `App not rotated.`, deploymentInfo: newInfo}
-
-                const oldInfo = this.callPlugin('system', "getAppDeploymentInfo", appId, newContext.previousSeed)
-
-                if(oldInfo.status !== 'PENDING' && oldInfo.status !== "EXPIRED")
-                    throw `App key cannot be reshared`
-
-                const reshareLeader = await this.callPlugin('system', "getReshareLeader")
-                if(!reshareLeader)
-                    throw `There is no leader to reshare the app's tss.`
-
-                const caller = ecRecover(seed, leaderSignature);
-                if(reshareLeader.wallet !== caller)
-                    throw `Only the leader can reshare the app's tss key.`
-
-                break;
             }
         }
     },
@@ -388,44 +366,49 @@ module.exports = {
             data: { params }
         } = request
         switch (method) {
-            case Methods.Deploy:
-            case Methods.TssRotate: {
+            case Methods.Deploy: 
+            case Methods.Reshare: {
+                const { 
+                    appId, 
+                    previousSeed,
+                    seed: {value: seed}, 
+                } = params
+
+                const {t, n, ttl, pendingPeriod, expiration} = await this.getDeploymentParams(request);
                 const selectedNodes = await this.selectPartyNodes(request);
+
+                /** initialize new context on the app partners. */
+                await this.callPlugin("system", "initDeploymentContext", {
+                    appId,
+                    appName: "", 
+                    previousSeed,
+                    seed,
+                    isBuiltIn: false,
+                    party: { 
+                        t, 
+                        max: n,
+                        partners: selectedNodes
+                    },
+                    rotationEnabled: true,
+                    ttl,
+                    pendingPeriod,
+                    expiration,
+                });
+
+                const {id, publicKey, polynomial, generators, shareProofs} = (
+                    method === Methods.Deploy
+                    ?
+                    await this.callPlugin('system', "generateAppTss", appId, seed)
+                    :
+                    await this.callPlugin('system', "reshareAppTss", appId, seed)
+                )
+
                 return {
+                    key: {id, publicKey, polynomial, generators, shareProofs},
                     selectedNodes,
                 }
             }
-            case Methods.TssKeyGen: {
-                const { appId, seed } = params
-
-                const {id, publicKey, generators, shareProofs} = await this.callPlugin('system', "generateAppTss", appId, seed)
-
-                let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
-
-                return {
-                    id,
-                    publicKey,
-                    partners: context.party.partners,
-                    keyGenerators: generators,
-                    shareProofs,
-                }
-            }
-            case Methods.TssReshare: {
-                const { appId, seed } = params
-
-                /** ensure app context to be exist */
-                let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
-
-                const {id, publicKey, generators, shareProofs} = await this.callPlugin('system', "reshareAppTss", appId, seed)
-
-                return {
-                    id,
-                    publicKey,
-                    partners: context.party.partners,
-                    keyGenerators: generators,
-                    shareProofs
-                }
-            }
+            
         }
     },
 
@@ -446,20 +429,16 @@ module.exports = {
                     throw "appId is undefined"
                 return {previousSeed, appId}
             }
-            case Methods.Deploy: {
-                const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const {selectedNodes} = init
+            case Methods.Deploy:
+            case Methods.Reshare: {
+                const {selectedNodes, key} = init
                 let {
                     appId,
+                    previousSeed,
                     seed: {value: seed},
-                    t=tssConfigs.threshold,
-                    n=tssConfigs.max,
-                    ttl: userDefinedTTL,
-                    pendingPeriod: pending,
                 } = params
 
-                const ttl = !!userDefinedTTL ? userDefinedTTL : await this.callPlugin("system", "getAppTTL", appId);
-                t = Math.max(t, tssConfigs.threshold);
+                const {t, n, ttl, pendingPeriod, expiration} = await this.getDeploymentParams(request);
 
                 /** check selected nodes */
 
@@ -469,114 +448,46 @@ module.exports = {
 
                 if(difference > NODES_SELECTION_TOLERANCE)
                     throw `selected nodes mismatched.`
-
-                const pendingPeriod = !!pending ? pending : tssConfigs.pendingPeriod
-
-                return {
-                    rotationEnabled: true,
-                    ttl,
-                    pendingPeriod,
-                    expiration: request.data.timestamp + ttl + pendingPeriod,
-                    timestamp: request.data.timestamp,
-                    seed,
-                    tssThreshold: t,
-                    maxGroupSize: n,
-                    selectedNodes,
-                };
-            }
-            case Methods.TssRotate: {
-                const { tss: tssConfigs } = await this.callPlugin("system", "getNetworkConfigs");
-                const {selectedNodes} = init
-                let {
-                    appId,
-                    previousSeed,
-                    seed: {value: seed},
-                    t=tssConfigs.threshold,
-                    n=tssConfigs.max,
-                    ttl: userDefinedTTL,
-                    pendingPeriod: pending,
-                } = params
-
-                const prevContext = await this.callPlugin("system", "getAppContext", appId, previousSeed);
-                if (!prevContext)
-                    throw {message: `App previous context missing on deployment onArrive method`, appId, seed};
-
-                /** check selected nodes */
-
-                let selectedNodes2 = await this.selectPartyNodes(request);
-
-                let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
-
-                if(difference > NODES_SELECTION_TOLERANCE)
-                    throw `selected nodes mismatched.`
-
-                const ttl = !!userDefinedTTL ? userDefinedTTL : prevContext.ttl;
-                const pendingPeriod = !!pending ? pending : prevContext.pendingPeriod;
-
-                /** TSS threshold will not change when rotating the app party */
-                t = appId === DEPLOYMENT_APP_ID ? tssConfigs.threshold : prevContext.party.t;
-
-                return {
-                    rotationEnabled: true,
-                    ttl,
-                    pendingPeriod,
-                    expiration: request.data.timestamp + ttl + pendingPeriod,
-                    timestamp: request.data.timestamp,
-                    previousSeed,
-                    seed,
-                    tssThreshold: t,
-                    maxGroupSize: n,
-                    selectedNodes,
-                };
-            }
-            case Methods.TssKeyGen:
-            case Methods.TssReshare: {
-                const {appId, seed} = params
-                /** ensure app context to be exist */
-                let context = await this.callPlugin('system', "getAppContext", appId, seed, true)
-                if(!context)
-                    throw `The app's deployment info was not found`
-
-                if(context.party.partners.join(',') !== request.data.init.partners.join(',')) {
-                    throw `deployed partners mismatched with key-gen partners`
-                }
 
                 /** ensure a random key already generated */
                 let publicKey, polynomial;
-                if(method === Methods.TssKeyGen) {
-                    const tssPublicInfo = await this.callPlugin('system', "findAndGetAppTssPublicInfo", appId, seed, init.id);
-                    ({publicKey, polynomial}=tssPublicInfo)
-                }
-                else {
-                    const oldContext = await this.callPlugin("system", "getAppContext", appId, context.previousSeed, true)
-                    publicKey = oldContext.publicKey;
-                    const tssPublicInfo = await this.callPlugin('system', "findAndGetAppTssPublicInfo", appId, seed, init.id);
-                    polynomial = tssPublicInfo.polynomial
-                }
+                const tssPublicInfo = await this.callPlugin('system', "findAndGetAppTssPublicInfo", appId, seed, init.key.id);
+                ({publicKey, polynomial}=tssPublicInfo)
 
-                if(!publicKey)
-                    throw `App new tss key not found`;
+                if(method === Methods.Reshare) {                
+                    const oldContext = await this.callPlugin("system", "getAppContext", appId, previousSeed, true)
+                    if(oldContext.publicKey.encoded != publicKey.encoded)
+                        throw `App's signing public key changed throgh the reshare.`;
+                }
 
                 const shareProofsIsValid = await this.callPlugin(
                   "system",
                   "validateShareProofs",
                   polynomial.Fx,
-                  init.shareProofs
+                  init.key.shareProofs
                 );
                 if(!shareProofsIsValid) {
                     throw `error in validating share proofs.`
                 }
-                if(Object.keys(init.shareProofs).length < polynomial.t)
+                if(Object.keys(init.key.shareProofs).length < polynomial.t)
                     throw `Insufficient share holder.`
 
                 return {
-                    rotationEnabled: context.rotationEnabled,
-                    ttl: context.ttl,
-                    expiration: context.expiration,
-                    seed: context.seed,
+                    rotationEnabled: true,
+                    ttl,
+                    pendingPeriod,
+                    expiration,
+                    timestamp: request.data.timestamp,
+                    previousSeed,
+                    seed,
+                    tssThreshold: t,
+                    maxGroupSize: n,
+                    selectedNodes,
                     publicKey,
                     polynomial,
-                }
+                    // publicKey: key.publicKey,
+                    // polynomial: key.polynomial,
+                };
             }
             default:
                 throw "Unknown method"
@@ -598,11 +509,12 @@ module.exports = {
                     {type: "uint256", value: result.appId},
                 ];
             case Methods.Deploy:
-            case Methods.TssRotate: {
+            case Methods.Reshare: {
                 const {
                     previousSeed,
                     seed: {value: seed}
                 } = request.data.params
+        
                 return [
                     {t: 'bool', v: result.rotationEnabled},
                     {t: 'uint64', v: result.ttl},
@@ -612,22 +524,8 @@ module.exports = {
                     ...(request.method === Methods.TssRotate ? [{t: 'uint256', v: previousSeed}] : []),
                     {t: 'uint256', v: seed},
                     ...result.selectedNodes.map(v => ({t: 'uint64', v})),
-                ]
-            }
-            case Methods.TssKeyGen:
-            case Methods.TssReshare: {
-                const {appId} = request.data.params
-                let polynomialParams = []
-                if(result.polynomial) {
-                    polynomialParams = result.polynomial.Fx.map(v => ({t: 'bytes',v}))
-                }
-                return [
-                    {t: "bool", v: request.data.result.rotationEnabled},
-                    {t: "uint64", v: request.data.result.ttl},
-                    {t: "uint64", v: request.data.result.expiration},
-                    {t: "string", v: request.data.result.seed},
-                    {t: 'address', v:request.data.result.publicKey.address},
-                    ...polynomialParams,
+                    {t: 'address', v:result.publicKey.address},
+                    ...result.polynomial.Fx.map(v => ({t: 'bytes',v})),
                 ]
             }
             default:
@@ -647,22 +545,15 @@ module.exports = {
                   init.selectedNodes,
                 ]
             }
-            case Methods.TssRotate: {
-                return [
-                  /** inform the partners of new context */
-                  init.selectedNodes,
-                ]
-            }
-            case Methods.TssKeyGen: {
-                return [
-                    /**  Inform the partners who participated in the keygen process. */
-                  init.keyGenerators
-                ]
-            }
-            case Methods.TssReshare: {
-                const {appId, seed} = params
+            case Methods.Reshare: {
+                const {appId, seed: {value: seed}} = params
+                
                 const newContext = await this.callPlugin("system", "getAppContext", appId, seed, true);
+                if(!newContext)
+                    throw {message: `Onboarding context not found.`, appId, seed}
+                
                 const previousContext = await this.callPlugin("system", "getAppContext", appId, newContext.previousSeed, true)
+                
                 return [
                   newContext.party.partners,
                   /** Overlap of two party. */
@@ -680,24 +571,17 @@ module.exports = {
             data: { params, init }
         } = request
         switch (method) {
-            case Methods.Deploy:
-            case Methods.TssRotate: {
+            case Methods.Deploy: 
+            case Methods.Reshare: {
                 let success = await this.callPlugin(
                     "system",
                     "appDeploymentConfirmed",
-                    request, result
+                    request, 
+                    result
                 )
                 if(!success)
                     throw "Fail to store app context."
                 break;
-            }
-            case Methods.TssKeyGen: {
-                await this.callPlugin('system', "appKeyGenConfirmed", request)
-                break
-            }
-            case Methods.TssReshare: {
-                await this.callPlugin('system', "appReshareConfirmed", request)
-                break
             }
         }
     }

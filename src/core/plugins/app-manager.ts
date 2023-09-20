@@ -68,6 +68,8 @@ export type FindAvailableNodesOptions = {
 @remoteApp
 export default class AppManager extends CallablePlugin {
   /** map App deployment seed to context */
+  private onboardingContexts: MapOf<AppContext> = {}
+  /** map App deployment seed to context */
   private appContexts: MapOf<AppContext> = {}
   /** map appId to its seeds list */
   private appSeeds: MapOf<string[]> = {}
@@ -85,6 +87,7 @@ export default class AppManager extends CallablePlugin {
   async onStart() {
     await super.onStart()
 
+    this.muon.on("app-context:onboard", this.onAppContextOnboard.bind(this))
     this.muon.on("app-context:add", this.onAppContextAdd.bind(this))
     this.muon.on("app-context:update", this.onAppContextUpdate.bind(this))
     this.muon.on("app-context:delete", this.onAppContextDelete.bind(this))
@@ -238,6 +241,10 @@ export default class AppManager extends CallablePlugin {
     }
   }
 
+  async onboardAppContext(context: AppContext) {
+    CoreIpc.fireEvent({type: "app-context:onboard", data: context,})
+  }
+
   async saveAppTssConfig(appTssConfig: WithRequired<AppTssConfig, "polynomial">) {
     // @ts-ignore
     if (appTssConfig.keyShare) {
@@ -253,28 +260,34 @@ export default class AppManager extends CallablePlugin {
       CoreIpc.fireEvent({type: "app-tss-key:add", data: newConfig})
     }
 
-    // @ts-ignore
-    const {appId, seed, keyGenRequest, publicKey, polynomial} = appTssConfig;
-    let context = await AppContextModel.findOne({seed}).exec();
-    if(!context) {
-      context = new AppContextModel(this.getAppContext(appId, seed))
-    }
+    // // @ts-ignore
+    // const {appId, seed, keyGenRequest, publicKey, polynomial} = appTssConfig;
+    // let context = await AppContextModel.findOne({seed}).exec();
+    // if(!context) {
+    //   context = new AppContextModel(this.getAppContext(appId, seed))
+    // }
 
-    if(context.appId !== appId) {
-      log.error(`AppManager.saveAppTssConfig appId mismatch %o`, {"appTssConfig.appId": appId, "context.appId": context.appId})
-      return ;
-    }
+    // if(context.appId !== appId) {
+    //   log.error(`AppManager.saveAppTssConfig appId mismatch %o`, {"appTssConfig.appId": appId, "context.appId": context.appId})
+    //   return ;
+    // }
 
-    // @ts-ignore
-    context.keyGenRequest = keyGenRequest
-    context.publicKey = publicKey
-    context.polynomial = polynomial
-    context.dangerousAllowToSave = true
-    if(context.seed !== GENESIS_SEED) {
-      await context.save();
-    }
-    CoreIpc.fireEvent({type: "app-context:update", data: context,})
-    NetworkIpc.fireEvent({type: "app-context:update", data: context,})
+    // // @ts-ignore
+    // context.keyGenRequest = keyGenRequest
+    // context.publicKey = publicKey
+    // context.polynomial = polynomial
+    // context.dangerousAllowToSave = true
+    // if(context.seed !== GENESIS_SEED) {
+    //   await context.save();
+    // }
+    // CoreIpc.fireEvent({type: "app-context:update", data: context,})
+    // NetworkIpc.fireEvent({type: "app-context:update", data: context,})
+  }
+
+  private async onAppContextOnboard(ctx: AppContext) {
+    log(`app context onboarded %o`, ctx)
+    const {appId, seed} = ctx;
+    this.onboardingContexts[seed] = ctx;
   }
 
   private async onAppContextAdd(ctx: AppContext) {
@@ -513,13 +526,15 @@ export default class AppManager extends CallablePlugin {
   }
 
   getAppContext(appId: string, seed: string) {
-    return this.appContexts[seed];
+    return this.appContexts[seed] || this.onboardingContexts[seed];
   }
 
   getAppParty(appId:string, seed: string):Party|undefined {
-    let ctx: AppContext = this.getAppContext(appId, seed);
+    let ctx: AppContext|undefined = this.getSeedContext(seed);
+    
     if(!ctx)
-      return ;
+      return;
+
     return {
       appId,
       seed,
@@ -530,7 +545,7 @@ export default class AppManager extends CallablePlugin {
   }
 
   getSeedContext(seed: string): AppContext | undefined {
-    return this.appContexts[seed];
+    return this.appContexts[seed] || this.onboardingContexts[seed];
   }
 
   async getAppContextAsync(appId: string, seed: string, tryFromNetwork:boolean=false): Promise<AppContext|undefined> {
