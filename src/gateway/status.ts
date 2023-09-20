@@ -9,7 +9,7 @@ const PeerID = process.env.PEER_ID || null
 
 const router = Router();
 
-router.use('/', asyncHandler(async (req, res, next) => {
+export async function getStatusData(options) {
   const [netConfig, nodeInfo, multiAddress, uptime, commitId] = await Promise.all([
     NetworkIpc.getNetworkConfig({
       timeout: 1000,
@@ -27,16 +27,16 @@ router.use('/', asyncHandler(async (req, res, next) => {
     getCommitId().catch(e => null)
   ]);
 
-  let autoUpdateLogs: string|undefined = undefined;
-  if(req.query.au !== undefined) {
+  let autoUpdateLogs: string | undefined = undefined;
+  if (options.au !== undefined) {
     // @ts-ignore
-    const n = parseInt(req.query.au) || 100;
+    const n = parseInt(options.au) || 100;
     autoUpdateLogs = await readFileTail("auto-update.log", n);
   }
 
-  let discordVerification=process.env.DISCORD_VERIFICATION;
+  let discordVerification = process.env.DISCORD_VERIFICATION;
 
-  res.json({
+  return {
     discordVerification,
     staker: nodeInfo ? nodeInfo.staker : undefined,
     address: NodeAddress,
@@ -62,7 +62,12 @@ router.use('/', asyncHandler(async (req, res, next) => {
       nodeInfo: nodeInfo ? lodash.omit(nodeInfo || {}, ['peerId', 'wallet', 'staker']) : undefined,
       address: multiAddress,
     }
-  })
-}))
+  };
+}
+
+router.use('/', asyncHandler(async (req, res, next) => {
+  const statusObj = await getStatusData({au: req.query.au});
+  res.json(statusObj);
+}));
 
 export default router;

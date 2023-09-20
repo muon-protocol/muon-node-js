@@ -3,7 +3,6 @@ import { tcp } from "@libp2p/tcp";
 import { mplex } from "@libp2p/mplex";
 import { noise } from "@chainsafe/libp2p-noise";
 import { bootstrap } from "@libp2p/bootstrap";
-import { gossipsub } from "@chainsafe/libp2p-gossipsub";
 import defaultsDeep from "@nodeutils/defaults-deep";
 // import { LevelDatastore } from "datastore-level";
 import { yamux } from '@chainsafe/libp2p-yamux';
@@ -27,7 +26,7 @@ const DEFAULT_OPTS = {
     mplex()
   ],
   services: {
-    pubsub: gossipsub({allowPublishToZeroPeers: true})
+    // pubsub: gossipsub({allowPublishToZeroPeers: true})
   }
 
 

@@ -84,7 +84,7 @@ export async function getNodeManagerDataFromCache(configs: NodeManagerConfigs): 
   let data: NodeManagerData = JSON.parse(dataStr) as NodeManagerData;
   if(!ajv.validate(NodeManagerDataSchema, data)) {
     // @ts-ignore
-    throw ajv.errors.map(e => e.message).join("\n");
+    throw ajv.errorsText(ajv.errors);
   }
   if(data.lastUpdateTime !== contractInfo.lastUpdateTime)
     throw `cache data expired`;

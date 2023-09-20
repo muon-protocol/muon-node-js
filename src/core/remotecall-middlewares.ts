@@ -32,7 +32,7 @@ export function coreRemoteMethodSchema(schema):CoreRemoteCallMiddleware {
     if(!ajv.validate(schema, args[0])){
       // @ts-ignore
       throw {
-        message: [`remote call input params validation failed.`, ...ajv.errors!.map(e => e.message)].join("\n"),
+        message: [`remote call input params validation failed.`, ajv.errorsText(ajv.errors)].join("\n"),
         method: params.method
       };
     }
