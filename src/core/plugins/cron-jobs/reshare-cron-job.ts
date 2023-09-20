@@ -2,7 +2,7 @@ import BaseCronJob from "./base-cron-job.js";
 import PQueue from "p-queue";
 import AppManagerPlugin from "../app-manager.js";
 import {AppContext} from "../../../common/types";
-import {APP_STATUS_EXPIRED, APP_STATUS_PENDING, APP_STATUS_TSS_GROUP_SELECTED} from "../../constants.js";
+import {APP_STATUS_EXPIRED, APP_STATUS_PENDING} from "../../constants.js";
 import {MapOf} from "../../../common/mpc/types";
 import {GatewayCallParams} from "../../../gateway/types";
 import {AnnounceCheckOptions, muonCall} from "../../../cmd/utils.js";
@@ -51,24 +51,7 @@ export default class ReshareCronJob extends BaseCronJob{
   }
 
   async process() {
-    /**
-     List of context that rotated but not reshared.
-     exclude new contexts because they might be generating the key.
-     */
-    const tenMinutesAgo = getTimestamp() - 600;
-    let list0: AppContext[] = this.appManager.filterContexts({
-      deploymentStatus: [APP_STATUS_TSS_GROUP_SELECTED],
-      custom: ctx => {
-        /** This is rotated context */
-        return !!ctx.previousSeed
-          /** Rotation enabled for this context */
-          && ctx.rotationEnabled === true
-          /** Ten minutes have passed since the context creation */
-          && ctx.deploymentRequest?.data.result.timestamp < tenMinutesAgo
-      },
-    })
-    this.log(`there is ${list0.length} context rotated but not reshared.`)
-
+    return;
     let pendingContexts: AppContext[] = this.appManager.filterContexts({
       deploymentStatus: [APP_STATUS_PENDING, APP_STATUS_EXPIRED],
       custom: ctx => ctx.rotationEnabled === true
@@ -83,20 +66,12 @@ export default class ReshareCronJob extends BaseCronJob{
     }
     /** filter and keep, only contexts that not rotated */
     pendingContexts = pendingContexts.filter(ctx => {
-      return !this.appManager.isSeedRotated(ctx.seed);
+      return !this.appManager.isSeedReshared(ctx.seed);
     })
 
     this.log(`starting ${pendingContexts.length} apps key reshare ...`)
-    const rotatedContexts = await Promise.all(pendingContexts.map(ctx => {
-      return this.rotateQueue.add(() => this.rotateAppContext(ctx)
-        .catch(e => null))
-    }))
-
-    //@ts-ignore
-    const contextToReshare: AppContext[] = [...rotatedContexts.filter(ctx => !!ctx), ...list0];
-    this.log(`starting ${contextToReshare.length} apps key reshare ...`)
-    await Promise.all(contextToReshare.map(ctx => {
-      return this.rotateQueue.add(() => this.reshareAppTss(ctx))
+    await Promise.all(pendingContexts.map(ctx => {
+      return this.rotateQueue.add(() => this.reshareAppContext(ctx))
         .catch(e => {})
     }))
 
@@ -107,7 +82,7 @@ export default class ReshareCronJob extends BaseCronJob{
    * @param ctx {AppContext} - The context that needs to rotate
    * @return {AppContext} - The rotated context of App (The new context)
    */
-  async rotateAppContext(ctx: AppContext): Promise<AppContext> {
+  async reshareAppContext(ctx: AppContext): Promise<AppContext> {
     const {appId, seed} = ctx;
 
     this.log("calling random-seed request %o", {appId, seed});
@@ -129,11 +104,11 @@ export default class ReshareCronJob extends BaseCronJob{
     }
     this.log(`Random seed generated %o`, {randomSeed: randomSeedResponse.signatures[0].signature})
 
-    this.log('Selecting new party ...')
+    this.log('resharing the app ...')
     const leaderSignature = crypto.sign(randomSeedResponse.signatures[0].signature)
     const reshareResponse = await enqueueAppRequest({
       app: 'deployment',
-      method: `tss-rotate`,
+      method: `reshare`,
       params: {
         appId,
         previousSeed: seed,
@@ -150,50 +125,14 @@ export default class ReshareCronJob extends BaseCronJob{
         throw e;
       })
     if(!reshareResponse?.confirmed) {
-      throw "rotation request not confirmed"
+      throw "reshare request not confirmed"
     }
-    this.log(`Party select tx ${reshareResponse.reqId}.`)
+    this.log(`Reshare tx ${reshareResponse.reqId}.`)
 
-    this.log(`Party select confirmation waiting ...`);
+    this.log(`Reshare confirmation waiting ...`);
     await this.waitToRequestBeAnnounced(reshareResponse, {checkAllGroups: true});
 
     return this.appManager.getSeedContext(reshareResponse.data.result.seed)!;
-  }
-
-  /**
-   * @param ctx {AppContext} - The context that needs to reshare the TSS key
-   * @return {void}
-   */
-  async reshareAppTss(ctx: AppContext) {
-    const {appId, seed} = ctx;
-
-    this.log('Generating app tss key ... %o', {appId, seed})
-    const keyGenResponse = await enqueueAppRequest({
-      app: `deployment`,
-      method: "tss-reshare",
-      params: {
-        appId,
-        seed,
-        leaderSignature: crypto.sign(seed),
-      }
-    })
-      .catch(e => {
-        if(!!e.mpcExecDebugs) {
-          this.log(`mpcExecDebug >> %s`, JSON.stringify(e.mpcExecDebugs));
-        }
-        this.log.error("tss-reshare failed %o %o", {appId, seed}, e)
-        throw e;
-      });
-    if(!keyGenResponse?.confirmed) {
-      throw "key-gen request not confirmed"
-    }
-    this.log(`Reshare tx ${keyGenResponse.reqId}.`)
-    this.log(`Reshare confirmation waiting ...`);
-    await this.waitToRequestBeAnnounced(keyGenResponse, {checkAllGroups: true});
-    this.log(
-      `TSS key resharing done with this generators: [${keyGenResponse.data.init.keyGenerators}]. %o`,
-      keyGenResponse.data.result
-    )
   }
 
   async waitToRequestBeAnnounced(request: any, options?:AnnounceCheckOptions) {

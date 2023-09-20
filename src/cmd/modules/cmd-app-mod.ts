@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {muonCall, waitToRequestBeAnnounced} from '../utils.js'
 import {getConfigs} from "./cmd-conf-mod.js";
 import {AppDeploymentStatus} from "../../common/types";
-import {APP_STATUS_EXPIRED, APP_STATUS_PENDING, APP_STATUS_TSS_GROUP_SELECTED} from "../../core/constants.js";
+import {APP_STATUS_EXPIRED, APP_STATUS_PENDING, APP_STATUS_ONBOARDING} from "../../core/constants.js";
 
 function expectConfirmed(response) {
   try {
@@ -112,10 +112,6 @@ async function deployApp(argv, configs) {
     console.log(`deployment confirmation waiting ...`);
     await waitToRequestBeAnnounced(configs.url, deployResponse.result, {checkAllGroups: true});
   }
-  // else if(appStatus === "TSS_GROUP_SELECTED") {
-  //   let context = statusResult?.result.contexts.find(ctx => ctx.status === "TSS_GROUP_SELECTED")
-  //   deploymentSeed = context.seed
-  // }
   else {
     throw `Unknown App status ${appStatus}`
   }

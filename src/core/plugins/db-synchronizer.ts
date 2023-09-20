@@ -16,7 +16,7 @@ import _ from 'lodash';
 import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
 import {readSetting, writeSetting} from "../../common/db-models/Settings.js";
-import {APP_STATUS_EXPIRED, APP_STATUS_TSS_GROUP_SELECTED} from "../constants.js";
+import {APP_STATUS_EXPIRED} from "../constants.js";
 
 const DEPLOYER_SYNC_ITEM_PER_PAGE = 100;
 const log = logger("muon:core:plugins:synchronizer")
@@ -326,19 +326,6 @@ export default class DbSynchronizer extends CallablePlugin {
 
     let seedsToDelete: string[] = expiredSeeds.filter((s, i) => localCheck[i]);
     let seedsToCheck: string[] = expiredSeeds.filter((s, i) => !localCheck[i]);
-
-    /** check old TSS_GROUP_SELECTED contexts */
-    const groupSelectedSeeds:string[] = this.appManager
-      .filterContexts({
-        deploymentStatus: [APP_STATUS_TSS_GROUP_SELECTED],
-        custom: ctx => this.appManager.isSeedReshared(ctx.seed),
-      })
-      .map(({seed}) => seed);
-
-    seedsToCheck = [
-      ...seedsToCheck,
-      ...groupSelectedSeeds,
-    ]
 
     if(seedsToCheck.length > 0 && !currentNode.isDeployer) {
       log(`there is ${seedsToCheck.length} expired context that is need to check with deployers to be deleted.`)

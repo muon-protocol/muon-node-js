@@ -41,7 +41,7 @@ const log = logger("muon:core:plugins:system");
 
 const RemoteMethods = {
   InitDeploymentContext: "initDeploymentContext",
-  storeDeploymentTssKey: 'storeDeploymentTssKey',
+  StoreGenesisKey: 'storeGenesisKey',
   GenerateAppTss: "generateAppTss",
   GetAppPublicKey: "getAppPubKey",
   StartAppTssReshare: "startAppTssReshare",
@@ -97,7 +97,7 @@ class System extends CallablePlugin {
   }
 
   @appApiMethod()
-  async initializeDeploymentKey() {
+  async initializeGenesisKey() {
     const currentNode:MuonNodeInfo = this.nodeManager.currentNodeInfo!
     if(!currentNode || !currentNode.isDeployer)
       throw `Only deployers can initialize the network.`
@@ -160,11 +160,11 @@ class System extends CallablePlugin {
       return (
         wallet === process.env.SIGN_WALLET_ADDRESS
           ?
-          this.__storeDeploymentTssKey({key: key.id}, this.nodeManager.currentNodeInfo)
+          this.__storeGenesisKey({key: key.id}, this.nodeManager.currentNodeInfo)
           :
           this.remoteCall(
             peerId,
-            RemoteMethods.storeDeploymentTssKey,
+            RemoteMethods.StoreGenesisKey,
             {
               key: key.id,
             },
@@ -173,7 +173,7 @@ class System extends CallablePlugin {
           )
       )
         .catch(e=>{
-          console.log("RemoteCall.storeDeploymentTssKey", e);
+          console.log("RemoteCall.StoreGenesisKey", e);
           return false
         });
     }))
@@ -703,18 +703,23 @@ class System extends CallablePlugin {
    * @returns {Promise<boolean>}
    * @private
    */
-  @remoteMethod(RemoteMethods.storeDeploymentTssKey)
-  async __storeDeploymentTssKey(data: {key: string}, callerInfo) {
+  @remoteMethod(RemoteMethods.StoreGenesisKey)
+  async __storeGenesisKey(data: {key: string}, callerInfo) {
     // TODO: problem condition: request arrive when tss is ready
     let {key: keyId} = data
     // let party = this.getParty(partyId)
     let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed: GENESIS_SEED})!;
     if (!key)
-      throw {message: 'KeyManager.storeDeploymentTssKey: key not found.'};
+      throw {message: 'System.StoreGenesisKey: key not found.'};
     if(callerInfo.id == this.netConfigs.defaultLeader && await this.keyManager.isNeedToCreateKey()) {
       const currentNode = this.nodeManager.currentNodeInfo!;
 
       const context = this.appManager.getSeedContext(GENESIS_SEED)!;
+      await this.appManager.saveAppContext({
+        ...context,
+        publicKey: pub2json(key.publicKey),
+        polynomial: key.toJson().polynomial,
+      })
       if(context.party.partners.includes(currentNode.id)) {
         // TODO: check context has key or not ?
         /** store tss key */

@@ -28,6 +28,7 @@ import * as PromiseLib from "../../common/promise-libs.js"
 import {Mutex} from "../../common/mutex.js";
 import {DEPLOYMENT_APP_ID, GENESIS_SEED} from "../../common/contantes.js";
 import {RedisCache} from "../../common/redis-cache.js";
+import { APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_NEW, APP_STATUS_ONBOARDING, APP_STATUS_PENDING } from '../constants.js';
 
 const log = logger('muon:core:plugins:app-manager')
 
@@ -228,8 +229,10 @@ export default class AppManager extends CallablePlugin {
          * Do not use this code in any other place
          * Call this method as the base method for saving AppContextModel.
          */
-        newContext.dangerousAllowToSave = true
-        await newContext.save()
+        if(context.seed !== GENESIS_SEED) {
+          newContext.dangerousAllowToSave = true
+          await newContext.save()
+        }
         CoreIpc.fireEvent({type: "app-context:add", data: context})
         NetworkIpc.fireEvent({type: "app-context:add", data: context})
 
@@ -345,7 +348,7 @@ export default class AppManager extends CallablePlugin {
 
   getAppDeploymentInfo(appId: string, seed: string): AppDeploymentInfo {
     const status = this.getAppDeploymentStatus(appId, seed);
-    const deployed:boolean = ['TSS_GROUP_SELECTED', "DEPLOYED", "PENDING"].includes(status);
+    const deployed:boolean = [APP_STATUS_DEPLOYED, APP_STATUS_PENDING].includes(status);
     const result: AppDeploymentInfo = {
       appId,
       seed,
@@ -626,26 +629,13 @@ export default class AppManager extends CallablePlugin {
       })
   }
 
-  isSeedRotated(seed: string): boolean {
-    const context:AppContext|undefined = this.getSeedContext(seed);
-    if(!context)
-      return false;
-
-    const deployTimestamp = context.deploymentRequest?.data.result.timestamp;
-    const appContexts: AppContext[] = this.filterContexts({appId: context.appId})
-
-    return !!appContexts.find(ctx => {
-      return ctx.deploymentRequest?.data.result.timestamp > deployTimestamp
-    });
-  }
-
   isSeedReshared(seed: string): boolean {
     const context:AppContext|undefined = this.getSeedContext(seed);
-    if(!context)
+    if(!context || !context.deploymentRequest)
       return false;
 
-    const deployTimestamp = context.deploymentRequest?.data.result.timestamp;
-    const appContexts: AppContext[] = this.filterContexts({appId: context.appId, hasKeyGenRequest: true})
+    const deployTimestamp = context.deploymentRequest.data.result.timestamp;
+    const appContexts: AppContext[] = this.filterContexts({appId: context.appId})
 
     return !!appContexts.find(ctx => {
       return ctx.deploymentRequest?.data.result.timestamp > deployTimestamp
@@ -670,15 +660,15 @@ export default class AppManager extends CallablePlugin {
   getAppDeploymentStatus(appId: string, seed: string): AppDeploymentStatus {
     let context: AppContext = this.getAppContext(appId, seed);
 
-    let status: AppDeploymentStatus = "NEW"
+    let status: AppDeploymentStatus = APP_STATUS_NEW;
     if (!!context) {
-      status = "TSS_GROUP_SELECTED";
+      status = APP_STATUS_ONBOARDING;
 
       if(!!context.publicKey) {
-        status = "DEPLOYED";
+        status = APP_STATUS_DEPLOYED;
       }
 
-      if (status === "DEPLOYED") {
+      if (status === APP_STATUS_DEPLOYED) {
         if (!!context.rotationEnabled) {
           const {expiration, ttl, pendingPeriod, deploymentRequest} = context
           const deploymentTime = !!deploymentRequest ? deploymentRequest!.data.timestamp : (expiration! - (ttl! + pendingPeriod!))
@@ -686,9 +676,9 @@ export default class AppManager extends CallablePlugin {
           const currentTime = getTimestamp();
 
           if (currentTime > pendingTime) {
-            status = "PENDING";
+            status = APP_STATUS_PENDING;
             if (context.expiration! < currentTime)
-              status = "EXPIRED";
+              status = APP_STATUS_EXPIRED;
           }
         }
       }

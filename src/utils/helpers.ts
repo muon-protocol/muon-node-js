@@ -13,6 +13,7 @@ import {isIP} from 'net'
 import isIpPrivate from 'private-ip'
 import {loadGlobalConfigs} from "../common/configurations.js";
 import BN from "bn.js";
+import { APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_NEW, APP_STATUS_ONBOARDING, APP_STATUS_PENDING } from '../core/constants.js';
 
 
 const exec = promisify(childProcess.exec);
@@ -173,7 +174,13 @@ export async function getCommitId(): Promise<string> {
 }
 
 export function statusCodeToTitle(code: number): AppDeploymentStatus {
-  return ["NEW", "TSS_GROUP_SELECTED", "DEPLOYED", "PENDING", "EXPIRED"][code] as AppDeploymentStatus;
+  return [
+    APP_STATUS_NEW, 
+    APP_STATUS_ONBOARDING, 
+    APP_STATUS_DEPLOYED, 
+    APP_STATUS_PENDING, 
+    APP_STATUS_EXPIRED
+  ][code] as AppDeploymentStatus;
 }
 
 export function toBN(number) {
