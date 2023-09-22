@@ -383,7 +383,7 @@ class KeyManager extends CallablePlugin {
 
     const newContext = this.appManager.getAppContext(newPartyInfo.appId, newPartyInfo.seed)
     if(!newContext)
-      throw {message: `reshare new context not found`, newPartyInfo};
+      throw {message: `reshare onboarding context not found`, newPartyInfo};
 
     if(newContext.previousSeed !== prevContext.seed)
       throw `The new context of reshare not related to the previous context.`

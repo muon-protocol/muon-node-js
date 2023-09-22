@@ -57,14 +57,14 @@ export const MuonSignatureSchema = {
   properties: {
     owner: {customType: "ethAddress"},
     ownerPublicKey: {
-      x: {customType: "uint32"},
+      x: {customType: "uint256"},
       yParity: {
         enum: ['0', '1']
       },
     },
     signature: {
       type: "array",
-      items: {customType: "uint32"}
+      items: {customType: "uint256"}
     },
   },
   required: ["owner", "ownerPublicKey", "signatures"]
@@ -87,7 +87,7 @@ export const AppRequestSchema = {
         // params: any,
         timestamp: {type: "number"},
         // result: any,
-        resultHash: {customType: "uint32"},
+        resultHash: {customType: "uint256"},
         // signParams: TypedValue[],
         init: {
           type: "object",
@@ -124,4 +124,76 @@ export const AppRequestSchema = {
     },
   },
   required: ["reqId", "app", "appId", "method", "deploymentSeed", "data"]
+}
+
+export const PartySchema = {
+  type: "object",
+  properties: {
+    appId: {customType: "hex"},
+    seed: {customType: "hex"},
+    t: {type: "number"},
+    max: {type: "number"},
+    partners: {
+      type: "array",
+      items: {type: "string"},
+      minItems: 2,
+    }
+  },
+  required: ["appId", "seed", "t", "partners"]
+}
+
+export const JsonPublicKeySchema = {
+  type: "object",
+  properties: {
+    address: {customType: "ethAddress"},
+    encoded: {customType: "ecPoint"},
+    x: {cystomType: "uint256"},
+    yParity: {type: "string", enum: ["0", "1"]},
+  },
+  required: ["x", "yParity"],
+}
+
+export const PolynomialInfoJsonSchema = {
+  type: "object",
+  properties: {
+    t: {type: "number", minimum: 2},
+    Fx: {
+      type: "array",
+      items: {customType: "ecPoint"},
+      minItems: 2
+    }
+  },
+  required: ["t", "Fx"],
+}
+
+export const AppContextSchema = {
+  type: "object",
+  properties: {
+    appId: {customType: "hex"},
+    appName: {type: "string"},
+    previusSeed: {customType: "hex"},
+    seed: {customType: "hex"},
+    party: {
+      type: "object",
+      properties: {
+        t: {type: "number", minimum: 2},
+        max: {type: "number", minimum: 2},
+        partners: {
+          type: "array",
+          items: {type: "string"},
+          minItems: 2
+        }
+      },
+      required: ["t", "partners"]
+    },
+    rotationEnabled: {type: "boolean"},
+    ttl: {type: "number"},
+    pendingPeriod: {type: "number"},
+    expiration: {type: "number"},
+    deploymentRequest: AppRequestSchema,
+    keyGenRequest: AppRequestSchema,
+    publicKey: JsonPublicKeySchema,
+    polynomial: PolynomialInfoJsonSchema,
+  },
+  required: ["appId", "appName", "seed", "party", "rotationEnabled"]
 }

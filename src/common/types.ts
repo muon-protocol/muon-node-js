@@ -52,12 +52,12 @@ export type MuonNodeInfo = {
  * Apps deployment statuses
  *
  * NEW: app not deployed.
- * TSS_GROUP_SELECTED: App deployed but TSS key not generated.
+ * ONBOARDING: App deployed but TSS key not generated.
  * DEPLOYED: App deployed and TSS key generated.
  * PENDING: App deployed and tss key generated but it is about to expire.
  * EXPIRED: App deployment expired and tss key is no longer valid.
  */
-export type AppDeploymentStatus = "NEW" | "TSS_GROUP_SELECTED" | "DEPLOYED" | "PENDING" | "EXPIRED";
+export type AppDeploymentStatus = "NEW" | "ONBOARDING" | "DEPLOYED" | "PENDING" | "EXPIRED";
 
 export type AppDeploymentInfo = {
     appId: string,
@@ -152,7 +152,7 @@ export type AppRequest = {
 export type AppContext = {
     appId: string,
     appName: string,
-    previousSeed: string,
+    previousSeed?: string,
     seed: string,
     isBuiltIn?: boolean,
     party: {

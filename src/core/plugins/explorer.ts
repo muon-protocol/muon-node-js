@@ -11,7 +11,7 @@ import NodeManagerPlugin from "./node-manager.js";
 import {RedisCache} from "../../common/redis-cache.js";
 import BaseAppPlugin from "./base/base-app-plugin";
 import {MapOf} from "../../common/mpc/types";
-import {APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_PENDING, APP_STATUS_TSS_GROUP_SELECTED} from "../constants.js";
+import {APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_ONBOARDING, APP_STATUS_PENDING} from "../constants.js";
 import {GENESIS_SEED} from "../../common/contantes.js";
 
 const requestConfirmCache: RedisCache = new RedisCache('req-confirm')
@@ -212,8 +212,8 @@ class Explorer extends CallablePlugin {
         appStatus = APP_STATUS_DEPLOYED;
       else if(statusList.includes(APP_STATUS_PENDING))
         appStatus = APP_STATUS_PENDING
-      else if(statusList.includes(APP_STATUS_TSS_GROUP_SELECTED))
-        appStatus = APP_STATUS_TSS_GROUP_SELECTED
+      else if(statusList.includes(APP_STATUS_ONBOARDING))
+        appStatus = APP_STATUS_ONBOARDING
       else if(statusList.includes(APP_STATUS_EXPIRED))
         appStatus = APP_STATUS_EXPIRED
     }
