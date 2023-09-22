@@ -32,10 +32,10 @@ export const builder = {
 
 export async function handler(argv) {
   let configs = getConfigs();
-  let {network} = argv;
+  let {network="local"} = argv;
   if(!network)
      console.log(`argument '--network' not defined, setting default network=local`);
-  network = "local";
+  // network = "local";
   configs = configs[network];
 
   if(!configs.url)
@@ -147,17 +147,21 @@ async function undeployApp(argv, configs) {
   if (!deployers || deployers.length == 0)
     throw `deployers not defined for this network in cmd.conf.json`;
 
-  for (let i = 0; i < deployers.length; i++) {
-    let deployer = deployers[i];
-    let statusResult = await muonCall(deployer, {
+  await Promise.all(deployers.map(url => {
+    return muonCall(url, {
       app: 'deployment',
       method: `undeploy`,
       params: {
         app: app,
       }
-    });
-    console.log(deployer, statusResult);
-  }
+    })
+    .then(statusResult => {
+      console.log(url, statusResult);
+    })
+    .catch(e => {
+      console.log(url, e);
+    })
+  }))
 }
 
 async function reshareApp(argv, configs) {
