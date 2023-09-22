@@ -140,17 +140,6 @@ class NetworkIpcHandler extends CallablePlugin {
     }
   }
 
-  // @ipcMethod(IpcMethods.PutDHT)
-  // async __putDHT(data: {key: string, value: any}) {
-  //   let ret = await this.DHTPlugin.put(data.key, data.value);
-  //   return ret
-  // }
-
-  // @ipcMethod(IpcMethods.GetDHT)
-  // async __getDHT(data: {key: string}) {
-  //   return await this.DHTPlugin.get(data.key);
-  // }
-
   assignTaskToProcess(taskId: string, pid: number) {
     tasksCache.set(taskId, pid);
   }
