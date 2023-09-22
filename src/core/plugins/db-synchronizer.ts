@@ -21,6 +21,8 @@ import {APP_STATUS_EXPIRED, APP_STATUS_TSS_GROUP_SELECTED} from "../constants.js
 const DEPLOYER_SYNC_ITEM_PER_PAGE = 100;
 const log = logger("muon:core:plugins:synchronizer")
 
+type DeleteCheckResult = "YES" | "MISSING" | "NOT-RESHARED" | "NOT-EXPIRED"
+
 const RemoteMethods = {
   GetAllContexts: "get-all-ctx",
   IsSeedListReshared: "is-seed-list-reshared",
@@ -322,7 +324,7 @@ export default class DbSynchronizer extends CallablePlugin {
       .map(({seed}) => seed);
     log(`there is ${expiredSeeds.length} expired context`)
 
-    const localCheck = await this.__canSeedsBeDeleted(expiredSeeds, currentNode);
+    const localCheck: boolean[] = (await this.__canSeedsBeDeleted(expiredSeeds, currentNode)).map(s => s === "YES");
 
     let seedsToDelete: string[] = expiredSeeds.filter((s, i) => localCheck[i]);
     let seedsToCheck: string[] = expiredSeeds.filter((s, i) => !localCheck[i]);
@@ -347,7 +349,7 @@ export default class DbSynchronizer extends CallablePlugin {
     if(seedsToCheck.length > 0 && !currentNode.isDeployer) {
       log(`there is ${seedsToCheck.length} expired context that is need to check with deployers to be deleted.`)
       const check2: boolean[] = await this.canSeedListBeDeleted(seedsToCheck);
-            seedsToDelete = [
+      seedsToDelete = [
         ...seedsToDelete,
         ...seedsToCheck.filter((_, i) => check2[i])
       ]
@@ -381,22 +383,39 @@ export default class DbSynchronizer extends CallablePlugin {
   private async canSeedListBeDeleted(seeds: string[]): Promise<boolean[]> {
     const currentNode: MuonNodeInfo = this.nodeManager.currentNodeInfo!;
     if(currentNode.isDeployer) {
-      return this.__canSeedsBeDeleted(seeds, currentNode)
+      let results = await this.__canSeedsBeDeleted(seeds, currentNode)
+      return results.map(r => r === "YES");
     }
     else {
-      log(`query deployers to find if seeds can be deleted ...`)
+      const numDeployersToQuery = Math.min(this.netConfigs.tss.threshold, 3);
       let deployersList: string[] = this.nodeManager.filterNodes({isDeployer: true}).map(({id}) => id);
-      let peerIds = await NetworkIpc.findNOnlinePeer(deployersList, 2, {timeout: 5000, return: "peerId"});
+      let onlineIds = await NetworkIpc.findNOnlinePeer(deployersList, numDeployersToQuery, {timeout: 5000});
+      if(onlineIds.length < 1)
+        throw `No online deployers.`
+      log(`query deployers %o to find if seeds can be deleted ...`, onlineIds);
+      const deployers: MuonNodeInfo[] = this.nodeManager.filterNodes({list: onlineIds})
       // @ts-ignore
-      return Promise.any(
-        peerIds.map(peerId => {
+      const responses:DeleteCheckResult[][] = await Promise.all(
+        deployers.map(d => {
           return this.remoteCall(
-            peerId,
+            d.peerId,
             RemoteMethods.CanSeedsBeDeleted,
             seeds
           )
         })
       )
+      
+      const combinedResults: DeleteCheckResult[][] = responses[0].map((_, seedIndex):DeleteCheckResult[] => {
+        return deployers.map((_, i) => responses[i][seedIndex])
+      })
+
+      return combinedResults.map((res:DeleteCheckResult[]):boolean => {
+        if(res.find(r => r === "YES"))
+          return true;
+        if(res.filter(r => r === "MISSING").length === numDeployersToQuery)
+          return true;
+        return false;
+      })
     }
   }
 
@@ -426,15 +445,15 @@ export default class DbSynchronizer extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.CanSeedsBeDeleted)
-  async __canSeedsBeDeleted(seeds: string[], callerInfo: MuonNodeInfo): Promise<boolean[]> {
+  async __canSeedsBeDeleted(seeds: string[], callerInfo: MuonNodeInfo): Promise<DeleteCheckResult[]> {
     const currentTime = getTimestamp();
     return seeds.map(seed => {
       const context = this.appManager.getSeedContext(seed);
       if(!context)
-        return true;
+        return "MISSING";
       if((context.deploymentRequest?.data.result.expiration || Infinity) > currentTime)
-        return false;
-      return this.appManager.isSeedReshared(seed);
+        return "NOT-EXPIRED";
+      return this.appManager.isSeedReshared(seed) ? "YES" : "NOT-RESHARED";
     })
   }
 
