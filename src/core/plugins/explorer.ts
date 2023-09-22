@@ -1,5 +1,4 @@
 import CallablePlugin from './base/callable-plugin.js'
-import Content from '../../common/db-models/Content.js'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
 import KeyManager from "./key-manager.js";
 import {AppContext, AppDeploymentStatus, AppRequest, MuonNodeInfo, Override} from "../../common/types";
@@ -144,26 +143,6 @@ class Explorer extends CallablePlugin {
       appPartyAnnounced: groupAnnounced[0],
       allGroupsAnnounced: announceGroups.length === groupAnnounced.filter(a => a).length,
     }
-  }
-
-  @gatewayMethod("tx")
-  async __onTxInfo(data: GetTransactionData) {
-    let content = await Content.findOne({reqId: data?.params?.reqId});
-    if(content) {
-      return JSON.parse(content.content);
-    }
-    else
-      throw `Transaction not found`
-  }
-
-  @gatewayMethod('last-tx')
-  async __onLastTx(data: LastTransactionData) {
-    let {count=10} = data?.params || {}
-    count = Math.min(count, 100)
-
-    let contents = await Content.find({}, {reqId: 1, _id: 1}).sort({_id: -1}).limit(count);
-
-    return contents.map(c => c.reqId);
   }
 
   @gatewayMethod('app')

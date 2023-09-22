@@ -1,6 +1,5 @@
 export const MODEL_REQUEST = 'requests'
 export const MODEL_SIGNATURE = 'signatures'
-export const MODEL_CONTENT = 'contents'
 export const MODEL_MEMORY = 'memories'
 export const MODEL_VIOLATION = 'violations'
 export const MODEL_REQ_LOG = 'req_logs'

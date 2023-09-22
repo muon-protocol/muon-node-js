@@ -135,14 +135,6 @@ class BaseAppPlugin extends CallablePlugin {
     return result;
   }
 
-  /**
-   * Override BasePlugin BROADCAST_CHANNEL
-   */
-  protected get BROADCAST_CHANNEL() {
-    // return this.APP_NAME ? `muon/${this.APP_NAME}/request/broadcast` : null
-    return this.APP_NAME ? super.BROADCAST_CHANNEL : null
-  }
-
   private getParty(seed: string): Party | undefined {
     return this.appManager.getAppParty(this.APP_ID, seed);
   }
@@ -566,16 +558,6 @@ class BaseAppPlugin extends CallablePlugin {
     return {
       nonceAddress: TssModule.pub2addr(nonce.publicKey),
     }
-  }
-
-  async writeNodeMem(key, data, ttl=0) {
-    const memory: MemoryPlugin = this.muon.getPlugin('memory')
-    await memory.writeNodeMem(`app-${this.APP_ID}-${key}`, data, ttl)
-  }
-
-  async readNodeMem(key) {
-    const memory: MemoryPlugin = this.muon.getPlugin('memory')
-    return await memory.readLocalMem(`app-${this.APP_ID}-${key}`);
   }
 
   async writeLocalMem(key, data, ttl=0, options:MemWriteOptions) {

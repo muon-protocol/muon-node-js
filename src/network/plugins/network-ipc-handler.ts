@@ -6,8 +6,6 @@ import NodeManagerPlugin, {NodeFilterOptions} from "./node-manager.js";
 import {MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
-import NetworkBroadcastPlugin from "./network-broadcast.js";
-// import NetworkDHTPlugin from "./network-dht.js";
 import {parseBool, timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
@@ -67,10 +65,6 @@ export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetNetworkConfig: "get-net-conf",
   GetNodeManagerData: "get-node-manager-data",
-  SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
-  BroadcastToChannel: "broadcast-to-channel",
-  // PutDHT: "put-dht",
-  // GetDHT: "get-dht",
   ReportClusterStatus: "report-cluster-status",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
@@ -104,16 +98,8 @@ class NetworkIpcHandler extends CallablePlugin {
   clustersPids: { [pid: string]: number } = {};
 
   async onStart() {
-    super.onStart()
+    await super.onStart()
   }
-
-  get broadcastPlugin(): NetworkBroadcastPlugin {
-    return this.network.getPlugin('broadcast')
-  }
-
-  // get DHTPlugin(): NetworkDHTPlugin {
-  //   return this.network.getPlugin('dht')
-  // }
 
   get nodeManager(): NodeManagerPlugin {
     return this.network.getPlugin('node-manager');
@@ -152,17 +138,6 @@ class NetworkIpcHandler extends CallablePlugin {
       contract: this.network.configs.net.nodeManager,
       nodesList: await this.nodeManager.getNodesList(),
     }
-  }
-
-  @ipcMethod(IpcMethods.SubscribeToBroadcastChannel)
-  async __subscribeToBroadcastChannel(channel: string) {
-    await this.broadcastPlugin.subscribe(channel);
-  }
-
-  @ipcMethod(IpcMethods.BroadcastToChannel)
-  async __broadcastToChannel(data: {channel: string, message: any}) {
-    this.broadcastToChannel(data.channel, data.message);
-    return "Ok"
   }
 
   // @ipcMethod(IpcMethods.PutDHT)
