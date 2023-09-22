@@ -115,7 +115,7 @@ export type AppRequest = {
             nonceAddress: string,
             [key: string]: any,
         },
-        fee: {
+        fee?: {
             /** returned from Fee server */
             amount: number,
             /** comes from client */
@@ -146,7 +146,8 @@ export type AppRequest = {
     }
     startedAt: number,
     confirmedAt: number,
-    signatures: MuonSignature[]
+    signatures: MuonSignature[],
+    [key: string]: any,
 }
 
 export type AppContext = {

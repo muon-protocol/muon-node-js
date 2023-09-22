@@ -1,5 +1,4 @@
 import CallablePlugin from './callable-plugin.js'
-import Request from '../../../common/db-models/Request.js'
 import {getTimestamp, pub2json} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
 import {muonSha3} from '../../../utils/sha3.js'
@@ -164,7 +163,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @gatewayMethod("default")
-  async __defaultRequestHandler(callParams: GatewayCallParams) {
+  async __defaultRequestHandler(callParams: GatewayCallParams): Promise<AppRequest> {
     const {method, params, mode, callId: gatewayCallId, gwSign, fee: feeParams} = callParams;
 
     this.log(`request arrived %o`, {method, params})
@@ -184,7 +183,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
     deploymentSeed = oldestContext.seed;
 
-    const nSign = this.getParty(deploymentSeed)!.t;
+    const nSign: number = this.getParty(deploymentSeed)!.t;
 
     if(this.METHOD_PARAMS_SCHEMA){
       if(this.METHOD_PARAMS_SCHEMA[method]){
@@ -197,7 +196,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     const feeData = !!feeParams ? {
       fee: {
-        amount: "",
+        amount: 0,
         spender: {
           address: Web3.utils.toChecksumAddress(feeParams.spender),
           timestamp: feeParams.timestamp,
@@ -207,23 +206,31 @@ class BaseAppPlugin extends CallablePlugin {
       }
     } : {};
 
-    let newRequest = new Request({
-      reqId: null,
-      app: this.APP_NAME,
+    let newRequest:AppRequest = {
+      confirmed: false,
+      reqId: "",
+      app: this.APP_NAME!,
       appId: this.APP_ID,
       method: method,
       deploymentSeed,
       nSign,
-      gwAddress: process.env.SIGN_WALLET_ADDRESS,
-      // peerId: process.env.PEER_ID,
+      gwAddress: process.env.SIGN_WALLET_ADDRESS!,
       data: {
-        uid: gatewayCallId,
+        uid: gatewayCallId!,
         params,
         timestamp: startedAt,
+        result: undefined,
+        resultHash: "",
+        signParams: [],
+        init: {
+          nonceAddress: ""
+        },
         ...feeData,
       },
-      startedAt
-    })
+      startedAt,
+      confirmedAt: 0,
+      signatures: []
+    }
     let t1= Date.now()
 
     /** view mode */
@@ -234,7 +241,7 @@ class BaseAppPlugin extends CallablePlugin {
       let result = await this.onRequest(clone(newRequest))
       this.resultChecking(result)
       newRequest.data.result = result
-      return omit(newRequest._doc, ['__v'])
+      return newRequest;
     }
     /** sign mode */
     else{
@@ -285,7 +292,7 @@ class BaseAppPlugin extends CallablePlugin {
       let isDuplicateRequest = false;
       if(this.requestManager.hasRequest(newRequest.reqId)){
         isDuplicateRequest = true;
-        newRequest = this.requestManager.getRequest(newRequest.reqId);
+        newRequest = this.requestManager.getRequest(newRequest.reqId)!;
       }
       else {
         this.requestManager.addRequest(newRequest, {requestTimeout: this.requestTimeout});
@@ -317,18 +324,20 @@ class BaseAppPlugin extends CallablePlugin {
         };
         t3 = Date.now();
 
-        // await newRequest.save()
-
         let sign: string = await this.makeSignature(newRequest, result, resultHash)
         this.requestManager.addSignature(newRequest.reqId, process.env.SIGN_WALLET_ADDRESS!, sign);
         // new Signature(sign).save()
 
-        const fee = await this.spendRequestFee(newRequest);
+        if(feeParams){
+          const fee = await this.spendRequestFee(newRequest);
 
-        if(fee) {
-          newRequest.data.fee.amount = fee.amount
-          newRequest.data.fee.signature = fee.sign
-          await useOneTime('fee', fee.sign, newRequest.reqId)
+          if(fee) {
+            // @ts-ignore
+            newRequest.data.fee.amount = fee.amount
+            // @ts-ignore
+            newRequest.data.fee.signature = fee.sign
+            await useOneTime('fee', fee.sign, newRequest.reqId)
+          }
         }
 
         this.log('broadcasting request ...');
@@ -356,10 +365,7 @@ class BaseAppPlugin extends CallablePlugin {
 
       let requestData: any = {
         confirmed,
-        ...omit(newRequest._doc, [
-          '__v',
-          '_id'
-        ]),
+        ...omit(newRequest, ['confirmed']),
         signatures: confirmed ? signatures : []
       }
 
@@ -388,9 +394,6 @@ class BaseAppPlugin extends CallablePlugin {
           .catch(e => {
             this.log(`error when sending request to aggregator nodes %o`, e)
           })
-
-        /** store data locally */
-        newRequest.save()
       }
 
       return requestData
