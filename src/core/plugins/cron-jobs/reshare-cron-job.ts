@@ -51,7 +51,6 @@ export default class ReshareCronJob extends BaseCronJob{
   }
 
   async process() {
-    return;
     let pendingContexts: AppContext[] = this.appManager.filterContexts({
       deploymentStatus: [APP_STATUS_PENDING, APP_STATUS_EXPIRED],
       custom: ctx => ctx.rotationEnabled === true
