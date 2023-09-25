@@ -4,7 +4,7 @@ import asyncHandler from 'express-async-handler'
 import * as NetworkIpc from '../../network/ipc.js'
 import * as crypto from "../../utils/crypto.js";
 import {muonSha3} from "../../utils/sha3.js";
-import {InsufficientPartnersAnalyticData} from "../../common/analitics-reporter";
+import {ConfirmFailureAnalyticData} from "../../common/analitics-reporter";
 
 const router = Router();
 
@@ -17,12 +17,12 @@ const nodes = {
 }
 
 router.use('/report', asyncHandler(async (req, res, next) => {
-  let {timestamp, signature, wallet, ...otherReportData} = req.body as InsufficientPartnersAnalyticData
+  let {timestamp, signature, wallet, ...otherReportData} = req.body as ConfirmFailureAnalyticData
 
   let hash = muonSha3(
     {t: 'uint64', v: timestamp},
     {t: 'address', v: wallet},
-    {t: 'string', v: "insufficient-partners-report"}
+    {t: 'string', v: "confirm-failure-report"}
   )
   const signer = crypto.recover(hash, signature)
   if(signer !== wallet) {
