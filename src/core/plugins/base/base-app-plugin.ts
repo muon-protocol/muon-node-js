@@ -24,13 +24,14 @@ import {RedisCache} from "../../../common/redis-cache.js";
 import axios from "axios";
 import {GatewayCallParams} from "../../../gateway/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
-import {reportInsufficientPartners} from "../../../common/analitics-reporter.js";
+import {reportConfirmFailure, reportInsufficientPartners} from "../../../common/analitics-reporter.js";
 import {createAjv} from "../../../common/ajv.js";
 import ethSigUtil from '@metamask/eth-sig-util'
 import {coreRemoteMethodSchema as crms} from "../../remotecall-middlewares.js";
 import {AppRequestSchema} from "../../../common/ajv-schemas.js";
 import Web3 from 'web3'
 import { MapOf } from '../../../common/mpc/types.js'
+import { DEPLOYMENT_APP_ID } from '../../../common/contantes.js'
 
 const { omit } = lodash;
 
@@ -524,6 +525,20 @@ class BaseAppPlugin extends CallablePlugin {
     }, {})
     if(Object.keys(reqConfirmCallErrors).length > 0) {
       this.log.error(`onConfirm failed on this nodes reqId:%s %o`, request.reqId, reqConfirmCallErrors);
+      if(this.APP_ID === DEPLOYMENT_APP_ID && ["deploy", "reshare"].includes(request.method)){
+        reportConfirmFailure({
+          callInfo: {
+            app: request.app,
+            method: request.method,
+            params: request.data.params
+          },
+          reqId: request.reqId,
+          partners: request.data.result.selectedNodes,
+          shareHolders: Object.keys(request.data.init?.key?.shareProofs),
+          confirmErrors: reqConfirmCallErrors
+        })
+          .catch(e => this.log.error(`error when reporting confirm failer %s`, e.message));
+      }
     }
     const successResponses = responses.filter(r => (r !== 'error'))
     if(successResponses.length < this.getParty(request.deploymentSeed)!.t)

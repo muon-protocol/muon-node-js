@@ -17,7 +17,7 @@ const nodes = {
 }
 
 router.use('/report', asyncHandler(async (req, res, next) => {
-  let {timestamp, signature, wallet, graph, minGraph, count} = req.body as InsufficientPartnersAnalyticData
+  let {timestamp, signature, wallet, ...otherReportData} = req.body as InsufficientPartnersAnalyticData
 
   let hash = muonSha3(
     {t: 'uint64', v: timestamp},
@@ -43,7 +43,7 @@ router.use('/report', asyncHandler(async (req, res, next) => {
 
   if(!reports[nodeId])
     reports[nodeId] = []
-  reports[nodeId].unshift({timestamp, count, graph, minGraph})
+  reports[nodeId].unshift({timestamp, ...otherReportData})
   /** keep last 100 reports */
   reports[nodeId] = reports[nodeId].slice(0, 100)
 
