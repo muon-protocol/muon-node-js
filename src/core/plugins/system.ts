@@ -658,6 +658,7 @@ class System extends CallablePlugin {
         return e?.message || "unknown error occurred"
       });
   }
+  
   @appApiMethod({})
   async getAppContext(appId, seed, tryFromNetwork:boolean=false) {
     // return this.appManager.getAppContextAsync(appId, seed, tryFromNetwork)
