@@ -80,14 +80,14 @@ async function get(key: string) {
  * @param timeout {number} - returning promise will reject after this timeout (default `0`).
  */
 async function waitAndGet(key, timeout: number=0) {
-  let configs = defaultConfig.request
+  let configs = defaultConfig.request!
   if(!!timeout){
     configs = {
       ...configs,
       timeout
     }
   }
-  return await requestSender.send({action: 'WGET', key, timeout: timeout+1e3}, configs)
+  return await requestSender.send({action: 'WGET', key, timeout: configs.timeout!+1e3}, configs)
 }
 
 async function clear(key: string) {
