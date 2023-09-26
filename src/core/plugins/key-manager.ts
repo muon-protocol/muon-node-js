@@ -514,7 +514,7 @@ class KeyManager extends CallablePlugin {
             n.peerId,
             RemoteMethods.KeyShareProof,
             {keyId, usage},
-            {timeout: 5000},
+            {timeout: 20000},
           )
         )
           .then(signature => {
@@ -544,7 +544,7 @@ class KeyManager extends CallablePlugin {
 
   @remoteMethod(RemoteMethods.KeyShareProof)
   async __keyShareProof(data: {keyId: string, usage: KeyUsageTypeApp|KeyUsageTypeNonce}, callerInfo:MuonNodeInfo): Promise<string> {
-    const key = await this.getSharedKey(data.keyId, undefined, data.usage);
+    const key = await this.getSharedKey(data.keyId, 15e3, data.usage);
     const keyPublicHash = muonSha3(key.publicKey.encode('hex', true));
     return crypto.signWithPrivateKey(keyPublicHash, bn2hex(key.share));
   }
