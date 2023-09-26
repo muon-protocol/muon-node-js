@@ -52,7 +52,10 @@ async function requestHandler(req:MemoryRequest) {
       if(storage.has(key))
         return storage.get(key);
       else {
-        waitingPromises[key] = new TimeoutPromise(timeout || 0, `waiting expired for shared data [${key}]`)
+        waitingPromises[key] = new TimeoutPromise(
+          timeout !== undefined ? timeout : defaultConfig.request?.timeout, 
+          `waiting expired for shared data [${key}]`
+        )
         return waitingPromises[key].promise;
       }
     case 'CLEAR':
@@ -84,7 +87,7 @@ async function waitAndGet(key, timeout: number=0) {
       timeout
     }
   }
-  return await requestSender.send({action: 'WGET', key, timeout}, configs)
+  return await requestSender.send({action: 'WGET', key, timeout: timeout+1e3}, configs)
 }
 
 async function clear(key: string) {
