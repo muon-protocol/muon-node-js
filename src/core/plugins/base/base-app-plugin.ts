@@ -518,13 +518,12 @@ class BaseAppPlugin extends CallablePlugin {
         return `error: ${e.message}`
       })
     )))
-    const reqConfirmCallErrors:MapOf<string> = partners.reduce((obj, node, i) => {
-      if(responses[i] !== "OK")
-        obj[node.id] = responses[i];
+    const reqConfirmResult:MapOf<string> = partners.reduce((obj, node, i) => {
+      obj[node.id] = responses[i];
       return obj;
     }, {})
-    if(Object.keys(reqConfirmCallErrors).length > 0) {
-      this.log.error(`onConfirm failed on this nodes reqId:%s %o`, request.reqId, reqConfirmCallErrors);
+    if(Object.values(reqConfirmResult).filter(r => r !== "OK").length > 0) {
+      this.log.error(`onConfirm failed on this nodes reqId:%s %o`, request.reqId, reqConfirmResult);
       if(this.APP_ID === DEPLOYMENT_APP_ID && ["deploy", "reshare"].includes(request.method)){
         reportConfirmFailure({
           callInfo: {
@@ -535,7 +534,7 @@ class BaseAppPlugin extends CallablePlugin {
           reqId: request.reqId,
           partners: request.data.result.selectedNodes,
           shareHolders: Object.keys(request.data.init?.key?.shareProofs),
-          confirmErrors: reqConfirmCallErrors
+          onConfirm: reqConfirmResult
         })
           .catch(e => this.log.error(`error when reporting confirm failer %s`, e.message));
       }

@@ -70,7 +70,7 @@ export type ConfirmFailureAnalyticData = {
   reqId: string,
   partners: string[],
   shareHolders: string[],
-  confirmErrors: MapOf<string>
+  onConfirm: MapOf<string>
 }
 
 export async function reportConfirmFailure(reportData: Omit<ConfirmFailureAnalyticData, "timestamp" | "wallet" | "signature">) {
