@@ -53,7 +53,7 @@ async function requestHandler(req:MemoryRequest) {
         return storage.get(key);
       else {
         waitingPromises[key] = new TimeoutPromise(
-          timeout !== undefined ? timeout : defaultConfig.request?.timeout, 
+          timeout || defaultConfig.request?.timeout, 
           `waiting expired for shared data [${key}]`
         )
         return waitingPromises[key].promise;
