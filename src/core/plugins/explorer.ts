@@ -170,10 +170,13 @@ class Explorer extends CallablePlugin {
   async __onGetAppInfo(data: GetAppData) {
     let {appName, appId, seed} = data.params;
     if(!!appName) {
-      appId = this.muon.getAppIdByName(appName)
+      appId = this.muon.getAppIdByName(appName);
     }
-    else if(!appId)
-      throw `App Name/ID required`
+    else {
+      if(!appId)
+        throw `App Name/ID required`
+      appName = this.muon.getAppById(appId)?.APP_NAME;
+    }
 
     if(appId === '0')
       throw `App not found`;

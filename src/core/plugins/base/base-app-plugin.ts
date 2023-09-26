@@ -100,7 +100,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async onStart() {
     await super.onStart();
-    // console.log(`onStart app[${this.APP_NAME}] ...`, this.constructor)
+    this.log(`${this.ConstructorName}.onStart %0`, {appName: this.APP_NAME, appId: this.APP_ID})
 
     /**
      * register apps readonly methods
@@ -510,7 +510,7 @@ class BaseAppPlugin extends CallablePlugin {
           node.peerId,
           RemoteMethods.InformRequestConfirmation,
           request,
-          {taskId: `keygen-${nonce.id}`, timeout: 10e3}
+          {taskId: `keygen-${nonce.id}`, timeout: 25e3}
         )
       )
       .then(() => "OK")

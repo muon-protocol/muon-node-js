@@ -505,7 +505,7 @@ class System extends CallablePlugin {
     const currentNode = this.nodeManager.currentNodeInfo!;
     if(selectedNodes.includes(currentNode.id)) {
       // TODO: check context has key or not ?
-      let key: AppTssKey = await this.keyManager.getSharedKey(keyId, undefined, {type: "app", seed})!
+      let key: AppTssKey = await this.keyManager.getSharedKey(keyId, 20e3, {type: "app", seed})!
       /** store tss key */
       await this.appManager.saveAppTssConfig({
         appId: appId,
