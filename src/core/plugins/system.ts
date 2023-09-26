@@ -799,7 +799,7 @@ class System extends CallablePlugin {
 
     const shareProofs = await this.keyManager.getKeyShareProofs(
       seed,
-      keyRedist.partners,
+      newContext.party.partners,
       keyRedist.id,
       keyRedist.polynomial!.Fx
     )
