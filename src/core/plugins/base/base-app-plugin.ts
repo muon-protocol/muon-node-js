@@ -100,7 +100,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async onStart() {
     await super.onStart();
-    this.log(`${this.ConstructorName}.onStart %0`, {appName: this.APP_NAME, appId: this.APP_ID})
+    this.log(`${this.ConstructorName}.onStart %o`, {appName: this.APP_NAME, appId: this.APP_ID})
 
     /**
      * register apps readonly methods
