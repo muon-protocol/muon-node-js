@@ -1,5 +1,6 @@
 import CallablePlugin from './base/callable-plugin.js'
-import {PeerInfo} from "@libp2p/interface-peer-info";
+// import {PeerInfo} from "@libp2p/interface-peer-info";
+import { PeerInfo } from '@libp2p/interface/peer-info'
 import {remoteApp, remoteMethod, ipcMethod} from './base/app-decorators.js'
 import {AppContext, AppRequest, IpcCallOptions, JsonPeerInfo, MuonNodeInfo} from "../../common/types";
 import NodeManagerPlugin, {NodeFilterOptions} from "./node-manager.js";

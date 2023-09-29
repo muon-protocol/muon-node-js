@@ -5,9 +5,14 @@ import PQueue from "p-queue";
 import defer from "p-defer";
 import errCode from "err-code";
 import type { PeerId } from "@libp2p/interface-peer-id";
-import type { PeerRouting } from "@libp2p/interface-peer-routing";
-import type { PeerInfo } from "@libp2p/interface-peer-info";
-import type { Startable } from "@libp2p/interfaces/startable";
+// import type { PeerRouting } from "@libp2p/interface-peer-routing";
+import type { PeerRouting } from '@libp2p/interface/peer-routing'
+// import type { PeerInfo } from "@libp2p/interface-peer-info";
+import type { PeerInfo } from '@libp2p/interface/peer-info'
+
+// import type { Startable } from "@libp2p/interfaces/startable";
+import type { Startable } from '@libp2p/interface/startable'
+
 import { peerIdFromBytes, peerIdFromString } from "@libp2p/peer-id";
 import { multiaddr } from "@multiformats/multiaddr";
 import { parseBool, timeout } from "../utils/helpers.js";
