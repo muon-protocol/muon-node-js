@@ -4,7 +4,7 @@ import * as crypto from "../utils/crypto.js";
 import {MapOf} from "./mpc/types";
 import {logger} from "@libp2p/logger"
 import loadNetworkConfigs from '../network/configurations.js'
-import {NetConfigs} from "./types";
+import {NetConfigs, PolynomialInfoJson} from "./types";
 import { GatewayCallMode, GatewayCallParams } from "../gateway/types.js";
 
 const log = logger('muon:analytic:reporter')
@@ -95,6 +95,49 @@ export async function reportConfirmFailure(reportData: Omit<ConfirmFailureAnalyt
   report.signature = crypto.sign(hash)
   log("confirm failure report data", report)
   return Promise.all(baseUrls.map(url => axios.post(`${url}/analytics/confirm/report`, report, axiosConfigs)))
+}
+
+export type PartialSignAnaliticData = {
+  timestamp: number,
+  wallet: string,
+  signature: string,
+  callInfo: {
+    app: string,
+    method: string,
+    params: any,
+  },
+  result: {
+    signer: string,
+    signature: string,
+    polynomial: PolynomialInfoJson,
+    partners: MapOf<string>,
+  },
+  reqId: string,
+  seed: string,
+  resultHash: string,
+}
+
+export async function reportPartialSingMismatch(reportData: Omit<PartialSignAnaliticData, "timestamp" | "wallet" | "signature">) {  const netConfigs = await getConfigs();
+  if((netConfigs.analytics?.baseUrls || []).length < 1)
+    return;
+  const baseUrls:string[] = netConfigs.analytics!.baseUrls!;
+
+  const report = {
+    timestamp: Date.now(),
+    wallet: process.env.SIGN_WALLET_ADDRESS,
+    signature: "",
+    ...reportData,
+  }
+  log('reporting partial sing mismatch to the muon servers ...')
+  const hash = muonSha3(
+    {t: 'uint64', v: report.timestamp},
+    {t: 'address', v: report.wallet},
+    {t: 'string', v: 'partial-sign-mismatch-report'},
+  );
+  // @ts-ignore
+  report.signature = crypto.sign(hash)
+  log("partial sing mismatch report data", report)
+  return Promise.all(baseUrls.map(url => axios.post(`${url}/analytics/partial/report`, report, axiosConfigs)))
 }
 
 export type InsufficientPartnersAnalyticData = {
