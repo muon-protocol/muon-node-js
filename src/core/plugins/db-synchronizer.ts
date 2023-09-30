@@ -223,7 +223,10 @@ export default class DbSynchronizer extends CallablePlugin {
         }
       }
 
-      await timeout(Math.floor((0.5 + Math.random()) * interval));
+      if (!this.isDbSynced)
+        await timeout(Math.floor((0.5 + Math.random()) * interval / 2)); //wait less if sync failed
+      else
+        await timeout(Math.floor((0.5 + Math.random()) * interval));
     }
   }
 
@@ -329,8 +332,8 @@ export default class DbSynchronizer extends CallablePlugin {
     let seedsToDelete: string[] = expiredSeeds.filter((s, i) => localCheck[i]);
     let seedsToCheck: string[] = expiredSeeds.filter((s, i) => !localCheck[i]);
 
-    /** 
-     * If the current node is a deployer, there is no need to search the network. 
+    /**
+     * If the current node is a deployer, there is no need to search the network.
      * All deployers must be updated and have all active contexts.
      */
     if(seedsToCheck.length > 0 && !currentNode.isDeployer) {
@@ -391,7 +394,7 @@ export default class DbSynchronizer extends CallablePlugin {
           )
         })
       )
-      
+
       const combinedResults: DeleteCheckResult[][] = responses[0].map((_, seedIndex):DeleteCheckResult[] => {
         return deployers.map((_, i) => responses[i][seedIndex])
       })

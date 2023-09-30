@@ -38,6 +38,8 @@ export async function handler(argv) {
   // network = "local";
   configs = configs[network];
 
+  if(!configs)
+    throw `configs not defined for network: ${network}`;
   if(!configs.url)
     throw `Please set muon api url config`;
   const {action} = argv;
