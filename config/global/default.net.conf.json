@@ -46,7 +46,7 @@
         "https://alice-n2.muon.net/network"
       ],
       "startDelay": 120e3,
-      "interval": 3600e3
+      "interval": 600e3
     },
     "dbSyncOnlineThreshold": 3
   },
