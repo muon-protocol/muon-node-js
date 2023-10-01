@@ -806,6 +806,12 @@ class BaseAppPlugin extends CallablePlugin {
         .catch(e => e.message)
       })
     )
+    const key:AppTssKey = this.getTss(request.deploymentSeed)!;
+    const nonce = await this.keyManager.getSharedKey(
+      `nonce-${request.reqId}`,
+      15000,
+      {type: "nonce", message: request.data.resultHash},
+    );
     return reportPartialSingMismatch({
       callInfo: {
         app: request.app,
@@ -815,7 +821,8 @@ class BaseAppPlugin extends CallablePlugin {
       request: {
         signer: remoteNode.id,
         ...data,
-        polynomial: this.getTss(request.deploymentSeed)!.toJson().polynomial!,
+        key: key.toJson().polynomial!,
+        nonce: nonce.toJson().polynomial!,
         partners: partnersData.reduce((obj, curr, i) => (obj[nodesToCheck[i].id]=curr, obj), {}),
       },
       reqId: request.reqId,
