@@ -45,6 +45,12 @@ const RemoteMethods = {
   PartialSignInfo: "partial-sing-info"
 }
 
+export type AppSignatureResponse = {
+  result?: any,
+  hash?: string,
+  signature: string,
+}
+
 @remoteApp
 class BaseAppPlugin extends CallablePlugin {
   /**=================================*/
@@ -716,7 +722,7 @@ class BaseAppPlugin extends CallablePlugin {
             taskId: `keygen-${nonce.id}`
           }
         )
-        .then(sign => this.__onRemoteSignTheRequest({reqId: request.reqId, sign}, null, node))
+        .then((signResponse: AppSignatureResponse) => this.__onRemoteSignTheRequest({reqId: request.reqId, ...signResponse}, null, node))
         .catch(e => {
           this.log.error('asking signature for request failed %O', e)
           return this.__onRemoteSignTheRequest(null, {
@@ -787,7 +793,7 @@ class BaseAppPlugin extends CallablePlugin {
     return stringifySignature(signature);
   }
 
-  async reportPartialMismatch(request: AppRequest, remoteNode: MuonNodeInfo, sign: string) {
+  async reportPartialMismatch(request: AppRequest, remoteNode: MuonNodeInfo, data: AppSignatureResponse) {
     const nodesToCheck = this.nodeManager.filterNodes({list: [remoteNode.id]});
     const partnersData = await Promise.all(
       nodesToCheck.map(node => {
@@ -806,9 +812,9 @@ class BaseAppPlugin extends CallablePlugin {
         method: request.method,
         params: request.data.params
       },
-      result: {
+      request: {
         signer: remoteNode.id,
-        signature: sign,
+        ...data,
         polynomial: this.getTss(request.deploymentSeed)!.toJson().polynomial!,
         partners: partnersData.reduce((obj, curr, i) => (obj[nodesToCheck[i].id]=curr, obj), {}),
       },
@@ -818,7 +824,7 @@ class BaseAppPlugin extends CallablePlugin {
     })
   }
 
-  async __onRemoteSignTheRequest(data: {reqId: string, sign: string} | null, error, remoteNode: MuonNodeInfo) {
+  async __onRemoteSignTheRequest(data: ({reqId: string} & AppSignatureResponse) | null, error, remoteNode: MuonNodeInfo) {
     if(error){
       this.log.error(`node ${remoteNode.id} unable to sign the request. %O`, error)
       let {request: reqId, ...otherParts} = error;
@@ -830,7 +836,7 @@ class BaseAppPlugin extends CallablePlugin {
     }
     try {
       this.log(`node ${remoteNode.id} signed the request.`)
-      let {reqId, sign} = data!;
+      let {reqId, signature, result, hash} = data!;
       let request:AppRequest = this.requestManager.getRequest(reqId) as AppRequest
       if (request) {
         /**
@@ -838,14 +844,14 @@ class BaseAppPlugin extends CallablePlugin {
          * disable verification temporarily for deployment.
          * */
         // let signatureVerified = request.appId === "1" || (await this.verifyPartialSignature(request, remoteNode, sign))
-        let signatureVerified = await this.verifyPartialSignature(request, remoteNode, sign)
+        let signatureVerified = await this.verifyPartialSignature(request, remoteNode, signature)
         if (signatureVerified) {
-          this.requestManager.addSignature(request.reqId, remoteNode.wallet, sign)
+          this.requestManager.addSignature(request.reqId, remoteNode.wallet, signature)
         }
         else {
-          this.log.error('partial signature mismatch %o', {reqId: request.reqId, sign, signer: remoteNode.id})
+          this.log.error('partial signature mismatch %o', {reqId: request.reqId, signature, signer: remoteNode.id})
           this.requestManager.addError(reqId, remoteNode.wallet, {message: "partial signature mismatch"});
-          this.reportPartialMismatch(request, remoteNode, sign)
+          this.reportPartialMismatch(request, remoteNode, data!)
             .catch(e => this.log(`partial signature mismatch resport error: %s`, e.message));
         }
       }
@@ -962,7 +968,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.AskSignature, crms(AppRequestSchema))
-  async __askSignature(request: AppRequest, callerInfo) {
+  async __askSignature(request: AppRequest, callerInfo): Promise<AppSignatureResponse> {
     this.log(`remote node [id:${callerInfo.id}] wants signature %o`, request)
     deepFreeze(request);
     /**
@@ -993,7 +999,11 @@ class BaseAppPlugin extends CallablePlugin {
       await useOneTime('fee', signature, request.reqId);
     }
 
-    return this.makeSignature(request, result, hash)
+    return {
+      result,
+      hash,
+      signature: await this.makeSignature(request, result, hash)!
+    }
   }
 
   @remoteMethod(RemoteMethods.InformRequestConfirmation, crms(AppRequestSchema))

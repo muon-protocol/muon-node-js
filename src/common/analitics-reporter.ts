@@ -106,8 +106,10 @@ export type PartialSignAnaliticData = {
     method: string,
     params: any,
   },
-  result: {
+  request: {
     signer: string,
+    result?: any,
+    hash?: string,
     signature: string,
     polynomial: PolynomialInfoJson,
     partners: MapOf<string>,
