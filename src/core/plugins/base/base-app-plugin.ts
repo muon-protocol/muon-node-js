@@ -856,11 +856,13 @@ class BaseAppPlugin extends CallablePlugin {
         }
       }
       else{
-        this.log(`Request not found id:${reqId}`)
+        this.log(`Request not found id:${reqId}`);
+        this.requestManager.addError(reqId, remoteNode.wallet, {message: "request not found"});
       }
     }
     catch (e) {
       this.log.error('onRemoteSignTheRequest', e);
+      this.requestManager.addError(data?.reqId, remoteNode.wallet, {message: e.message});
     }
   }
 
