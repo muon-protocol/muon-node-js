@@ -4,7 +4,7 @@ import * as crypto from "../utils/crypto.js";
 import {MapOf} from "./mpc/types";
 import {logger} from "@libp2p/logger"
 import loadNetworkConfigs from '../network/configurations.js'
-import {NetConfigs, PolynomialInfoJson} from "./types";
+import {AppRequest, NetConfigs, PolynomialInfoJson} from "./types";
 import { GatewayCallMode, GatewayCallParams } from "../gateway/types.js";
 
 const log = logger('muon:analytic:reporter')
@@ -101,23 +101,19 @@ export type PartialSignAnaliticData = {
   timestamp: number,
   wallet: string,
   signature: string,
-  callInfo: {
-    app: string,
-    method: string,
-    params: any,
-  },
-  request: {
-    signer: string,
+  request: AppRequest,
+  remoteNode: {
+    id: string,
     result?: any,
     hash?: string,
     signature: string,
+  },
+  signatureData: {
+    resultHash: string,
     key: PolynomialInfoJson,
     nonce: PolynomialInfoJson,
     partners: MapOf<string>,
   },
-  reqId: string,
-  seed: string,
-  resultHash: string,
 }
 
 export async function reportPartialSingMismatch(reportData: Omit<PartialSignAnaliticData, "timestamp" | "wallet" | "signature">) {  const netConfigs = await getConfigs();
