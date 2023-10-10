@@ -8,8 +8,8 @@
   },
   "nodeManager": {
     "network": "bsctest",
-    "address": "0x25B019d98CF6FBcD73C92C468A352449e2BB39C2",
-    "stake": "0xd788C2276A6f75a8B9360E9695028329C925b0AB"
+    "address": "0xD884634095AB3058264eE3143078F27D8fD78b9F",
+    "stake": "0x349a34804F8740c3202baDdeC0216c66A40c02e5"
   },
   "routing": {
     "delegate": [
@@ -51,8 +51,6 @@
     "dbSyncOnlineThreshold": 3
   },
   "analytics": {
-    "baseUrls": [
-      "http://159.69.192.98:8011"
-    ]
+    "baseUrls": []
   }
 }

@@ -16,10 +16,10 @@ COPY . .
 ENV DOCKER_MODE=1
 
 # gateway
-EXPOSE 8000
+EXPOSE 8012
 
 # P2P
-EXPOSE 4000
+EXPOSE 9012
 
 # Add cronjobs
 RUN mkdir /root/.ssh/
@@ -35,7 +35,7 @@ RUN apt-get update && apt-get -y install cron
 
 RUN apt-get -y purge exim4*
 
-RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-alice2'
+RUN ./scripts/auto-update.sh -a setup -p 'muon-node-js-pion'
 
-CMD [ "bash", "-c", "node testnet-generate-env.js; service cron start; pm2 start ecosystem.config.cjs; sleep infinity" ]
+CMD [ "bash", "-c", "node init-env.js; service cron start; pm2 start ecosystem.config.cjs; sleep infinity" ]
 #
