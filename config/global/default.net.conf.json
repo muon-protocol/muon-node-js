@@ -24,7 +24,7 @@
     "peerStoreTTL": 1200000
   },
   "bootstrap": [
-    "/ip4/188.166.73.132/tcp/9011/p2p/QmYPbLuwy7CWqsMrZM6W9VZGSu7oM9PGRfVe1kssKcjjpj"
+    "/ip4/3.136.59.242/tcp/9012/p2p/QmeZ5zHPfhrUeYY4D1kzHTS3BPKFrcTxbRrmC3gXsYNVmi"
   ],
   "fee": {
     "endpoint": "https://fees.muon.net/sign",
