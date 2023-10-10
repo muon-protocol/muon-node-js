@@ -7,28 +7,21 @@
     "pendingPeriod": 86400
   },
   "nodeManager": {
-    "network": "bsctest",
+    "network": "eth",
     "address": "0xD884634095AB3058264eE3143078F27D8fD78b9F",
     "stake": "0x349a34804F8740c3202baDdeC0216c66A40c02e5"
   },
   "routing": {
     "delegate": [
-      "https://alice-n2.muon.net/delegate",
-      "http://188.166.73.132:8011/delegate"
+      "http://3.136.59.242:8012/delegate"
     ],
     "ifconfig":[
-      "http://3.130.24.220:3002/",
-      "http://159.69.192.98:8011/ifconfig",
-      "http://188.166.73.132:8011/ifconfig"
+      "http://3.136.59.242:8012/ifconfig"
     ],
     "discoveryValidPeriod": 30000,
     "findPeerValidPeriod": 30000,
     "delegateRoutingTTL": 1200000,
     "peerStoreTTL": 1200000
-  },
-  "nodes": {
-    "onlineList": "https://alice-v2.muon.net/monitor/nodes",
-    "aggregators": ["1", "3"]
   },
   "bootstrap": [
     "/ip4/188.166.73.132/tcp/9011/p2p/QmYPbLuwy7CWqsMrZM6W9VZGSu7oM9PGRfVe1kssKcjjpj"
@@ -42,8 +35,7 @@
   "synchronizer": {
     "monitor": {
       "providers": [
-        "http://188.166.73.132:8011/network",
-        "https://alice-n2.muon.net/network"
+        "https://3.136.59.242:8012/network"
       ],
       "startDelay": 120e3,
       "interval": 600e3
