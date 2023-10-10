@@ -2,7 +2,6 @@ version: '3'
 services:
   muon_api:
     container_name: muon-node
-    image: muonnode/pion:latest
     restart: always
     network_mode: host
     build:
