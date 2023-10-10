@@ -1,7 +1,7 @@
 {
   "defaultLeader": "1",
   "tss": {
-    "threshold": 2,
+    "threshold": 7,
     "max": 20,
     "defaultTTL": 604800,
     "pendingPeriod": 86400
