@@ -10,7 +10,6 @@ export type GatewayGlobalConfigs = {
       network: boolean,
       status: boolean,
       delegate: boolean,
-      mine: boolean,
       crashReport: boolean,
       ifconfig: boolean,
     }
@@ -47,9 +46,6 @@ export function load(): GatewayGlobalConfigs{
 
   if(!!process.env.gateway_routes_enable_delegate)
     configs.routes.enable.delegate = parseBool(process.env.gateway_routes_enable_delegate)
-
-  if(!!process.env.gateway_routes_enable_mine)
-    configs.routes.enable.mine = parseBool(process.env.gateway_routes_enable_mine)
 
   if(!!process.env.gateway_routes_enable_crash_report)
     configs.routes.enable.crashReport = parseBool(process.env.gateway_routes_enable_crash_report)
