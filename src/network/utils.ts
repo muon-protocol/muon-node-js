@@ -63,6 +63,7 @@ function nodeManagerDataCacheKey(configs: NodeManagerConfigs) {
 function convertToCoreObject(item): MuonNodeInfo {
   // @ts-ignore
   const roles = item.roles.map(r => parseInt(r));
+  const tier = parseInt(item.tier);
   return {
     id: BigInt(item.id).toString(),
     active: true,
@@ -70,9 +71,9 @@ function convertToCoreObject(item): MuonNodeInfo {
     wallet: item.nodeAddress,
     peerId: item.peerId,
     // @ts-ignore
-    tier: parseInt(item.tier),
+    tier,
     roles,
-    isDeployer: roles.includes(MuonNodeRoles.Deployer)
+    isDeployer: tier == 4,
   }
 }
 
