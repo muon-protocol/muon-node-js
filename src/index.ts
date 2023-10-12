@@ -42,7 +42,7 @@ if(parseBool(process.env.CLUSTER_MODE)) {
     clusterCount = Math.min(clusterCount, os.cpus().length)
   }
   else{
-    clusterCount = Math.min(os.cpus().length, 2);
+    clusterCount = Math.min(os.cpus().length, 4);
   }
 }
 
