@@ -980,6 +980,10 @@ export default class AppManager extends CallablePlugin {
     return list;
   }
 
+  getAllSeeds(): string[] {
+    return Object.keys(this.appContexts);
+  }
+
   /**
    * Remote methods
    */
