@@ -232,7 +232,6 @@ class Explorer extends CallablePlugin {
 
   @gatewayMethod("ctx-health")
   async __getContextsHelth() {
-    try {
     let allSeeds: string[] = this.appManager.getAllSeeds();
     const result = {}
     const currentTime = getTimestamp();
@@ -245,7 +244,8 @@ class Explorer extends CallablePlugin {
         const proof = Object.keys(ctx.deploymentRequest?.data.init.key.shareProofs);
         result[ctx.appName] = {
           timestamp,
-          expired: ctx.deploymentRequest?.data.result.expiration > currentTime,
+          expiration: ctx.deploymentRequest?.data.result.expiration,
+          expired: ctx.deploymentRequest?.data.result.expiration < currentTime,
           reqId: ctx.deploymentRequest?.reqId,
           t: ctx.party.t,
           partners: ctx.party.partners,
@@ -255,11 +255,6 @@ class Explorer extends CallablePlugin {
       }
     }
     return result;
-    }
-    catch(e) {
-      console.log(e);
-      return e
-    }
   }
 
   @remoteMethod(RemoteMethods.IsReqConfirmationAnnounced)
