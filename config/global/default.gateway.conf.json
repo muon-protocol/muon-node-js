@@ -7,7 +7,6 @@
       "network": true,
       "status": true,
       "delegate": true,
-      "mine": true,
       "crashReport": true,
       "ifconfig": true
     }
