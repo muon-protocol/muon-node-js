@@ -34,6 +34,8 @@ const _networksWeb3 = {
   1088: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_METIS || 'https://andromeda.metis.io/?owner=1088')),
   10: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_OPTIMISM || 'https://rpc.ankr.com/optimism')),
   420: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_OPTIMISM_TESTNET || 'https://rpc.ankr.com/optimism_testnet')),
+  59140: new Web3(new HttpProvider("https://rpc.goerli.linea.build/")),
+  59144: new Web3(new HttpProvider("https://rpc.linea.build")),
 }
 
 const nameToChainIdMap = {
@@ -56,6 +58,9 @@ const nameToChainIdMap = {
   metis: 1088, // Metis
   optimism: 10, // Optimism
   optimismTestnet: 420, // Optimism Testnet
+
+  linea_test: 59140,
+  linea: 59144
 }
 
 function getWeb3(network) {
