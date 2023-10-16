@@ -177,7 +177,7 @@ class RemoteCall extends BaseNetworkPlugin {
   }
 
   getPeerStream(peer){
-    return this.network.libp2p.dialProtocol(peer.id, [PROTOCOL])
+    return this.network.libp2p.dialProtocol(peer.multiaddrs, [PROTOCOL])
   }
 
   private getCallExactMethod(method: string, callParams: {method: string}): string {

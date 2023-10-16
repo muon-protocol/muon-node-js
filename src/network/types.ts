@@ -1,4 +1,6 @@
-import {PeerInfo} from "@libp2p/interface-peer-info";
+// import {PeerInfo} from "@libp2p/interface-peer-info";
+import type { PeerInfo } from '@libp2p/interface/peer-info';
+
 export { PeerId, isPeerId } from '@libp2p/interface-peer-id';
 import { Peer } from '@libp2p/interface-peer-store';
 import {NetConfigs} from "../common/types";
