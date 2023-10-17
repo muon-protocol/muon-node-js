@@ -41,14 +41,6 @@ export function broadcastToChannel(channel, message) {
   return call(IpcMethods.BroadcastToChannel, {channel, message})
 }
 
-// export function putDHT(key, value) {
-//   return call(IpcMethods.PutDHT, {key, value})
-// }
-
-// export function getDHT(key) {
-//   return call(IpcMethods.GetDHT, {key})
-// }
-
 export function forwardCoreRemoteCall(peer, method, params, options) {
   return call(IpcMethods.ForwardCoreRemoteCall, {peer, method, params, options})
 }

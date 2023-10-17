@@ -30,23 +30,6 @@ const DEFAULT_OPTS = {
   }
 
 
-  // dht: kadDHT({
-  //   kBucketSize: 20,
-  //   clientMode: false,
-  //   validators: {
-  //     muon: async (key, data) => {
-  //       // validate data1111
-  //       // throw an err when data is not valid
-  //       return;
-  //     },
-  //   },
-  //   selectors: {
-  //     muon: (key, dataList) => {
-  //       // select correct record
-  //       return 0;
-  //     },
-  //   },
-  // }),
 
 };
 
