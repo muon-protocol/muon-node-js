@@ -8,7 +8,6 @@ import {MessagePublisher, MessageBusConfigs} from "../../common/message-bus/inde
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
 import NetworkBroadcastPlugin from "./network-broadcast.js";
-// import NetworkDHTPlugin from "./network-dht.js";
 import {parseBool, timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
@@ -70,8 +69,6 @@ export const IpcMethods = {
   GetNodeManagerData: "get-node-manager-data",
   SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
   BroadcastToChannel: "broadcast-to-channel",
-  // PutDHT: "put-dht",
-  // GetDHT: "get-dht",
   ReportClusterStatus: "report-cluster-status",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
@@ -111,10 +108,6 @@ class NetworkIpcHandler extends CallablePlugin {
   get broadcastPlugin(): NetworkBroadcastPlugin {
     return this.network.getPlugin('broadcast')
   }
-
-  // get DHTPlugin(): NetworkDHTPlugin {
-  //   return this.network.getPlugin('dht')
-  // }
 
   get nodeManager(): NodeManagerPlugin {
     return this.network.getPlugin('node-manager');
@@ -166,16 +159,7 @@ class NetworkIpcHandler extends CallablePlugin {
     return "Ok"
   }
 
-  // @ipcMethod(IpcMethods.PutDHT)
-  // async __putDHT(data: {key: string, value: any}) {
-  //   let ret = await this.DHTPlugin.put(data.key, data.value);
-  //   return ret
-  // }
 
-  // @ipcMethod(IpcMethods.GetDHT)
-  // async __getDHT(data: {key: string}) {
-  //   return await this.DHTPlugin.get(data.key);
-  // }
 
   assignTaskToProcess(taskId: string, pid: number) {
     tasksCache.set(taskId, pid);

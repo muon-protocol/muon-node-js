@@ -312,7 +312,6 @@ async function start() {
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],
       "ipc-handler": [IpcHandlerPlugin, {}],
-      // dht: [NetworkDHTPlugin, {}]
     },
     net,
   };
