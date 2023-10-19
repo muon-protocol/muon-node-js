@@ -74,6 +74,7 @@ export default class BaseNetworkPlugin extends Events {
       //
       // We load addresses from peerRouting and patch the
       // peerStore
+      
       try {
         //set timestamp on newly found peer
         const timestamp = Date.now();

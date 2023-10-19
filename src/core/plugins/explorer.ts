@@ -13,6 +13,7 @@ import BaseAppPlugin from "./base/base-app-plugin";
 import {MapOf} from "../../common/mpc/types";
 import {APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_ONBOARDING, APP_STATUS_PENDING} from "../constants.js";
 import {GENESIS_SEED} from "../../common/contantes.js";
+import { getTimestamp } from '../../utils/helpers.js';
 
 const requestConfirmCache: RedisCache = new RedisCache('req-confirm')
 
@@ -226,6 +227,33 @@ class Explorer extends CallablePlugin {
       status: appStatus,
       contexts: contextStatuses,
     }
+  }
+
+  @gatewayMethod("ctx-health")
+  async __getContextsHelth() {
+    let allSeeds: string[] = this.appManager.getAllSeeds();
+    const result = {}
+    const currentTime = getTimestamp();
+    for(let seed of allSeeds) {
+      const ctx: AppContext = this.appManager.getSeedContext(seed)!;
+      if(ctx.seed === GENESIS_SEED)
+        continue;
+      const timestamp:number = ctx.deploymentRequest?.data.timestamp!;
+      if(result[ctx.appName] === undefined || result[ctx.appName].timestamp < timestamp) {
+        const proof = Object.keys(ctx.deploymentRequest?.data.init.key.shareProofs);
+        result[ctx.appName] = {
+          timestamp,
+          expiration: ctx.deploymentRequest?.data.result.expiration,
+          expired: ctx.deploymentRequest?.data.result.expiration < currentTime,
+          reqId: ctx.deploymentRequest?.reqId,
+          t: ctx.party.t,
+          partners: ctx.party.partners,
+          proof,
+          keyHealth: 100*(proof.length/ctx.party.partners.length),
+        };
+      }
+    }
+    return result;
   }
 
   @remoteMethod(RemoteMethods.IsReqConfirmationAnnounced)

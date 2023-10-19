@@ -25,6 +25,7 @@
 
 A Linux server with 4 GB of RAM, dual-core CPU, 20GB of storage space. 
 
+
 ## Installation
 
 To run a Muon node on your local machine, you need to first install [Redis](https://redis.com) and [MongoDB](https://www.mongodb.com/).
@@ -81,3 +82,4 @@ You can ask your development related questions in #dev-help channel.
 ## License
 This project is licensed under the terms of the GNU General Public License v3.0.
 A copy of the license can be found at [https://www.gnu.org/licenses/gpl-3.0](https://www.gnu.org/licenses/gpl-3.0).
+ 
