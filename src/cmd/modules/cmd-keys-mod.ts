@@ -4,7 +4,7 @@ import * as dotenv from "dotenv";
 
 const ROOT = "./";
 const ENV_PATH = path.join(ROOT, ".env");
-const ENV_TEMPLATE_PATH = path.join(ROOT, ".env.testnet");
+const ENV_TEMPLATE_PATH = path.join(ROOT, ".env.pion");
 
 export const command = "keys <action> [value]";
 
