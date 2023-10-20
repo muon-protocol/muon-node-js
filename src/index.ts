@@ -34,6 +34,16 @@ process.on('unhandledRejection', async function(reason, _promise) {
   process.exit(1);
 });
 
+const gracefulClusterShutdown = (signal: NodeJS.Signals) => async () => {
+    for (let id in cluster.workers) {
+        let process_id = cluster!.workers[id]!.process.pid;
+        process.kill(process_id!);
+    }
+}
+
+process.on('SIGTERM', gracefulClusterShutdown('SIGTERM'))
+process.on('SIGINT', gracefulClusterShutdown('SIGINT'))
+
 
 let clusterCount = 1;
 if(parseBool(process.env.CLUSTER_MODE)) {
