@@ -39,8 +39,9 @@ check_for_update (){
     else
         RES=$?
         if [[ $RES -eq 0 ]]
+            echo "Git: no error"
         then
-            log "Git retuned error"
+            log "Git: retuned error"
             exit 0
         fi
         # restart services
