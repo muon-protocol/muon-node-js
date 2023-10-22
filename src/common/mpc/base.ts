@@ -302,6 +302,8 @@ export class MultiPartyComputation {
           callingPartners.map(partner => {
             return this.tryToGetRoundDate(network, partner, r, dataToSend, isQualified[network.id], isQualified[partner])
               .catch(e => {
+                if(typeof e === "string")
+                  e = {message: e};
                 mpcExecDebugs[currentRound].roundErrors[partner] = e.message || "unknown error";
                 partyErrors[partner] = JSON.stringify(e);
                 this.log.error(`[${this.id}][${currentRound}] error at node[${partner}] round ${r} %o`, e)
