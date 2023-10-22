@@ -119,7 +119,7 @@ export default class DbSynchronizer extends CallablePlugin {
    other deployers and updates the own context list accordingly.
    */
   private async deployersSyncLoop() {
-    const {monitor: {startDelay, interval},dbSyncOnlineThreshold} = this.muon.configs.net.synchronizer;
+    const {monitor: {startDelay, interval}, dbSyncOnlineThreshold=1} = this.muon.configs.net.synchronizer;
     log(`deployers sync loop start %o`, {startDelay, interval})
 
     await timeout(Math.floor((0.5 + Math.random()) * startDelay));
