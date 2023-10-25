@@ -37,13 +37,13 @@ check_for_update (){
 #        log "Node: [`which node`]    PM2: [`which pm2`]";
         ``;
     else
-        RES=$?
-        if [[ $RES -eq 0 ]]
-            echo "Git: no error"
-        then
-            log "Git: retuned error"
-            exit 0
-        fi
+        # RES=$?
+        # if [[ $RES -eq 0 ]]
+        #     echo "Git: no error"
+        # then
+        #     log "Git: retuned error"
+        #     exit 0
+        # fi
         # restart services
         if [[ -z $_NODE ]]
             # uses env _NODE by default
