@@ -10,10 +10,60 @@ import { parseBool, timeout } from './utils/helpers.js'
 import { createRequire } from "module";
 import {reportCrash} from "./common/analitics-reporter.js";
 
-// const require = createRequire(import.meta.url);
 const log = logger('muon:boot')
 
 type ClusterType = 'gateway' | 'networking' | "core"
+
+
+const gracefulClusterShutdown = (signal: NodeJS.Signals) => {
+
+  log(`Got . Graceful shutdown start at ${new Date().toISOString()}`)
+
+  try {
+    if (cluster.isMaster) {
+      shutdownWorkers(signal).then(x => {
+        console.log("Workers closed. exiting master");
+        process.exit(0)
+      });
+    }
+  } catch (e) {
+    process.exit(0)
+  }
+}
+
+const shutdownWorkers = (signal: NodeJS.Signals) => {
+  return new Promise<void>((resolve, reject) => {
+    if (!cluster.isMaster) { return resolve() }
+
+    const wIds = Object.keys(cluster.workers || {})
+    if (wIds.length == 0) { return resolve() }
+    //Filter all the valid workers
+    const wks = cluster.workers || {}
+    const workers = wIds.map(id => wks[id]).filter(v => v);
+    let workersAlive = 0
+    let funcRun = 0
+
+    //Count the number of alive workers and keep looping until the number is zero.
+    const fn = () => {
+      ++funcRun
+      workersAlive = 0
+      workers.forEach(worker => {
+        if (worker && !worker.isDead()) {
+          ++workersAlive
+          if (funcRun == 1)
+            worker.kill(signal)
+        }
+      })
+      log(`${workersAlive} workers alive`)
+      if (workersAlive == 0) {
+        //Clear the interval when all workers are dead
+        clearInterval(interval)
+        return resolve()
+      }
+    }
+    const interval = setInterval(fn, 500)
+  })
+}
 
 process.on('unhandledRejection', async function(reason, _promise) {
   // console.log("Unhandled promise rejection", _promise);
@@ -122,6 +172,7 @@ async function boot() {
         }
       }
     });
+    process.on("SIGINT", gracefulClusterShutdown);
   }
   else {
     const clusterType:ClusterType = process.env.MUON_CLUSTER_TYPE! as ClusterType;
@@ -146,8 +197,6 @@ async function boot() {
         throw `invalid cluster type: ${clusterType}`;
     }
   }
-
-  // Core.start();
 }
 
 boot();
