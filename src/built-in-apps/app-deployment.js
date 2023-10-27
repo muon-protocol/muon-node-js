@@ -13,6 +13,7 @@ const Methods = {
 
 const NODES_SELECTION_TOLERANCE = 0.07;
 const ROTATION_COEFFICIENT = 1.5;
+const MIN_REQUIRED_SHARE_PROOF = 1.2;
 const DEPLOYMENT_APP_ID = "1"
 
 function shuffleNodes(nodes, seed) {
@@ -216,17 +217,9 @@ module.exports = {
         if(method === Methods.Reshare) {
             let countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
             let previousNodes = prevContext.party.partners
-            if(!!prevContext.keyGenRequest?.data?.init?.shareProofs) {
-                const nodesWithProof = Object.keys(prevContext.keyGenRequest?.data?.init?.shareProofs);
-                if(nodesWithProof.length < countToKeep) {
-                    /** select all nodes with proof and add some other random nodes */
-                    selectedNodes = [...nodesWithProof, ...selectedNodes];
-                    previousNodes = prevContext.party.partners.filter(id => !nodesWithProof.includes(id))
-                    countToKeep -= nodesWithProof.length
-                }
-                else{
-                    previousNodes = nodesWithProof;
-                }
+            const shareProofs = prevContext.deploymentRequest?.data?.init?.key?.shareProofs;
+            if(!!shareProofs) {
+                previousNodes = Object.keys(shareProofs);
             }
             /** Pick some nodes to retain in the new party */
             const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
@@ -402,6 +395,9 @@ module.exports = {
                     :
                     await this.callPlugin('system', "reshareAppTss", appId, seed)
                 )
+
+                if(Object.keys(shareProofs).length < Math.ceil(t * MIN_REQUIRED_SHARE_PROOF))
+                    throw `Share proof count is lower than the minimum required count.`
 
                 return {
                     key: {id, publicKey, polynomial, generators, shareProofs},
