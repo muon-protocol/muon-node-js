@@ -442,8 +442,14 @@ module.exports = {
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
 
-                if(difference > NODES_SELECTION_TOLERANCE)
-                    throw `selected nodes mismatched.`
+                if(difference > NODES_SELECTION_TOLERANCE) {
+                    throw {
+                        message: `selected nodes mismatched.`,
+                        gatewaySelected: selectedNodes,
+                        nodeSelected: selectedNodes2,
+                        diff: symmetricDifference(selectedNodes, selectedNodes2)
+                    }
+                }
 
                 /** ensure a random key already generated */
                 let publicKey, polynomial;
