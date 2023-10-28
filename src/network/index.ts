@@ -93,19 +93,24 @@ class Network extends Events {
     let myIp;
     if (!parseBool(process.env.DISABLE_PUBLIC_IP_ANNOUNCE!)) {
       log("finding public ip ...");
-      myIp = await findMyIp();
-      if(!myIp){
-        myIp = await publicIpv4();
-      }
-      if(!myIp){
-        log(`unable to find public ip`);
-      }
-      else {
-        log(`public ip: %s`, myIp);
-        announce.push(
-          `/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`
-        );
-        log(`announce public address: %s`, announce[0]);
+      try {
+        myIp = await findMyIp();
+        if (!myIp) {
+          myIp = await publicIpv4();
+        }
+        if (!myIp) {
+          throw `unable to find node's public ip.`
+        }
+        else {
+          log(`public ip: %s`, myIp);
+          announce.push(
+            `/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`
+          );
+          log(`announce public address: %s`, announce[0]);
+        }
+      } catch (e) {
+        log.error(`error when loading public ip %s`, e.message);
+        throw `unable to find node's public ip.`
       }
     }
 
