@@ -377,6 +377,11 @@ class System extends CallablePlugin {
 
   @appApiMethod({})
   async validateShareProofs(polynomial: string[], shareProofs: MapOf<string>): Promise<boolean> {
+    const netConfigs:NetConfigs = this.netConfigs;
+    const threshold = polynomial.length
+    if(Object.keys(shareProofs).length < netConfigs.tss.minShareProof * threshold) {
+      throw `Share proof count is lower than the minimum required count.`
+    }
     /** nodes must sign hash of publicKey */
     const keyPublicHash = muonSha3(polynomial[0]);
     const poly = polynomial.map(pub => TssModule.keyFromPublic(pub));

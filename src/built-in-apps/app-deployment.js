@@ -216,17 +216,9 @@ module.exports = {
         if(method === Methods.Reshare) {
             let countToKeep = Math.ceil(t * ROTATION_COEFFICIENT);
             let previousNodes = prevContext.party.partners
-            if(!!prevContext.keyGenRequest?.data?.init?.shareProofs) {
-                const nodesWithProof = Object.keys(prevContext.keyGenRequest?.data?.init?.shareProofs);
-                if(nodesWithProof.length < countToKeep) {
-                    /** select all nodes with proof and add some other random nodes */
-                    selectedNodes = [...nodesWithProof, ...selectedNodes];
-                    previousNodes = prevContext.party.partners.filter(id => !nodesWithProof.includes(id))
-                    countToKeep -= nodesWithProof.length
-                }
-                else{
-                    previousNodes = nodesWithProof;
-                }
+            const shareProofs = prevContext.deploymentRequest?.data?.init?.key?.shareProofs;
+            if(!!shareProofs) {
+                previousNodes = Object.keys(shareProofs);
             }
             /** Pick some nodes to retain in the new party */
             const nodesToKeep = shuffleNodes(previousNodes, seed).slice(0, countToKeep)
@@ -446,8 +438,14 @@ module.exports = {
 
                 let difference = symmetricDifference(selectedNodes, selectedNodes2).length / selectedNodes2.length
 
-                if(difference > NODES_SELECTION_TOLERANCE)
-                    throw `selected nodes mismatched.`
+                if(difference > NODES_SELECTION_TOLERANCE) {
+                    throw {
+                        message: `selected nodes mismatched.`,
+                        gatewaySelected: selectedNodes,
+                        nodeSelected: selectedNodes2,
+                        diff: symmetricDifference(selectedNodes, selectedNodes2)
+                    }
+                }
 
                 /** ensure a random key already generated */
                 let publicKey, polynomial;
