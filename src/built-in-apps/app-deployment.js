@@ -13,7 +13,6 @@ const Methods = {
 
 const NODES_SELECTION_TOLERANCE = 0.07;
 const ROTATION_COEFFICIENT = 1.5;
-const MIN_REQUIRED_SHARE_PROOF = 1.2;
 const DEPLOYMENT_APP_ID = "1"
 
 function shuffleNodes(nodes, seed) {
@@ -395,9 +394,6 @@ module.exports = {
                     :
                     await this.callPlugin('system', "reshareAppTss", appId, seed)
                 )
-
-                if(Object.keys(shareProofs).length < Math.ceil(t * MIN_REQUIRED_SHARE_PROOF))
-                    throw `Share proof count is lower than the minimum required count.`
 
                 return {
                     key: {id, publicKey, polynomial, generators, shareProofs},
