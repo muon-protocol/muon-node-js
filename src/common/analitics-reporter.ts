@@ -97,6 +97,42 @@ export async function reportConfirmFailure(reportData: Omit<ConfirmFailureAnalyt
   return Promise.all(baseUrls.map(url => axios.post(`${url}/analytics/confirm/report`, report, axiosConfigs)))
 }
 
+export type ReshareFailureAnalyticData = {
+  timestamp: number,
+  wallet: string,
+  signature: string,
+  leader: string,
+  appInfo: {
+    appName: string,
+    seed: string,
+  },
+  error: any
+}
+
+export async function reportReshareFailure(reportData: Omit<ReshareFailureAnalyticData, "timestamp" | "wallet" | "signature">) {
+  const netConfigs = await getConfigs();
+  if((netConfigs.analytics?.baseUrls || []).length < 1)
+    return;
+  const baseUrls:string[] = netConfigs.analytics!.baseUrls!;
+
+  const report = {
+    timestamp: Date.now(),
+    wallet: process.env.SIGN_WALLET_ADDRESS,
+    signature: "",
+    ...reportData,
+  }
+  log('reporting reshare failure to muon servers ...')
+  const hash = muonSha3(
+    {t: 'uint64', v: report.timestamp},
+    {t: 'address', v: report.wallet},
+    {t: 'string', v: 'confirm-failure-report'},
+  );
+  // @ts-ignore
+  report.signature = crypto.sign(hash)
+  log("reshare failure report data", report)
+  return Promise.all(baseUrls.map(url => axios.post(`${url}/analytics/reshare/report`, report, axiosConfigs)))
+}
+
 export type PartialSignAnaliticData = {
   timestamp: number,
   wallet: string,

@@ -4,6 +4,7 @@ services:
     container_name: muon-node
     image: muonnode/pion:latest
     restart: always
+    init: true
     network_mode: host
     depends_on:
       - muon_mongo

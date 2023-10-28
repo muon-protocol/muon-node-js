@@ -222,6 +222,7 @@ export type NetConfigs = {
         max: number,
         defaultTTL: number,
         pendingPeriod: number,
+        minShareProof: number,
     },
     nodeManager: NodeManagerConfigs,
     "routing": {

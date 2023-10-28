@@ -3,6 +3,7 @@ services:
   muon_api:
     container_name: muon-node
     restart: always
+    init: true
     network_mode: host
     build:
       context: .
