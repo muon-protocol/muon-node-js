@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin.js'
-import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
+import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
 import KeyManager from "./key-manager.js";
 import {

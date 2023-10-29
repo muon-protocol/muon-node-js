@@ -37,16 +37,6 @@ export function ipcMethod (title, options={}) {
   }
 }
 
-export function broadcastHandler (target, property, descriptor) {
-  if(target.__broadcastHandlerMethod !== undefined){
-    const error = `Broadcast handler method already defined.`
-    console.error({error})
-    throw error
-  }
-  target.__broadcastHandlerMethod = property
-  return descriptor
-}
-
 export function remoteApp (constructor: Constructor<CallablePlugin>): any {
   if(!classNames(constructor).includes('CallablePlugin'))
     throw {message: 'RemoteApp should be CallablePlugin.'}

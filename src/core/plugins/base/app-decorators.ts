@@ -46,16 +46,6 @@ export function ipcMethod (title, options={}) {
   }
 }
 
-export function broadcastHandler (target, property, descriptor) {
-  if(target.__broadcastHandlerMethod !== undefined){
-    const error = `Broadcast handler method already defined.`
-    console.error({error})
-    throw error
-  }
-  target.__broadcastHandlerMethod = property
-  return descriptor
-}
-
 /**
  * Exported methods can be call by apps.
  *
