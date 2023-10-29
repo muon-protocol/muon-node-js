@@ -24,6 +24,9 @@
     "delegateRoutingTTL": 1200000,
     "peerStoreTTL": 1200000
   },
+  "nodes": {
+    "aggregators": ["11"]
+  },
   "bootstrap": [
     "/ip4/3.136.59.242/tcp/9012/p2p/QmeZ5zHPfhrUeYY4D1kzHTS3BPKFrcTxbRrmC3gXsYNVmi"
   ],
