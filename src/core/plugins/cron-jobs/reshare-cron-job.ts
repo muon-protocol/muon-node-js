@@ -9,6 +9,7 @@ import {AnnounceCheckOptions, muonCall} from "../../../cmd/utils.js";
 import {getTimestamp, timeout} from "../../../utils/helpers.js";
 import * as crypto from "../../../utils/crypto.js";
 import {enqueueAppRequest} from "../../ipc.js";
+import { reportReshareFailure } from "../../../common/analitics-reporter.js";
 
 const CONCURRENT_RESHARE = 5;
 
@@ -55,23 +56,47 @@ export default class ReshareCronJob extends BaseCronJob{
       deploymentStatus: [APP_STATUS_PENDING, APP_STATUS_EXPIRED],
       custom: ctx => ctx.rotationEnabled === true
     })
-    /** All context of pending Apps */
-    const appsContexts: MapOf<AppContext[]> = {}
-    for(const ctx of pendingContexts) {
-      const {appId} = ctx;
-      if(appsContexts[appId] === undefined) {
-        appsContexts[appId] = this.appManager.filterContexts({appId});
-      }
-    }
     /** filter and keep, only contexts that not rotated */
     pendingContexts = pendingContexts.filter(ctx => {
       return !this.appManager.isSeedReshared(ctx.seed);
     })
 
+    const ctxMap:MapOf<AppContext> = pendingContexts.reduce((obj:MapOf<AppContext>, curr: AppContext): MapOf<AppContext> => {
+      let {appId} = curr;
+      if(obj[appId] === undefined) {
+        obj[appId] = curr;
+      }
+      else {
+        if(curr.deploymentRequest?.data.result.timestamp > obj[appId].deploymentRequest?.data.result.timestamp)
+          obj[appId] = curr;
+      }
+      return obj;
+    }, {})
+
+    this.log("reshare contexts: %o", {
+      pending: pendingContexts.map(c => ({app: c.appName, seed: c.seed})),
+      reshare: Object.values(ctxMap).map(c => ({app: c.appName, seed: c.seed})),
+    })
+
+    pendingContexts = Object.values(ctxMap);
+
     this.log(`starting ${pendingContexts.length} apps key reshare ...`)
     await Promise.all(pendingContexts.map(ctx => {
-      return this.rotateQueue.add(() => this.reshareAppContext(ctx))
-        .catch(e => {})
+      return this.rotateQueue.add(() => this.reshareAppContext(ctx).catch(e => {
+        let {message, ...otherErrorParams} = e;
+        if(typeof e === "string")
+          message = e;
+        reportReshareFailure({
+          leader: this.currentNodeInfo!.id,
+          appInfo: {appName: ctx.appName, seed: ctx.seed},
+          error: {
+            message,
+            ...otherErrorParams,
+          }
+        })
+          .catch(e => this.log("error when reporting reshare failure to the server %o", e));
+        this.log.error("reshare failed %o error: %o", {app: ctx.appName, seed: ctx.seed}, e)
+      }))
     }))
 
     this.log(`all ${pendingContexts.length} reshare done.`)
@@ -99,7 +124,7 @@ export default class ReshareCronJob extends BaseCronJob{
       });
     if(!randomSeedResponse?.confirmed) {
       this.log.error("random-seed failed %o", randomSeedResponse)
-      throw "random seed failed";
+      throw {message: "random seed failed", request: randomSeedResponse};
     }
     this.log(`Random seed generated %o`, {randomSeed: randomSeedResponse.signatures[0].signature})
 
@@ -124,7 +149,7 @@ export default class ReshareCronJob extends BaseCronJob{
         throw e;
       })
     if(!reshareResponse?.confirmed) {
-      throw "reshare request not confirmed"
+      throw {message: "reshare request not confirmed", request: reshareResponse}
     }
     this.log(`Reshare tx ${reshareResponse.reqId}.`)
 
