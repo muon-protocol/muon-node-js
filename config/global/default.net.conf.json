@@ -4,7 +4,8 @@
     "threshold": 2,
     "max": 20,
     "defaultTTL": 604800,
-    "pendingPeriod": 86400
+    "pendingPeriod": 86400,
+    "minShareProof": 1.2
   },
   "nodeManager": {
     "network": "bsctest",
@@ -18,7 +19,6 @@
     ],
     "ifconfig":[
       "http://3.130.24.220:3002/",
-      "http://159.69.192.98:8011/ifconfig",
       "http://188.166.73.132:8011/ifconfig"
     ],
     "discoveryValidPeriod": 30000,
@@ -52,7 +52,7 @@
   },
   "analytics": {
     "baseUrls": [
-      "http://159.69.192.98:8011"
+      "http://3.145.111.202:8011"
     ]
   }
 }

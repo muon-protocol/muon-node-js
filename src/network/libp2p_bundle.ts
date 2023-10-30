@@ -28,9 +28,6 @@ const DEFAULT_OPTS = {
   services: {
     // pubsub: gossipsub({allowPublishToZeroPeers: true})
   }
-
-
-
 };
 
 function create(opts) {

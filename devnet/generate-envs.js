@@ -146,7 +146,8 @@ const createEnv = async () => {
       tss: {
         ...defaultNetConfigs.tss,
         "threshold": threshold,
-        "max": 100
+        "max": 100,
+        "minShareProof": 1.0,
       },
       nodeManager: {
         "network": "bsctest",

@@ -1,8 +1,8 @@
 import BaseCronJob from "./base-cron-job.js";
 import PQueue from "p-queue";
 import AppManagerPlugin from "../app-manager.js";
-import {AppContext} from "../../../common/types";
-import {APP_STATUS_EXPIRED, APP_STATUS_PENDING} from "../../constants.js";
+import {AppContext, AppDeploymentStatus} from "../../../common/types";
+import {APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_PENDING} from "../../constants.js";
 import {MapOf} from "../../../common/mpc/types";
 import {GatewayCallParams} from "../../../gateway/types";
 import {AnnounceCheckOptions, muonCall} from "../../../cmd/utils.js";
@@ -10,6 +10,8 @@ import {getTimestamp, timeout} from "../../../utils/helpers.js";
 import * as crypto from "../../../utils/crypto.js";
 import {enqueueAppRequest} from "../../ipc.js";
 import { reportReshareFailure } from "../../../common/analitics-reporter.js";
+import { DEPLOYMENT_APP_ID, GENESIS_SEED } from "../../../common/contantes.js";
+import System from "../system.js";
 
 const CONCURRENT_RESHARE = 5;
 
@@ -32,7 +34,7 @@ function isRequestAnnounced(explorerResult, options:AnnounceCheckOptions={}) {
 
 export default class ReshareCronJob extends BaseCronJob{
 
-  protected startDelay:number = 10e3;
+  protected startDelay:number = 300e3;
   protected interval:number = 30e3;
   protected leadingPeriod: number = 300e3;
   protected leadingGap: number = 30e3;
@@ -51,7 +53,13 @@ export default class ReshareCronJob extends BaseCronJob{
     return this.muon.getPlugin('app-manager')
   }
 
+  private get SystemPlugin():System {
+    return this.muon.getPlugin('system')
+  }
+
   async process() {
+    await this.checkDeploymentInitialization();
+    
     let pendingContexts: AppContext[] = this.appManager.filterContexts({
       deploymentStatus: [APP_STATUS_PENDING, APP_STATUS_EXPIRED],
       custom: ctx => ctx.rotationEnabled === true
@@ -100,6 +108,24 @@ export default class ReshareCronJob extends BaseCronJob{
     }))
 
     this.log(`all ${pendingContexts.length} reshare done.`)
+  }
+
+  async checkDeploymentInitialization() {
+    const lastDeploymentContext = this.appManager.getAppLastContext(DEPLOYMENT_APP_ID)!;
+    const {appId, seed} = lastDeploymentContext;
+    const lastDeploymentStatus:AppDeploymentStatus = this.appManager.getAppDeploymentStatus(appId, seed);
+    this.log(`deployment status: %o`, {lastDeploymentStatus, seed});
+    if(seed === GENESIS_SEED && lastDeploymentStatus !== APP_STATUS_DEPLOYED) {
+      await this.SystemPlugin.initializeGenesisKey()
+      return;
+    }
+    else if(lastDeploymentStatus === APP_STATUS_EXPIRED) {
+      const genesisStatus = this.appManager.getAppDeploymentStatus(DEPLOYMENT_APP_ID, GENESIS_SEED)
+      if(genesisStatus !== APP_STATUS_DEPLOYED) {
+        await this.SystemPlugin.initializeGenesisKey()
+      }
+      return;
+    }
   }
 
   /**

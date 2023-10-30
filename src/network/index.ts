@@ -16,7 +16,6 @@ import LatencyCheckPlugin from "./plugins/latency-check.js";
 import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
-import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
 import { logger } from "@libp2p/logger";
 import {findMyIp, parseBool, timeout} from "../utils/helpers.js";
 import { muonRouting } from "./muon-routing.js";
@@ -93,19 +92,24 @@ class Network extends Events {
     let myIp;
     if (!parseBool(process.env.DISABLE_PUBLIC_IP_ANNOUNCE!)) {
       log("finding public ip ...");
-      myIp = await findMyIp();
-      if(!myIp){
-        myIp = await publicIpv4();
-      }
-      if(!myIp){
-        log(`unable to find public ip`);
-      }
-      else {
-        log(`public ip: %s`, myIp);
-        announce.push(
-          `/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`
-        );
-        log(`announce public address: %s`, announce[0]);
+      try {
+        myIp = await findMyIp();
+        if (!myIp) {
+          myIp = await publicIpv4();
+        }
+        if (!myIp) {
+          throw `unable to find node's public ip.`
+        }
+        else {
+          log(`public ip: %s`, myIp);
+          announce.push(
+            `/ip4/${myIp}/tcp/${configs.port}/p2p/${process.env.PEER_ID}`
+          );
+          log(`announce public address: %s`, announce[0]);
+        }
+      } catch (e) {
+        log.error(`error when loading public ip %s`, e.message);
+        throw `unable to find node's public ip.`
       }
     }
 
@@ -308,7 +312,6 @@ async function start() {
         } as NodeManagerPluginConfigs
       ],
       "latency": [LatencyCheckPlugin, {}],
-      broadcast: [NetworkBroadcastPlugin, {}],
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],
       "ipc-handler": [IpcHandlerPlugin, {}],

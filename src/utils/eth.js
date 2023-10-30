@@ -2,6 +2,7 @@ import Web3 from 'web3'
 import EventEmbitter from 'events'
 import { sortObject, getTimestamp, timeout } from './helpers.js'
 import * as crypto from './crypto.js'
+import {logger} from '@libp2p/logger'
 import { createRequire } from "module";
 import EthRpcList from './eth-rpc-list.js';
 const require = createRequire(import.meta.url);
@@ -10,6 +11,7 @@ const ERC721_ABI = require('../data/ERC721-ABI.json')
 import {muonSha3} from './sha3.js'
 
 
+const log = logger('muon:utils:eth')
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
 
@@ -53,8 +55,14 @@ function getWeb3(network) {
     return Promise.reject({ message: `invalid network "${network}"` })
 
   if (!web3Instances[chainId]) {
-    const nextRpc = ((lastUsedRpcIndex[chainId] ?? -1) + 1) % EthRpcList[chainId].length;
+    const previusRpc = lastUsedRpcIndex[chainId] ?? -1;
+    const nextRpc = (previusRpc + 1) % EthRpcList[chainId].length;
     lastUsedRpcIndex[chainId] = nextRpc;
+    log(`eth rpc change %o`, {
+      chainId, 
+      from: EthRpcList[chainId][previusRpc], 
+      to: EthRpcList[chainId][nextRpc]
+    })
     web3Instances[chainId] = new Web3(new HttpProvider(EthRpcList[chainId][nextRpc]))
   }
 
@@ -124,12 +132,12 @@ function errorNeedRpcRotate(msg) {
   return false
 }
 
-async function wrappedCall(network, web3ApiCall, args=[]) {
+async function wrappedCall(network, web3ApiCall, args=[], options={}) {
   try {
     return await web3ApiCall(...args)
   }
   catch (e) {
-    if(errorNeedRpcRotate(e.message) ) {
+    if(options.forceRotate || errorNeedRpcRotate(e.message) ) {
       const chainId = getNetworkId(network);
       console.log(`error on web3 call`, {chainId}, e.message)
       delete web3Instances[chainId];
@@ -166,10 +174,21 @@ function getTransactionReceipt(txHash, network) {
   return getWeb3(network).then((web3) => wrappedCall(network, web3.eth.getTransactionReceipt.bind(web3), [txHash]))
 }
 
-function call(contractAddress, methodName, params, abi, network) {
+/**
+ * Call a smart contract method
+ * @param {string} contractAddress - Smart contract address
+ * @param {string} methodName - Smart contract method name
+ * @param {any} params - Call params
+ * @param {object} abi - Smart contract ABI object
+ * @param {string} network - Chain ID
+ * @param {object} options - Options
+ * @param {boolean, undefined} options.forceRotate - rotate RPC provider when any error happened.  
+ * @returns {Promise<any>}
+ */
+function call(contractAddress, methodName, params, abi, network, options={}) {
   return getWeb3(network).then((web3) => {
     let contract = new web3.eth.Contract(abi, contractAddress)
-    return wrappedCall(network, contract.methods[methodName](...params).call)
+    return wrappedCall(network, contract.methods[methodName](...params).call, undefined, options)
   })
 }
 
