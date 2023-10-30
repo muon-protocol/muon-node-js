@@ -175,7 +175,7 @@ router.use(
     // @ts-ignore
     const wallet = crypto.recover(hash, signature);
     if (wallet !== realPeerInfo[0].wallet) {
-      log(`Invalid dicovery signature, ${peerInfo.id}`);
+      log(`Invalid dicovery signature %o`, peerInfo);
       throw `Invalid signature`;
     }
 

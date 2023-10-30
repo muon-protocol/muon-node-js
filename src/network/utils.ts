@@ -104,7 +104,7 @@ export async function getContractInfo(nodeManagerConfigs: NodeManagerConfigs, co
     "1":lastNodeId,
     "2":lastRoleId,
     "3":configValues
-  } = await eth.call(address, 'getInfo', [configNames], NodeManagerAbi, network);
+  } = await eth.call(address, 'getInfo', [configNames], NodeManagerAbi, network, {forceRotate: true});
   return {
     lastUpdateTime,
     lastNodeId,
@@ -133,7 +133,8 @@ export async function getNodeManagerData(nodeManagerConfigs: NodeManagerConfigs)
       'getAllNodes',
       ["0", `0x${startIndex.toString(16)}`,`0x${endIndex.toString(16)}`],
       NodeManagerAbi,
-      network
+      network,
+      {forceRotate: true},
     )
   }))
   let rawResult: NodeManagerDataRaw = [].concat(...pagesData);
@@ -182,7 +183,7 @@ export async function tryAndGetNodeManagerChanges(nodeManagerConfigs: NodeManage
 
 export async function getNodeManagerChanges(nodeManagerConfigs: NodeManagerConfigs, fromTimestamp: number, count:number=100): Promise<NodeManagerData> {
   const {address, network} = nodeManagerConfigs;
-  const changes = await eth.call(address, 'getEditedNodes', [fromTimestamp, 0, count], NodeManagerAbi, network)
+  const changes = await eth.call(address, 'getEditedNodes', [fromTimestamp, 0, count], NodeManagerAbi, network, {forceRotate: true})
 
   let lastUpdateTime = fromTimestamp;
   const nodes = changes.nodesList
