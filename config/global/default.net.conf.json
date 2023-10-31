@@ -48,7 +48,7 @@
       "startDelay": 120e3,
       "interval": 600e3
     },
-    "dbSyncOnlineThreshold": 3
+    "dbSyncOnlineThreshold": 2
   },
   "analytics": {
     "baseUrls": [
