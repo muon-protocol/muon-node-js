@@ -31,7 +31,6 @@ export default class BasePlugin extends Events{
    * @returns {Promise<void>}
    */
   async onStart(){
-    await this.registerBroadcastHandler()
   }
 
   get muon(): Muon {
@@ -50,47 +49,6 @@ export default class BasePlugin extends Events{
   get ConstructorName() {
     let superClass = Object.getPrototypeOf(this);
     return superClass.constructor.name
-  }
-
-  protected get BROADCAST_CHANNEL(){
-    // @ts-ignore
-    if(this.__broadcastHandlerMethod === undefined)
-      return null;
-    // @ts-ignore
-    return `muon.core.${this.ConstructorName}.${this.__broadcastHandlerMethod}`
-  }
-
-  async registerBroadcastHandler(){
-    let broadcastChannel = this.BROADCAST_CHANNEL
-    /*eslint no-undef: "error"*/
-    if (broadcastChannel) {
-      if(process.env.VERBOSE) {
-        log('Subscribing to broadcast channel %s', this.BROADCAST_CHANNEL)
-      }
-      this.muon.getPlugin('broadcast').subscribe(this.BROADCAST_CHANNEL);
-      // @ts-ignore
-      this.muon.getPlugin('broadcast').on(broadcastChannel, this[this.__broadcastHandlerMethod].bind(this))
-    }
-  }
-
-  broadcast(data){
-    // @ts-ignore
-    if(this.__broadcastHandlerMethod === undefined) {
-      throw `core.${this.ConstructorName} plugin is not declared broadcast handler`;
-    }
-    this.muon.getPlugin('broadcast')
-        .broadcastToChannel(this.BROADCAST_CHANNEL, data)
-        .catch(e => {
-          log(`${this.ConstructorName}.broadcast %O`, e)
-        })
-  }
-
-  broadcastToChannel(channel, data){
-    this.muon.getPlugin('broadcast')
-        .broadcastToChannel(channel, data)
-        .catch(e => {
-          log(`${this.ConstructorName}.broadcastToChannel %O`, e)
-        })
   }
 
   sharedMemKey(key) {

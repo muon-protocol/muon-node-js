@@ -9,6 +9,7 @@
 import TimeoutPromise from '../../../common/timeout-promise.js'
 import NodeCache from 'node-cache'
 import {MapOf} from "../../../common/mpc/types";
+import { AppRequest } from '../../../common/types.js';
 
 const requestCache = new NodeCache({
   /**
@@ -76,9 +77,9 @@ export default class AppRequestManager{
     }
   }
 
-  getRequest(reqId): object | undefined{
+  getRequest(reqId): AppRequest | undefined{
     const item: CacheItem | undefined = requestCache.get(reqId)
-    return !!item ? item.request : undefined
+    return !!item ? item.request as AppRequest : undefined
   }
 
   addSignature(reqId: string, owner: string, sign: string){
