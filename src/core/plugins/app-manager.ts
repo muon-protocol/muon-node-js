@@ -49,7 +49,6 @@ export type ContextFilterOptions = {
   excludeExpired?: boolean,
   excludeGenesis?: boolean,
   deploymentStatus?: AppDeploymentStatus[],
-  hasKeyGenRequest?: boolean,
   custom?: (ctx: AppContext) => boolean,
 }
 
@@ -90,7 +89,6 @@ export default class AppManager extends CallablePlugin {
 
     this.muon.on("app-context:onboard", this.onAppContextOnboard.bind(this))
     this.muon.on("app-context:add", this.onAppContextAdd.bind(this))
-    this.muon.on("app-context:update", this.onAppContextUpdate.bind(this))
     this.muon.on("app-context:delete", this.onAppContextDelete.bind(this))
     this.muon.on("app-tss-key:add", this.onAppTssConfigAdd.bind(this))
 
@@ -214,15 +212,7 @@ export default class AppManager extends CallablePlugin {
       // @ts-ignore
       const oldDoc = await AppContextModel.findOne({seed: context.seed, appId: context.appId})
       if (oldDoc) {
-        if(oldDoc.keyGenRequest) {
-          return;
-        }
-        _.assign(oldDoc, context)
-        oldDoc.dangerousAllowToSave = true
-        await oldDoc.save()
-        CoreIpc.fireEvent({type: "app-context:update", data: context})
-        NetworkIpc.fireEvent({type: "app-context:update", data: context})
-        return oldDoc
+        return;
       } else {
         let newContext = new AppContextModel(context)
         /**
@@ -262,29 +252,6 @@ export default class AppManager extends CallablePlugin {
       }
       CoreIpc.fireEvent({type: "app-tss-key:add", data: newConfig})
     }
-
-    // // @ts-ignore
-    // const {appId, seed, keyGenRequest, publicKey, polynomial} = appTssConfig;
-    // let context = await AppContextModel.findOne({seed}).exec();
-    // if(!context) {
-    //   context = new AppContextModel(this.getAppContext(appId, seed))
-    // }
-
-    // if(context.appId !== appId) {
-    //   log.error(`AppManager.saveAppTssConfig appId mismatch %o`, {"appTssConfig.appId": appId, "context.appId": context.appId})
-    //   return ;
-    // }
-
-    // // @ts-ignore
-    // context.keyGenRequest = keyGenRequest
-    // context.publicKey = publicKey
-    // context.polynomial = polynomial
-    // context.dangerousAllowToSave = true
-    // if(context.seed !== GENESIS_SEED) {
-    //   await context.save();
-    // }
-    // CoreIpc.fireEvent({type: "app-context:update", data: context,})
-    // NetworkIpc.fireEvent({type: "app-context:update", data: context,})
   }
 
   private async onAppContextOnboard(ctx: AppContext) {
@@ -297,16 +264,6 @@ export default class AppManager extends CallablePlugin {
     log(`app context add %o`, ctx)
     const {appId, seed} = ctx;
     this.appContexts[seed] = ctx;
-    this.appSeeds[appId] = _.uniq([
-      ...this.getAppSeeds(appId),
-      seed
-    ]) as string[]
-  }
-
-  private async onAppContextUpdate(doc) {
-    log(`app context update %o`, doc)
-    const {appId, seed} = doc;
-    this.appContexts[seed] = doc;
     this.appSeeds[appId] = _.uniq([
       ...this.getAppSeeds(appId),
       seed
@@ -353,13 +310,11 @@ export default class AppManager extends CallablePlugin {
       appId,
       seed,
       deployed,
-      hasKeyGenRequest: false,
       hasTssKey: this.appHasTssKey(appId, seed),
       status,
     }
     const context = seed ? this.getAppContext(appId, seed) : null
     if(context) {
-      result.hasKeyGenRequest = !!context.keyGenRequest;
       result.reqId = appId === DEPLOYMENT_APP_ID ? undefined : context.deploymentRequest?.reqId;
       result.contextHash = hashAppContext(context);
     }
@@ -617,11 +572,6 @@ export default class AppManager extends CallablePlugin {
           if(!options.deploymentStatus.includes(this.getAppDeploymentStatus(appId, seed)))
             return false
         }
-        if(options.hasKeyGenRequest !== undefined) {
-          let hasKeyGenRequest = !!ctx.keyGenRequest
-          if(options.hasKeyGenRequest !== hasKeyGenRequest)
-            return false;
-        }
         if(options.custom && !options.custom(ctx)) {
           return false;
         }
@@ -715,13 +665,7 @@ export default class AppManager extends CallablePlugin {
 
   hasContext(ctx: AppContext): boolean {
     let existingCtx: AppContext = this.appContexts[ctx.seed];
-    if(!existingCtx)
-      return false;
-    return (
-      (!ctx.keyGenRequest && !existingCtx.keyGenRequest)
-      ||
-      (ctx.keyGenRequest?.data.result.seed === existingCtx.keyGenRequest?.data.result.seed)
-    )
+    return !existingCtx
   }
 
   appHasTssKey(appId: string, seed: string): boolean {

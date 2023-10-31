@@ -39,8 +39,8 @@ async function callProperNode(requestData: GatewayCallParams, currentNode: MuonN
 
   if (context) {
     let partners = context.party.partners;
-    if(context.keyGenRequest?.data?.init?.shareProofs)
-      partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs)
+    if(context.deploymentRequest?.data?.init?.key?.shareProofs)
+      partners = Object.keys(context.deploymentRequest?.data?.init?.key?.shareProofs)
     if(partners.includes(currentNode.id)) {
       return await enqueueAppRequest(requestData)
     }

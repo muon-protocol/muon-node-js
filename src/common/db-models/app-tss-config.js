@@ -17,7 +17,6 @@ const TssPolynomialInfo = mongoose.Schema({
 const modelSchema = mongoose.Schema({
   appId: {type: String, required: true},
   seed: {type: String, required: true},
-  keyGenRequest: {type: Object},
   publicKey: {type: TssPublicKeyInfo, required: true},
   keyShare: {type: String},
   polynomial: {type: TssPolynomialInfo},

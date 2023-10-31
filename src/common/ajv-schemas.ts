@@ -191,7 +191,6 @@ export const AppContextSchema = {
     pendingPeriod: {type: "number"},
     expiration: {type: "number"},
     deploymentRequest: AppRequestSchema,
-    keyGenRequest: AppRequestSchema,
     publicKey: JsonPublicKeySchema,
     polynomial: PolynomialInfoJsonSchema,
   },

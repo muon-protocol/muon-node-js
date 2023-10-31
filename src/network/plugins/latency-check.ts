@@ -33,7 +33,6 @@ export default class LatencyCheckPlugin extends CallablePlugin {
     await super.onStart();
 
     this.network.on("app-context:add", this.onAppContextAdd.bind(this))
-    this.network.on("app-context:update", this.onAppContextUpdate.bind(this))
     this.network.on("app-context:delete", this.onAppContextDelete.bind(this))
 
     this.monitorAllContexts();
@@ -132,12 +131,6 @@ export default class LatencyCheckPlugin extends CallablePlugin {
   async onAppContextAdd(context: AppContext) {
     let {seed} = context
     log(`adding context to monitor list. ${seed}`)
-    this.initAppContext(context)
-  }
-
-  async onAppContextUpdate(context: AppContext) {
-    let {seed} = context
-    log(`updating context of monitor list. ${seed}`)
     this.initAppContext(context)
   }
 

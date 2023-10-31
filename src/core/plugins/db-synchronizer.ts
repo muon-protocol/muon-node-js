@@ -179,7 +179,6 @@ export default class DbSynchronizer extends CallablePlugin {
 
             if (uniqueList.length > 0) {
               const lastContextTime: number = uniqueList
-                .filter(ctx => !!ctx.keyGenRequest)
                 .reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
 
               /** filter out locally existing context and keep only missing contexts. */
