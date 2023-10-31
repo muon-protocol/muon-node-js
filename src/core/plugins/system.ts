@@ -515,7 +515,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey: pub2json(key.publicKey!),
         keyShare: bn2hex(key.share!),
         polynomial,
@@ -550,7 +549,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey: pub2json(key.publicKey!),
         keyShare: bn2hex(key.share!),
         polynomial,
@@ -561,7 +559,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey: request.data.init.publicKey,
         polynomial,
         expiration,
@@ -614,7 +611,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey,
         keyShare,
         polynomial,
@@ -625,7 +621,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey,
         polynomial,
         expiration,

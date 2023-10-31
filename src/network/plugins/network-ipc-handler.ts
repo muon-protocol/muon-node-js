@@ -425,8 +425,8 @@ class NetworkIpcHandler extends CallablePlugin {
     const context: AppContext|undefined = await CoreIpc.getAppOldestContext(app);
     if(context) {
       let partners = context.party.partners;
-      if(!!context.keyGenRequest?.data?.init?.shareProofs) {
-        partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs);
+      if(!!context.deploymentRequest?.data?.init?.key?.shareProofs) {
+        partners = Object.keys(context.deploymentRequest?.data?.init?.key?.shareProofs);
       }
       /** When the context exists, the node can either process it or send it to the appropriate node. */
       if(partners.includes(currentNode.id)) {

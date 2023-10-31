@@ -65,8 +65,6 @@ export type AppDeploymentInfo = {
     seed: string|null,
     /** Is app deployed? */
     deployed: boolean,
-    /** Is this context contains the TSS key generation request data */
-    hasKeyGenRequest: boolean,
     /** Is this node has the App's TSS key share */
     hasTssKey: boolean,
     /** deployment status*/
@@ -166,7 +164,6 @@ export type AppContext = {
     pendingPeriod?: number,
     expiration?: number,
     deploymentRequest?: AppRequest,
-    keyGenRequest?: AppRequest,
     publicKey?: JsonPublicKey,
     polynomial?: PolynomialInfoJson
 }
@@ -184,7 +181,6 @@ export type PolynomialInfoJson = {
 export type AppTssConfig = {
     appId: string,
     seed: string,
-    keyGenRequest?: AppRequest,
     publicKey: JsonPublicKey,
     keyShare?: string,
     expiration?: number,

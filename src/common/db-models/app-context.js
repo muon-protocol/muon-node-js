@@ -44,7 +44,6 @@ const modelSchema = mongoose.Schema({
    */
   expiration:{type: Number},
   deploymentRequest: {type: Object},
-  keyGenRequest: {type: Object},
   publicKey: {type: TssPublicKeyInfo},
   polynomial: {type: TssPolynomialInfo}
 }, {timestamps: true});
