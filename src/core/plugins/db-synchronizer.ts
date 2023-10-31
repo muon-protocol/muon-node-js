@@ -17,6 +17,7 @@ import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
 import {readSetting, writeSetting} from "../../common/db-models/Settings.js";
 import {APP_STATUS_EXPIRED} from "../constants.js";
+import { DEPLOYMENT_APP_ID, GENESIS_SEED } from "../../common/contantes.js";
 
 const DEPLOYER_SYNC_ITEM_PER_PAGE = 100;
 const log = logger("muon:core:plugins:synchronizer")
@@ -146,7 +147,7 @@ export default class DbSynchronizer extends CallablePlugin {
           candidateDeployers,
           dbSyncOnlineThreshold,
           {
-            timeout: 3000,
+            timeout: 5000,
             return: 'peerId'
           },
         );
@@ -185,7 +186,7 @@ export default class DbSynchronizer extends CallablePlugin {
               uniqueList = uniqueList.filter(ctx => {
                 const {appId, seed} = ctx
 
-                if(appId === "1")
+                if(appId === DEPLOYMENT_APP_ID && seed === GENESIS_SEED)
                   return false;
 
                 /** if ctx exist locally */
@@ -194,7 +195,7 @@ export default class DbSynchronizer extends CallablePlugin {
 
                 const lastContext = this.appManager.getAppLastContext(appId);
                 /** if newer rotated context of app exist locally */
-                if(!!lastContext && lastContext.deploymentRequest!.data.result.timestamp > ctx.deploymentRequest?.data.result.timestamp)
+                if(!!lastContext && lastContext.deploymentRequest?.data.result.timestamp > ctx.deploymentRequest?.data.result.timestamp)
                   return false;
 
                 return true;
