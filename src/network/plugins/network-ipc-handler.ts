@@ -415,7 +415,7 @@ class NetworkIpcHandler extends CallablePlugin {
       const onlineList: string[] = await this.nodeManager.findNOnline(
         _.shuffle(deployers).slice(0, Math.ceil(deployers.length/2)),
         1,
-        {timeout: 2000},
+        {timeout: 5000},
       )
       if(onlineList.length <= 0)
         throw `no online deployer to forward the request`;
