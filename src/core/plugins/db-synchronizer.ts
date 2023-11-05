@@ -69,6 +69,9 @@ export default class DbSynchronizer extends CallablePlugin {
       else {
         log(`process pid:${process.pid} not permitted to synchronize db.`)
       }
+
+
+      this.muon.on("db:synced", this.onDbSynced.bind(this))
     }
   }
 
@@ -221,7 +224,7 @@ export default class DbSynchronizer extends CallablePlugin {
               break;
           }
 
-          this.isDbSynced = true;
+          CoreIpc.fireEvent({type: "db:synced", data:null})
         }
       }
 
@@ -230,6 +233,10 @@ export default class DbSynchronizer extends CallablePlugin {
       else
         await timeout(Math.floor((0.5 + Math.random()) * interval));
     }
+  }
+
+  async onDbSynced() {
+    this.isDbSynced = true;
   }
 
   private async syncContextsAndKeys() {
