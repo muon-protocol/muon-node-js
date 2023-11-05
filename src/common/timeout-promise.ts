@@ -49,9 +49,9 @@ export default class TimeoutPromise {
     this._resolve(value);
   }
 
-  reject(reason: any) {
+  reject(reason: any, preventTimoutResolve:boolean=false) {
     this.isFulfilled = true;
-    if(this.options.resolveOnTimeout) {
+    if(this.options.resolveOnTimeout && !preventTimoutResolve) {
       if(this.options.onTimeoutResult)
         this._resolve(this.options.onTimeoutResult(this.options.defaultResult))
       else
