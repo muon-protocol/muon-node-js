@@ -354,7 +354,8 @@ export default class NodeManagerPlugin extends CallablePlugin{
               resultPromise.reject({
                 message: `cannot found ${count} online from ${searchList.length} candidate nodes.`,
                 responses: allResponses
-              })
+              }, true);
+              return;
             }
             resultPromise.resolve(responseList);
           }
