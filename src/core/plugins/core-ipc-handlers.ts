@@ -165,7 +165,7 @@ class CoreIpcHandlers extends CallablePlugin {
   @ipcMethod(IpcMethods.IsDbSynced)
   async __isDbSynced(): Promise<boolean> {
     const dbSync: DbSynchronizer = this.muon.getPlugin("db-synchronizer");
-    return dbSync.isSynced
+    return dbSync.isSynced();
   }
 }
 

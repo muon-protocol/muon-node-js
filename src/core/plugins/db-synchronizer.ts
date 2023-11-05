@@ -5,7 +5,7 @@ import NodeManagerPlugin from "./node-manager.js";
 import * as NetworkIpc from "../../network/ipc.js";
 import {AppContext, MuonNodeInfo, NetConfigs} from "../../common/types";
 import KeyManager from "./key-manager.js";
-import {getTimestamp, timeout} from "../../utils/helpers.js";
+import {getTimestamp, parseBool, timeout} from "../../utils/helpers.js";
 import {logger} from '@libp2p/logger'
 import {MapOf} from "../../common/mpc/types";
 import AppContextModel from "../../common/db-models/app-context.js";
@@ -15,11 +15,13 @@ import axios, {AxiosInstance} from "axios";
 import _ from 'lodash';
 import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
+import {RedisCache} from "../../common/redis-cache.js";
 import {readSetting, writeSetting} from "../../common/db-models/Settings.js";
 import {APP_STATUS_EXPIRED} from "../constants.js";
 import { DEPLOYMENT_APP_ID, GENESIS_SEED } from "../../common/contantes.js";
 
 const DEPLOYER_SYNC_ITEM_PER_PAGE = 100;
+const SYNC_STATUS_REDIS_KEY = "dbIsSynced";
 const log = logger("muon:core:plugins:synchronizer")
 
 type DeleteCheckResult = "YES" | "MISSING" | "NOT-RESHARED" | "NOT-EXPIRED"
@@ -34,7 +36,7 @@ const RemoteMethods = {
 @remoteApp
 export default class DbSynchronizer extends CallablePlugin {
   private readonly apis: AxiosInstance[];
-  private isDbSynced:boolean = false;
+  private readonly redisCache:RedisCache;
 
   constructor(muon, configs) {
     super(muon, configs)
@@ -48,6 +50,9 @@ export default class DbSynchronizer extends CallablePlugin {
           timeout: 5000,
         })
       );
+
+      const {interval} = netConfigs.synchronizer.monitor
+      this.redisCache = new RedisCache("db-sync-cache", Math.ceil(interval / 1000));
     }
   }
 
@@ -69,9 +74,6 @@ export default class DbSynchronizer extends CallablePlugin {
       else {
         log(`process pid:${process.pid} not permitted to synchronize db.`)
       }
-
-
-      this.muon.on("db:synced", this.onDbSynced.bind(this))
     }
   }
 
@@ -83,8 +85,9 @@ export default class DbSynchronizer extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
-  get isSynced():boolean {
-    return this.isDbSynced;
+  async isSynced():Promise<boolean> {
+    const synced = await this.redisCache.get(SYNC_STATUS_REDIS_KEY);
+    return parseBool(synced);
   }
 
   private async nonDeployersSyncLoop() {
@@ -222,19 +225,21 @@ export default class DbSynchronizer extends CallablePlugin {
               break;
           }
 
-          CoreIpc.fireEvent({type: "db:synced", data:null})
+          this.redisCache.set(SYNC_STATUS_REDIS_KEY, "true")
         }
       }
 
-      if (!this.isDbSynced)
-        await timeout(Math.floor((0.5 + Math.random()) * interval / 2)); //wait less if sync failed
-      else
+      const isDbSynced = await this.isSynced();
+      if (isDbSynced) {
+        /** Renew the expiration time of the key to avoid deleting it. */
+        await this.redisCache.set(SYNC_STATUS_REDIS_KEY, "true");
+        
         await timeout(Math.floor((0.5 + Math.random()) * interval));
+      } 
+      else {
+        await timeout(Math.floor((0.5 + Math.random()) * interval / 2)); //wait less if sync failed
+      }
     }
-  }
-
-  async onDbSynced() {
-    this.isDbSynced = true;
   }
 
   private async syncContextsAndKeys() {
