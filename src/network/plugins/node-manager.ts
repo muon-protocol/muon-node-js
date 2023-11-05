@@ -17,6 +17,7 @@ import {remoteApp, remoteMethod} from "./base/app-decorators.js";
 import lodash from "lodash";
 import {Network} from "../index";
 import {ifSynced} from "../remotecall-middlewares.js";
+import { MapOf } from '../../common/mpc/types.js';
 
 const require = createRequire(import.meta.url);
 const NodeManagerAbi = require('../../data/NodeManager-ABI.json')
@@ -35,6 +36,12 @@ const RemoteMethods = {
 
 export type NodeManagerPluginConfigs = {
   initialNodeManagerData: NodeManagerData
+}
+
+export type FindNOnlineOptions = {
+  timeout?: number,
+  return?: string,
+  forceNOnline?: boolean,
 }
 
 @remoteApp
@@ -288,20 +295,20 @@ export default class NodeManagerPlugin extends CallablePlugin{
     return result
   }
 
-  findNOnline(searchList: string[], count: number, options?:{timeout?: number, return?: string}): Promise<string[]> {
+  findNOnline(searchList: string[], count: number, options?: FindNOnlineOptions): Promise<string[]> {
     options = {
       timeout: 15000,
       return: 'id',
       ...options
     }
-    let peers = this.filterNodes({list: searchList})
+    let nodes: MuonNodeInfo[] = this.filterNodes({list: searchList});
     log(`finding ${count} of ${searchList.length} online peer ...`)
-    const selfIndex = peers.findIndex(p => p.peerId === process.env.PEER_ID!)
+    const selfIndex = nodes.findIndex(p => p.peerId === process.env.PEER_ID!)
 
     let responseList: string[] = []
     let n = count;
     if(selfIndex >= 0) {
-      peers = peers.filter((_, i) => (i!==selfIndex))
+      nodes = nodes.filter((_, i) => (i!==selfIndex))
       responseList.push(this.currentNodeInfo![options!.return!]);
       n--;
     }
@@ -317,17 +324,19 @@ export default class NodeManagerPlugin extends CallablePlugin{
       }
     );
 
-    let pendingRequests = peers.length
-    for(let i=0 ; i<peers.length ; i++) {
-      this.findPeer(peers[i].peerId)
+    let pendingRequests = nodes.length;
+    const allResponses: MapOf<string> = {};
+    for(let i=0 ; i<nodes.length ; i++) {
+      this.findPeer(nodes[i].peerId)
         .then(peer => {
           if(!peer)
-            throw `peer ${peers[i].peerId} not found to check online status.`
+            throw `peer ${nodes[i].peerId} not found to check online status.`
           return this.remoteCall(peer, RemoteMethods.CheckOnline, {}, {timeout: options!.timeout})
         })
         .then(result => {
+          allResponses[nodes[i].id] = result;
           if(result === "OK") {
-            responseList.push(peers[i][options!.return!])
+            responseList.push(nodes[i][options!.return!])
             if (--n <= 0)
               resultPromise.resolve(responseList);
           }
@@ -336,11 +345,19 @@ export default class NodeManagerPlugin extends CallablePlugin{
           }
         })
         .catch(e => {
+          allResponses[nodes[i].id] = typeof e === "string" ? e : e.message;
           log.error("check status error %O", e)
         })
         .finally(() => {
-          if(--pendingRequests <= 0)
+          if(--pendingRequests <= 0) {
+            if(responseList.length < count && options?.forceNOnline) {
+              resultPromise.reject({
+                message: `cannot found ${count} online from ${searchList.length} candidate nodes.`,
+                responses: allResponses
+              })
+            }
             resultPromise.resolve(responseList);
+          }
         })
     }
 

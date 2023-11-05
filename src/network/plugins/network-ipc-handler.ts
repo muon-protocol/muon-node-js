@@ -246,7 +246,7 @@ class NetworkIpcHandler extends CallablePlugin {
   private async forwardGatewayRequestToOnlinePartner(partners: string[], requestData: GatewayCallParams, timeout?:number) {
     const n = partners.length;
     const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(n/2));
-    const onlines: string[] = await this.nodeManager.findNOnline(candidatePartners, 1, {timeout: 5000});
+    const onlines: string[] = await this.nodeManager.findNOnline(candidatePartners, 1, {timeout: 5000, forceNOnline: true});
     if(onlines.length < 1)
       throw `The request cannot be forwarded because there is no online partner`;
     return this.forwardGatewayCallToOtherNode(
