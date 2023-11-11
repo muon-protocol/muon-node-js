@@ -12,11 +12,6 @@ RUN git clone https://github.com/muon-protocol/muon-node-js.git --recurse-submod
 ## Install app dependencies
 WORKDIR /usr/src/muon-node-js
 
-COPY ./Dockerfile ./devnet
-COPY ./docker-compose.yml ./devnet
-COPY ./ecosystem.config.cjs ./devnet
-COPY ./package.json .
-
 RUN npm i -g @babel/node
 RUN npm i -g pm2
 RUN pm2 install pm2-logrotate
