@@ -12,6 +12,10 @@
     "address": "0x25B019d98CF6FBcD73C92C468A352449e2BB39C2",
     "stake": "0xd788C2276A6f75a8B9360E9695028329C925b0AB"
   },
+  "connectionManager":{
+    "maxConnections": 500,
+    "pruneInterval": 300000
+  },
   "routing": {
     "delegate": [
       "https://alice-n2.muon.net/delegate",
