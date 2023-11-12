@@ -212,6 +212,11 @@ export type NodeManagerConfigs = {
     network: string,
 }
 
+export type ConnectionManagerConfigs = {
+    maxConnections: number,
+    pruneInterval: number,
+}
+
 export type NetConfigs = {
     defaultLeader: string,
     tss: {
@@ -222,6 +227,7 @@ export type NetConfigs = {
         minShareProof: number,
     },
     nodeManager: NodeManagerConfigs,
+    connectionManager: ConnectionManagerConfigs,
     "routing": {
         "delegate": string[]
     },

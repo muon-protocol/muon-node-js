@@ -7,6 +7,7 @@ import BaseAppPlugin from "./base/base-app-plugin.js";
 import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
 import NodeManagerPlugin from "./node-manager";
 import DbSynchronizer from "./db-synchronizer";
+import lodash from 'lodash';
 
 export const IpcMethods = {
   ExecRemoteCall: "exec-remote-call",
@@ -22,6 +23,7 @@ export const IpcMethods = {
   VerifyRequestSignature: "verify-req-sign",
   GetNodeLastContextTime: "get-node-last-ctx-time",
   IsDbSynced: "is-db-synced",
+  GetNodesWithCommonSubnet: "get-nodes-with-common-subnet",
 } as const;
 type IpcKeys = keyof typeof IpcMethods;
 export type CoreIpcMethod = typeof IpcMethods[IpcKeys];
@@ -166,6 +168,13 @@ class CoreIpcHandlers extends CallablePlugin {
   async __isDbSynced(): Promise<boolean> {
     const dbSync: DbSynchronizer = this.muon.getPlugin("db-synchronizer");
     return dbSync.isSynced();
+  }
+
+  @ipcMethod(IpcMethods.GetNodesWithCommonSubnet)
+  async __getNodeSubnets():Promise<string[]> {
+    const ctxPartners: string[][] = this.appManager.getNodeAllContexts(this.currentNodeInfo!)
+      .map(ctx => ctx.party.partners);
+    return lodash.uniq(lodash.flatten(ctxPartners))
   }
 }
 

@@ -7,6 +7,7 @@ import { multiaddr } from '@multiformats/multiaddr';
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
 import {loadGlobalConfigs} from "../../../common/configurations.js";
+import { NetConfigs } from "../../../common/types.js";
 
 export default class BaseNetworkPlugin extends Events {
   network: Network;
@@ -31,6 +32,10 @@ export default class BaseNetworkPlugin extends Events {
    * Runs right after the plugin has been started
    */
   async onStart(){
+  }
+
+  get netConfigs():NetConfigs {
+    return this.network.configs.net;
   }
 
   /**

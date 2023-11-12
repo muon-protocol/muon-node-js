@@ -12,6 +12,7 @@ import {
 } from "./utils.js";
 import { MessagePublisher } from "../common/message-bus/index.js";
 import NodeManagerPlugin, {NodeManagerPluginConfigs} from "./plugins/node-manager.js";
+import ConnectionManagerPlugin from "./plugins/connection-pruner.js";
 import LatencyCheckPlugin from "./plugins/latency-check.js";
 import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
@@ -311,6 +312,7 @@ async function start() {
           initialNodeManagerData: nodeManagerData
         } as NodeManagerPluginConfigs
       ],
+      "connection-manager":[ConnectionManagerPlugin, {}],
       "latency": [LatencyCheckPlugin, {}],
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],

@@ -111,3 +111,7 @@ export async function getNodeLastContextTime(node: string): Promise<number|null>
 export async function isDbSynced(): Promise<boolean> {
   return call(IpcMethods.IsDbSynced, {});
 }
+
+export async function GetNodesWithCommonSubnet(): Promise<string[]> {
+  return call(IpcMethods.GetNodesWithCommonSubnet, {});
+}
