@@ -7,8 +7,6 @@ import NodeManagerPlugin, {NodeFilterOptions} from "./node-manager.js";
 import {MessagePublisher, MessageBusConfigs} from "../../common/message-bus/index.js";
 import _ from 'lodash';
 import RemoteCall from "./remote-call.js";
-import NetworkBroadcastPlugin from "./network-broadcast.js";
-// import NetworkDHTPlugin from "./network-dht.js";
 import {parseBool, timeout} from '../../utils/helpers.js'
 import NodeCache from 'node-cache'
 import * as CoreIpc from '../../core/ipc.js'
@@ -68,10 +66,6 @@ export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetNetworkConfig: "get-net-conf",
   GetNodeManagerData: "get-node-manager-data",
-  SubscribeToBroadcastChannel: "subscribe-to-broadcast-channel",
-  BroadcastToChannel: "broadcast-to-channel",
-  // PutDHT: "put-dht",
-  // GetDHT: "get-dht",
   ReportClusterStatus: "report-cluster-status",
   AskClusterPermission: "ask-cluster-permission",
   AssignTask: "assign-task",
@@ -105,16 +99,8 @@ class NetworkIpcHandler extends CallablePlugin {
   clustersPids: { [pid: string]: number } = {};
 
   async onStart() {
-    super.onStart()
+    await super.onStart()
   }
-
-  get broadcastPlugin(): NetworkBroadcastPlugin {
-    return this.network.getPlugin('broadcast')
-  }
-
-  // get DHTPlugin(): NetworkDHTPlugin {
-  //   return this.network.getPlugin('dht')
-  // }
 
   get nodeManager(): NodeManagerPlugin {
     return this.network.getPlugin('node-manager');
@@ -154,28 +140,6 @@ class NetworkIpcHandler extends CallablePlugin {
       nodesList: await this.nodeManager.getNodesList(),
     }
   }
-
-  @ipcMethod(IpcMethods.SubscribeToBroadcastChannel)
-  async __subscribeToBroadcastChannel(channel: string) {
-    await this.broadcastPlugin.subscribe(channel);
-  }
-
-  @ipcMethod(IpcMethods.BroadcastToChannel)
-  async __broadcastToChannel(data: {channel: string, message: any}) {
-    this.broadcastToChannel(data.channel, data.message);
-    return "Ok"
-  }
-
-  // @ipcMethod(IpcMethods.PutDHT)
-  // async __putDHT(data: {key: string, value: any}) {
-  //   let ret = await this.DHTPlugin.put(data.key, data.value);
-  //   return ret
-  // }
-
-  // @ipcMethod(IpcMethods.GetDHT)
-  // async __getDHT(data: {key: string}) {
-  //   return await this.DHTPlugin.get(data.key);
-  // }
 
   assignTaskToProcess(taskId: string, pid: number) {
     tasksCache.set(taskId, pid);
@@ -282,7 +246,7 @@ class NetworkIpcHandler extends CallablePlugin {
   private async forwardGatewayRequestToOnlinePartner(partners: string[], requestData: GatewayCallParams, timeout?:number) {
     const n = partners.length;
     const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(n/2));
-    const onlines: string[] = await this.nodeManager.findNOnline(candidatePartners, 1, {timeout: 5000});
+    const onlines: string[] = await this.nodeManager.findNOnline(candidatePartners, 1, {timeout: 5000, forceNOnline: true});
     if(onlines.length < 1)
       throw `The request cannot be forwarded because there is no online partner`;
     return this.forwardGatewayCallToOtherNode(
@@ -451,7 +415,7 @@ class NetworkIpcHandler extends CallablePlugin {
       const onlineList: string[] = await this.nodeManager.findNOnline(
         _.shuffle(deployers).slice(0, Math.ceil(deployers.length/2)),
         1,
-        {timeout: 2000},
+        {timeout: 5000},
       )
       if(onlineList.length <= 0)
         throw `no online deployer to forward the request`;
@@ -461,8 +425,8 @@ class NetworkIpcHandler extends CallablePlugin {
     const context: AppContext|undefined = await CoreIpc.getAppOldestContext(app);
     if(context) {
       let partners = context.party.partners;
-      if(!!context.keyGenRequest?.data?.init?.shareProofs) {
-        partners = Object.keys(context.keyGenRequest?.data?.init?.shareProofs);
+      if(!!context.deploymentRequest?.data?.init?.key?.shareProofs) {
+        partners = Object.keys(context.deploymentRequest?.data?.init?.key?.shareProofs);
       }
       /** When the context exists, the node can either process it or send it to the appropriate node. */
       if(partners.includes(currentNode.id)) {

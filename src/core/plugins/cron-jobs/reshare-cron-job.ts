@@ -34,7 +34,7 @@ function isRequestAnnounced(explorerResult, options:AnnounceCheckOptions={}) {
 
 export default class ReshareCronJob extends BaseCronJob{
 
-  protected startDelay:number = 10e3;
+  protected startDelay:number = 300e3;
   protected interval:number = 30e3;
   protected leadingPeriod: number = 300e3;
   protected leadingGap: number = 30e3;

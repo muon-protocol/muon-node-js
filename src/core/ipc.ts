@@ -1,13 +1,11 @@
 import {AppContext, AppDeploymentInfo, AppRequest, IpcCallOptions, MuonNodeInfo} from "../common/types";
 import { QueueProducer, MessagePublisher } from '../common/message-bus/index.js'
-import { BROADCAST_CHANNEL } from './plugins/broadcast.js'
 import { IPC_CHANNEL } from './plugins/core-ipc-plugin.js'
 import {MessageOptions} from "../common/message-bus/msg-publisher.js";
 import {IpcMethods, CoreIpcMethod} from "./plugins/core-ipc-handlers.js";
 import {GatewayCallParams} from "../gateway/types";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
-const broadcastQueue = new QueueProducer(BROADCAST_CHANNEL)
 
 export const GLOBAL_EVENT_CHANNEL = 'core-global-events'
 const coreGlobalEvents = new MessagePublisher(GLOBAL_EVENT_CHANNEL)
@@ -40,10 +38,6 @@ export async function enqueueAppRequest(requestData: GatewayCallParams, defaultO
  */
 export function call(method: CoreIpcMethod, params: any, options: IpcCallOptions={}) {
   return callQueue.send({method, params}, options);
-}
-
-export function broadcast(data: any, options: IpcCallOptions={}) {
-  return broadcastQueue.send(data, options)
 }
 
 export function fireEvent(event: CoreGlobalEvent, options: MessageOptions={}) {
@@ -116,4 +110,8 @@ export async function getNodeLastContextTime(node: string): Promise<number|null>
 
 export async function isDbSynced(): Promise<boolean> {
   return call(IpcMethods.IsDbSynced, {});
+}
+
+export async function GetNodesWithCommonSubnet(): Promise<string[]> {
+  return call(IpcMethods.GetNodesWithCommonSubnet, {});
 }

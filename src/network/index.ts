@@ -12,11 +12,11 @@ import {
 } from "./utils.js";
 import { MessagePublisher } from "../common/message-bus/index.js";
 import NodeManagerPlugin, {NodeManagerPluginConfigs} from "./plugins/node-manager.js";
+import ConnectionManagerPlugin from "./plugins/connection-pruner.js";
 import LatencyCheckPlugin from "./plugins/latency-check.js";
 import IpcHandlerPlugin from "./plugins/network-ipc-handler.js";
 import IpcPlugin from "./plugins/network-ipc-plugin.js";
 import RemoteCallPlugin from "./plugins/remote-call.js";
-import NetworkBroadcastPlugin from "./plugins/network-broadcast.js";
 import { logger } from "@libp2p/logger";
 import {findMyIp, parseBool, timeout} from "../utils/helpers.js";
 import { muonRouting } from "./muon-routing.js";
@@ -312,12 +312,11 @@ async function start() {
           initialNodeManagerData: nodeManagerData
         } as NodeManagerPluginConfigs
       ],
+      "connection-manager":[ConnectionManagerPlugin, {}],
       "latency": [LatencyCheckPlugin, {}],
-      broadcast: [NetworkBroadcastPlugin, {}],
       "remote-call": [RemoteCallPlugin, {}],
       ipc: [IpcPlugin, {}],
       "ipc-handler": [IpcHandlerPlugin, {}],
-      // dht: [NetworkDHTPlugin, {}]
     },
     net,
   };

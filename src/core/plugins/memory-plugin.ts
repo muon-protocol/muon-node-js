@@ -1,40 +1,13 @@
-/**
- * This plugin provides some API for store and retrieving data in a shared memory on the Muon network.
- * Writing Data is distributed and will write on the all nodes local database. Reading data is locally
- * at the moment.
- *
- * There is three type of Data can be store in shared memory.
- *
- * 1) node: The owner of this type of MemoryWrite is the `calling node`. The collateral wallet of
- *          the Node will store in memory.  any other nodes can query for this data. This type of
- *          memory write can be done immediately by calling because it needs only the calling nodes
- *          signature.
- *
- * 2) app: The owner of this MemoryWrite is user Apps. The ID of the calling App will store in memory
- *          as the owner of Memory data. This type of MemoryWrite can be stored in memory after that
- *          all nodes (nodes that process the app request) sign the memory write. In the other word, Threshold Signature
- *          needed for this MemoryWrite. Because of the threshold signature, this MemoryWrite only can
- *          be stored when the request is processed successfully.
- *
- * 3) local: The owner of this memory is current node. This type of memory only stored on current node
- *          and does not broadcast to other nodes.
- *
- * Any node on the network can query for app|node types of data.
- */
-
 import CallablePlugin from './base/callable-plugin.js'
-import * as crypto from '../../utils/crypto.js'
 import {getTimestamp} from '../../utils/helpers.js'
-import Memory, {types as MemoryTypes} from '../../common/db-models/Memory.js'
-import { remoteApp, broadcastHandler } from './base/app-decorators.js'
-import NodeManagerPlugin from "./node-manager.js";
+import { remoteApp } from './base/app-decorators.js'
 import { createClient, RedisClient } from 'redis'
 import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
 import Web3 from 'web3'
 import {muonSha3} from '../../utils/sha3.js'
 
-export type MemWriteType = 'app' | 'node' | 'local'
+export type MemWriteType = 'local'
 
 export type MemWrite = {
   type: MemWriteType,
@@ -85,105 +58,9 @@ class MemoryPlugin extends CallablePlugin {
     this.redisClient = redisClient
   }
 
-  // broadcastWrite(memWrite: MemWrite) {
-  //   this.broadcast({
-  //     type: 'mem_write',
-  //     peerId: process.env.PEER_ID,
-  //     memWrite
-  //   })
-  // }
-
-  @broadcastHandler
-  async onBroadcastReceived(data) {
-    // console.log("MemoryPlugin.onBroadcastReceived", data)
-    try {
-      if (data && data.type === 'mem_write' && !!data.memWrite) {
-        if(this.checkSignature(data.memWrite)){
-          await this.storeMemWrite(data.memWrite);
-        }
-        else{
-          console.log('memWrite signature mismatch', data.memWrite)
-        }
-      }
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  checkSignature(memWrite: MemWrite){
-    let nodeManager: NodeManagerPlugin = this.muon.getPlugin('node-manager');
-
-    let {signatures} = memWrite;
-
-    let hash = this.hashMemWrite(memWrite)
-    if(hash !== memWrite.hash) {
-      console.log('hash mismatch', [hash, memWrite.hash])
-      return false
-    }
-
-    switch (memWrite.type) {
-      case "app": {
-        if(signatures.length < this.netConfigs.tss.threshold)
-          throw "Insufficient MemWrite signature";
-        let sigOwners: string[] = signatures.map(sig => crypto.recover(hash, sig).toLowerCase())
-        let validOwners: string[] = nodeManager.filterNodes({list: sigOwners}).map(n => n.id)
-        return validOwners.length >= this.netConfigs.tss.threshold;
-      }
-      case "node": {
-        if(signatures.length !== 1){
-          throw `Node MemWrite must have one signature. currently has ${signatures.length}.`;
-        }
-        const owner = crypto.recover(hash, signatures[0]).toLowerCase()
-        return !!nodeManager.getNodeInfo(owner);
-      }
-      default:
-        throw `Unknown MemWrite type: ${memWrite.type}`
-    }
-  }
-
-  hashMemWrite(memWrite: MemWrite) {
-    let {type, owner, timestamp, ttl, nSign, data} = memWrite;
-    let ownerIsWallet = type === MemoryTypes.Node;
-    return muonSha3(
-      {type: 'string', value: type},
-      {type: ownerIsWallet ? 'address' : 'string', value: owner},
-      {type: 'uint256', value: timestamp},
-      {type: 'uint256', value: ttl},
-      {type: 'uint256', value: nSign},
-      ... data.map(({type, value}) => ({type, value}))
-    )
-  }
-
-  /**
-   * Any node can call this to save a data into the shared memory.
-   * only the node signature needed to this data be saved.
-   * @param memory
-   * @returns {Promise<void>}
-   */
-  async writeNodeMem(key: string, data: any, ttl: number=0) {
-    let nSign=1,
-      timestamp=getTimestamp();
-    let memWrite: MemWrite = {
-      type: MemoryTypes.Node,
-      key,
-      owner: process.env.SIGN_WALLET_ADDRESS!,
-      timestamp,
-      ttl,
-      nSign,
-      data,
-      hash: '',
-      signatures: []
-    }
-    memWrite.hash = this.hashMemWrite(memWrite)!;
-    memWrite.signatures = [crypto.sign(memWrite.hash)]
-
-    await this.storeMemWrite(memWrite);
-    // this.broadcastWrite(memWrite);
-  }
-
   async writeLocalMem(key: string, data: any, ttl: number=0, options:MemWriteOptions={}) {
     let memWrite: MemWrite = {
-      type: MemoryTypes.Local,
+      type: "local",
       key,
       owner: process.env.SIGN_WALLET_ADDRESS!,
       timestamp: getTimestamp(),

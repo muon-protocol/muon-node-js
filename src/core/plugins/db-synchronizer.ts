@@ -5,7 +5,7 @@ import NodeManagerPlugin from "./node-manager.js";
 import * as NetworkIpc from "../../network/ipc.js";
 import {AppContext, MuonNodeInfo, NetConfigs} from "../../common/types";
 import KeyManager from "./key-manager.js";
-import {getTimestamp, timeout} from "../../utils/helpers.js";
+import {getTimestamp, parseBool, timeout} from "../../utils/helpers.js";
 import {logger} from '@libp2p/logger'
 import {MapOf} from "../../common/mpc/types";
 import AppContextModel from "../../common/db-models/app-context.js";
@@ -15,10 +15,13 @@ import axios, {AxiosInstance} from "axios";
 import _ from 'lodash';
 import {muonSha3} from "../../utils/sha3.js";
 import * as crypto from "../../utils/crypto.js";
+import {RedisCache} from "../../common/redis-cache.js";
 import {readSetting, writeSetting} from "../../common/db-models/Settings.js";
 import {APP_STATUS_EXPIRED} from "../constants.js";
+import { DEPLOYMENT_APP_ID, GENESIS_SEED } from "../../common/contantes.js";
 
 const DEPLOYER_SYNC_ITEM_PER_PAGE = 100;
+const SYNC_STATUS_REDIS_KEY = "dbIsSynced";
 const log = logger("muon:core:plugins:synchronizer")
 
 type DeleteCheckResult = "YES" | "MISSING" | "NOT-RESHARED" | "NOT-EXPIRED"
@@ -33,7 +36,7 @@ const RemoteMethods = {
 @remoteApp
 export default class DbSynchronizer extends CallablePlugin {
   private readonly apis: AxiosInstance[];
-  private isDbSynced:boolean = false;
+  private readonly redisCache:RedisCache;
 
   constructor(muon, configs) {
     super(muon, configs)
@@ -47,6 +50,9 @@ export default class DbSynchronizer extends CallablePlugin {
           timeout: 5000,
         })
       );
+
+      const {interval} = netConfigs.synchronizer.monitor
+      this.redisCache = new RedisCache("db-sync-cache", Math.ceil(interval / 1000));
     }
   }
 
@@ -79,8 +85,9 @@ export default class DbSynchronizer extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
-  get isSynced():boolean {
-    return this.isDbSynced;
+  async isSynced():Promise<boolean> {
+    const synced = await this.redisCache.get(SYNC_STATUS_REDIS_KEY);
+    return parseBool(synced);
   }
 
   private async nonDeployersSyncLoop() {
@@ -139,17 +146,19 @@ export default class DbSynchronizer extends CallablePlugin {
          * may introduce bias and reduce the randomness of the system. To keep
          * randomness and prevent always selecting fast nodes, we can select half
          * of the nodes as the candidate nodes and then select some of them to do query. */
-        let numCandidate = Math.min(10, Math.ceil(deployers.length/2))
+        
+        let numCandidate = Math.min(10, Math.ceil((deployers.length + 1)/2)) // +1 to include current node
         const candidateDeployers = _.shuffle(deployers).slice(0, numCandidate)
 
         const onlineDeployers: string[] = await NetworkIpc.findNOnlinePeer(
           candidateDeployers,
           dbSyncOnlineThreshold,
           {
-            timeout: 3000,
+            timeout: 5000,
             return: 'peerId'
           },
         );
+
         if (onlineDeployers.length < dbSyncOnlineThreshold){
           log(`Cannot perform dbSync, Insufficient online deployers ${onlineDeployers.length}/${dbSyncOnlineThreshold}`);
         } else {
@@ -179,14 +188,13 @@ export default class DbSynchronizer extends CallablePlugin {
 
             if (uniqueList.length > 0) {
               const lastContextTime: number = uniqueList
-                .filter(ctx => !!ctx.keyGenRequest)
                 .reduce((max, ctx) => Math.max(max, ctx.deploymentRequest!.data.timestamp), 0);
 
               /** filter out locally existing context and keep only missing contexts. */
               uniqueList = uniqueList.filter(ctx => {
                 const {appId, seed} = ctx
 
-                if(appId === "1")
+                if(appId === DEPLOYMENT_APP_ID && seed === GENESIS_SEED)
                   return false;
 
                 /** if ctx exist locally */
@@ -195,7 +203,7 @@ export default class DbSynchronizer extends CallablePlugin {
 
                 const lastContext = this.appManager.getAppLastContext(appId);
                 /** if newer rotated context of app exist locally */
-                if(!!lastContext && lastContext.deploymentRequest!.data.result.timestamp > ctx.deploymentRequest?.data.result.timestamp)
+                if(!!lastContext && lastContext.deploymentRequest?.data.result.timestamp > ctx.deploymentRequest?.data.result.timestamp)
                   return false;
 
                 return true;
@@ -219,14 +227,20 @@ export default class DbSynchronizer extends CallablePlugin {
               break;
           }
 
-          this.isDbSynced = true;
+          this.redisCache.set(SYNC_STATUS_REDIS_KEY, "true")
         }
       }
 
-      if (!this.isDbSynced)
-        await timeout(Math.floor((0.5 + Math.random()) * interval / 2)); //wait less if sync failed
-      else
+      const isDbSynced = await this.isSynced();
+      if (isDbSynced) {
+        /** Renew the expiration time of the key to avoid deleting it. */
+        await this.redisCache.set(SYNC_STATUS_REDIS_KEY, "true");
+        
         await timeout(Math.floor((0.5 + Math.random()) * interval));
+      } 
+      else {
+        await timeout(Math.floor((0.5 + Math.random()) * interval / 2)); //wait less if sync failed
+      }
     }
   }
 

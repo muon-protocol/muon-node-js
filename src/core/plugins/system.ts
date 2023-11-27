@@ -1,5 +1,5 @@
 import CallablePlugin from './base/callable-plugin.js'
-import {remoteApp, remoteMethod, appApiMethod, broadcastHandler} from './base/app-decorators.js'
+import {remoteApp, remoteMethod, appApiMethod} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
 import KeyManager from "./key-manager.js";
 import {
@@ -515,7 +515,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey: pub2json(key.publicKey!),
         keyShare: bn2hex(key.share!),
         polynomial,
@@ -550,7 +549,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey: pub2json(key.publicKey!),
         keyShare: bn2hex(key.share!),
         polynomial,
@@ -561,7 +559,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey: request.data.init.publicKey,
         polynomial,
         expiration,
@@ -614,7 +611,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey,
         keyShare,
         polynomial,
@@ -625,7 +621,6 @@ class System extends CallablePlugin {
       await this.appManager.saveAppTssConfig({
         appId: appId,
         seed,
-        keyGenRequest: request,
         publicKey,
         polynomial,
         expiration,

@@ -341,7 +341,7 @@ module.exports = {
                     throw `Only the leader can rotate the app's party.`
 
                 /** Most recent status of App should be PENDING (about to expire) */
-                const {status, hasKeyGenRequest} = this.callPlugin('system', "getAppDeploymentInfo", appId, previousSeed)
+                const {status} = this.callPlugin('system', "getAppDeploymentInfo", appId, previousSeed)
 
                 if(status !== 'PENDING' && status !== 'EXPIRED')
                     throw `Previous context status is not PENDING/EXPIRED. It is ${status}`

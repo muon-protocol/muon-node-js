@@ -65,8 +65,6 @@ export type AppDeploymentInfo = {
     seed: string|null,
     /** Is app deployed? */
     deployed: boolean,
-    /** Is this context contains the TSS key generation request data */
-    hasKeyGenRequest: boolean,
     /** Is this node has the App's TSS key share */
     hasTssKey: boolean,
     /** deployment status*/
@@ -115,7 +113,7 @@ export type AppRequest = {
             nonceAddress: string,
             [key: string]: any,
         },
-        fee: {
+        fee?: {
             /** returned from Fee server */
             amount: number,
             /** comes from client */
@@ -146,7 +144,8 @@ export type AppRequest = {
     }
     startedAt: number,
     confirmedAt: number,
-    signatures: MuonSignature[]
+    signatures: MuonSignature[],
+    [key: string]: any,
 }
 
 export type AppContext = {
@@ -165,7 +164,6 @@ export type AppContext = {
     pendingPeriod?: number,
     expiration?: number,
     deploymentRequest?: AppRequest,
-    keyGenRequest?: AppRequest,
     publicKey?: JsonPublicKey,
     polynomial?: PolynomialInfoJson
 }
@@ -183,7 +181,6 @@ export type PolynomialInfoJson = {
 export type AppTssConfig = {
     appId: string,
     seed: string,
-    keyGenRequest?: AppRequest,
     publicKey: JsonPublicKey,
     keyShare?: string,
     expiration?: number,
@@ -215,6 +212,11 @@ export type NodeManagerConfigs = {
     network: string,
 }
 
+export type ConnectionManagerConfigs = {
+    maxConnections: number,
+    pruneInterval: number,
+}
+
 export type NetConfigs = {
     defaultLeader: string,
     tss: {
@@ -225,6 +227,7 @@ export type NetConfigs = {
         minShareProof: number,
     },
     nodeManager: NodeManagerConfigs,
+    connectionManager: ConnectionManagerConfigs,
     "routing": {
         "delegate": string[]
     },

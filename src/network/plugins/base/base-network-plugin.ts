@@ -1,5 +1,4 @@
 import {Network} from "../../index.js";
-import NetworkBroadcastPlugin from "../network-broadcast.js";
 import Events from 'events-async'
 import {isPeerId, Libp2pPeer, Libp2pPeerInfo} from '../../types.js';
 import {peerIdFromString} from '@libp2p/peer-id'
@@ -8,6 +7,7 @@ import { multiaddr } from '@multiformats/multiaddr';
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string';
 import {loadGlobalConfigs} from "../../../common/configurations.js";
+import { NetConfigs } from "../../../common/types.js";
 
 export default class BaseNetworkPlugin extends Events {
   network: Network;
@@ -32,7 +32,10 @@ export default class BaseNetworkPlugin extends Events {
    * Runs right after the plugin has been started
    */
   async onStart(){
-    this.registerBroadcastHandler()
+  }
+
+  get netConfigs():NetConfigs {
+    return this.network.configs.net;
   }
 
   /**
@@ -106,51 +109,6 @@ export default class BaseNetworkPlugin extends Events {
     let superClass = Object.getPrototypeOf(this);
     return superClass.constructor.name
   }
-
-  private get __broadcastPlugin(): NetworkBroadcastPlugin {
-    return this.network.getPlugin('broadcast')
-  }
-
-  get BROADCAST_CHANNEL(){
-    // @ts-ignore
-    if(this.__broadcastHandlerMethod === undefined)
-      return null;
-    // @ts-ignore
-    return `muon.network.${this.ConstructorName}.${this.__broadcastHandlerMethod}`
-  }
-
-  async registerBroadcastHandler(){
-    await this.__broadcastPlugin.subscribe(this.BROADCAST_CHANNEL)
-    // @ts-ignore
-    this.__broadcastPlugin.on(this.BROADCAST_CHANNEL, this.__onPluginBroadcastReceived.bind(this))
-  }
-
-  broadcast(data){
-    let broadcastChannel = this.BROADCAST_CHANNEL
-    if (!broadcastChannel) {
-      // this.defaultLogger.error(`Broadcast not available for plugin ${this.ConstructorName}`)
-      return;
-    }
-    this.__broadcastPlugin.rawBroadcast(this.BROADCAST_CHANNEL, data)
-  }
-
-  broadcastToChannel(channel, data) {
-    this.__broadcastPlugin.rawBroadcast(channel, data)
-  }
-
-  async __onPluginBroadcastReceived(data, callerInfo){
-    // console.log("BaseNetworkPlugin.__onPluginBroadcastReceived", {data, callerInfo})
-    try{
-      // @ts-ignore
-      let broadcastHandler = this[this.__broadcastHandlerMethod].bind(this);
-      await broadcastHandler(data, callerInfo);
-    }
-    catch (e) {
-      // this.defaultLogger.error("%o", e)
-      throw e;
-    }
-  }
-
 
   hasValidTimestamp(peer) {
     const configs = loadGlobalConfigs('net.conf.json', 'default.net.conf.json');

@@ -8,13 +8,18 @@
     "minShareProof": 1.2
   },
   "nodeManager": {
-    "network": "eth",
-    "address": "0xD884634095AB3058264eE3143078F27D8fD78b9F",
-    "stake": "0x349a34804F8740c3202baDdeC0216c66A40c02e5"
+    "network": "bsc",
+    "address": "0x6eA3096eB0fAf5c1DEb970DCd29A6b10a48DaD83"
+  },
+  "connectionManager":{
+    "maxConnections": 900,
+    "pruneInterval": 300000
   },
   "routing": {
     "delegate": [
-      "http://3.136.59.242:8012/delegate"
+      "http://3.136.59.242:8012/delegate",
+      "http://18.219.185.213:8012/delegate",
+      "http://18.222.212.72:8012/delegate"
     ],
     "ifconfig":[
       "http://3.136.59.242:8012/ifconfig"
@@ -39,7 +44,7 @@
   "synchronizer": {
     "monitor": {
       "providers": [
-        "https://3.136.59.242:8012/network"
+        "http://3.136.59.242:8012/network"
       ],
       "startDelay": 120e3,
       "interval": 600e3

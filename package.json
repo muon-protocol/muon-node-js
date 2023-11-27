@@ -8,7 +8,9 @@
     "start": "env-cmd node_modules/.bin/ts-node-esm ./src/index.ts",
     "dev": "env-cmd nodemon --exec node_modules/.bin/ts-node ./src/index.ts",
     "devnet-init": "./node_modules/.bin/ts-node devnet/generate-envs.js",
-    "devnet-run": "./node_modules/.bin/ts-node devnet/run.js"
+    "devnet-run": "./node_modules/.bin/ts-node devnet/run.js",
+    "dev-node-1": "env-cmd -f ./devnet/nodes/dev-node-1.env npx ts-node ./src/index.ts",
+    "dev-node-2": "env-cmd -f ./devnet/nodes/dev-node-2.env npx ts-node ./src/index.ts"
   },
   "author": "",
   "license": "GPL-3.0",
