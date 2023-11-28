@@ -69,14 +69,6 @@ export async function getAppOldestContext(appName: string): Promise<AppContext|u
 }
 
 /**
- * Return minimum time the app needs to confirm the request
- * @param appName
- */
-export async function getAppTimeout(appName): Promise<number> {
-  return await call(IpcMethods.GetAppTimeout, appName)
-}
-
-/**
  * If app context not found locally, it's need to query muon network to find it.
  * @param appName
  */

@@ -15,7 +15,6 @@ export const IpcMethods = {
   GetAppContext: "get-app-context",
   GetAppOldestContext: "get-app-oldest-context",
   GetAppDeploymentInfo: "get-app-deployment-info",
-  GetAppTimeout: "get-app-timeout",
   QueryAppAllContext: "query-app-all-context",
   IsDeploymentExcerpt: "is-deployment-excerpt",
   EnsureAppTssKeyExist: "ensure-app-tss-key-exist",
@@ -87,18 +86,6 @@ class CoreIpcHandlers extends CallablePlugin {
     if(appId === "0")
       return null;
     return await this.appManager.getAppOldestContext(appId)
-  }
-
-  /**
-   * Return local app context
-   * @param appName
-   */
-  @ipcMethod(IpcMethods.GetAppTimeout)
-  async __getAppTimeout(appName: string): Promise<number> {
-    const app:BaseAppPlugin = await this.muon.getAppByName(appName)
-    if(!app)
-      return 0;
-    return app.requestTimeout || 0
   }
 
   /**
