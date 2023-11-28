@@ -54,14 +54,6 @@ const tasksCache = new NodeCache({
   useClones: false,
 });
 
-const appTimeouts = {}
-async function getAppTimeout(app) {
-  if(appTimeouts[app] === undefined) {
-    appTimeouts[app] = await CoreIpc.getAppTimeout(app);
-  }
-  return appTimeouts[app];
-}
-
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetNetworkConfig: "get-net-conf",
@@ -239,8 +231,7 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
   async __ipcForwardGateWayRequest(data: {requestData: GatewayCallParams, appTimeout: number}) {
-    const timeout = await getAppTimeout(data.requestData.app);
-    return this.__rcForwardGatewayRequest(data.requestData, this.nodeManager.currentNodeInfo, {timeout})
+    return this.__rcForwardGatewayRequest(data.requestData, this.nodeManager.currentNodeInfo, {timeout: 30000})
   }
 
   private async forwardGatewayRequestToOnlinePartner(partners: string[], requestData: GatewayCallParams, timeout?:number) {
