@@ -5,7 +5,7 @@
     "max": 20,
     "defaultTTL": 604800,
     "pendingPeriod": 86400,
-    "minShareProof": 1.2
+    "minShareProof": 1.5
   },
   "nodeManager": {
     "network": "bsctest",
