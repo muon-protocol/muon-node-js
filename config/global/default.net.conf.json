@@ -13,9 +13,9 @@
     "stake": "0xd788C2276A6f75a8B9360E9695028329C925b0AB"
   },
   "connectionManager":{
-    "maxConnections": 300,
+    "maxConnections": 100,
     "pruneInterval": 300000,
-    "pruneBatchSize": 50
+    "pruneBatchSize": 30
   },
   "routing": {
     "delegate": [
