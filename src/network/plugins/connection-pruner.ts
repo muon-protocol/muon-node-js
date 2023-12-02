@@ -6,6 +6,7 @@ import * as CoreIpc from '../../core/ipc.js'
 import NodeManagerPlugin from './node-manager.js';
 import { MapOf } from '../../common/mpc/types.js';
 import lodash from "lodash"
+import RemoteCall from './remote-call.js';
 
 const log = logger("muon:network:plugins:conn-pruner")
 
@@ -20,6 +21,10 @@ export default class LatencyCheckPlugin extends BaseNetworkPlugin {
 
   private get nodeManager():NodeManagerPlugin {
     return this.network.getPlugin('node-manager');
+  }
+
+  private get remoteCallPlugin(): RemoteCall {
+    return this.network.getPlugin('remote-call');
   }
 
   async watchAndPrune() {
@@ -48,23 +53,27 @@ export default class LatencyCheckPlugin extends BaseNetworkPlugin {
             })
                 .reduce((obj, curr) => (obj[curr.peerId]=curr, obj), {});
 
+            const lastCallTimes:MapOf<number> = this.remoteCallPlugin.getLastCallTimes();
+
             /** sort connections */
             const sorted = connections.sort((a, b) => {
+                a = `${a.remotePeer}`;
+                b = `${b.remotePeer}`;
                 /** rank connection a */
-                const nodeA = allNodes[a.remotePeer];
-                const aRank = (nodeA.isDeployer ? 4 : 0) 
-                    + (isInCommonSubnet[nodeA.peerId] ? 2 : 0)
-                    + (a.timeline.upgraded > b.timeline.upgraded ? 1 : -1)
+                const nodeA = allNodes[a];
+                const aRank = (isInCommonSubnet[a] ? 4 : 0)
+                    + (nodeA.isDeployer ? 2 : 0)
+                    + (lastCallTimes[a] > lastCallTimes[b] ? 1 : -1)
 
                 /** rank connection b */
-                const nodeB = allNodes[b.remotePeer];
-                const bRank = (nodeB.isDeployer ? 4 : 0) 
-                    + (isInCommonSubnet[nodeB.peerId] ? 2 : 0)
-                    + (b.timeline.upgraded > a.timeline.upgraded ? 1 : -1)
+                const nodeB = allNodes[b];
+                const bRank = (isInCommonSubnet[b] ? 4 : 0) 
+                    + (nodeB.isDeployer ? 2 : 0)
+                    + (lastCallTimes[b] > lastCallTimes[a] ? 1 : -1)
 
                 return aRank - bRank;
             })
-            const numToPrune = connections.length - configs.maxConnections;
+            const numToPrune = configs.pruneBatchSize;
 
             const connToPrune = sorted.slice(0, numToPrune);
             log(`prunning connections: %o`, connToPrune.map(c => allNodes[`${c.remotePeer}`].id));
