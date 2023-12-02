@@ -215,6 +215,7 @@ export type NodeManagerConfigs = {
 export type ConnectionManagerConfigs = {
     maxConnections: number,
     pruneInterval: number,
+    pruneBatchSize: number,
 }
 
 export type NetConfigs = {
