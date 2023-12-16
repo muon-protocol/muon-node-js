@@ -1,4 +1,4 @@
-import {gatewayMethod, remoteApp, remoteMethod} from "./base/app-decorators.js";
+import {remoteApp, remoteMethod} from "./base/app-decorators.js";
 import CallablePlugin from "./base/callable-plugin.js";
 import {IMpcNetwork, MapOf, PartnerRoundReceive} from "../../common/mpc/types";
 import {MultiPartyComputation} from "../../common/mpc/base.js";

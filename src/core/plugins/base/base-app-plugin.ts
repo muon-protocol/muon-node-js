@@ -578,7 +578,6 @@ class BaseAppPlugin extends CallablePlugin {
     })
     this.log(`nonce generation has ben completed with address %s.`, TssModule.pub2addr(nonce.publicKey))
 
-    // let sign = this.keyManager.sign(null, party);
     return {
       nonceAddress: TssModule.pub2addr(nonce.publicKey),
     }
@@ -620,24 +619,14 @@ class BaseAppPlugin extends CallablePlugin {
       confirmed ? [{
         owner: TssModule.pub2addr(verifyingPubKey),
         ownerPubKey: pub2json(verifyingPubKey, true),
-        // signers: signersIndices,
-        signature: bn2hex(aggregatedSign.s),
-        // sign: {
-        //   s: `0x${aggregatedSign.s.toString(16)}`,
-        //   e: `0x${aggregatedSign.e.toString(16)}`
-        // },
+        signature: bn2hex(aggregatedSign.s)
       }] : []
     ]
   }
 
   async recoverSignature(request: AppRequest, owner: string, signature: string) {
     let tt0 = Date.now();
-    const appTssKey = this.getTss(request.deploymentSeed)!
-    // TODO: need to recheck
-    // if(owner !== TssModule.pub2addr(pubKey)) {
-    //   console.log({owner, pubKeyStr,})
-    //   throw {message: 'Sign recovery error: invalid pubKey address'}
-    // }
+    const appTssKey = this.getTss(request.deploymentSeed)!;
 
     let {s, e} = splitSignature(signature)
     //

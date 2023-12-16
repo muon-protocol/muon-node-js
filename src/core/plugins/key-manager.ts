@@ -209,8 +209,6 @@ class KeyManager extends CallablePlugin {
         /** randomly select (maxPartners - 1) from others */
         ...shuffle(partners).slice(0, maxPartners - 1)
       ];
-      // console.log(partners)
-      // partners = partners.slice(0, maxPartners);
     }
 
     const keyId = id || uuid()

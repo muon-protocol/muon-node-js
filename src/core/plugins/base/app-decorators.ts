@@ -86,7 +86,6 @@ export function remoteApp (constructor:Constructor<CallablePlugin>): any {
       if(constructor.prototype.__remoteMethods) {
         for (let i = 0; i < constructor.prototype.__remoteMethods.length; i++) {
           let item = constructor.prototype.__remoteMethods[i];
-          // console.log('########## registering remote method', item, this.remoteMethodEndpoint(item.title))
           this.registerRemoteMethod(item.title, this[item.property].bind(this), {
             /** override options */
             middlewares: item.middlewares,
@@ -103,7 +102,6 @@ export function remoteApp (constructor:Constructor<CallablePlugin>): any {
       if(constructor.prototype.__ipcMethods) {
         for (let i = 0; i < constructor.prototype.__ipcMethods.length; i++) {
           let item = constructor.prototype.__ipcMethods[i];
-          // console.log('########## registering ipc method', item, this.remoteMethodEndpoint(item.title))
           this.registerIpcMethod(item.title, this[item.property].bind(this))
         }
       }
@@ -112,8 +110,6 @@ export function remoteApp (constructor:Constructor<CallablePlugin>): any {
         let gateway = this.muon.getPlugin('gateway-interface')
         for (let i = 0; i < constructor.prototype.__gatewayMethods.length; i++) {
           let item = constructor.prototype.__gatewayMethods[i];
-          // let logTitle = `${this.APP_NAME}.${item.title}`
-          // console.log(`registering gateway method: ${logTitle} >> ${target.name}.${item.property}`)
           // @ts-ignore
           gateway.registerAppCall(this.APP_NAME, item.title, this[item.property].bind(this))
         }
