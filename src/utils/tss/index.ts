@@ -77,7 +77,7 @@ export function lagrangeCoef(j, t, shares, index) {
   let _x = BN.isBN(index) ? index : toBN(index);
   let prod = arr => arr.reduce((acc, current) => acc.mul(current), toBN(1));
   let x_j = toBN(shares[j].i)
-  let arr = range(0, t).filter(k => k!==j).map(k => {
+  let arr = range(0, shares.length).filter(k => k!==j).map(k => {
     let x_k = toBN(shares[k].i)
     // [numerator, denominator]
     return [_x.sub(x_k), x_j.sub(x_k)]

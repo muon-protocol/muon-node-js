@@ -30,7 +30,7 @@ const ellipticCurve = new elliptic.ec('secp256k1');
  */
 const N = TssModule.curve.n
 const threshold = 3;
-const partners = range(threshold).map(i => `${i+1}`)
+const partners = range(threshold+1).map(i => `${i+1}`)
 const random = () => Math.floor(Math.random()*9999999)
 
 type KeyConstructionData = {
@@ -105,31 +105,29 @@ function H1(l, m, B): string {
 }
 
 function H2(R:PublicKey, Y:PublicKey, m:string): string {
-    return muonSha3(
-        {t: "bytes", v: R.encode("hex", true)},
-        {t: "bytes", v: Y.encode("hex", true)},
-        {t: "uint256", v: m},
-    )
+    return TssModule.schnorrHash(Y, TssModule.pub2addr(R), m);
 }
 
-function verify(R: PublicKey, Y:PublicKey, z:string, m:string): boolean {
+function verify(R: PublicKey, Y:PublicKey, sign:string, m:string): boolean {
     const e = H2(R, Y, m);
-    const p1 = TssModule.curve.g.mul(toBN(z)).encode("hex", true);
-    const p2 = R.add(Y.mul(toBN(e))).encode("hex", true);
-    console.log({p1, p2})
-    return p1 == p2;
+    const p1 = TssModule.curve.g.mul(toBN(sign));
+    const p2 = p1.add(Y.mul(toBN(e))).encode("hex", true);
+    return R.encode("hex", true) == p2;
 }
 
 async function run() {
+  console.log("start ...");
   const fakeNets:FakeNetwork[] = partners.map(id => new FakeNetwork(id));
 
   const m: string = bn2str(TssModule.random());
 
+  console.log("longterm key generation start ...")
   let longTermKeyShares = await keyGen(partners, fakeNets, {
     id: `dkg-${Date.now()}${random()}`,
     partners,
     t: threshold
   });
+  console.log("KeyGen done.")
 
   const Y:PublicKey = TssModule.keyFromPublic(longTermKeyShares[0].publicKey);
 
@@ -165,17 +163,18 @@ async function run() {
     const c:BN = toBN(H2(R, Y, m));
 
     const iList = S.map((_, i) => ({i: i+1}));
+    const lc = iList.map((item, i) => TssModule.lagrangeCoef(i, threshold, iList, "0").toString())
     const z: BN[] = S.map((id, i):BN => {
         const {d, e} = nonceBatch[id].nonces[batchIndex];
         const s: BN = toBN(longTermKeyShares[i].share)
-        console.log(iList, i);
+        // console.log(iList, i);
         const lambda:BN = TssModule.lagrangeCoef(i, threshold, iList, "0");
         return d
             .add(e.mul(rho[i]))
-            .add(lambda.mul(s).mul(c))
+            .sub(lambda.mul(s).mul(c))
     })
 
-    const totalZ = z.reduce((res:BN, zi) => res.add(zi), toBN("0")).umod(TssModule.curve.n!);
+    const totalZ = z.reduce((res:BN, zi, i) => res.add(zi), toBN("0")).umod(TssModule.curve.n!);
     const verified = verify(R, Y, bn2str(totalZ), m);
 
     console.log(`i: ${batchIndex}, match: ${verified ? "" : "not "}verified, time: ${Date.now() - startTime} ms`)
