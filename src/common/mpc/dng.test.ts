@@ -7,22 +7,16 @@
 import {DistributedKeyGeneration} from "./dkg.js";
 import {DistributedNonceGeneration} from "./dng.js";
 import {DistKeyJson} from "./dist-key.js";
-import {DistNonce, DistNonceCommitment, DistNonceCommitmentJson, NonceBatch, NonceBatchJson} from "./dist-nonce.js";
+import {NonceBatch} from "./dist-nonce.js";
 import FakeNetwork from './fake-network.js';
 import {bn2str} from './utils.js'
-import BN from "bn.js";
-import Web3 from 'web3'
-import elliptic from 'elliptic'
 import * as TssModule from '../../utils/tss/index.js'
 import {toBN} from "../../utils/tss/utils.js";
 import lodash from 'lodash'
 import { MapOf } from "./types.js";
 import { PublicKey } from "../../utils/tss/types.js";
-import { muonSha3, soliditySha3 } from "../../utils/sha3.js";
 
-const {range, uniq} = lodash
-const {randomHex} = Web3.utils
-const ellipticCurve = new elliptic.ec('secp256k1');
+const {range, shuffle} = lodash
 
 /**
  * Share privateKey between 5 individuals
@@ -30,7 +24,7 @@ const ellipticCurve = new elliptic.ec('secp256k1');
  */
 const N = TssModule.curve.n
 const threshold = 3;
-const partners = range(threshold+1).map(i => `${i+1}`)
+const partners = range(threshold*2).map(i => `${i+1}`)
 const random = () => Math.floor(Math.random()*9999999)
 
 type KeyConstructionData = {
@@ -46,18 +40,8 @@ type NonceConstructionData = {
     pi: number
 }
 
-function resultOk(realKey: string|null, realPubKey: string|null, resultPubKey: string, reconstructedKey, reconstructedPubKey) {
-  if(resultPubKey !== reconstructedPubKey)
-    return false
-
-  if(realKey) {
-    return realKey === reconstructedKey && realPubKey === resultPubKey
-  }
-
-  return true
-}
-
-async function keyGen(partners: string[], networks: FakeNetwork[], cData: KeyConstructionData): Promise<DistKeyJson[]> {
+async function keyGen(partners: string[], networks: FakeNetwork[], cData: KeyConstructionData): 
+Promise<MapOf<DistKeyJson>> {
 
   let keyGens = partners.map(p => new DistributedKeyGeneration({
     id: cData.id,
@@ -73,7 +57,7 @@ async function keyGen(partners: string[], networks: FakeNetwork[], cData: KeyCon
     )
   );
 
-  return allNodeResults.map(r => r.toJson())
+  return allNodeResults.reduce((res, r, i) => (res[partners[i]] = r.toJson(), res), {});
 }
 
 async function nonceGen(networks: FakeNetwork[], cData: NonceConstructionData): 
@@ -94,22 +78,8 @@ async function nonceGen(networks: FakeNetwork[], cData: NonceConstructionData):
     return partners.reduce((obj, id, i) => (obj[id]=nonceBatches[i], obj), {});
 }
 
-function H1(l, m, B): string {
-    return muonSha3(
-        {t: "uint32", v: l},
-        {t: "uint256", v: m},
-        ...B.map(({i}) => ({t: "uint32", v: i})),
-        ...B.map(({D}) => ({t: "byte[]", v: D.encode("hex", true)})),
-        ...B.map(({E}) => ({t: "byte[]", v: E.encode("hex", true)}))
-    )
-}
-
-function H2(R:PublicKey, Y:PublicKey, m:string): string {
-    return TssModule.schnorrHash(Y, TssModule.pub2addr(R), m);
-}
-
 function verify(R: PublicKey, Y:PublicKey, sign:string, m:string): boolean {
-    const e = H2(R, Y, m);
+    const e = TssModule.schnorrHash(Y, TssModule.pub2addr(R), m);
     const p1 = TssModule.curve.g.mul(toBN(sign));
     const p2 = p1.add(Y.mul(toBN(e))).encode("hex", true);
     return R.encode("hex", true) == p2;
@@ -121,61 +91,51 @@ async function run() {
 
   const m: string = bn2str(TssModule.random());
 
-  console.log("longterm key generation start ...")
-  let longTermKeyShares = await keyGen(partners, fakeNets, {
+  let longTermKeyShares: MapOf<DistKeyJson> = await keyGen(partners, fakeNets, {
     id: `dkg-${Date.now()}${random()}`,
     partners,
     t: threshold
   });
-  console.log("KeyGen done.")
 
-  const Y:PublicKey = TssModule.keyFromPublic(longTermKeyShares[0].publicKey);
+  const Y:PublicKey = TssModule.keyFromPublic(longTermKeyShares[partners[0]].publicKey);
 
   const pi = 4;
-  const nonceBatch: MapOf<NonceBatch> = await nonceGen(fakeNets, {
+  const nonceBatchs: MapOf<NonceBatch> = await nonceGen(fakeNets, {
     id: "sample-nonce",
     partners,
     pi
   });
 
-//   console.dir(
-//     nonceBatch[1].toJson(),
-//     {depth: 5}
-//   )
-
   const t1 = Date.now()
   for(let batchIndex=0 ; batchIndex<pi ; batchIndex++) {
     const startTime = Date.now();
 
-    const S = partners;
+    const S = shuffle(partners).slice(0, threshold);
 
-    const B = S.map((id, i) => {
-        const commitment: DistNonceCommitment = nonceBatch[id].commitments[id][batchIndex];
-        return {i:i+1, D: commitment.D, E: commitment.E}
-    });
-
-    const rho: BN[] = S.map((id, i) => toBN(H1(i, m, B)));
-    const R:PublicKey = S.reduce((res: undefined|PublicKey, id, i): PublicKey => {
-        const {D, E} = B[i];
-        const DE = TssModule.pointAdd(D, E.mul(rho[i]));
-        return TssModule.pointAdd(res, DE)
-    }, undefined)!;
-    const c:BN = toBN(H2(R, Y, m));
-
-    const iList = S.map((_, i) => ({i: i+1}));
-    const lc = iList.map((item, i) => TssModule.lagrangeCoef(i, threshold, iList, "0").toString())
-    const z: BN[] = S.map((id, i):BN => {
-        const {d, e} = nonceBatch[id].nonces[batchIndex];
-        const s: BN = toBN(longTermKeyShares[i].share)
-        // console.log(iList, i);
-        const lambda:BN = TssModule.lagrangeCoef(i, threshold, iList, "0");
-        return d
-            .add(e.mul(rho[i]))
-            .sub(lambda.mul(s).mul(c))
+    const partialSigns: TssModule.FrostSign[] = S.map((id):TssModule.FrostSign => {
+        const nonceBatch:NonceBatch = nonceBatchs[id];
+        const key = longTermKeyShares[id];
+        return TssModule.frostSign(
+          m,
+          {
+            share: toBN(key.share),
+            pubKey: TssModule.keyFromPublic(key.publicKey)
+          },
+          nonceBatch.nonces[batchIndex],
+          S,
+          S.findIndex(i => i == id),
+          S.reduce((obj, id) => {
+            obj[id] = {
+              i: parseInt(id), 
+              ...nonceBatch.commitments[id][batchIndex]
+            }
+            return obj;
+          }, {})
+        )
     })
 
-    const totalZ = z.reduce((res:BN, zi, i) => res.add(zi), toBN("0")).umod(TssModule.curve.n!);
-    const verified = verify(R, Y, bn2str(totalZ), m);
+    const totalSign = TssModule.frostAggregateSigs(partialSigns);
+    const verified = verify(totalSign.R, Y, bn2str(totalSign.s), m);
 
     console.log(`i: ${batchIndex}, match: ${verified ? "" : "not "}verified, time: ${Date.now() - startTime} ms`)
   }

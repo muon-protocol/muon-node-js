@@ -27,6 +27,8 @@ export type DNGOptions = {
     partners: string[],
     /** The count of nonce that will be generated. */
     pi: number,
+    /** Extra data that are available on the all partners. */
+    extra?: any,
 }
 
 export class DistributedNonceGeneration extends MultiPartyComputation {

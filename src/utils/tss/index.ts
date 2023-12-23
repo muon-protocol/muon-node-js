@@ -1,8 +1,11 @@
 import {PublicKey, PublicKeyShare} from "./types";
 import ethJsUtil from 'ethereumjs-util'
-import {BN, toBN, keccak256, range, pub2addr} from './utils.js'
+import {BN, toBN, keccak256, range, pub2addr, bn2hex} from './utils.js'
 import assert from 'assert'
 import elliptic from 'elliptic'
+import { muonSha3 } from "../sha3.js";
+import { DistNonceCommitment } from "../../common/mpc/dist-nonce";
+import { MapOf } from "../../common/mpc/types";
 
 const EC = elliptic.ec;
 const curve = new EC('secp256k1');
@@ -164,7 +167,7 @@ export function schnorrSign(signingShare:BN|string, signingPubKey:PublicKey, non
 
 export function schnorrVerify(signingPublicKey: PublicKey, msg, sig:{s: BN, e: BN}|string) {
   if(typeof sig === 'string')
-    sig = splitSignature(sig);
+    sig = splitSignature(sig) as SchnorrSign;
   if(!validatePublicKey(signingPublicKey))
     return false
   const s = sig.s.umod(curve.n!)
@@ -189,7 +192,7 @@ export function schnorrVerifyPartial(
   sig:{s: BN, e: BN}|string
 ) {
   if(typeof sig === 'string')
-    sig = splitSignature(sig);
+    sig = splitSignature(sig) as SchnorrSign;
   if(
     !validatePublicKey(partialPubKey)
     || !validatePublicKey(pubKey)
@@ -231,17 +234,92 @@ export function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, sig
   return nonceAddress === addr;
 }
 
-export function stringifySignature(sign: {s: BN, e: BN}): string {
-  return `0x${sign.e.toString('hex' ,64)}${sign.s.toString('hex',64)}`
+export function frostH1(id: string|number, msg: string, B: {i: string|number, D: PublicKey, E: PublicKey}[]): string {
+  return muonSha3(
+      {t: "uint32", v: id},
+      {t: "uint256", v: msg},
+      ...B.map(({i}) => ({t: "uint32", v: i})),
+      ...B.map(({D}) => ({t: "byte[]", v: D.encode("hex", true)})),
+      ...B.map(({E}) => ({t: "byte[]", v: E.encode("hex", true)}))
+  )
 }
 
-export function splitSignature(signature: string): {s: BN, e: BN} {
+export function frostSignInit(
+  msg: string,
+  Y: PublicKey, 
+  partners: string[],
+  commitments: MapOf<DistNonceCommitment>,
+) {
+  const B = partners.map(id => ({
+    i: parseInt(id), 
+    ...commitments[id]
+  }));
+  const rho: BN[] = partners.map((id, i) => toBN(frostH1(i, msg, B)));
+  const R:PublicKey = partners.reduce((res: undefined|PublicKey, id, i): PublicKey => {
+    const {D, E} = B[i];
+    const DE = pointAdd(D, E.mul(rho[i]));
+    return pointAdd(res, DE)
+  }, undefined)!;
+  const c:BN = toBN(schnorrHash(Y, pub2addr(R), msg));
+  return {R, rho, c}
+}
+
+export function frostSign(
+  msg: string,
+  secret: {share: BN, pubKey: PublicKey}, 
+  nonce: {d: BN, e: BN}, 
+  partners: string[],
+  partnerIndex: number,
+  commitments: MapOf<DistNonceCommitment>,
+): {R: PublicKey, s: BN} {
+  const {R, rho, c} = frostSignInit(msg, secret.pubKey, partners, commitments);
+  const iList = partners.map(id => ({i: parseInt(id)}));
+  const lambda:BN = lagrangeCoef(partnerIndex, -1, iList, "0");
+  const s = nonce.d
+    .add(nonce.e.mul(rho[partnerIndex]))
+    .sub(lambda.mul(secret.share).mul(c))
+    .umod(curve.n!)
+
+  return {R, s};
+}
+
+export function frostVerify(sign: FrostSign, Y: PublicKey, msg: string): boolean {
+  const e = schnorrHash(Y, pub2addr(sign.R), msg);
+  const p1 = curve.g.mul(sign.s);
+  const p2 = p1.add(Y.mul(toBN(e))).encode("hex", true);
+  return sign.R.encode("hex", true) == p2;
+}
+
+// export function frostVerifyPartial(i: number, sign: FrostSign, Y: PublicKey, msg: string): boolean {
+// }
+
+export function stringifySignature(sign: {s: BN, e: BN}|{R: PublicKey, s: BN}): string {
+  // @ts-ignore
+  if(!!sign.e)
+    // @ts-ignore
+    return `0x${sign.e.toString('hex' ,64)}${sign.s.toString('hex',64)}`
+  else
+    // @ts-ignore
+    return `0x${sign.R.encode('hex' ,true).replace("0x", "")}${sign.s.toString('hex',64)}`
+}
+
+export function splitSignature(signature: string): {s: BN, e: BN} | {R: PublicKey, s: BN} {
   const bytes = signature.replace('0x','');
-  if(bytes.length !== 128)
-    throw `invalid schnorr signature string`;
-  return {
-    e: toBN(`0x${bytes.substr(0, 64)}`),
-    s: toBN(`0x${bytes.substr(64, 64)}`),
+  const numBytes = bytes.length >> 1;
+  switch (numBytes) {
+    case 64: return {
+      e: toBN(`0x${bytes.substr(0, 64)}`),
+      s: toBN(`0x${bytes.substr(64, 64)}`),
+    };
+    case 65: {
+      return {
+        R: keyFromPublic(`0x${bytes.substr(0, 66)}`),
+        s: toBN(`0x${bytes.substr(66, 64)}`),
+      }
+    };
+    default: 
+      throw {message: `invalid schnorr signature string`, signature: signature};
+
   }
 }
 
@@ -255,6 +333,16 @@ export function schnorrAggregateSigs(t, sigs, indices): {s: BN, e: BN}{
   let s = ts.umod(curve.n!)
   let e = sigs[0].e.clone();
   return {s, e}
+}
+
+export type SchnorrSign = {s: BN, e: BN};
+export type FrostSign = {R: PublicKey, s: BN};
+
+export function frostAggregateSigs(sigs: {R: PublicKey, s: BN}[]): FrostSign {
+  return {
+    R: sigs[0].R,
+    s: sigs.reduce((sum: BN, {s}) => (sum.iadd(s), sum), toBN("0")).umod(curve.n!)
+  }
 }
 
 export function validatePublicKey(publicKey: string|PublicKey): boolean {

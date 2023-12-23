@@ -53,21 +53,18 @@ export class NonceBatch {
     }
   }
 
-  // static fromJson(key: DistKeyJson): DistKey {
-  //   const publicKey = TssModule.keyFromPublic(key.publicKey)
-  //   const address = TssModule.pub2addr(publicKey)
-  //   if(address.toLowerCase() !== key.address.toLowerCase())
-  //     throw `DistKeyJson address mismatched with publicKey`
-  //   return new DistKey(
-  //     key.index,
-  //     toBN(key.share),
-  //     address,
-  //     publicKey,
-  //     key.partners,
-  //     !key.polynomial ? undefined : {
-  //       t: key.polynomial.t,
-  //       Fx: key.polynomial.Fx.map(p => TssModule.keyFromPublic(p))
-  //     },
-  //   );
-  // }
+  static fromJson(data: NonceBatchJson): NonceBatch {
+    return new NonceBatch(
+      data.pi,
+      data.partners,
+      data.nonces.map(({d, e}) => ({d: toBN(d), e: toBN(d)})),
+      Object.entries(data.commitments).reduce((obj, [id, commitments]) => {
+        obj[id] = commitments.map(({D, E}) => ({
+          D: TssModule.keyFromPublic(D),
+          E: TssModule.keyFromPublic(E),
+        }))
+        return obj;
+      }, {})
+    );
+  }
 }
