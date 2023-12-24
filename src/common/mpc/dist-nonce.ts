@@ -63,7 +63,7 @@ export class NonceBatch {
       data.partners,
       data.nonces.map(({d, e, commitments}) => ({
         d: toBN(d), 
-        e: toBN(d),
+        e: toBN(e),
         commitments: Object.entries(commitments).reduce((obj, [id, {D, E}]) => {
           obj[id] = {
             D: TssModule.keyFromPublic(D),
