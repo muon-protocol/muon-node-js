@@ -77,10 +77,6 @@ class BaseAppPlugin extends CallablePlugin {
   isBuiltInApp: boolean
   private log;
   useFrost: boolean = false;
-  /** 
-  NonceBatchId => index
-  */
-  private nonceIndex:MapOf<number> = {};
 
   constructor(muon, configs) {
     super(muon, configs);
@@ -599,8 +595,7 @@ class BaseAppPlugin extends CallablePlugin {
     if(this.useFrost) {
       /** increase nonce index */
       const nonceBatch: AppNonceBatch = this.keyManager.appNonceBatches[appId][seed];
-      this.nonceIndex[nonceBatch.id] = (this.nonceIndex[nonceBatch.id] ?? -1) + 1;
-      const currentNonce:number = this.nonceIndex[nonceBatch.id];
+      const currentNonce:number = await this.keyManager.takeNonceIndex(nonceBatch.id);
 
       const key: AppTssKey = this.getTss(seed)!;
 

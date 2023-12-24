@@ -7,6 +7,7 @@ import {remoteApp, remoteMethod} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
+import * as CoreIpc from "../ipc.js";
 import {AppContext, MpcType, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
 import {IMpcNetwork, MapOf} from "../../common/mpc/types";
@@ -21,7 +22,8 @@ import {muonSha3} from "../../utils/sha3.js";
 import {bn2hex} from "../../utils/tss/utils.js";
 import { NonceBatch } from '../../common/mpc/dist-nonce.js';
 import { DistributedNonceGeneration } from '../../common/mpc/dng.js';
-import AppNonceBatch from '../../utils/tss/app-nonce-batch.js';
+import AppNonceBatch, { AppNonceBatchJson } from '../../utils/tss/app-nonce-batch.js';
+import { Mutex } from '../../common/mutex.js';
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -105,6 +107,15 @@ class KeyManager extends CallablePlugin {
    */
   appNonceBatches: MapOf<MapOf<AppNonceBatch>> = {};
 
+  private mutex:Mutex;
+
+  constructor(muon, configs) {
+    super(muon, configs);
+    this.mutex = new Mutex(undefined, {
+      retryCount: 10000,
+    });
+  }
+
   async onStart() {
     await super.onStart();
 
@@ -120,6 +131,8 @@ class KeyManager extends CallablePlugin {
     mpcNetwork.registerMpcInitHandler("DistributedKeyGeneration", this.dkgInitializeHandler.bind(this))
     mpcNetwork.registerMpcInitHandler("KeyRedistribution", this.keyRedistInitHandler.bind(this))
     mpcNetwork.registerMpcInitHandler("DistributedNonceGeneration", this.dngInitializeHandler.bind(this))
+
+    this.muon.on("nonce-batch:gen", this.onNonceBatchGen.bind(this))
   }
 
   private get nodeManager(): NodeManagerPlugin {
@@ -521,12 +534,11 @@ class KeyManager extends CallablePlugin {
       }
     })
     nonceBatch = await nonceGen.runByNetwork(network, timeout)
-    const appNonceBatch = new AppNonceBatch(party, nonceId, nonceBatch);
+    const appNonceBatch = new AppNonceBatch(partyInfo, nonceId, nonceBatch);
 
     // TODO: store nonceBatch to be used in all cluster.
-    if(this.appNonceBatches[partyInfo.appId] === undefined)
-      this.appNonceBatches[partyInfo.appId] = {};
-    this.appNonceBatches[partyInfo.appId][partyInfo.seed] = appNonceBatch;
+
+    CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatch.toJson()})
 
     return appNonceBatch;
   }
@@ -543,10 +555,9 @@ class KeyManager extends CallablePlugin {
           throw `party[${extra.party}] not found`
 
         // TODO: store nonceBatch to be used in all cluster.
-        const appNonceBatch = new AppNonceBatch(party,  extra.nonceId, nonceBatch);
-        if(this.appNonceBatches[partyInfo.appId] === undefined)
-          this.appNonceBatches[partyInfo.appId] = {};
-        this.appNonceBatches[partyInfo.appId][partyInfo.seed] = appNonceBatch;
+        const appNonceBatch = new AppNonceBatch(partyInfo,  extra.nonceId, nonceBatch);
+
+        CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatch.toJson()})
 
         // let key = new AppTssKey(party, extra.keyId, dKey)
         // await SharedMemory.set(
@@ -564,6 +575,29 @@ class KeyManager extends CallablePlugin {
       })
 
     return dng;
+  }
+
+  async onNonceBatchGen(appNonceBatchJson: AppNonceBatchJson) {
+    try {
+      const appNonceBatch: AppNonceBatch = AppNonceBatch.fromJson(appNonceBatchJson);
+      const {partyInfo} = appNonceBatchJson;
+      if(this.appNonceBatches[partyInfo.appId] === undefined) {
+        this.appNonceBatches[partyInfo.appId] = {};
+      }
+      this.appNonceBatches[partyInfo.appId][partyInfo.seed] = appNonceBatch;
+
+      await SharedMemory.set(
+        appNonceBatchJson.id,
+        {
+          partyInfo,
+          index: 0
+        },
+        /** clear after 7 days */
+        7*24*60*60*1000
+      );
+    }
+    catch(e) {
+    }
   }
 
   async getSharedKey(id: string, timeout:number=5000, expectedUsage:KeyUsageTypeApp|KeyUsageTypeNonce): Promise<AppTssKey> {
@@ -594,6 +628,26 @@ class KeyManager extends CallablePlugin {
       throw `party [${key.party}] not found`
 
     return AppTssKey.fromJson(party, this.currentNodeInfo!.id, key)
+  }
+
+  async takeNonceIndex(id: string, timeout: number=5000): Promise<number> {
+    const lock = await this.mutex.lock(id);
+    try {
+      const {partyInfo, index} = await SharedMemory.waitAndGet(id, timeout);
+      await SharedMemory.set(
+        id,
+        {
+          partyInfo,
+          index: index+1
+        },
+        /** clear after 7 days */
+        7*24*60*60*1000
+      );
+      return index;
+    }
+    finally {
+      await lock.release();
+    }
   }
 
   /**

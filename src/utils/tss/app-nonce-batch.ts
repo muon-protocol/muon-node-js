@@ -7,7 +7,7 @@ const random = () => Math.floor(Math.random()*9999999)
 
 export type AppNonceBatchJson = {
   id: string,
-  party: PartyInfo,
+  partyInfo: PartyInfo,
   nonceBatch: NonceBatchJson
 }
 
@@ -24,13 +24,13 @@ export default class AppNonceBatch {
   /**
    * party that this key created from.
    */
-  party: Party;
+  partyInfo: PartyInfo;
 
   private nonceBatch: NonceBatch;
 
-  constructor(party: Party, id, nonceBatch: NonceBatch){
+  constructor(partyInfo: PartyInfo, id, nonceBatch: NonceBatch){
     this.id = id || `N${Date.now()}${random()}`
-    this.party = party;
+    this.partyInfo = partyInfo;
     this.nonceBatch = nonceBatch
   }
 
@@ -49,14 +49,14 @@ export default class AppNonceBatch {
   toJson(): AppNonceBatchJson {
     return {
       id: this.id,
-      party: {appId: this.party.appId, seed: this.party.seed},
+      partyInfo: this.partyInfo,
       nonceBatch: this.nonceBatch.toJson(),
     }
   }
 
-  static fromJson(party: Party, appNonceBatch: Omit<AppNonceBatchJson, "party">): AppNonceBatch {
+  static fromJson(appNonceBatch: AppNonceBatchJson): AppNonceBatch {
     return new AppNonceBatch(
-      party,
+      appNonceBatch.partyInfo,
       appNonceBatch.id,
       NonceBatch.fromJson(appNonceBatch.nonceBatch)
     )
