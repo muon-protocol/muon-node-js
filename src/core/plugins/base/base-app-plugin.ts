@@ -715,14 +715,23 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async verifyPartialSignature(request: AppRequest, owner:MuonNodeInfo, signature: string): Promise<boolean> {
-    const {appId, deploymentSeed: seed} = request;
+    const {appId, deploymentSeed: seed, data: {resultHash, init}} = request;
     const {useFrost} = this;
 
     const appTssKey = this.getTss(seed)!
 
     if(useFrost) {
+      const {nonceIndex, noncePartners, } = init;
       const nonceBatch: AppNonceBatch = this.keyManager.appNonceBatches[appId][seed];
-      return true;
+      return TssModule.frostVerifyPartial(
+        TssModule.splitSignature(signature) as TssModule.FrostSign,
+        appTssKey.publicKey,
+        appTssKey.getPubKey(owner.id),
+        noncePartners,
+        noncePartners.findIndex(id => id === owner.id),
+        nonceBatch.getCommitments(nonceIndex, noncePartners),
+        resultHash,
+      );
     }
     else {
       let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})

@@ -255,13 +255,16 @@ export function frostSignInit(
     ...commitments[id]
   }));
   const rho: BN[] = partners.map((id, i) => toBN(frostH1(i, msg, B)));
-  const R:PublicKey = partners.reduce((res: undefined|PublicKey, id, i): PublicKey => {
+  const Ri = partners.map((id, i) => {
     const {D, E} = B[i];
     const DE = pointAdd(D, E.mul(rho[i]));
-    return pointAdd(res, DE)
+    return DE;
+  })
+  const R:PublicKey = Ri.reduce((res: undefined|PublicKey, r): PublicKey => {
+    return pointAdd(res, r)
   }, undefined)!;
   const c:BN = toBN(schnorrHash(Y, pub2addr(R), msg));
-  return {R, rho, c}
+  return {R, Ri, rho, c}
 }
 
 export function frostSign(
@@ -290,8 +293,26 @@ export function frostVerify(sign: FrostSign, Y: PublicKey, msg: string): boolean
   return sign.R.encode("hex", true) == p2;
 }
 
-// export function frostVerifyPartial(i: number, sign: FrostSign, Y: PublicKey, msg: string): boolean {
-// }
+export function frostVerifyPartial(
+  sign: FrostSign, 
+  Y: PublicKey, 
+  Yi: PublicKey,
+  partners: string[],
+  i: number,
+  commitments: MapOf<DistNonceCommitment>, 
+  msg: string
+): boolean {
+  const {Ri, c} = frostSignInit(
+    msg,
+    Y,
+    partners,
+    commitments
+  )
+  const lambda = lagrangeCoef(i, -1, partners.map(id => ({i: parseInt(id)})), "0");
+  const Ylc = Yi.mul(c).mul(lambda);
+  const p1 = curve.g.mul(sign.s).add(Ylc);
+  return p1.encode("hex", true) === Ri[i].encode("hex", true);
+}
 
 export function stringifySignature(sign: {s: BN, e: BN}|{R: PublicKey, s: BN}): string {
   // @ts-ignore
