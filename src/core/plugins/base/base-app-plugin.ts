@@ -77,7 +77,10 @@ class BaseAppPlugin extends CallablePlugin {
   isBuiltInApp: boolean
   private log;
   useFrost: boolean = false;
-  private nonceIndex:number = 0;
+  /** 
+  NonceBatchId => index
+  */
+  private nonceIndex:MapOf<number> = {};
 
   constructor(muon, configs) {
     super(muon, configs);
@@ -594,15 +597,18 @@ class BaseAppPlugin extends CallablePlugin {
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     if(this.useFrost) {
-      const currentNonce:number = this.nonceIndex++;
+      /** increase nonce index */
       const nonceBatch: AppNonceBatch = this.keyManager.appNonceBatches[appId][seed];
+      this.nonceIndex[nonceBatch.id] = (this.nonceIndex[nonceBatch.id] ?? -1) + 1;
+      const currentNonce:number = this.nonceIndex[nonceBatch.id];
+
       const key: AppTssKey = this.getTss(seed)!;
 
       const {R} = TssModule.frostSignInit(
         resultHash, 
         key.publicKey,
         availablePartners, 
-        nonceBatch.getCommitments(currentNonce, availablePartners)
+        nonceBatch.getNonce(currentNonce).commitments
       )
 
       return {
@@ -729,7 +735,7 @@ class BaseAppPlugin extends CallablePlugin {
         appTssKey.getPubKey(owner.id),
         noncePartners,
         noncePartners.findIndex(id => id === owner.id),
-        nonceBatch.getCommitments(nonceIndex, noncePartners),
+        nonceBatch.getNonce(nonceIndex).commitments,
         resultHash,
       );
     }
@@ -899,7 +905,7 @@ class BaseAppPlugin extends CallablePlugin {
       nonceBatch.getNonce(nonceIndex),
       noncePartners,
       noncePartners.findIndex(id => this.currentNodeInfo?.id===id),
-      nonceBatch.getCommitments(nonceIndex, noncePartners)
+      nonceBatch.getNonce(nonceIndex).commitments
     )
 
     if(!process.env.SIGN_WALLET_ADDRESS){

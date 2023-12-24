@@ -127,7 +127,7 @@ async function run() {
           S.reduce((obj, id) => {
             obj[id] = {
               i: parseInt(id), 
-              ...nonceBatch.commitments[id][batchIndex]
+              ...nonceBatch.nonces[batchIndex].commitments[id]
             }
             return obj;
           }, {})

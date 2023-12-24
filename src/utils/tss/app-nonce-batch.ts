@@ -1,6 +1,6 @@
 import BN from 'bn.js';
 import {Party, PartyInfo} from "../../common/types";
-import { DistNonceCommitment, NonceBatch, NonceBatchJson } from '../../common/mpc/dist-nonce.js';
+import { FrostCommitment, FrostNonce, NonceBatch, NonceBatchJson } from '../../common/mpc/dist-nonce.js';
 import { MapOf } from '../../common/mpc/types';
 
 const random = () => Math.floor(Math.random()*9999999)
@@ -38,12 +38,8 @@ export default class AppNonceBatch {
 //     return this.distKey.address;
 //   }
 
-  getNonce(index: number): {d: BN, e: BN} {
+  getNonce(index: number): FrostNonce {
     return this.nonceBatch.nonces[index];
-  }
-
-  getCommitments(index: number, partners: string[]): MapOf<DistNonceCommitment> {
-    return partners.reduce((obj, id) => (obj[id] = this.nonceBatch.commitments[id][index], obj), {});
   }
 
   get partners(): string[] {
@@ -65,17 +61,4 @@ export default class AppNonceBatch {
       NonceBatch.fromJson(appNonceBatch.nonceBatch)
     )
   }
-
-//   /**
-//    * Returns public key of participant with id of [idx]
-//    * public key calculated from public key of local shared polynomials coefficients.
-//    * @param idx
-//    * @returns {[string, any]}
-//    */
-//   getPubKey(idx){
-//     if(!this.partnersPubKey[idx]) {
-//       this.partnersPubKey[idx] = this.distKey!.getPublicKey(idx);
-//     }
-//     return this.partnersPubKey[idx]
-//   }
 }

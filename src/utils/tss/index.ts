@@ -4,7 +4,7 @@ import {BN, toBN, keccak256, range, pub2addr, bn2hex} from './utils.js'
 import assert from 'assert'
 import elliptic from 'elliptic'
 import { muonSha3 } from "../sha3.js";
-import { DistNonceCommitment } from "../../common/mpc/dist-nonce";
+import { FrostCommitment } from "../../common/mpc/dist-nonce.js";
 import { MapOf } from "../../common/mpc/types";
 
 const EC = elliptic.ec;
@@ -248,7 +248,7 @@ export function frostSignInit(
   msg: string,
   Y: PublicKey, 
   partners: string[],
-  commitments: MapOf<DistNonceCommitment>,
+  commitments: MapOf<FrostCommitment>,
 ) {
   const B = partners.map(id => ({
     i: parseInt(id), 
@@ -273,7 +273,7 @@ export function frostSign(
   nonce: {d: BN, e: BN}, 
   partners: string[],
   partnerIndex: number,
-  commitments: MapOf<DistNonceCommitment>,
+  commitments: MapOf<FrostCommitment>,
 ): {R: PublicKey, s: BN} {
   const {R, rho, c} = frostSignInit(msg, secret.pubKey, partners, commitments);
   const iList = partners.map(id => ({i: parseInt(id)}));
@@ -299,7 +299,7 @@ export function frostVerifyPartial(
   Yi: PublicKey,
   partners: string[],
   i: number,
-  commitments: MapOf<DistNonceCommitment>, 
+  commitments: MapOf<FrostCommitment>, 
   msg: string
 ): boolean {
   const {Ri, c} = frostSignInit(

@@ -1,14 +1,16 @@
 
 import * as TssModule from "../../utils/tss/index.js";
 import { MultiPartyComputation } from "./base.js";
-import { DistNonce, DistNonceCommitment, DistNonceCommitmentJson, NonceBatch } from "./dist-nonce.js";
+import { FrostNonce, FrostCommitment, FrostCommitmentJson, NonceBatch } from "./dist-nonce.js";
 import { MapOf, RoundOutput } from "./types.js";
+
+type NonceConstants = Omit<FrostNonce, "commitments">;
 
 /** Round-1 Output */
 export type Round1Result = any;
 export type Round1Broadcast = {
     /** commitment */
-    commitments: DistNonceCommitmentJson[],
+    commitments: FrostCommitmentJson[],
 }
 
 /** Round-2 Output */
@@ -41,11 +43,11 @@ export class DistributedNonceGeneration extends MultiPartyComputation {
     }
 
     async round1(_, __, networkId: string, qualified: string[]): Promise<RoundOutput<Round1Result, Round1Broadcast>> {
-        const nonces:DistNonce[] = new Array(this.pi).fill(0).map(_ => ({
+        const nonces:NonceConstants[] = new Array(this.pi).fill(0).map(_ => ({
             d: TssModule.random(), 
             e: TssModule.random()
         }))
-        const commitments:DistNonceCommitment[] = nonces.map(({d, e}) => ({
+        const commitments:FrostCommitment[] = nonces.map(({d, e}) => ({
             D: TssModule.keyFromPrivate(d).getPublic(),
             E: TssModule.keyFromPrivate(e).getPublic(),
         }))
@@ -77,18 +79,21 @@ export class DistributedNonceGeneration extends MultiPartyComputation {
           throw `Insufficient partner to create the Key.`
         }
 
-        return new NonceBatch(
-            this.pi, 
-            this.partners,
-            r1Store.nonces,
-            qualified.reduce((obj, id, i) => {
-                const comm = r1Msgs[id].broadcast.commitments.map(({D, E}) => ({
-                    D: TssModule.keyFromPublic(D),
-                    E: TssModule.keyFromPublic(E),
-                }))
-                obj[id]= comm;
-                return obj;
-            }, {}),
-        )
+        const nonces: FrostNonce[] = r1Store.nonces.map(({d, e}, i) => {
+            return {
+                d,
+                e,
+                commitments: qualified.reduce((obj, id) => {
+                    const {D, E} = r1Msgs[id].broadcast.commitments[i]
+                    obj[id]= {
+                        D: TssModule.keyFromPublic(D),
+                        E: TssModule.keyFromPublic(E),
+                    };
+                    return obj;
+                }, {})
+            }
+        })
+
+        return new NonceBatch(this.pi, this.partners, nonces)
     }
 }

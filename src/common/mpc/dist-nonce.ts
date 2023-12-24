@@ -6,50 +6,54 @@ import {toBN} from "../../utils/helpers.js";
 import { MapOf } from "./types";
 
 
-export type DistNonce = {d: BN, e: BN}
+export type FrostCommitment = {D: PublicKey, E: PublicKey}
 
-export type DistNonceJson = {d: string, e: string}
+export type FrostCommitmentJson = {D: string, E: string}
 
-export type DistNonceCommitment = {D: PublicKey, E: PublicKey}
+export type FrostNonce = {
+  d: BN, 
+  e: BN,
+  commitments: MapOf<FrostCommitment>
+}
 
-export type DistNonceCommitmentJson = {D: string, E: string}
+export type FrostNonceJson = {
+  d: string, 
+  e: string,
+  commitments: MapOf<FrostCommitmentJson>
+}
 
 export type NonceBatchJson = {
   pi: number,
   partners: string[],
-  nonces: DistNonceJson[],
-  commitments: MapOf<DistNonceCommitmentJson[]>,
+  nonces: FrostNonceJson[],
 }
 
 export class NonceBatch {
   pi: number;
   partners: string[];
-  nonces: DistNonce[];
-  commitments: MapOf<DistNonceCommitment[]>;
+  nonces: FrostNonce[];
 
-  constructor(pi: number, partners: string[], nonces: DistNonce[], commitments: MapOf<DistNonceCommitment[]>) {
+  constructor(pi: number, partners: string[], nonces: FrostNonce[]) {
     this.pi = pi;
     this.partners = partners;
     this.nonces = nonces;
-    this.commitments = commitments;
   }
-
-  // getNonce(index: number): DistNonce | undefined{
-  //   return TssModule.calcPolyPoint(idx, this.polynomial.Fx)
-  // }
 
   toJson(): NonceBatchJson {
     return {
       pi: this.pi,
       partners: this.partners,
-      nonces: this.nonces.map(({d, e}) => ({d: bn2str(d), e: bn2str(e)})),
-      commitments: Object.entries(this.commitments).reduce((obj, [id, commitments]) => {
-        obj[id] = commitments.map(({D, E}) => ({
-          D: D.encode("hex", true),
-          E: E.encode("hex", true),
-        }))
-        return obj;
-      }, {}),
+      nonces: this.nonces.map(({d, e, commitments}) => ({
+        d: bn2str(d), 
+        e: bn2str(e),
+        commitments: Object.entries(commitments).reduce((obj, [id, {D, E}]) => {
+          obj[id] = {
+            D: D.encode("hex", true),
+            E: E.encode("hex", true),
+          }
+          return obj;
+        }, {})
+      }))
     }
   }
 
@@ -57,14 +61,17 @@ export class NonceBatch {
     return new NonceBatch(
       data.pi,
       data.partners,
-      data.nonces.map(({d, e}) => ({d: toBN(d), e: toBN(d)})),
-      Object.entries(data.commitments).reduce((obj, [id, commitments]) => {
-        obj[id] = commitments.map(({D, E}) => ({
-          D: TssModule.keyFromPublic(D),
-          E: TssModule.keyFromPublic(E),
-        }))
-        return obj;
-      }, {})
+      data.nonces.map(({d, e, commitments}) => ({
+        d: toBN(d), 
+        e: toBN(d),
+        commitments: Object.entries(commitments).reduce((obj, [id, {D, E}]) => {
+          obj[id] = {
+            D: TssModule.keyFromPublic(D),
+            E: TssModule.keyFromPublic(E),
+          }
+          return obj;
+        }, {})
+      }))
     );
   }
 }
