@@ -1,6 +1,6 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
-import KeyManager from "./key-manager.js";
+import KeyManager, { NonceGenOptions } from "./key-manager.js";
 import {AppContext, AppDeploymentStatus, AppRequest, MuonNodeInfo, Override} from "../../common/types";
 import HealthCheck from "./health-check.js";
 import {GatewayCallParams} from "../../gateway/types";
@@ -13,6 +13,7 @@ import {MapOf} from "../../common/mpc/types";
 import {APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_ONBOARDING, APP_STATUS_PENDING} from "../constants.js";
 import {GENESIS_SEED} from "../../common/contantes.js";
 import { getTimestamp } from '../../utils/helpers.js';
+import AppNonceBatch from '../../utils/tss/app-nonce-batch.js';
 
 const requestConfirmCache: RedisCache = new RedisCache('req-confirm')
 
@@ -257,6 +258,14 @@ class Explorer extends CallablePlugin {
       if(!ctx || !ctx.party.partners.includes(this.nodeManager.currentNodeInfo!.id))
         return;
     }
+  }
+
+  @gatewayMethod("init-frost")
+  async __initFrost(data) {
+    const {n, seed} = data?.params || {};
+    const appId = "14133107918753457905122726879005594497699931608290848063847062588349373557837";
+    const nonceBatch: AppNonceBatch = await this.keyManager.nonceGen({appId, seed}, {n: parseInt(n), timeout: 60000})
+    return nonceBatch.toJson()
   }
 }
 

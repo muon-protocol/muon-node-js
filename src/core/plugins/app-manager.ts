@@ -825,7 +825,7 @@ export default class AppManager extends CallablePlugin {
    * @param options.return {number} - Determine which field of MuonNodeInfo should be returned as the response. The id field is the default value.
    * @return {string[]} - A list of the selected fields of available nodes (options.return specifies these items).
    */
-  async findOptimalAvailablePartners(appId: string, seed: string, count: number, options: { timeout?: number, return?: string } = {}) {
+  async findOptimalAvailablePartners(appId: string, seed: string, count: number, options: { timeout?: number, return?: string, candidatePartners?:string[] } = {}) {
     options = {
       //TODO: find N best partners instead of setting timeout
       timeout: 12000,
@@ -835,8 +835,12 @@ export default class AppManager extends CallablePlugin {
     const context = this.getAppContext(appId, seed)
     if (!context)
       throw `app not deployed`;
+    
+    let list: string[] = context.party.partners;
+    if(!!options.candidatePartners && options.candidatePartners.length > 0)
+      list = list.filter(id => options.candidatePartners?.includes(id))
 
-    let peers = this.nodeManager.filterNodes({list: context.party.partners})
+    let peers = this.nodeManager.filterNodes({list})
     log(`finding ${count} optimal available of ${context.appName} app partners ...`)
 
     let responseTimes = await PromiseLib.resolveN(

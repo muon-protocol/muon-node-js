@@ -37,7 +37,7 @@ type KeyConstructionData = {
 type NonceConstructionData = {
     id: string,
     partners: string[],
-    pi: number
+    n: number
 }
 
 async function keyGen(partners: string[], networks: FakeNetwork[], cData: KeyConstructionData): 
@@ -66,7 +66,7 @@ async function nonceGen(networks: FakeNetwork[], cData: NonceConstructionData):
         id: cData.id,
         starter: "1",
         partners: cData.partners,
-        pi: cData.pi
+        n: cData.n
       }));
     
     let nonceBatches: any[] = await Promise.all(
@@ -99,15 +99,15 @@ async function run() {
 
   const Y:PublicKey = TssModule.keyFromPublic(longTermKeyShares[partners[0]].publicKey);
 
-  const pi = 4;
+  const batchSize = 4;
   const nonceBatchs: MapOf<NonceBatch> = await nonceGen(fakeNets, {
     id: "sample-nonce",
     partners,
-    pi
+    n: batchSize
   });
 
   const t1 = Date.now()
-  for(let batchIndex=0 ; batchIndex<pi ; batchIndex++) {
+  for(let batchIndex=0 ; batchIndex<batchSize ; batchIndex++) {
     const startTime = Date.now();
 
     const S = shuffle(partners).slice(0, threshold);

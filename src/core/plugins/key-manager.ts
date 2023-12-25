@@ -83,7 +83,7 @@ export type NonceGenOptions = {
    */
   partners?: string[],
   /** The count of nonce that will be generated. */
-  pi: number,
+  n: number,
   /**
    Timeout for key generation process
    */
@@ -105,7 +105,7 @@ class KeyManager extends CallablePlugin {
    map appId and seed to App TSS key
    example: appTss[appId][seed] = AppTssKey
    */
-  appNonceBatches: MapOf<MapOf<AppNonceBatch>> = {};
+  private appNonceBatches: MapOf<MapOf<AppNonceBatch>> = {};
 
   private mutex:Mutex;
 
@@ -496,7 +496,7 @@ class KeyManager extends CallablePlugin {
 
   async nonceGen(partyInfo: PartyInfo, options: NonceGenOptions): Promise<AppNonceBatch> {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
-    let {id, partners: oPartners, pi, timeout=60000} = options;
+    let {id, partners: oPartners, n, timeout=60000} = options;
 
     const party = this.appManager.getAppParty(partyInfo.appId, partyInfo.seed)
 
@@ -525,7 +525,7 @@ class KeyManager extends CallablePlugin {
       /** partners list */
       partners: partners.map(p => p.id),
       /** The count of nonce that will be generated. */
-      pi: pi ?? 1000,
+      n: n ?? 1000,
       /** extra values usable in DKG */
       extra: {
         mpcType: "DistributedNonceGeneration" as MpcType,
@@ -628,6 +628,12 @@ class KeyManager extends CallablePlugin {
       throw `party [${key.party}] not found`
 
     return AppTssKey.fromJson(party, this.currentNodeInfo!.id, key)
+  }
+
+  getAppNonceBatch(appId: string, seed: string): AppNonceBatch|undefined {
+    if(!this.appNonceBatches[appId])
+      return undefined;
+    return this.appNonceBatches[appId][seed];
   }
 
   async takeNonceIndex(id: string, timeout: number=5000): Promise<number> {

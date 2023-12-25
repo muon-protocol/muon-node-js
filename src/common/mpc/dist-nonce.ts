@@ -23,25 +23,25 @@ export type FrostNonceJson = {
 }
 
 export type NonceBatchJson = {
-  pi: number,
+  n: number,
   partners: string[],
   nonces: FrostNonceJson[],
 }
 
 export class NonceBatch {
-  pi: number;
+  n: number;
   partners: string[];
   nonces: FrostNonce[];
 
-  constructor(pi: number, partners: string[], nonces: FrostNonce[]) {
-    this.pi = pi;
+  constructor(n: number, partners: string[], nonces: FrostNonce[]) {
+    this.n = n;
     this.partners = partners;
     this.nonces = nonces;
   }
 
   toJson(): NonceBatchJson {
     return {
-      pi: this.pi,
+      n: this.n,
       partners: this.partners,
       nonces: this.nonces.map(({d, e, commitments}) => ({
         d: bn2str(d), 
@@ -59,7 +59,7 @@ export class NonceBatch {
 
   static fromJson(data: NonceBatchJson): NonceBatch {
     return new NonceBatch(
-      data.pi,
+      data.n,
       data.partners,
       data.nonces.map(({d, e, commitments}) => ({
         d: toBN(d), 

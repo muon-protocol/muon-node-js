@@ -316,32 +316,15 @@ class BaseAppPlugin extends CallablePlugin {
         isDuplicateRequest = true;
         newRequest = this.requestManager.getRequest(newRequest.reqId)!;
       }
-      else {
-        /** find available partners to sign the request */
-        const availableCount = Math.min(
-          Math.ceil(appParty.t*1.5),
-          appParty.partners.length,
-        );
-        const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
-          this.APP_ID,
-          deploymentSeed,
-          availableCount,
-        );
+      else {        
+        t1 = Date.now();
+        const availablePartners = await this.findAvailablePartners(newRequest, appParty);
 
         this.requestManager.addRequest(newRequest, {
           requestTimeout: this.requestTimeout, 
           isFrost: this.useFrost,
           partnerCount: availablePartners.length,
         });
-
-        t1 = Date.now();
-        this.log(`partners:[%o] are available to sign the request`, availablePartners)
-        if(availablePartners.length < appParty.t) {
-          /** send analytic data to server */
-          reportInsufficientPartners({graph, minGraph, count: availableCount})
-            .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
-          throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
-        }
 
         t2 = Date.now()
         newRequest.data.init = {
@@ -429,6 +412,42 @@ class BaseAppPlugin extends CallablePlugin {
 
       return requestData
     }
+  }
+
+  async findAvailablePartners(newRequest, appParty: Party) {
+    /** find available partners to sign the request */
+    let availableCount = Math.min(
+      Math.ceil(appParty.t*1.5),
+      appParty.partners.length,
+    );
+
+    let candidatePartners: string[]|undefined = undefined;
+    if(this.useFrost) {
+      /** increase nonce index */
+      const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appParty.appId, appParty.seed);
+      if(!nonceBatch) {
+        throw `Missing app nonce.`
+      }
+      candidatePartners = nonceBatch.partners;
+      availableCount = Math.min(availableCount, candidatePartners.length);
+    }
+    
+    const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
+      appParty.appId,
+      appParty.seed,
+      availableCount,
+      {candidatePartners}
+    );
+
+    this.log(`partners:[%o] are available to sign the request`, availablePartners)
+    if(availablePartners.length < appParty.t) {
+      /** send analytic data to server */
+      reportInsufficientPartners({graph, minGraph, count: availableCount})
+        .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
+      throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+    }
+
+    return availablePartners;
   }
 
   async spendRequestFee(request: AppRequest) {
@@ -594,7 +613,10 @@ class BaseAppPlugin extends CallablePlugin {
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     if(this.useFrost) {
       /** increase nonce index */
-      const nonceBatch: AppNonceBatch = this.keyManager.appNonceBatches[appId][seed];
+      const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appId, seed);
+      if(!nonceBatch) {
+        throw `Missing app nonce.`
+      }
       const currentNonce:number = await this.keyManager.takeNonceIndex(nonceBatch.id);
 
       const key: AppTssKey = this.getTss(seed)!;
@@ -643,29 +665,18 @@ class BaseAppPlugin extends CallablePlugin {
     let {
       appId, 
       deploymentSeed: seed, 
-      data:{
-        init: {noncePartners}
-      }
+      data:{init}
     } = newRequest;
     let party = this.getParty(newRequest.deploymentSeed)
     let verifyingPubKey = this.getTss(newRequest.deploymentSeed)?.publicKey!
 
     const signatures: MapOf<string> = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
-
-    let owners = Object.keys(signatures)
-    let allSignatures = noncePartners.map(id => signatures[id]);
-
-    // console.log({
-    //   owners,
-    //   noncePartners,
-    //   signatures,
-    //   allSignatures
-    // })
-
     let resultHash = this.hashAppSignParams(newRequest, newRequest.data.signParams, false)
 
     let aggregatedSign, confirmed;
     if(this.useFrost) {
+      let allSignatures = init.noncePartners.map(id => signatures[id]);
+
       let frostSigns = allSignatures.map(signature => {
         return splitSignature(signature) as {R: PublicKey, s: BN};
       })
@@ -673,9 +684,10 @@ class BaseAppPlugin extends CallablePlugin {
       confirmed = TssModule.frostVerify(aggregatedSign, verifyingPubKey, resultHash)
     } 
     else{
+      let owners = Object.keys(signatures);
+      let allSignatures = owners.map(w => signatures[w]);
       let schnorrSigns = allSignatures.map(signature => splitSignature(signature))
-      const signersId = owners.map(wallet => this.nodeManager.getNodeInfo(wallet)!.id);
-      aggregatedSign = TssModule.schnorrAggregateSigs(party!.t, schnorrSigns, signersId)
+      aggregatedSign = TssModule.schnorrAggregateSigs(party!.t, schnorrSigns, owners)
       // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
       confirmed = TssModule.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
     } 
@@ -723,7 +735,9 @@ class BaseAppPlugin extends CallablePlugin {
 
     if(useFrost) {
       const {nonceIndex, noncePartners, } = init;
-      const nonceBatch: AppNonceBatch = this.keyManager.appNonceBatches[appId][seed];
+      const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appId, seed);
+      if(!nonceBatch)
+        throw "Missing app nonce"
       return TssModule.frostVerifyPartial(
         TssModule.splitSignature(signature) as TssModule.FrostSign,
         appTssKey.publicKey,
@@ -762,7 +776,7 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async broadcastNewRequest(request: AppRequest) {
-    const {appId, deploymentSeed: seed} = request;
+    const {appId, deploymentSeed: seed, data: {init}} = request;
     let party = this.getParty(seed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
@@ -770,8 +784,10 @@ class BaseAppPlugin extends CallablePlugin {
     let sidePartners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: party.partners, excludeSelf: true});
     let taskId: string;
     if(this.useFrost) {
-      const nonceBatch: AppNonceBatch = this.keyManager.appNonceBatches[appId][seed];
-      sidePartners = sidePartners.filter((op: MuonNodeInfo) => nonceBatch.partners.includes(op.id))
+      const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appId, seed);
+      if(!nonceBatch) 
+        throw "Missing app nonce"
+      sidePartners = sidePartners.filter((op: MuonNodeInfo) => init.noncePartners.includes(op.id))
     }
     else {
       let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, 15000, {type: "nonce", message: request.data.resultHash})
@@ -885,7 +901,7 @@ class BaseAppPlugin extends CallablePlugin {
     /** Storing the TSS key usage for ever. */
     await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-${this.APP_ID}-tss`)
 
-    let nonceBatch: AppNonceBatch = this.keyManager.appNonceBatches[appId][seed];
+    let nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appId, seed);
     if(!nonceBatch)
       throw `nonce not found for request ${reqId}`
     /**

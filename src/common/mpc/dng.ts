@@ -28,22 +28,22 @@ export type DNGOptions = {
     /** The list of all partners who will participate in the signing process later. */
     partners: string[],
     /** The count of nonce that will be generated. */
-    pi: number,
+    n: number,
     /** Extra data that are available on the all partners. */
     extra?: any,
 }
 
 export class DistributedNonceGeneration extends MultiPartyComputation {
-    readonly pi: number;
+    readonly n: number;
 
     constructor(options: DNGOptions) {
         super({rounds: ['round1','round2'], ...options});
-        const {pi} = options
-        this.pi = pi;
+        const {n} = options
+        this.n = n;
     }
 
     async round1(_, __, networkId: string, qualified: string[]): Promise<RoundOutput<Round1Result, Round1Broadcast>> {
-        const nonces:NonceConstants[] = new Array(this.pi).fill(0).map(_ => ({
+        const nonces:NonceConstants[] = new Array(this.n).fill(0).map(_ => ({
             d: TssModule.random(), 
             e: TssModule.random()
         }))
@@ -94,6 +94,6 @@ export class DistributedNonceGeneration extends MultiPartyComputation {
             }
         })
 
-        return new NonceBatch(this.pi, this.partners, nonces)
+        return new NonceBatch(this.n, qualified, nonces)
     }
 }
