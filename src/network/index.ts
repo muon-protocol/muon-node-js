@@ -155,15 +155,6 @@ class Network extends Events {
           });
         },
       },
-      // config: {
-      //   peerDiscovery: {
-      //     // [Libp2pBundle.Bootstrap.tag]: {
-      //     //   list: [...configs.bootstrap],
-      //     //   interval: 5000, // default is 10 ms,
-      //     //   enabled: configs.bootstrap.length > 0,
-      //     // },
-      //   },
-      // },
     });
 
     this.peerId = peerId;

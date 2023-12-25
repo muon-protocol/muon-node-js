@@ -232,7 +232,7 @@ export class MultiPartyComputation {
     if(lastError)
       throw lastError;
 
-    if(this.RoundValidations[roundTitle] && !this.RoundValidations[roundTitle](result)){
+    if(this.RoundValidations && this.RoundValidations[roundTitle] && !this.RoundValidations[roundTitle](result)){
       // console.dir({r,currentRound, result}, {depth: null})
       this.log.error(`round[${roundTitle}] data validation error. data: %o`, result)
       // @ts-ignore

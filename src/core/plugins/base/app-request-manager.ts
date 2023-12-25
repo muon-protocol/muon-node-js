@@ -10,6 +10,10 @@ import TimeoutPromise from '../../../common/timeout-promise.js'
 import NodeCache from 'node-cache'
 import {MapOf} from "../../../common/mpc/types";
 import { AppRequest } from '../../../common/types.js';
+import {logger} from '@libp2p/logger'
+
+
+const log = logger('muon:app-req-man')
 
 const requestCache = new NodeCache({
   /**
@@ -51,10 +55,12 @@ export default class AppRequestManager{
    */
   addRequest(req, options={}){
     if(!requestCache.has(req.reqId)){
+      log(`Init: %s`, req.reqId)
       requestCache.set(req.reqId, {
         /** options can override items above "...options" */
         partnerCount: Infinity,
         requestTimeout: 40000,
+        isFrost: false,
 
         ...options,
 
@@ -71,6 +77,7 @@ export default class AppRequestManager{
   }
 
   setPartnerCount(reqId, partnerCount) {
+    log(`setPartnerCount : %o`, {reqId, partnerCount})
     let item:CacheItem|undefined = this.getItem(reqId);
     if(item) {
       item.partnerCount = partnerCount
@@ -83,10 +90,12 @@ export default class AppRequestManager{
   }
 
   addSignature(reqId: string, owner: string, sign: string){
+    log(`addSignature : %o`, {reqId})
     let item: CacheItem | undefined = this.getItem(reqId);
     if(item && item.signatures[owner] === undefined){
       item.signatures[owner] = sign
       if(this.isRequestFullFilled(reqId)){
+        log(`requst resolved: %o`, {reqId})
         if(item.promise)
           item.promise.resolve(item.signatures)
       }
@@ -94,6 +103,7 @@ export default class AppRequestManager{
   }
 
   addError(reqId, owner, error) {
+    log(`addError : %o`, {reqId})
     // console.log('AppRequestManager.addError: request error', reqId, owner, error);
     let item: CacheItem | undefined = this.getItem(reqId);
     if(item && item.errors[owner] === undefined){
@@ -101,6 +111,7 @@ export default class AppRequestManager{
       if(this.isRequestFailed(reqId)){
         const req = this.getRequest(reqId)!;
         if(item.promise)
+          log(`requst reject: %o`, {reqId, reason: "lot of errors"})
           item.promise.reject({
             message: "Request failed to confirm.",
             data: {
@@ -125,7 +136,10 @@ export default class AppRequestManager{
     if(!item)
       return false
     // @ts-ignore
-    let {request: {nSign}, signatures: sigs} = item
+    let {request: {nSign}, signatures: sigs, isFrost, partnerCount} = item
+    if(isFrost) {
+      return !!sigs && Object.keys(sigs).length === partnerCount;
+    }
     return !!sigs && Object.keys(sigs).length >= nSign;
   }
 
@@ -134,10 +148,12 @@ export default class AppRequestManager{
     if(!item)
       return false
     // @ts-ignore
-    let {request: {nSign}, errors, signatures} = item
-    const signCount = Object.keys(signatures).length
-    const needMoreSignature = nSign - signCount;
+    let {request: {nSign}, errors, signatures, isFrost} = item
+    const signCount = Object.keys(signatures).length;
     const failedCount = !!errors ? Object.keys(errors).length : 0;
+    if(isFrost)
+      return failedCount > 0;
+    const needMoreSignature = nSign - signCount;
     const remainingPartners = item.partnerCount - signCount - failedCount;
     // TODO: customize number 2
     return remainingPartners < needMoreSignature || failedCount >= 2;
@@ -145,12 +161,15 @@ export default class AppRequestManager{
 
   onRequestSignFullFilled(reqId): Promise<MapOf<string>>{
     let item = this.getItem(reqId);
-    if(!item)
+    if(!item) {
+      log(`requst reject: %o`, {reqId, reason: "no request"})
       return Promise.reject({message: "RequestManager: request not added to RequestManager"})
+    }
 
     let {request, signatures} = item;
     // @ts-ignore
     if(signatures && Object.keys(signatures).length >= request.nSign){
+      log(`requst resolved: %o`, {reqId})
       return Promise.resolve(signatures)
     }
     else{

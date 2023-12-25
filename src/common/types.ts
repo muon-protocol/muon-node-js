@@ -273,6 +273,6 @@ export type NodeManagerData = {
 
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] }
 
-export type MpcType = "DistributedKeyGeneration" | "KeyRedistribution";
+export type MpcType = "DistributedKeyGeneration" | "KeyRedistribution" | "DistributedNonceGeneration";
 
 export type MpcInitHandler = (constructData, MpcNetwork) => Promise<MultiPartyComputation>

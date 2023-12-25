@@ -21,42 +21,7 @@ class HealthCheck extends CallablePlugin {
 
   async onStart() {
     this.healthCheckEndpoint = this.remoteMethodEndpoint(RemoteMethods.CheckHealth)
-    // this.muon.getPlugin('remote-call').on('error', this.onRemoteCallFailed.bind(this))
   }
-
-  // async onRemoteCallFailed({peerId, method, onRemoteSide=false}) {
-  //   // TODO: need more check
-  //   if(method === this.healthCheckEndpoint || onRemoteSide)
-  //     return;
-  //   let peerIdStr = peerId2Str(peerId)
-  //   if(this.checkingTime[peerIdStr] && Date.now() - this.checkingTime[peerIdStr] < 30000) {
-  //     return;
-  //   }
-  //
-  //   console.log(`checking peer ${peerId2Str(peerId)} health ...`, {peer: peerIdStr, method, onRemoteSide})
-  //
-  //   this.checkingTime[peerIdStr] = Date.now();
-  //
-  //   // @ts-ignore
-  //   let peer = await this.findPeer(peerId);
-  //   if (!peer) {
-  //     // TODO: what to do ?
-  //     return;
-  //   }
-  //   for (let i = 0; i < 3; i++) {
-  //     try {
-  //       let response = await this.remoteCall(peer, RemoteMethods.CheckHealth, null, {silent: true})
-  //       if (response?.status === 'OK') {
-  //         console.log(`peer responded OK.`)
-  //         return;
-  //       }
-  //     }catch (e) {}
-  //     await timeout(5000)
-  //   }
-  //   console.log(`peer not responding. trigger muon onDisconnect`)
-  //   // @ts-ignore;
-  //   await this.muon.onPeerDisconnect({remotePeer: peerId})
-  // }
 
   private async collectNodeStatus(){
     const loadAvg = OS.loadavg().map(load => Math.round(load * 100) / 100).toString();
@@ -86,9 +51,7 @@ class HealthCheck extends CallablePlugin {
   }
 
   @remoteMethod(RemoteMethods.CheckHealth)
-  async _onHealthCheck(data:{log?: any}={}) {
-    if(data?.log)
-      console.log(`===== HealthCheck._onHealthCheck =====`, new Date());
+  async _onHealthCheck() {
     return {
       status: "OK",
       statusData: await getStatusData({}),
