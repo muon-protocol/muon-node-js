@@ -416,7 +416,7 @@ class BaseAppPlugin extends CallablePlugin {
 
   async findAvailablePartners(newRequest, appParty: Party) {
     /** find available partners to sign the request */
-    let availableCount = Math.min(
+    let availableCount = this.useFrost ? appParty.t : Math.min(
       Math.ceil(appParty.t*1.5),
       appParty.partners.length,
     );
