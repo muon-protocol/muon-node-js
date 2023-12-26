@@ -67,6 +67,11 @@ export type AppDeploymentInfo = {
     deployed: boolean,
     /** Is this node has the App's TSS key share */
     hasTssKey: boolean,
+    /** 
+     * Is this node has the App's FROST nonce share or not.
+     * Only for FROST apps.
+     */
+    hasNonce?: boolean,
     /** deployment status*/
     status: AppDeploymentStatus,
     /** reqId of confirmed deployment request signed by deployment tss group */

@@ -4,6 +4,7 @@ import { IPC_CHANNEL } from './plugins/core-ipc-plugin.js'
 import {MessageOptions} from "../common/message-bus/msg-publisher.js";
 import {IpcMethods, CoreIpcMethod} from "./plugins/core-ipc-handlers.js";
 import {GatewayCallParams} from "../gateway/types";
+import { FindAvailableNodesOptions } from "./plugins/app-manager";
 
 const callQueue = new QueueProducer(IPC_CHANNEL)
 
@@ -84,8 +85,8 @@ export async function ensureAppTssKeyExist(appId: string, seed: string) {
   return await call(IpcMethods.EnsureAppTssKeyExist, {appId, seed});
 }
 
-export async function findNAvailablePartners(appId: string, seed: string, searchList: string[], count: number) {
-  return await call(IpcMethods.FindNAvailablePartners, {appId, seed, searchList, count})
+export async function findNAvailablePartners(options: FindAvailableNodesOptions) {
+  return await call(IpcMethods.FindNAvailablePartners, options)
 }
 
 export async function verifyRequestSignature(request: AppRequest) {

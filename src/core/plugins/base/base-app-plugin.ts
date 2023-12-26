@@ -415,39 +415,53 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async findAvailablePartners(newRequest, appParty: Party) {
-    /** find available partners to sign the request */
-    let availableCount = this.useFrost ? appParty.t : Math.min(
-      Math.ceil(appParty.t*1.5),
-      appParty.partners.length,
-    );
-
-    let candidatePartners: string[]|undefined = undefined;
     if(this.useFrost) {
       /** increase nonce index */
       const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appParty.appId, appParty.seed);
       if(!nonceBatch) {
         throw `Missing app nonce.`
       }
-      candidatePartners = nonceBatch.partners;
-      availableCount = Math.min(availableCount, candidatePartners.length);
+
+      const availablePartners = await this.appManager.findNAvailablePartners({
+        nodes: nonceBatch.partners, 
+        count: appParty.t, 
+        partyInfo: {
+          appId: appParty.appId,
+          seed: appParty.seed,
+        },
+        resolveAnyway: true,
+        checkFrostNonce: true,
+      })
+
+      if(availablePartners.length < appParty.t) {
+        throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+      }
+      return availablePartners;
+    }
+    else {
+      /** find available partners to sign the request */
+      let availableCount = Math.min(
+        Math.ceil(appParty.t*1.5),
+        appParty.partners.length,
+      );
+
+      const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
+        appParty.appId,
+        appParty.seed,
+        availableCount,
+      );
+
+      this.log(`partners:[%o] are available to sign the request`, availablePartners)
+      if(availablePartners.length < appParty.t) {
+        /** send analytic data to server */
+        reportInsufficientPartners({graph, minGraph, count: availableCount})
+          .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
+        throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+      }
+      return availablePartners;
     }
     
-    const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
-      appParty.appId,
-      appParty.seed,
-      availableCount,
-      {candidatePartners}
-    );
 
-    this.log(`partners:[%o] are available to sign the request`, availablePartners)
-    if(availablePartners.length < appParty.t) {
-      /** send analytic data to server */
-      reportInsufficientPartners({graph, minGraph, count: availableCount})
-        .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
-      throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
-    }
-
-    return availablePartners;
   }
 
   async spendRequestFee(request: AppRequest) {

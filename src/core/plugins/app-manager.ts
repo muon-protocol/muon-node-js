@@ -53,16 +53,25 @@ export type ContextFilterOptions = {
 }
 
 export type FindAvailableNodesOptions = {
+  /** The list of candidate nodes. */
+  nodes: string[],
+  /** The number of available nodes to be found */
+  count: number,
   /** If it is set, target nodes will check the status of this app. */
-  appId?: string,
-  /** If the appId is set, the seed needs to be set. */
-  seed?: string,
+  partyInfo?: {
+    appId: string,
+    seed: string,
+  }
   /** If not enough nodes respond, the query will terminate after this timespan.*/
   timeout?: number,
   /** Determine which field of MuonNodeInfo should be returned as the response. The id field is the default value. */
   return?: string,
   /** ignore self and not include in result */
-  excludeSelf?: boolean
+  excludeSelf?: boolean,
+  /** used for FROST apps */
+  checkFrostNonce?: boolean,
+  /** resolve if unable find the desired number of online nodes. */
+  resolveAnyway?: boolean,
 }
 
 @remoteApp
@@ -306,11 +315,14 @@ export default class AppManager extends CallablePlugin {
   getAppDeploymentInfo(appId: string, seed: string): AppDeploymentInfo {
     const status = this.getAppDeploymentStatus(appId, seed);
     const deployed:boolean = [APP_STATUS_DEPLOYED, APP_STATUS_PENDING].includes(status);
+    /** Is valid only for FROST apps. */
+    const hasNonce:boolean = this.keyManager.hasNonceBatch(appId, seed);
     const result: AppDeploymentInfo = {
       appId,
       seed,
       deployed,
       hasTssKey: this.appHasTssKey(appId, seed),
+      hasNonce,
       status,
     }
     const context = seed ? this.getAppContext(appId, seed) : null
@@ -726,93 +738,51 @@ export default class AppManager extends CallablePlugin {
   }
 
   /**
-   * Finds available nodes from a given list. By default, it selects online nodes. Any node that responds will be selected.
-   * If you pass {appId, seed} as the third param, only nodes that have this app's context and tss key will be selected.
-   * @param searchList {string[]} - id/wallet/peerId list of nodes to check.
-   * @param count {number} - enough count of results to resolve the promise.
-   * @param options {FindAvailableNodesOptions} - Query options.
+   * Finds available nodes from a given list. By default, it selects online nodes.
    * @return {string[]} - A list of the selected fields of available nodes (options.return specifies these items).
    */
-  async findNAvailablePartners(searchList: string[], count: number, options: FindAvailableNodesOptions = {}): Promise<string[]> {
+  async findNAvailablePartners(options: FindAvailableNodesOptions): Promise<string[]> {
     options = {
       timeout: 15000,
       return: 'id',
       ...options
     }
 
-    const {appId, seed} = options;
+    const {nodes, count, partyInfo, checkFrostNonce, resolveAnyway=false} = options;
 
-    let peers = this.nodeManager.filterNodes({list: searchList})
-    log(`finding ${count} of ${searchList.length} available peer ...`)
-    const selfIndex = peers.findIndex(p => p.peerId === process.env.PEER_ID!)
+    let nodeInfos: MuonNodeInfo[] = this.nodeManager.filterNodes({list: nodes})
+    log(`finding ${count} of ${nodes.length} available peer ...`)
 
-    let responseList: string[] = []
-    let n = count;
-    if (selfIndex >= 0) {
-      peers = peers.filter((_, i) => (i !== selfIndex))
-      if(options.excludeSelf !== true) {
-        /** If the appId is not set, being online is enough to be considered as available. */
-        if (!appId)
-          responseList.push(this.currentNodeInfo![options!.return!]);
-        else {
-          const deploymentInfo = this.getAppDeploymentInfo(appId, seed!);
-          if(deploymentInfo.deployed && deploymentInfo.hasTssKey) {
-            responseList.push(this.currentNodeInfo![options!.return!]);
+    let responseList: AppDeploymentInfo|boolean[] = await PromiseLib.resolveN(
+      count,
+      nodeInfos.map(({peerId, wallet}) => (
+        wallet === process.env.SIGN_WALLET_ADDRESS
+        ?
+        (partyInfo ? this.__getAppDeploymentInfo(partyInfo) : Promise.resolve(true))
+        :
+        this.remoteCall(
+          peerId,
+          RemoteMethods.GetAppDeploymentInfo,
+          partyInfo,
+          {timeout: options!.timeout},
+        )
+      ).then(info => {
+        if (partyInfo) {
+          if(!info) {
+            throw "missing info"
           }
+          const {hasTssKey, hasNonce} = info
+          if(!hasTssKey)
+            throw "missing tss key"
+          if(checkFrostNonce && !hasNonce)
+            throw "missing frost nonce"
         }
-      }
-      n--;
-    }
+        return info;
+      })),
+      resolveAnyway
+    )
 
-    let resultPromise = new TimeoutPromise(
-      options.timeout,
-      `Finding ${count} from ${searchList.length} peer timed out`,
-      {
-        resolveOnTimeout: true,
-        onTimeoutResult: () => {
-          return responseList;
-        }
-      }
-    );
-
-    let pendingRequests = peers.length
-    const execTimes = new Array(peers.length).fill(-1)
-    const startTime = Date.now()
-    let finalized = false;
-    for (let i = 0; i < peers.length; i++) {
-      this.remoteCall(
-        peers[i].peerId,
-        RemoteMethods.GetAppDeploymentInfo,
-        {appId, seed},
-        {timeout: options!.timeout},
-      )
-        .then(({hasTssKey}) => {
-          execTimes[i] = Date.now() - startTime
-          if (!appId || hasTssKey) {
-            responseList.push(peers[i][options!.return!])
-            n--;
-          }
-        })
-        .catch(e => {
-          log.error("get deployment status has been failed %O", e)
-        })
-        .finally(() => {
-          if (n <= 0) {
-            if (!finalized)
-              log("find availability exec times %o, nodes: %o", execTimes, peers.map(p => p.id))
-            finalized = true
-            resultPromise.resolve(responseList);
-          }
-          if (--pendingRequests <= 0) {
-            if (!finalized)
-              log("find availability exec times %o, nodes: %o", execTimes, peers.map(p => p.id))
-            finalized = true
-            resultPromise.resolve(responseList);
-          }
-        })
-    }
-
-    return resultPromise.promise;
+    return nodeInfos.filter((n ,i) => !!responseList[i]).map(n => n[options!.return!]);
   }
 
   /**
