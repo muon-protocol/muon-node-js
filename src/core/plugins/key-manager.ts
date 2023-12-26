@@ -24,6 +24,7 @@ import { NonceBatch } from '../../common/mpc/dist-nonce.js';
 import { DistributedNonceGeneration } from '../../common/mpc/dng.js';
 import AppNonceBatch, { AppNonceBatchJson } from '../../utils/tss/app-nonce-batch.js';
 import { Mutex } from '../../common/mutex.js';
+import { DEPLOYMENT_APP_ID, GENESIS_SEED } from '../../common/contantes.js';
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -205,11 +206,11 @@ class KeyManager extends CallablePlugin {
       return false;
     }
 
-    const readyDeployers = await this.appManager.findNAvailablePartners(
-      deployers,
-      this.netConfigs.tss.threshold,
-      {appId: "1", seed: "1"}
-    )
+    const readyDeployers = await this.appManager.findNAvailablePartners({
+      nodes: deployers,
+      count: this.netConfigs.tss.threshold,
+      partyInfo: {appId: DEPLOYMENT_APP_ID, seed: GENESIS_SEED}
+    })
     log(`there is ${readyDeployers.length} deployers are ready.`)
     return readyDeployers.length < this.netConfigs.tss.threshold;
   }
@@ -628,6 +629,12 @@ class KeyManager extends CallablePlugin {
       throw `party [${key.party}] not found`
 
     return AppTssKey.fromJson(party, this.currentNodeInfo!.id, key)
+  }
+
+  hasNonceBatch(appId: string, seed: string): boolean {
+    if(!this.appNonceBatches[appId])
+      return false;
+    return this.appNonceBatches[appId][seed] !== undefined;
   }
 
   getAppNonceBatch(appId: string, seed: string): AppNonceBatch|undefined {

@@ -349,11 +349,12 @@ class System extends CallablePlugin {
       throw `App's old context not found.`
 
     const dealers: string[] = newContext.party.partners.filter(id => oldContext.party.partners.includes(id));
-    const readyDealers = await this.appManager.findNAvailablePartners(
-      dealers,
-      dealers.length,
-      {appId, seed: oldContext.seed, return: "id"},
-    );
+    const readyDealers = await this.appManager.findNAvailablePartners({
+      nodes: dealers,
+      count: dealers.length,
+      partyInfo: {appId, seed: oldContext.seed}, 
+      return: "id",
+    });
     // const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
     const generatorId = _.shuffle(dealers.filter(id => readyDealers.includes(id)))[0];
     if(!generatorId)

@@ -1,7 +1,7 @@
 import CallablePlugin from "./base/callable-plugin.js"
 import {remoteApp, ipcMethod} from "./base/app-decorators.js"
 import System from "./system.js";
-import AppManager from "./app-manager.js";
+import AppManager, { FindAvailableNodesOptions } from "./app-manager.js";
 import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
@@ -117,15 +117,8 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.FindNAvailablePartners)
-  async __findNAvailablePartners(data: {appId: string, seed: string, searchList: string[], count: number}): Promise<string[]> {
-    return await this.appManager.findNAvailablePartners(
-      data.searchList,
-      data.count,
-      {
-        appId: data.appId,
-        seed: data.seed
-      }
-    )
+  async __findNAvailablePartners(options: FindAvailableNodesOptions): Promise<string[]> {
+    return await this.appManager.findNAvailablePartners(options)
   }
 
   @ipcMethod(IpcMethods.VerifyRequestSignature)
