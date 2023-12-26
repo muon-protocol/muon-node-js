@@ -93,7 +93,7 @@ export function lagrangeCoef(j, t, shares, index) {
 export function reconstructKey(shares, t, index=0) {
   assert(shares.length >= t);
   let sum = toBN(0);
-  for (let j = 0; j < t; j++) {
+  for (let j = 0; j < shares.length; j++) {
     let coef = lagrangeCoef(j, t, shares, index)
     let key = shares[j].key.getPrivate()
     sum = sum.add(key.mul(coef))
@@ -104,7 +104,7 @@ export function reconstructKey(shares, t, index=0) {
 export function reconstructPubKey(shares: PublicKeyShare[], t, index=0): PublicKey {
   assert(shares.length >= t);
   let sum: PublicKey|undefined = undefined;
-  for (let j = 0; j < t; j++) {
+  for (let j = 0; j < shares.length; j++) {
     let coef = lagrangeCoef(j, t, shares, index)
     let pubKey:PublicKey = shares[j].publicKey
     sum = pointAdd(sum, pubKey.mul(coef))
@@ -347,7 +347,7 @@ export function splitSignature(signature: string): {s: BN, e: BN} | {R: PublicKe
 export function schnorrAggregateSigs(t, sigs, indices): {s: BN, e: BN}{
   assert(sigs.length >= t);
   let ts = toBN(0)
-  range(0, t).map(j => {
+  range(0, sigs.length).map(j => {
     let coef = lagrangeCoef(j, t, indices.map(i => ({i})), 0);
     ts.iadd(sigs[j].s.mul(coef))
   })
