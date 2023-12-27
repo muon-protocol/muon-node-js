@@ -33,6 +33,7 @@ import Web3 from 'web3'
 import { MapOf } from '../../../common/mpc/types.js'
 import { DEPLOYMENT_APP_ID } from '../../../common/contantes.js'
 import AppNonceBatch from '../../../utils/tss/app-nonce-batch.js'
+import { FrostCommitment, FrostCommitmentJson } from '../../../common/mpc/dist-nonce.js';
 
 const { omit } = lodash;
 
@@ -642,10 +643,20 @@ class BaseAppPlugin extends CallablePlugin {
         nonceBatch.getNonce(currentNonce).commitments
       )
 
+      let commitments:MapOf<FrostCommitment> = nonceBatch.getNonce(currentNonce).commitments;
+      commitments = Object.entries(commitments).reduce((obj, [id, {D, E}]) => {
+        obj[id] = {
+          D: D.encode("hex", true),
+          E: E.encode("hex", true),
+        }
+        return obj;
+      }, {});
+
       return {
         nonceBatchId: nonceBatch.id,
         nonceIndex: currentNonce,
         noncePartners: availablePartners,
+        commitments,
         nonceAddress: TssModule.pub2addr(R),
       }
     }
@@ -905,7 +916,7 @@ class BaseAppPlugin extends CallablePlugin {
       appId, 
       deploymentSeed: seed,
       data:{
-        init: {nonceIndex, noncePartners}
+        init: {nonceIndex, noncePartners, commitments}
       }
     } = request;
     // let tssKey = this.isBuiltInApp ? this.keyManager.tssKey : this.keyManager.getAppTssKey(this.APP_ID);
@@ -924,13 +935,20 @@ class BaseAppPlugin extends CallablePlugin {
      */
     // await useOneTime("key", K.encode('hex', true), `app-${this.APP_ID}-nonce-${resultHash}`, 3600)
     // TODO: remove nonce after sign
+    commitments = Object.entries(commitments as MapOf<FrostCommitmentJson>).reduce((obj, [id, {D, E}]) => {
+      obj[id] = {
+        D: TssModule.keyFromPublic(D),
+        E: TssModule.keyFromPublic(E),
+      };
+      return obj;
+    }, {})
     let signature = TssModule.frostSign(
       resultHash,
       {share: tssKey.share, pubKey: tssKey.publicKey},
       nonceBatch.getNonce(nonceIndex),
       noncePartners,
       noncePartners.findIndex(id => this.currentNodeInfo?.id===id),
-      nonceBatch.getNonce(nonceIndex).commitments
+      commitments,
     )
 
     if(!process.env.SIGN_WALLET_ADDRESS){

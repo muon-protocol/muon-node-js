@@ -234,6 +234,18 @@ export function schnorrVerifyWithNonceAddress(hash, signature, nonceAddress, sig
   return nonceAddress === addr;
 }
 
+export function frostInit(n: number) {
+  const nonces = new Array(n).fill(0).map(_ => ({
+    d: random(), 
+    e: random()
+  }))
+  const commitments = nonces.map(({d, e}) => ({
+    D: keyFromPrivate(d).getPublic(),
+    E: keyFromPrivate(e).getPublic(),
+  }))
+  return {nonces, commitments}
+}
+
 export function frostH1(id: string|number, msg: string, B: {i: string|number, D: PublicKey, E: PublicKey}[]): string {
   return muonSha3(
       {t: "uint32", v: id},
