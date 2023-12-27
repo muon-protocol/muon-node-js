@@ -20,11 +20,12 @@ import {PublicKey} from "../../utils/tss/types";
 import * as crypto from "../../utils/crypto.js";
 import {muonSha3} from "../../utils/sha3.js";
 import {bn2hex} from "../../utils/tss/utils.js";
-import { NonceBatch } from '../../common/mpc/dist-nonce.js';
+import { FrostCommitmentJson, FrostNonce, FrostNonceJson, NonceBatch, NonceBatchJson } from '../../common/mpc/dist-nonce.js';
 import { DistributedNonceGeneration } from '../../common/mpc/dng.js';
 import AppNonceBatch, { AppNonceBatchJson } from '../../utils/tss/app-nonce-batch.js';
 import { Mutex } from '../../common/mutex.js';
 import { DEPLOYMENT_APP_ID, GENESIS_SEED } from '../../common/contantes.js';
+import * as PromiseLib from "../../common/promise-libs.js"
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -93,6 +94,7 @@ export type NonceGenOptions = {
 
 const RemoteMethods = {
   KeyShareProof: "keyShareProof",
+  InitFROST: "initFROST",
 }
 
 @remoteApp
@@ -495,7 +497,72 @@ class KeyManager extends CallablePlugin {
     return key;
   }
 
-  async nonceGen(partyInfo: PartyInfo, options: NonceGenOptions): Promise<AppNonceBatch> {
+  async nonceGen(partyInfo: PartyInfo, threshold: number, options: NonceGenOptions): Promise<AppNonceBatchJson> {
+    let {id, n, timeout=60000} = options;
+
+    const party = this.appManager.getAppParty(partyInfo.appId, partyInfo.seed)
+    if(!party)
+      throw {message: `party not found`, partyInfo};
+
+    let candidatePartners = party.partners;
+    if(options.partners)
+      candidatePartners = candidatePartners.filter(p => options.partners!.includes(p));
+
+    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({
+      list: candidatePartners,
+      excludeSelf: true,
+    })
+
+    const nonceId = id || uuid()
+
+    const responses:(FrostCommitmentJson[]|null)[] = await PromiseLib.resolveN(
+      Math.max(threshold, Math.ceil(partners.length * 0.8)),
+      partners.map(({peerId, id}) => {
+        return this.remoteCall(peerId, RemoteMethods.InitFROST, {partyInfo, nonceId, n})
+        .catch(e => null);
+      })
+    )
+
+    const qualifiedsResponse:MapOf<FrostCommitmentJson[]> = partners.reduce((obj, node, i) => {
+      if(!!responses[i]) {
+        obj[node.id] = responses[i];
+      }
+      return obj;
+    }, {})
+
+    const {nonces, commitments} = TssModule.frostInit(n);
+    const frostNonces:FrostNonceJson[] = nonces.map(({d, e}, i) => {
+      const init:MapOf<FrostCommitmentJson> = {
+        [this.currentNodeInfo!.id]: {
+          D: commitments[i].D.encode("hex", true),
+          E: commitments[i].E.encode("hex", true),
+        } 
+      };
+      return {
+        d: d.toString(),
+        e: e.toString(),
+        commitments: Object.keys(qualifiedsResponse).reduce((obj: MapOf<FrostCommitmentJson>, id): MapOf<FrostCommitmentJson> => {
+            obj[id] = { ... qualifiedsResponse[id][i] };
+            return obj;
+        }, init)
+      }
+    });
+
+    const appNonceBatchJson: AppNonceBatchJson = {
+      id: nonceId,
+      partyInfo,
+      nonceBatch: {
+        n,
+        partners: [this.currentNodeInfo!.id, ...Object.keys(qualifiedsResponse)],
+        nonces: frostNonces
+      }
+    }
+
+    CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
+    return appNonceBatchJson;
+  }
+
+  async nonceGenOld(partyInfo: PartyInfo, options: NonceGenOptions): Promise<AppNonceBatch> {
     let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
     let {id, partners: oPartners, n, timeout=60000} = options;
 
@@ -721,6 +788,35 @@ class KeyManager extends CallablePlugin {
     const key = await this.getSharedKey(data.keyId, 15e3, data.usage);
     const keyPublicHash = muonSha3(key.publicKey.encode('hex', true));
     return crypto.signWithPrivateKey(keyPublicHash, bn2hex(key.share));
+  }
+
+  @remoteMethod(RemoteMethods.InitFROST)
+  async __initFROST(data: {partyInfo: PartyInfo, n: number, nonceId: string}, callerInfo: MuonNodeInfo): 
+  Promise<(FrostNonceJson|FrostCommitmentJson)[]> {
+    const {partyInfo: {appId, seed}, n, nonceId} = data;
+    const appParty = this.appManager.getAppParty(appId, seed);
+    if(!appParty) {
+      throw `Missing app party`
+    }
+    const currentNode:MuonNodeInfo = this.currentNodeInfo!;
+    if(callerInfo.id === currentNode.id) {
+      throw `InitFrost not allowed to call by self`
+    }
+
+    const {nonces, commitments} = TssModule.frostInit(n);
+    const appNonceBatchJson: AppNonceBatchJson = new AppNonceBatch(
+      {appId, seed}, 
+      nonceId, 
+      new NonceBatch(
+        n, appParty.partners, 
+        nonces.map(({d, e}, i) => ({d, e, commitments: {}})))
+    ).toJson();
+    
+    CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
+    return commitments.map(({D, E}) => ({
+      D: D.encode("hex", true),
+      E: E.encode("hex", true),
+    }))
   }
 }
 
