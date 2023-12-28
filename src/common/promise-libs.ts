@@ -102,6 +102,8 @@ export function resolveN<T>( n: number, promises: Promise<T>[],resolveAnyway: bo
   /** Create an array to store the resolved values */
   let values: T[] = new Array(promises.length).fill(undefined);
 
+  const errors: any[] = new Array(promises.length).fill(undefined);
+
   /** Create a new promise to return */
   return new Promise((resolve, reject) => {
     /** Loop through the promises array */
@@ -117,6 +119,8 @@ export function resolveN<T>( n: number, promises: Promise<T>[],resolveAnyway: bo
           }
         })
         .catch((error) => {
+          errors[i] = error;
+          log.error("")
             /** If the promise rejects, increment the rejected counter */
             rejected++;
           /**
@@ -124,7 +128,14 @@ export function resolveN<T>( n: number, promises: Promise<T>[],resolveAnyway: bo
            If resolveAnyway is set, wait to all promise finalize and then resolve.
            */
             if (!resolveAnyway && rejected > promises.length - n) {
-              reject(new Error("Cannot resolve " + n + " promises"));
+              // reject(new Error("Cannot resolve " + n + " promises"));
+              reject({
+                message: "Cannot resolve " + n + " promises",
+                errors: errors.map(e => ({
+                  message: e.message,
+                  stack: e.stack,
+                })),
+              });
             }
           })
         .finally(() => {
