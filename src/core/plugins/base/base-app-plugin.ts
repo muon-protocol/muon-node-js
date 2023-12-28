@@ -431,7 +431,6 @@ class BaseAppPlugin extends CallablePlugin {
           seed: appParty.seed,
         },
         resolveAnyway: true,
-        checkFrostNonce: true,
       })
 
       if(availablePartners.length < appParty.t) {

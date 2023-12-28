@@ -68,8 +68,6 @@ export type FindAvailableNodesOptions = {
   return?: string,
   /** ignore self and not include in result */
   excludeSelf?: boolean,
-  /** used for FROST apps */
-  checkFrostNonce?: boolean,
   /** resolve if unable find the desired number of online nodes. */
   resolveAnyway?: boolean,
 }
@@ -310,6 +308,17 @@ export default class AppManager extends CallablePlugin {
     if(isAesEncrypted(doc.keyShare))
       doc.keyShare = aesDecrypt(doc.keyShare, process.env.SIGN_WALLET_PRIVATE_KEY)
     this.appTssConfigs[doc.seed] = doc;
+  }
+
+  private frostApps: MapOf<boolean> = {};
+  isFrostApp(appId: string): boolean {
+    if(this.frostApps[appId] === undefined) {
+      let app = this.muon.getAppById(appId);
+      if(app) {
+        this.frostApps[appId] = app.useFrost;
+      }
+    }
+    return this.frostApps[appId];
   }
 
   getAppDeploymentInfo(appId: string, seed: string): AppDeploymentInfo {
@@ -748,7 +757,7 @@ export default class AppManager extends CallablePlugin {
       ...options
     }
 
-    const {nodes, count, partyInfo, checkFrostNonce, resolveAnyway=false} = options;
+    const {nodes, count, partyInfo, resolveAnyway=false} = options;
 
     let nodeInfos: MuonNodeInfo[] = this.nodeManager.filterNodes({list: nodes})
     log(`finding ${count} of ${nodes.length} available peer ...`)
@@ -774,7 +783,7 @@ export default class AppManager extends CallablePlugin {
           const {hasTssKey, hasNonce} = info
           if(!hasTssKey)
             throw "missing tss key"
-          if(checkFrostNonce && !hasNonce)
+          if(this.isFrostApp(partyInfo.appId) && !hasNonce)
             throw "missing frost nonce"
         }
         return info;
