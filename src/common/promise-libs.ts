@@ -119,8 +119,9 @@ export function resolveN<T>( n: number, promises: Promise<T>[],resolveAnyway: bo
           }
         })
         .catch((error) => {
+          if(typeof error === "string")
+            error = {message: error}
           errors[i] = error;
-          log.error("")
             /** If the promise rejects, increment the rejected counter */
             rejected++;
           /**
@@ -131,10 +132,7 @@ export function resolveN<T>( n: number, promises: Promise<T>[],resolveAnyway: bo
               // reject(new Error("Cannot resolve " + n + " promises"));
               reject({
                 message: "Cannot resolve " + n + " promises",
-                errors: errors.map(e => ({
-                  message: e.message,
-                  stack: e.stack,
-                })),
+                errors: errors.map(e => e.message),
               });
             }
           })
