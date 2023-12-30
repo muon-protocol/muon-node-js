@@ -428,7 +428,11 @@ class NetworkIpcHandler extends CallablePlugin {
         /** Forward request to the appropriate node. */
         const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(partners.length/2));
         /** find an online node that has the app's tss key */
-        const availables: string[] = await CoreIpc.findNAvailablePartners(context.appId, context.seed, candidatePartners, 1);
+        const availables: string[] = await CoreIpc.findNAvailablePartners({
+          nodes: candidatePartners,
+          count: 1,
+          partyInfo: {appId:context.appId, seed: context.seed},
+        });
         if(availables.length <= 0)
           throw "The request cannot be forwarded because there is no available partner";
         return this.forwardGatewayCallToOtherNode(availables[0], requestData, options.timeout);

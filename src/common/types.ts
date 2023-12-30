@@ -67,6 +67,11 @@ export type AppDeploymentInfo = {
     deployed: boolean,
     /** Is this node has the App's TSS key share */
     hasTssKey: boolean,
+    /** 
+     * Is this node has the App's FROST nonce share or not.
+     * Only for FROST apps.
+     */
+    hasNonce?: boolean,
     /** deployment status*/
     status: AppDeploymentStatus,
     /** reqId of confirmed deployment request signed by deployment tss group */
@@ -273,6 +278,6 @@ export type NodeManagerData = {
 
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] }
 
-export type MpcType = "DistributedKeyGeneration" | "KeyRedistribution";
+export type MpcType = "DistributedKeyGeneration" | "KeyRedistribution" | "DistributedNonceGeneration";
 
 export type MpcInitHandler = (constructData, MpcNetwork) => Promise<MultiPartyComputation>

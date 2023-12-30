@@ -7,9 +7,10 @@ import {remoteApp, remoteMethod} from './base/app-decorators.js'
 import NodeManagerPlugin from "./node-manager.js";
 import * as SharedMemory from '../../common/shared-memory/index.js'
 import * as NetworkIpc from '../../network/ipc.js'
-import {AppContext, MuonNodeInfo, PartyInfo} from "../../common/types";
+import * as CoreIpc from "../ipc.js";
+import {AppContext, MpcType, MuonNodeInfo, PartyInfo} from "../../common/types";
 import AppManager from "./app-manager.js";
-import {IMpcNetwork} from "../../common/mpc/types";
+import {IMpcNetwork, MapOf} from "../../common/mpc/types";
 import {DistributedKeyGeneration} from "../../common/mpc/dkg.js";
 import {DistKey} from "../../common/mpc/dist-key.js";
 import {logger} from '@libp2p/logger'
@@ -19,6 +20,12 @@ import {PublicKey} from "../../utils/tss/types";
 import * as crypto from "../../utils/crypto.js";
 import {muonSha3} from "../../utils/sha3.js";
 import {bn2hex} from "../../utils/tss/utils.js";
+import { FrostCommitmentJson, FrostNonce, FrostNonceJson, NonceBatch, NonceBatchJson } from '../../common/mpc/dist-nonce.js';
+import { DistributedNonceGeneration } from '../../common/mpc/dng.js';
+import AppNonceBatch, { AppNonceBatchJson } from '../../utils/tss/app-nonce-batch.js';
+import { Mutex } from '../../common/mutex.js';
+import { DEPLOYMENT_APP_ID, GENESIS_SEED } from '../../common/contantes.js';
+import * as PromiseLib from "../../common/promise-libs.js"
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -68,8 +75,26 @@ export type KeyGenOptions = {
   usage: KeyUsageTypeApp | KeyUsageTypeNonce,
 }
 
+export type NonceGenOptions = {
+  /**
+   nonce ID
+   */
+  id?: string,
+  /**
+   partners to generate key between them
+   */
+  partners?: string[],
+  /** The count of nonce that will be generated. */
+  n: number,
+  /**
+   Timeout for key generation process
+   */
+  timeout?: number,
+}
+
 const RemoteMethods = {
   KeyShareProof: "keyShareProof",
+  InitFROST: "initFROST",
 }
 
 @remoteApp
@@ -79,6 +104,20 @@ class KeyManager extends CallablePlugin {
    example: appTss[appId][seed] = AppTssKey
    */
   appTss:{[index: string]: {[index: string]: AppTssKey}} = {}
+  /**
+   map appId and seed to App TSS key
+   example: appTss[appId][seed] = AppTssKey
+   */
+  private appNonceBatches: MapOf<MapOf<AppNonceBatch>> = {};
+
+  private mutex:Mutex;
+
+  constructor(muon, configs) {
+    super(muon, configs);
+    this.mutex = new Mutex(undefined, {
+      retryCount: 10000,
+    });
+  }
 
   async onStart() {
     await super.onStart();
@@ -94,6 +133,9 @@ class KeyManager extends CallablePlugin {
     const mpcNetwork:MpcNetworkPlugin = this.muon.getPlugin('mpcnet');
     mpcNetwork.registerMpcInitHandler("DistributedKeyGeneration", this.dkgInitializeHandler.bind(this))
     mpcNetwork.registerMpcInitHandler("KeyRedistribution", this.keyRedistInitHandler.bind(this))
+    mpcNetwork.registerMpcInitHandler("DistributedNonceGeneration", this.dngInitializeHandler.bind(this))
+
+    this.muon.on("nonce-batch:gen", this.onNonceBatchGen.bind(this))
   }
 
   private get nodeManager(): NodeManagerPlugin {
@@ -166,11 +208,11 @@ class KeyManager extends CallablePlugin {
       return false;
     }
 
-    const readyDeployers = await this.appManager.findNAvailablePartners(
-      deployers,
-      this.netConfigs.tss.threshold,
-      {appId: "1", seed: "1"}
-    )
+    const readyDeployers = await this.appManager.findNAvailablePartners({
+      nodes: deployers,
+      count: this.netConfigs.tss.threshold,
+      partyInfo: {appId: DEPLOYMENT_APP_ID, seed: GENESIS_SEED}
+    })
     log(`there is ${readyDeployers.length} deployers are ready.`)
     return readyDeployers.length < this.netConfigs.tss.threshold;
   }
@@ -209,8 +251,6 @@ class KeyManager extends CallablePlugin {
         /** randomly select (maxPartners - 1) from others */
         ...shuffle(partners).slice(0, maxPartners - 1)
       ];
-      // console.log(partners)
-      // partners = partners.slice(0, maxPartners);
     }
 
     const keyId = id || uuid()
@@ -239,10 +279,8 @@ class KeyManager extends CallablePlugin {
           mpcType: "DistributedKeyGeneration",
           usage: options.usage,
           partyInfo,
-            keyId,
-            lowerThanHalfN
-        :
-          options.lowerThanHalfN,
+          keyId,
+          lowerThanHalfN: options.lowerThanHalfN,
         }
       });
       dKey = await keyGen.runByNetwork(network, timeout)
@@ -459,6 +497,177 @@ class KeyManager extends CallablePlugin {
     return key;
   }
 
+  async nonceGen(partyInfo: PartyInfo, threshold: number, options: NonceGenOptions): Promise<AppNonceBatchJson> {
+    let {id, n, timeout=60000} = options;
+
+    const party = this.appManager.getAppParty(partyInfo.appId, partyInfo.seed)
+    if(!party)
+      throw {message: `party not found`, partyInfo};
+
+    let candidatePartners = party.partners;
+    if(options.partners)
+      candidatePartners = candidatePartners.filter(p => options.partners!.includes(p));
+
+    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({
+      list: candidatePartners,
+      excludeSelf: true,
+    })
+
+    const nonceId = id || uuid()
+
+    const responses:(FrostCommitmentJson[]|null)[] = await PromiseLib.resolveN(
+      Math.max(threshold, Math.ceil(partners.length * 0.8)),
+      partners.map(({peerId, id}) => {
+        return this.remoteCall(peerId, RemoteMethods.InitFROST, {partyInfo, nonceId, n})
+        .catch(e => null);
+      })
+    )
+
+    const qualifiedsResponse:MapOf<FrostCommitmentJson[]> = partners.reduce((obj, node, i) => {
+      if(!!responses[i]) {
+        obj[node.id] = responses[i];
+      }
+      return obj;
+    }, {})
+
+    const {nonces, commitments} = TssModule.frostInit(n);
+    const frostNonces:FrostNonceJson[] = nonces.map(({d, e}, i) => {
+      const init:MapOf<FrostCommitmentJson> = {
+        [this.currentNodeInfo!.id]: {
+          D: commitments[i].D.encode("hex", true),
+          E: commitments[i].E.encode("hex", true),
+        } 
+      };
+      return {
+        d: d.toString(),
+        e: e.toString(),
+        commitments: Object.keys(qualifiedsResponse).reduce((obj: MapOf<FrostCommitmentJson>, id): MapOf<FrostCommitmentJson> => {
+            obj[id] = { ... qualifiedsResponse[id][i] };
+            return obj;
+        }, init)
+      }
+    });
+
+    const appNonceBatchJson: AppNonceBatchJson = {
+      id: nonceId,
+      partyInfo,
+      nonceBatch: {
+        n,
+        partners: [this.currentNodeInfo!.id, ...Object.keys(qualifiedsResponse)],
+        nonces: frostNonces
+      }
+    }
+
+    CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
+    return appNonceBatchJson;
+  }
+
+  async nonceGenOld(partyInfo: PartyInfo, options: NonceGenOptions): Promise<AppNonceBatch> {
+    let network: IMpcNetwork = this.muon.getPlugin('mpcnet');
+    let {id, partners: oPartners, n, timeout=60000} = options;
+
+    const party = this.appManager.getAppParty(partyInfo.appId, partyInfo.seed)
+
+    if(!party)
+      throw {message: `party not found`, partyInfo};
+
+    let candidatePartners = party.partners;
+    if(oPartners)
+      candidatePartners = candidatePartners.filter(p => oPartners!.includes(p));
+
+    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({
+      list: candidatePartners,
+    })
+
+    const nonceId = id || uuid()
+    
+    let nonceGen:DistributedNonceGeneration, nonceBatch: NonceBatch; 
+    nonceGen = new DistributedNonceGeneration({
+      /** MPC ID */
+      id: uuid(),
+      /**
+       * starter of MPC
+       * starter have higher priority than others when selecting MPC fully connected sub set.
+       */
+      starter: this.nodeManager.currentNodeInfo!.id,
+      /** partners list */
+      partners: partners.map(p => p.id),
+      /** The count of nonce that will be generated. */
+      n: n ?? 1000,
+      /** extra values usable in DKG */
+      extra: {
+        mpcType: "DistributedNonceGeneration" as MpcType,
+        partyInfo,
+        nonceId,
+      }
+    })
+    nonceBatch = await nonceGen.runByNetwork(network, timeout)
+    const appNonceBatch = new AppNonceBatch(partyInfo, nonceId, nonceBatch);
+
+    // TODO: store nonceBatch to be used in all cluster.
+
+    CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatch.toJson()})
+
+    return appNonceBatch;
+  }
+
+  async dngInitializeHandler(constructData, network: MpcNetworkPlugin): Promise<DistributedNonceGeneration> {
+    const dng = new DistributedNonceGeneration(constructData)
+    const {extra} = constructData
+
+    dng.runByNetwork(network)
+      .then(async (nonceBatch: NonceBatch) => {
+        const partyInfo: PartyInfo = extra.partyInfo as PartyInfo
+        const party = this.appManager.getAppParty(partyInfo.appId, partyInfo.seed);
+        if(!party)
+          throw `party[${extra.party}] not found`
+
+        // TODO: store nonceBatch to be used in all cluster.
+        const appNonceBatch = new AppNonceBatch(partyInfo,  extra.nonceId, nonceBatch);
+
+        CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatch.toJson()})
+
+        // let key = new AppTssKey(party, extra.keyId, dKey)
+        // await SharedMemory.set(
+        //   extra.keyId, {
+        //     usage: extra.usage,
+        //     partyInfo,
+        //     key: key.toJson()
+        //   },
+        //   30*60*1000
+        // )
+      })
+      .catch(e => {
+        // TODO
+        log.error("KeyManager running mpc failed. %O", e)
+      })
+
+    return dng;
+  }
+
+  async onNonceBatchGen(appNonceBatchJson: AppNonceBatchJson) {
+    try {
+      const appNonceBatch: AppNonceBatch = AppNonceBatch.fromJson(appNonceBatchJson);
+      const {partyInfo} = appNonceBatchJson;
+      if(this.appNonceBatches[partyInfo.appId] === undefined) {
+        this.appNonceBatches[partyInfo.appId] = {};
+      }
+      this.appNonceBatches[partyInfo.appId][partyInfo.seed] = appNonceBatch;
+
+      await SharedMemory.set(
+        appNonceBatchJson.id,
+        {
+          partyInfo,
+          index: 0
+        },
+        /** clear after 7 days */
+        7*24*60*60*1000
+      );
+    }
+    catch(e) {
+    }
+  }
+
   async getSharedKey(id: string, timeout:number=5000, expectedUsage:KeyUsageTypeApp|KeyUsageTypeNonce): Promise<AppTssKey> {
     let {partyInfo, key, usage} = await SharedMemory.waitAndGet(id, timeout)
     if(usage.type !== expectedUsage.type) {
@@ -487,6 +696,38 @@ class KeyManager extends CallablePlugin {
       throw `party [${key.party}] not found`
 
     return AppTssKey.fromJson(party, this.currentNodeInfo!.id, key)
+  }
+
+  hasNonceBatch(appId: string, seed: string): boolean {
+    if(!this.appNonceBatches[appId])
+      return false;
+    return this.appNonceBatches[appId][seed] !== undefined;
+  }
+
+  getAppNonceBatch(appId: string, seed: string): AppNonceBatch|undefined {
+    if(!this.appNonceBatches[appId])
+      return undefined;
+    return this.appNonceBatches[appId][seed];
+  }
+
+  async takeNonceIndex(id: string, timeout: number=5000): Promise<number> {
+    const lock = await this.mutex.lock(id);
+    try {
+      const {partyInfo, index} = await SharedMemory.waitAndGet(id, timeout);
+      await SharedMemory.set(
+        id,
+        {
+          partyInfo,
+          index: index+1
+        },
+        /** clear after 7 days */
+        7*24*60*60*1000
+      );
+      return index;
+    }
+    finally {
+      await lock.release();
+    }
   }
 
   /**
@@ -547,6 +788,35 @@ class KeyManager extends CallablePlugin {
     const key = await this.getSharedKey(data.keyId, 15e3, data.usage);
     const keyPublicHash = muonSha3(key.publicKey.encode('hex', true));
     return crypto.signWithPrivateKey(keyPublicHash, bn2hex(key.share));
+  }
+
+  @remoteMethod(RemoteMethods.InitFROST)
+  async __initFROST(data: {partyInfo: PartyInfo, n: number, nonceId: string}, callerInfo: MuonNodeInfo): 
+  Promise<(FrostNonceJson|FrostCommitmentJson)[]> {
+    const {partyInfo: {appId, seed}, n, nonceId} = data;
+    const appParty = this.appManager.getAppParty(appId, seed);
+    if(!appParty) {
+      throw `Missing app party`
+    }
+    const currentNode:MuonNodeInfo = this.currentNodeInfo!;
+    if(callerInfo.id === currentNode.id) {
+      throw `InitFrost not allowed to call by self`
+    }
+
+    const {nonces, commitments} = TssModule.frostInit(n);
+    const appNonceBatchJson: AppNonceBatchJson = new AppNonceBatch(
+      {appId, seed}, 
+      nonceId, 
+      new NonceBatch(
+        n, appParty.partners, 
+        nonces.map(({d, e}, i) => ({d, e, commitments: {}})))
+    ).toJson();
+    
+    CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
+    return commitments.map(({D, E}) => ({
+      D: D.encode("hex", true),
+      E: E.encode("hex", true),
+    }))
   }
 }
 

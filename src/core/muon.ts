@@ -2,12 +2,9 @@
 /* eslint-disable no-console */
 import {CoreGlobalEvent} from "./ipc.js";
 import Events from 'events'
-import chalk from 'chalk'
 import fs from 'fs'
-import { MessagePublisher, MessageSubscriber } from '../common/message-bus/index.js'
-import { GLOBAL_EVENT_CHANNEL, fireEvent } from './ipc.js'
-import * as NetworkIpc from '../network/ipc.js'
-import MuonBasePlugin from './plugins/base/base-plugin.js';
+import { MessageSubscriber } from '../common/message-bus/index.js'
+import { GLOBAL_EVENT_CHANNEL } from './ipc.js'
 import BaseAppPlugin from "./plugins/base/base-app-plugin.js";
 import BasePlugin from "./plugins/base/base-plugin.js";
 import {Constructor, NetConfigs} from "../common/types";
@@ -63,7 +60,6 @@ export default class Muon extends Events {
         console.error(`error on initializing plugin [${plugin.name}]`, e);
       }
     }
-    // console.log('plugins initialized.')
   }
 
   getAppNameById(appId): string {
@@ -86,16 +82,6 @@ export default class Muon extends Events {
   getPlugin(pluginName) {
     return this._plugins[pluginName]
   }
-
-  // getAppByName(appName) {
-  //   if (!appName) return null
-  //   let keys = Object.keys(this._plugins)
-  //   for (let i = 0; i < keys.length; i++) {
-  //     if (this._plugins[keys[i]].APP_NAME === appName)
-  //       return this._plugins[keys[i]]
-  //   }
-  //   return null
-  // }
 
   async start() {
     // @ts-ignore

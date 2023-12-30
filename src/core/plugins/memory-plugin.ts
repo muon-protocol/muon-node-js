@@ -5,7 +5,6 @@ import { createClient, RedisClient } from 'redis'
 import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
 import Web3 from 'web3'
-import {muonSha3} from '../../utils/sha3.js'
 
 export type MemWriteType = 'local'
 
