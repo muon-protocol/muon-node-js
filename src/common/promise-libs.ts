@@ -132,7 +132,7 @@ export function resolveN<T>( n: number, promises: Promise<T>[],resolveAnyway: bo
               // reject(new Error("Cannot resolve " + n + " promises"));
               reject({
                 message: "Cannot resolve " + n + " promises",
-                errors: errors.map(e => e.message),
+                errors: errors.filter(e => !!e).map(e => e.message),
               });
             }
           })

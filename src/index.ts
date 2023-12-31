@@ -6,6 +6,7 @@ import * as Network from './network/index.js'
 import * as Core from './core/index.js'
 import * as NetworkIpc from './network/ipc.js'
 import * as SharedMemory from './common/shared-memory/index.js'
+import * as NonceStorage from './common/nonce-storage/index.js'
 import { parseBool, timeout } from './utils/helpers.js'
 import { createRequire } from "module";
 import {reportCrash} from "./common/analitics-reporter.js";
@@ -72,6 +73,7 @@ async function boot() {
   if (cluster.isMaster) {
     log(`Master cluster start at [${process.pid}]`)
     SharedMemory.startServer();
+    NonceStorage.startServer();
 
     /** start gateway cluster */
     runNewApplicationCluster('gateway');
