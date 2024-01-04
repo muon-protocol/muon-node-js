@@ -433,6 +433,7 @@ class NetworkIpcHandler extends CallablePlugin {
           count: 1,
           partyInfo: {appId:context.appId, seed: context.seed},
           resolveAnyway: true,
+          checkFrostNonce: true,
         });
         if(availables.length <= 0)
           throw "The request cannot be forwarded because there is no available partner";
