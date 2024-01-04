@@ -194,7 +194,7 @@ class System extends CallablePlugin {
       .reduce((obj, current) => (obj[current]=true, obj), {});
 
     if(externalOnlineList){
-      let response = await axios.get(externalOnlineList).then(({data}) => data);
+      let response = await axios.get(externalOnlineList+`?r=${uuid()}`).then(({data}) => data);
       let availables = response.result.filter(item => {
         /** active nodes that has uptime more than 1 hour */
         // return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
