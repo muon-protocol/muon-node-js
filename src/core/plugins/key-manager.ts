@@ -561,7 +561,11 @@ class KeyManager extends CallablePlugin {
     }
 
     // CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
-    await NonceStorage.put(partyInfo.seed, this.currentNodeInfo!.id, appNonceBatchJson);
+    await NonceStorage.put({
+      seed: partyInfo.seed, 
+      owner: this.currentNodeInfo!.id, 
+      appNonceBatch: appNonceBatchJson
+    });
 
     return appNonceBatchJson;
   }
@@ -630,7 +634,11 @@ class KeyManager extends CallablePlugin {
         const appNonceBatch = new AppNonceBatch(partyInfo,  extra.nonceId, nonceBatch);
 
         //CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatch.toJson()})
-        await NonceStorage.put(partyInfo.seed, constructData.starter, appNonceBatch.toJson());
+        await NonceStorage.put({
+          seed: partyInfo.seed, 
+          owner: constructData.starter, 
+          appNonceBatch: appNonceBatch.toJson()
+        });
 
         // let key = new AppTssKey(party, extra.keyId, dKey)
         // await SharedMemory.set(
@@ -819,7 +827,11 @@ class KeyManager extends CallablePlugin {
     ).toJson();
     
     // CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
-    await NonceStorage.put(seed, callerInfo.id, appNonceBatchJson);
+    await NonceStorage.put({
+      seed, 
+      owner: callerInfo.id, 
+      appNonceBatch: appNonceBatchJson
+    });
     return commitments.map(({D, E}) => ({
       D: D.encode("hex", true),
       E: E.encode("hex", true),

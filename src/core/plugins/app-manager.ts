@@ -917,7 +917,7 @@ export default class AppManager extends CallablePlugin {
   async __getAppDeploymentInfo({appId, seed}, callerInfo:MuonNodeInfo): Promise<AppDeploymentInfo> {
     const info = this.getAppDeploymentInfo(appId, seed);
     if(this.isFrostApp(appId)) {
-      const hasNonce:boolean = await NonceStorage.has(seed, callerInfo.id);
+      const hasNonce:boolean = await NonceStorage.has({seed, owner: callerInfo.id});
       info["hasNonce"] = hasNonce;
     }
     return info;

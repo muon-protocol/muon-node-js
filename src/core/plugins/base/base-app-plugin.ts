@@ -21,6 +21,7 @@ import {bn2hex} from "../../../utils/tss/utils.js";
 import * as NetworkIpc from "../../../network/ipc.js";
 import {PublicKey} from "../../../utils/tss/types";
 import {RedisCache} from "../../../common/redis-cache.js";
+import Redis from "ioredis";
 import axios from "axios";
 import {GatewayCallParams} from "../../../gateway/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
@@ -319,26 +320,10 @@ class BaseAppPlugin extends CallablePlugin {
         isDuplicateRequest = true;
         newRequest = this.requestManager.getRequest(newRequest.reqId)!;
       }
-      else {    
-        if(this.useFrost) {
-          let hasNonce: boolean = await NonceStorage.has(deploymentSeed, this.currentNodeInfo!.id);
-          if(!hasNonce) {
-            console.log(`generating nonce batch for this party ...`);
-            const nonceBatchJson: AppNonceBatchJson = await this.keyManager.nonceGen(
-              {appId: this.APP_ID, seed: deploymentSeed}, 
-              this.getParty(deploymentSeed)!.t, 
-              {
-                n: 50, 
-                timeout: 60000
-              }
-            )
-            console.log(`nonce generation done for this party.`);
-            // nonceBatch = AppNonceBatch.fromJson(nonceBatchJson);
-          }
-        }
-
+      else {
+        const nonceIndex: string|null = this.useFrost ? (await this.getNextNonce(appParty.seed, newRequest.reqId)) : null;
         t1 = Date.now();
-        const availablePartners = await this.findAvailablePartners(newRequest, appParty);
+        const availablePartners = await this.findAvailablePartners(newRequest, appParty, nonceIndex);
 
         this.requestManager.addRequest(newRequest, {
           requestTimeout: this.requestTimeout, 
@@ -349,7 +334,7 @@ class BaseAppPlugin extends CallablePlugin {
         t2 = Date.now()
         newRequest.data.init = {
           ... newRequest.data.init,
-          ... await this.onFirstNodeRequestSucceed(clone(newRequest), availablePartners)
+          ... await this.onFirstNodeRequestSucceed(clone(newRequest), availablePartners, nonceIndex)
         };
         t3 = Date.now();
 
@@ -434,10 +419,42 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async findAvailablePartners(newRequest, appParty: Party) {
+  private async initFrostNonce(seed: string, reqId): Promise<any> {
+    const redis = new Redis();
+    const lockKey = `frost-nonce-${seed}-start`;
+    let lockVal = await redis.getset(lockKey, "locked")
+    if(lockVal === null) {
+      await redis.expire(lockKey, 60000);
+      this.log(`generating nonce batch for this party ...`);
+      const nonceBatchJson: AppNonceBatchJson = await this.keyManager.nonceGen(
+        {appId: this.APP_ID, seed}, 
+        this.getParty(seed)!.t, 
+        {
+          n: 50, 
+          timeout: 60000
+        }
+      )
+      this.log(`nonce generation done for this party.`);
+      // nonceBatch = AppNonceBatch.fromJson(nonceBatchJson);;
+      
+      redis.del(lockKey).catch(e => {});
+    }
+    else {
+      const t0 = Date.now();
+      while(await redis.get(lockKey)){
+        await timeout(50);
+      }
+    }
+  }
+
+  async findAvailablePartners(newRequest, appParty: Party, nonceIndex: string|null) {
     if(this.useFrost) {
       /** increase nonce index */
-      const noncePartners: string[]|undefined = await NonceStorage.getPartners(appParty.seed, this.currentNodeInfo!.id);
+      const noncePartners: string[]|undefined = await NonceStorage.getPartners({
+        seed: appParty.seed, 
+        owner: this.currentNodeInfo!.id,
+        index: nonceIndex!
+      });
       if(!noncePartners) {
         throw `Missing app nonce.`
       }
@@ -632,7 +649,20 @@ class BaseAppPlugin extends CallablePlugin {
     );
   }
 
-  async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[]) {
+  private async getNextNonce(seed: string, reqId: string): Promise<string> {
+    while (true) {
+      let nonceIndex = await NonceStorage.pickIndex({
+        seed, 
+        owner: this.currentNodeInfo!.id
+      });
+      if (nonceIndex != null) {
+        return nonceIndex;
+      }
+      await this.initFrostNonce(seed, reqId);
+    }
+  }
+
+  async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[], nonceIndex: string|null) {
     const {appId, deploymentSeed: seed, data: {resultHash}} = request;
 
     if(!this.getTss(seed)){
@@ -645,8 +675,11 @@ class BaseAppPlugin extends CallablePlugin {
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     if(this.useFrost) {
-      const currentNonce:number = await NonceStorage.pickIndex(seed, this.currentNodeInfo!.id);
-      const commitmentsJson = await NonceStorage.getCommitment(seed, this.currentNodeInfo!.id, currentNonce);
+      const commitmentsJson = await NonceStorage.getCommitment({
+        seed, 
+        owner: this.currentNodeInfo!.id, 
+        index: nonceIndex!
+      });
 
       const key: AppTssKey = this.getTss(seed)!;
 
@@ -665,7 +698,7 @@ class BaseAppPlugin extends CallablePlugin {
 
       return {
         // nonceBatchId: nonceBatch.id,
-        nonceIndex: currentNonce,
+        nonceIndex: nonceIndex,
         noncePartners: availablePartners,
         commitments: commitmentsJson,
         nonceAddress: TssModule.pub2addr(R),
@@ -940,7 +973,7 @@ class BaseAppPlugin extends CallablePlugin {
 
     const owner = this.nodeManager.getNodeInfo(gwAddress)!.id
 
-    let nonceJson: FrostNonceJson|undefined = await NonceStorage.getNonce(seed, owner, nonceIndex);
+    let nonceJson: FrostNonceJson|undefined = await NonceStorage.getNonce({seed, owner, index: nonceIndex});
     if(!nonceJson)
       throw `nonce not found for request ${reqId}`
     /**

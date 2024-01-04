@@ -4,58 +4,30 @@ import { AppNonceBatchJson } from '../../utils/tss/app-nonce-batch.js';
 import { MapOf } from './../mpc/types.js';
 import { FrostCommitmentJson, FrostNonceJson } from '../mpc/dist-nonce.js';
 import _ from 'lodash';
+import {Mutex} from "../../common/mutex.js";
 import { timeout } from '../../utils/helpers.js';
 
 const CHANNEL = `muon-nonce-store-${process.env.SIGN_WALLET_ADDRESS}`
+const mutex = new Mutex();
 
-export type PutRequest = {
-  action: "PUT",
-  seed: string,
-  appNonceBatch: AppNonceBatchJson,
-  owner: string,
-}
+export type PutRequest = {seed: string, owner: string, appNonceBatch: AppNonceBatchJson}
+export type HasRequest = {seed: string, owner: string}
+export type GetPartnersRequest = {seed: string, owner: string, index: string}
+export type PickIdxRequest = { seed: string, owner: string, timeout?: number, timeoutMessage?: string}
+export type GetCommitmentRequest = {seed: string, owner: string, index: string,}
+export type GetNonceRequest = {seed: string, owner: string, index: string,}
+export type ClearNonceRequest = {seed: string,}
 
-export type HasRequest = {
-  action: "HAS",
-  seed: string,
-  owner: string,
-}
+type WithAction<T, A extends string> = T & { action: A };
 
-export type GetPartnersRequest = {
-  action: "GETPARTNERS",
-  seed: string,
-  owner: string,
-}
-
-export type PickIdxRequest = {
-  action: "PICKIDX",
-  seed: string,
-  owner: string,
-  timeout?: number,
-  timeoutMessage?: string,
-}
-
-export type GetCommitmentRequest = {
-  action: "GETCOMM",
-  seed: string,
-  owner: string,
-  index: number,
-}
-
-export type GetNonceRequest = {
-  action: "GETNONCE",
-  seed: string,
-  owner: string,
-  index: number,
-}
-
-export type ClearNonceRequest = {
-  action: "CLEAR",
-  seed: string,
-}
-
-export type NonceStoreRequest = PutRequest | HasRequest | GetPartnersRequest 
-  | PickIdxRequest | GetCommitmentRequest | GetNonceRequest | ClearNonceRequest;
+export type NonceStoreRequest = 
+    WithAction<PutRequest, "PUT"> 
+  | WithAction<HasRequest, 'HAS'> 
+  | WithAction<GetPartnersRequest, 'GETPARTNERS'>  
+  | WithAction<PickIdxRequest , 'PICKIDX'> 
+  | WithAction<GetCommitmentRequest , 'GETCOMM'> 
+  | WithAction<GetNonceRequest , 'GETNONCE'> 
+  | WithAction<ClearNonceRequest, 'CLEAR'>;
 
 /**
  * @type {QueueConsumer}
@@ -75,15 +47,16 @@ function startServer() {
 
 type StorageItem = {
   appNonceBatch: AppNonceBatchJson,
-  index: number
+  index: number,
+  n: number,
 }
 
 function getCacheIndex(seed, owner): string {
   return `${seed}-${owner}`
 }
 
-// maps key => StorageItem
-const storage: MapOf<MapOf<StorageItem>> = {};
+// maps seed => owner => NonceBatch.id => StorageItem
+const storage: MapOf<MapOf<MapOf<StorageItem>>> = {};
 const waitingPromises: {[index: string]: TimeoutPromise} = {
 }
 
@@ -94,55 +67,70 @@ async function requestHandler(req:NonceStoreRequest) {
       let {seed, appNonceBatch, owner} = req as PutRequest;
       if(storage[seed] === undefined)
         storage[seed] = {};
-      storage[seed][owner] = {
+      if(storage[seed][owner] === undefined)
+        storage[seed][owner] = {};
+      storage[seed][owner][appNonceBatch.id] = {
         appNonceBatch,
-        index: 0
+        index: 0,
+        n: appNonceBatch.nonceBatch.n,
       }
-      const cacheIndex = getCacheIndex(seed, owner);
-      if(waitingPromises[cacheIndex])
-        waitingPromises[cacheIndex].resolve(0);
-      delete waitingPromises[cacheIndex];
+      // const cacheIndex = getCacheIndex(seed, owner);
+      // if(waitingPromises[cacheIndex])
+      //   waitingPromises[cacheIndex].resolve(0);
+      // delete waitingPromises[cacheIndex];
       return "Ok"
     }
     case "HAS": {
       let {seed, owner} = req as HasRequest;
-      return !!storage[seed] && !!storage[seed][owner] && storage[seed][owner].index < storage[seed][owner].appNonceBatch.nonceBatch.n;
-    }
-    case "GETPARTNERS": {
-      let {seed, owner} = req as GetPartnersRequest;
-      if(!storage[seed])
-        return undefined;
-      return storage[seed][owner]?.appNonceBatch?.nonceBatch?.partners;
+      if(!storage[seed] || !storage[seed][owner] || Object.keys(storage[seed][owner]).length === 0)
+        return false;
+      return Object.values(storage[seed][owner]).findIndex(item => item.index < item.n) >= 0
     }
     case 'PICKIDX': {
       let {seed, owner, timeout, timeoutMessage} = req as PickIdxRequest;
       const cacheIndex = getCacheIndex(seed, owner);
 
-      if(storage[seed][owner] === undefined) {
-        waitingPromises[cacheIndex] = new TimeoutPromise(
-          timeout || defaultConfig.timeout, 
-          timeoutMessage || defaultConfig.timeoutMessage
-        )
-        return waitingPromises[cacheIndex].promise;
+     if(!storage[seed] || !storage[seed][owner]) {
+        return null;
       }
       else {
-        let index = storage[seed][owner].index;
-        storage[seed][owner].index = storage[seed][owner].index + 1;
-        return index;
+        const lock = await mutex.lock(`nonce-storrage-lock:${seed}-${owner}`);
+        try {
+          const item:StorageItem|undefined = Object.values(storage[seed][owner]).find(({n, index}) => index < n-1)
+          if(!item)
+            return null
+          let index = item.index;
+          storage[seed][owner][item.appNonceBatch.id].index = index + 1;
+          return `${item.appNonceBatch.id}-${index}`;
+        }
+        finally {
+          await lock.release()
+        }
       }
 
+    }
+    case "GETPARTNERS": {
+      let {seed, owner, index} = req as GetPartnersRequest;
+      const [batchId, i] = index.split("-")
+      if(!storage[seed])
+        return undefined;
+      return storage[seed][owner][batchId]?.appNonceBatch?.nonceBatch?.partners;
     }
     case "GETCOMM": {
       const {seed, owner, index} = req as GetCommitmentRequest;
-      return storage[seed][owner].appNonceBatch.nonceBatch.nonces[index].commitments;
+      const [batchId, i] = index.split("-")
+      if(parseInt(i) >= storage[seed][owner][batchId].appNonceBatch.nonceBatch.nonces.length)
+        throw "nonce index is out of range."
+      return storage[seed][owner][batchId].appNonceBatch.nonceBatch.nonces[i].commitments;
     }
     case "GETNONCE": {
       const {seed, owner, index} = req as GetNonceRequest;
+      const [batchId, i] = index.split("-")
 
-      const nonce:FrostNonceJson = _.cloneDeep(storage[seed][owner].appNonceBatch.nonceBatch.nonces[index]);
+      const nonce:FrostNonceJson = _.cloneDeep(storage[seed][owner][batchId].appNonceBatch.nonceBatch.nonces[i]);
       
-      storage[seed][owner].appNonceBatch.nonceBatch.nonces[index].d = "used";
-      storage[seed][owner].appNonceBatch.nonceBatch.nonces[index].e = "used";
+      storage[seed][owner][batchId].appNonceBatch.nonceBatch.nonces[i].d = "used";
+      storage[seed][owner][batchId].appNonceBatch.nonceBatch.nonces[i].e = "used";
 
       return nonce;
     }
@@ -156,31 +144,31 @@ async function requestHandler(req:NonceStoreRequest) {
   }
 }
 
-async function put(seed: string, owner: string, appNonceBatch:AppNonceBatchJson): Promise<string> {
-  return requestSender.send({action: 'PUT', seed, owner, appNonceBatch})
+async function put(req: PutRequest): Promise<string> {
+  return requestSender.send({action: 'PUT', ...req})
 }
 
-async function has(seed: string, owner: string): Promise<boolean> {
-  return requestSender.send({action: 'HAS', seed, owner});
+async function has(req: HasRequest): Promise<boolean> {
+  return requestSender.send({action: 'HAS', ...req});
 }
-async function getPartners(seed: string, owner: string): Promise<string[]|undefined> {
-  return requestSender.send({action: 'GETPARTNERS', seed, owner});
-}
-
-async function pickIndex(seed: string, owner: string, timeout?: number): Promise<number> {
-  return requestSender.send({action: 'PICKIDX', seed, owner, timeout});
+async function getPartners(req: GetPartnersRequest): Promise<string[]|undefined> {
+  return requestSender.send({action: 'GETPARTNERS', ...req});
 }
 
-async function getCommitment(seed: string, owner: string, index: number): Promise<MapOf<FrostCommitmentJson>> {
-  return requestSender.send({action: "GETCOMM", seed, owner, index}); 
+async function pickIndex(req: PickIdxRequest): Promise<string> {
+  return requestSender.send({action: 'PICKIDX', ...req});
 }
 
-async function getNonce(seed: string, owner: string, index: number): Promise<FrostNonceJson> {
-  return requestSender.send({action: 'GETNONCE', seed, owner, index});
+async function getCommitment(req: GetCommitmentRequest): Promise<MapOf<FrostCommitmentJson>> {
+  return requestSender.send({action: "GETCOMM", ...req}); 
 }
 
-async function clearSeed(seed: string): Promise<any> {
-  return requestSender.send({action: 'CLEAR', seed});
+async function getNonce(req: GetNonceRequest): Promise<FrostNonceJson> {
+  return requestSender.send({action: 'GETNONCE', ...req});
+}
+
+async function clearSeed(req: ClearNonceRequest): Promise<any> {
+  return requestSender.send({action: 'CLEAR', ...req});
 }
 
 export {
