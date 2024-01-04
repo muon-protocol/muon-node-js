@@ -259,61 +259,6 @@ class Explorer extends CallablePlugin {
         return;
     }
   }
-
-  @gatewayMethod("init-frost")
-  async __initFrost(data) {
-    const {n, seed} = data?.params || {};
-    const appId = "14133107918753457905122726879005594497699931608290848063847062588349373557837";
-    const appParty:Party|undefined = this.appManager.getAppParty(appId, seed);
-    if(!appParty)
-    throw "missing app party";
-
-    const nonceBatch: AppNonceBatchJson = await this.keyManager.nonceGen(
-      {appId, seed}, 
-      appParty.t, 
-      {
-        n: parseInt(n), 
-        timeout: 60000
-      }
-    )
-    return nonceBatch;
-  }
-
-  @gatewayMethod("check-frost")
-  async __checkFrost(data) {
-    const {seed} = data?.params || {};
-    const appId = "14133107918753457905122726879005594497699931608290848063847062588349373557837";
-    const context: AppContext = this.appManager.getAppContext(appId, seed);
-    const nodes = context.party.partners
-    const responses = await Promise.all(
-      this.nodeManager.filterNodes({list: nodes})
-        .map(n => {
-          return (
-            n.wallet === process.env.SIGN_WALLET_ADDRESS
-            ?
-            this.__checkFrostRM({appId, seed})
-            :
-            this.remoteCall(
-              n.peerId,
-              "check-frost",
-              {appId, seed}
-            )
-          )
-          .catch(e => e.message)
-        })
-    )
-    return nodes.reduce((obj, id, i) => (obj[id]=responses[i], obj), {})
-  }
-
-  @remoteMethod("check-frost")
-  async __checkFrostRM(data) {
-    const {appId, seed} = data;
-    const nb = this.keyManager.getAppNonceBatch(appId, seed);
-    console.log({appId, seed, nb});
-    if(!nb)
-      return null;
-    return nb?.partners.sort();
-  }
 }
 
 export default Explorer;

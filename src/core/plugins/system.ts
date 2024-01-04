@@ -354,6 +354,7 @@ class System extends CallablePlugin {
       count: dealers.length,
       partyInfo: {appId, seed: oldContext.seed}, 
       return: "id",
+      resolveAnyway: true,
     });
     // const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
     const generatorId = _.shuffle(dealers.filter(id => readyDealers.includes(id)))[0];
