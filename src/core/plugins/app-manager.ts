@@ -71,6 +71,7 @@ export type FindAvailableNodesOptions = {
   excludeSelf?: boolean,
   /** resolve if unable find the desired number of online nodes. */
   resolveAnyway?: boolean,
+  checkFrostNonce?: boolean,
 }
 
 @remoteApp
@@ -755,7 +756,7 @@ export default class AppManager extends CallablePlugin {
       ...options
     }
 
-    const {nodes, count, partyInfo, resolveAnyway=false} = options;
+    const {nodes, count, partyInfo, resolveAnyway=false, checkFrostNonce=false} = options;
 
     let nodeInfos: MuonNodeInfo[] = this.nodeManager.filterNodes({list: nodes})
     log(`finding ${count} of ${nodes.length} available peer ...`)
@@ -781,7 +782,7 @@ export default class AppManager extends CallablePlugin {
           const {hasTssKey, hasNonce} = info
           if(!hasTssKey)
             throw "missing tss key"
-          if(this.isFrostApp(partyInfo.appId) && !hasNonce)
+          if(checkFrostNonce && this.isFrostApp(partyInfo.appId) && !hasNonce)
             throw "missing frost nonce"
         }
         return info;
