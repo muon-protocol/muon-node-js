@@ -358,8 +358,14 @@ class System extends CallablePlugin {
     });
     // const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
     const generatorId = _.shuffle(dealers.filter(id => readyDealers.includes(id)))[0];
+    console.log({dealers, readyDealers, generatorId})
     if(!generatorId)
-      throw `key-gen starter node not online`
+      throw {
+        message: `key-gen starter node not online`,
+        dealers, 
+        readyDealers, 
+        generatorId
+      }
 
     const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
 
