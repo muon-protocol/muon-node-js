@@ -28,6 +28,7 @@ import * as PromiseLib from "../../common/promise-libs.js"
 import {Mutex} from "../../common/mutex.js";
 import {DEPLOYMENT_APP_ID, GENESIS_SEED} from "../../common/contantes.js";
 import {RedisCache} from "../../common/redis-cache.js";
+import * as NonceStorage from '../../common/nonce-storage/index.js'
 import { APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_NEW, APP_STATUS_ONBOARDING, APP_STATUS_PENDING } from '../constants.js';
 
 const log = logger('muon:core:plugins:app-manager')
@@ -324,14 +325,11 @@ export default class AppManager extends CallablePlugin {
   getAppDeploymentInfo(appId: string, seed: string): AppDeploymentInfo {
     const status = this.getAppDeploymentStatus(appId, seed);
     const deployed:boolean = [APP_STATUS_DEPLOYED, APP_STATUS_PENDING].includes(status);
-    /** Is valid only for FROST apps. */
-    const hasNonce:boolean = this.keyManager.hasNonceBatch(appId, seed);
     const result: AppDeploymentInfo = {
       appId,
       seed,
       deployed,
       hasTssKey: this.appHasTssKey(appId, seed),
-      hasNonce,
       status,
     }
     const context = seed ? this.getAppContext(appId, seed) : null
@@ -767,7 +765,7 @@ export default class AppManager extends CallablePlugin {
       nodeInfos.map(({peerId, wallet}) => (
         wallet === process.env.SIGN_WALLET_ADDRESS
         ?
-        (partyInfo ? this.__getAppDeploymentInfo(partyInfo) : Promise.resolve(true))
+        (partyInfo ? this.__getAppDeploymentInfo(partyInfo, this.currentNodeInfo!) : Promise.resolve(true))
         :
         this.remoteCall(
           peerId,
@@ -916,8 +914,13 @@ export default class AppManager extends CallablePlugin {
    */
 
   @remoteMethod(RemoteMethods.GetAppDeploymentInfo)
-  async __getAppDeploymentInfo({appId, seed}): Promise<AppDeploymentInfo> {
-    return this.getAppDeploymentInfo(appId, seed);
+  async __getAppDeploymentInfo({appId, seed}, callerInfo:MuonNodeInfo): Promise<AppDeploymentInfo> {
+    const info = this.getAppDeploymentInfo(appId, seed);
+    if(this.isFrostApp(appId)) {
+      const hasNonce:boolean = await NonceStorage.has({seed, owner: callerInfo.id});
+      info["hasNonce"] = hasNonce;
+    }
+    return info;
   }
 
   /** return App all active context list */
