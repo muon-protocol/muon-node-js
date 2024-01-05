@@ -20,7 +20,7 @@ import {PublicKey} from "../../utils/tss/types";
 import * as crypto from "../../utils/crypto.js";
 import {muonSha3} from "../../utils/sha3.js";
 import {bn2hex} from "../../utils/tss/utils.js";
-import { FrostCommitmentJson, FrostNonce, FrostNonceJson, NonceBatch, NonceBatchJson } from '../../common/mpc/dist-nonce.js';
+import { FrostCommitment, FrostCommitmentJson, FrostNonce, FrostNonceJson, NonceBatch, NonceBatchJson } from '../../common/mpc/dist-nonce.js';
 import { DistributedNonceGeneration } from '../../common/mpc/dng.js';
 import AppNonceBatch, { AppNonceBatchJson } from '../../utils/tss/app-nonce-batch.js';
 import { Mutex } from '../../common/mutex.js';
@@ -656,6 +656,38 @@ class KeyManager extends CallablePlugin {
       })
 
     return dng;
+  }
+
+  async initFrostNonce(reqId: string): Promise<FrostCommitment> {
+    const d = TssModule.curve.genKeyPair(), e = TssModule.curve.genKeyPair()
+    await SharedMemory.set(
+      `frost-single-nonce-${reqId}`, 
+      {
+        d: bn2hex(d.getPrivate()),
+        e: bn2hex(e.getPrivate())
+      },
+      5*60e3
+    )
+    return {
+      D: d.getPublic(),
+      E: e.getPublic(),
+    }
+  }
+
+  async getFrostNonce(reqId: string): Promise<FrostNonce> {
+    let {d, e} = await SharedMemory.waitAndGet(`frost-single-nonce-${reqId}`, 5e3)
+    d = TssModule.keyFromPrivate(d);
+    e = TssModule.keyFromPrivate(e);
+    return {
+      d: d.getPrivate(),
+      e: e.getPrivate(),
+      commitments: {
+        [this.currentNodeInfo!.id]: {
+          D: d.getPublic(),
+          E: e.getPublic()
+        }
+      }
+    }
   }
 
   async onNonceBatchGen(appNonceBatchJson: AppNonceBatchJson) {
