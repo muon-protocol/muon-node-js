@@ -21,6 +21,7 @@ import {bn2hex} from "../../../utils/tss/utils.js";
 import * as NetworkIpc from "../../../network/ipc.js";
 import {PublicKey} from "../../../utils/tss/types";
 import {RedisCache} from "../../../common/redis-cache.js";
+import Redis from "ioredis";
 import axios from "axios";
 import {GatewayCallParams} from "../../../gateway/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
@@ -32,8 +33,11 @@ import {AppRequestSchema} from "../../../common/ajv-schemas.js";
 import Web3 from 'web3'
 import { MapOf } from '../../../common/mpc/types.js'
 import { DEPLOYMENT_APP_ID } from '../../../common/contantes.js'
-import AppNonceBatch from '../../../utils/tss/app-nonce-batch.js'
-import { FrostCommitment, FrostCommitmentJson } from '../../../common/mpc/dist-nonce.js';
+import { AppNonceBatchJson } from '../../../utils/tss/app-nonce-batch.js'
+import { FrostCommitmentJson, FrostNonce, FrostNonceJson } from '../../../common/mpc/dist-nonce.js';
+import * as NonceStorage from '../../../common/nonce-storage/index.js'
+import * as PromiseLib from "../../../common/promise-libs.js"
+import {toBN} from "../../../utils/helpers.js";
 
 const { omit } = lodash;
 
@@ -44,6 +48,7 @@ const requestConfirmationCache: RedisCache = new RedisCache('req-confirm', 3600)
 const RemoteMethods = {
   AskSignature: 'AskSign',
   InformRequestConfirmation: 'InformReqConfirmation',
+  InitNonce: "init-nonce",
   PartialSignInfo: "partial-sing-info"
 }
 
@@ -317,9 +322,17 @@ class BaseAppPlugin extends CallablePlugin {
         isDuplicateRequest = true;
         newRequest = this.requestManager.getRequest(newRequest.reqId)!;
       }
-      else {        
+      else {
         t1 = Date.now();
-        const availablePartners = await this.findAvailablePartners(newRequest, appParty);
+        let availablePartners: string[], commitments;
+        if(this.useFrost){
+          commitments = await this.initReqNonce(newRequest);
+          availablePartners = Object.keys(commitments);
+          if(availablePartners.length < appParty.t)
+            throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+        }
+        else
+          availablePartners = await this.findAvailablePartners(newRequest, appParty);
 
         this.requestManager.addRequest(newRequest, {
           requestTimeout: this.requestTimeout, 
@@ -330,7 +343,7 @@ class BaseAppPlugin extends CallablePlugin {
         t2 = Date.now()
         newRequest.data.init = {
           ... newRequest.data.init,
-          ... await this.onFirstNodeRequestSucceed(clone(newRequest), availablePartners)
+          ... await this.onFirstNodeRequestSucceed(clone(newRequest), availablePartners, commitments)
         };
         t3 = Date.now();
 
@@ -415,53 +428,87 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async findAvailablePartners(newRequest, appParty: Party) {
-    if(this.useFrost) {
-      /** increase nonce index */
-      const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appParty.appId, appParty.seed);
-      if(!nonceBatch) {
-        throw `Missing app nonce.`
-      }
+  private async initReqNonce(request: AppRequest): Promise<MapOf<FrostCommitmentJson>> {
+    let {deploymentSeed: seed, reqId} = request;
+    const party = this.getParty(seed)!;
 
-      const availablePartners = await this.appManager.findNAvailablePartners({
-        nodes: nonceBatch.partners, 
-        count: appParty.t, 
-        partyInfo: {
-          appId: appParty.appId,
-          seed: appParty.seed,
-        },
-        resolveAnyway: true,
-      })
+    /** exclude current node */
+    let partners = party.partners.filter(id => id != this.currentNodeInfo!.id);
+    partners = lodash.shuffle(partners).slice(0, Math.ceil(party.t * 1.5));
+    const nodes:MuonNodeInfo[] = this.nodeManager.filterNodes({list: partners});
 
-      if(availablePartners.length < appParty.t) {
-        throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
-      }
-      return availablePartners;
+    let responses:(FrostCommitmentJson|null)[] = await PromiseLib.resolveN(
+      /** exclude current node */
+      party.t-1,
+      nodes.map(n => this.remoteCall(
+          n.peerId,
+          RemoteMethods.InitNonce,
+          {seed, reqId},
+          {timeout: 5000}
+        )
+      ),
+      true,
+    );
+
+    return responses.reduce((obj, r, i) => {
+      if(r)
+        obj[nodes[i].id] = r;
+      return obj
+    }, {
+      /** add current node */
+      [this.currentNodeInfo!.id]: await this.__initNonce({seed, reqId}, this.currentNodeInfo),
+    });
+  }
+
+  private async initFrostNonce(seed: string, reqId): Promise<any> {
+    const redis = new Redis();
+    const lockKey = `frost-nonce-${seed}-start`;
+    let lockVal = await redis.getset(lockKey, "locked")
+    if(lockVal === null) {
+      await redis.expire(lockKey, 60000);
+      this.log(`generating nonce batch for this party ...`);
+      const nonceBatchJson: AppNonceBatchJson = await this.keyManager.nonceGen(
+        {appId: this.APP_ID, seed}, 
+        this.getParty(seed)!.t, 
+        {
+          n: 50, 
+          timeout: 60000
+        }
+      )
+      this.log(`nonce generation done for this party.`);
+      // nonceBatch = AppNonceBatch.fromJson(nonceBatchJson);;
+      
+      redis.del(lockKey).catch(e => {});
     }
     else {
-      /** find available partners to sign the request */
-      let availableCount = Math.min(
-        Math.ceil(appParty.t*1.5),
-        appParty.partners.length,
-      );
-
-      const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
-        appParty.appId,
-        appParty.seed,
-        availableCount,
-      );
-
-      this.log(`partners:[%o] are available to sign the request`, availablePartners)
-      if(availablePartners.length < appParty.t) {
-        /** send analytic data to server */
-        reportInsufficientPartners({graph, minGraph, count: availableCount})
-          .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
-        throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+      const t0 = Date.now();
+      while(await redis.get(lockKey)){
+        await timeout(50);
       }
-      return availablePartners;
     }
-    
+  }
 
+  async findAvailablePartners(newRequest, appParty: Party) {
+    /** find available partners to sign the request */
+    let availableCount = Math.min(
+      Math.ceil(appParty.t*1.5),
+      appParty.partners.length,
+    );
+
+    const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
+      appParty.appId,
+      appParty.seed,
+      availableCount,
+    );
+
+    this.log(`partners:[%o] are available to sign the request`, availablePartners)
+    if(availablePartners.length < appParty.t) {
+      /** send analytic data to server */
+      reportInsufficientPartners({graph, minGraph, count: availableCount})
+        .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
+      throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+    }
+    return availablePartners;
   }
 
   async spendRequestFee(request: AppRequest) {
@@ -613,7 +660,20 @@ class BaseAppPlugin extends CallablePlugin {
     );
   }
 
-  async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[]) {
+  private async getNextNonce(seed: string, reqId: string): Promise<string> {
+    while (true) {
+      let nonceIndex = await NonceStorage.pickIndex({
+        seed, 
+        owner: this.currentNodeInfo!.id
+      });
+      if (nonceIndex != null) {
+        return nonceIndex;
+      }
+      await this.initFrostNonce(seed, reqId);
+    }
+  }
+
+  async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[], commitmentsJson:MapOf<FrostCommitmentJson>) {
     const {appId, deploymentSeed: seed, data: {resultHash}} = request;
 
     if(!this.getTss(seed)){
@@ -626,12 +686,11 @@ class BaseAppPlugin extends CallablePlugin {
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
     if(this.useFrost) {
-      /** increase nonce index */
-      const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appId, seed);
-      if(!nonceBatch) {
-        throw `Missing app nonce.`
-      }
-      const currentNonce:number = await this.keyManager.takeNonceIndex(nonceBatch.id);
+      // const commitmentsJson = await NonceStorage.getCommitment({
+      //   seed, 
+      //   owner: this.currentNodeInfo!.id, 
+      //   index: nonceIndex!
+      // });
 
       const key: AppTssKey = this.getTss(seed)!;
 
@@ -639,23 +698,20 @@ class BaseAppPlugin extends CallablePlugin {
         resultHash, 
         key.publicKey,
         availablePartners, 
-        nonceBatch.getNonce(currentNonce).commitments
+        Object.entries(commitmentsJson).reduce((obj, [id, {D, E}]) => {
+          obj[id] = {
+            D: TssModule.keyFromPublic(D),
+            E: TssModule.keyFromPublic(E),
+          }
+          return obj;
+        }, {}),
       )
 
-      let commitments:MapOf<FrostCommitment> = nonceBatch.getNonce(currentNonce).commitments;
-      commitments = Object.entries(commitments).reduce((obj, [id, {D, E}]) => {
-        obj[id] = {
-          D: D.encode("hex", true),
-          E: E.encode("hex", true),
-        }
-        return obj;
-      }, {});
-
       return {
-        nonceBatchId: nonceBatch.id,
-        nonceIndex: currentNonce,
+        // nonceBatchId: nonceBatch.id,
+        // nonceIndex: nonceIndex,
         noncePartners: availablePartners,
-        commitments,
+        commitments: commitmentsJson,
         nonceAddress: TssModule.pub2addr(R),
       }
     }
@@ -759,16 +815,19 @@ class BaseAppPlugin extends CallablePlugin {
 
     if(useFrost) {
       const {nonceIndex, noncePartners, } = init;
-      const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appId, seed);
-      if(!nonceBatch)
-        throw "Missing app nonce"
       return TssModule.frostVerifyPartial(
         TssModule.splitSignature(signature) as TssModule.FrostSign,
         appTssKey.publicKey,
         appTssKey.getPubKey(owner.id),
         noncePartners,
         noncePartners.findIndex(id => id === owner.id),
-        nonceBatch.getNonce(nonceIndex).commitments,
+        Object.entries(init.commitments as MapOf<FrostCommitmentJson>).reduce((obj, [id, {D, E}]) => {
+          obj[id] = {
+            D: TssModule.keyFromPublic(D),
+            E: TssModule.keyFromPublic(E),
+          }
+          return obj;
+        }, {}),
         resultHash,
       );
     }
@@ -808,9 +867,6 @@ class BaseAppPlugin extends CallablePlugin {
     let sidePartners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: party.partners, excludeSelf: true});
     let taskId: string;
     if(this.useFrost) {
-      const nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appId, seed);
-      if(!nonceBatch) 
-        throw "Missing app nonce"
       sidePartners = sidePartners.filter((op: MuonNodeInfo) => init.noncePartners.includes(op.id))
     }
     else {
@@ -914,6 +970,7 @@ class BaseAppPlugin extends CallablePlugin {
       reqId,
       appId, 
       deploymentSeed: seed,
+      gwAddress,
       data:{
         init: {nonceIndex, noncePartners, commitments}
       }
@@ -925,9 +982,10 @@ class BaseAppPlugin extends CallablePlugin {
     /** Storing the TSS key usage for ever. */
     await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-${this.APP_ID}-tss`)
 
-    let nonceBatch: AppNonceBatch|undefined = this.keyManager.getAppNonceBatch(appId, seed);
-    if(!nonceBatch)
-      throw `nonce not found for request ${reqId}`
+    const owner = this.nodeManager.getNodeInfo(gwAddress)!.id
+
+    // let nonceJson: FrostNonceJson|undefined = await NonceStorage.getNonce({seed, owner, index: nonceIndex});
+    let nonce: FrostNonce = await this.keyManager.getFrostNonce(reqId);
     /**
      Storing the nonce usage for an hour.
      Each nonce will remain in the memory for 30 minutes. Therefore one hour is reasonable for keeping usage history.
@@ -944,7 +1002,11 @@ class BaseAppPlugin extends CallablePlugin {
     let signature = TssModule.frostSign(
       resultHash,
       {share: tssKey.share, pubKey: tssKey.publicKey},
-      nonceBatch.getNonce(nonceIndex),
+      // {
+      //   d: toBN(nonceJson.d),
+      //   e: toBN(nonceJson.e),
+      // },
+      nonce,
       noncePartners,
       noncePartners.findIndex(id => this.currentNodeInfo?.id===id),
       commitments,
@@ -1208,6 +1270,22 @@ class BaseAppPlugin extends CallablePlugin {
     await requestConfirmationCache.set(request.reqId, '1');
 
     return `OK`;
+  }
+
+  @remoteMethod(RemoteMethods.InitNonce)
+  async __initNonce(data: {seed: string, reqId: string}, callerInfo): Promise<FrostCommitmentJson> {
+    let {seed, reqId} = data;
+    const ctx = this.appManager.getSeedContext(seed);
+    if(!ctx)
+      throw `App's constext not found`;
+    if(!this.appManager.appHasTssKey(this.APP_ID, seed))
+      throw `Missing app's long term key.`
+
+    const {D, E} = await this.keyManager.initFrostNonce(reqId);
+    return {
+      D: D.encode("hex", true),
+      E: E.encode("hex", true),
+    }
   }
 
   @remoteMethod(RemoteMethods.PartialSignInfo)

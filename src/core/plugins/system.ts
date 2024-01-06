@@ -194,7 +194,7 @@ class System extends CallablePlugin {
       .reduce((obj, current) => (obj[current]=true, obj), {});
 
     if(externalOnlineList){
-      let response = await axios.get(externalOnlineList).then(({data}) => data);
+      let response = await axios.get(externalOnlineList+`?r=${uuid()}`).then(({data}) => data);
       let availables = response.result.filter(item => {
         /** active nodes that has uptime more than 1 hour */
         // return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
@@ -354,11 +354,18 @@ class System extends CallablePlugin {
       count: dealers.length,
       partyInfo: {appId, seed: oldContext.seed}, 
       return: "id",
+      resolveAnyway: true,
     });
     // const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
     const generatorId = _.shuffle(dealers.filter(id => readyDealers.includes(id)))[0];
+    console.log({dealers, readyDealers, generatorId})
     if(!generatorId)
-      throw `key-gen starter node not online`
+      throw {
+        message: `key-gen starter node not online`,
+        dealers, 
+        readyDealers, 
+        generatorId
+      }
 
     const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
 

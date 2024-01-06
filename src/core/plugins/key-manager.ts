@@ -20,12 +20,13 @@ import {PublicKey} from "../../utils/tss/types";
 import * as crypto from "../../utils/crypto.js";
 import {muonSha3} from "../../utils/sha3.js";
 import {bn2hex} from "../../utils/tss/utils.js";
-import { FrostCommitmentJson, FrostNonce, FrostNonceJson, NonceBatch, NonceBatchJson } from '../../common/mpc/dist-nonce.js';
+import { FrostCommitment, FrostCommitmentJson, FrostNonce, FrostNonceJson, NonceBatch, NonceBatchJson } from '../../common/mpc/dist-nonce.js';
 import { DistributedNonceGeneration } from '../../common/mpc/dng.js';
 import AppNonceBatch, { AppNonceBatchJson } from '../../utils/tss/app-nonce-batch.js';
 import { Mutex } from '../../common/mutex.js';
 import { DEPLOYMENT_APP_ID, GENESIS_SEED } from '../../common/contantes.js';
 import * as PromiseLib from "../../common/promise-libs.js"
+import * as NonceStorage from '../../common/nonce-storage/index.js'
 
 const {shuffle} = lodash;
 const log = logger('muon:core:plugins:tss')
@@ -211,7 +212,8 @@ class KeyManager extends CallablePlugin {
     const readyDeployers = await this.appManager.findNAvailablePartners({
       nodes: deployers,
       count: this.netConfigs.tss.threshold,
-      partyInfo: {appId: DEPLOYMENT_APP_ID, seed: GENESIS_SEED}
+      partyInfo: {appId: DEPLOYMENT_APP_ID, seed: GENESIS_SEED},
+      resolveAnyway: true,
     })
     log(`there is ${readyDeployers.length} deployers are ready.`)
     return readyDeployers.length < this.netConfigs.tss.threshold;
@@ -558,7 +560,13 @@ class KeyManager extends CallablePlugin {
       }
     }
 
-    CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
+    // CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
+    await NonceStorage.put({
+      seed: partyInfo.seed, 
+      owner: this.currentNodeInfo!.id, 
+      appNonceBatch: appNonceBatchJson
+    });
+
     return appNonceBatchJson;
   }
 
@@ -625,7 +633,12 @@ class KeyManager extends CallablePlugin {
         // TODO: store nonceBatch to be used in all cluster.
         const appNonceBatch = new AppNonceBatch(partyInfo,  extra.nonceId, nonceBatch);
 
-        CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatch.toJson()})
+        //CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatch.toJson()})
+        await NonceStorage.put({
+          seed: partyInfo.seed, 
+          owner: constructData.starter, 
+          appNonceBatch: appNonceBatch.toJson()
+        });
 
         // let key = new AppTssKey(party, extra.keyId, dKey)
         // await SharedMemory.set(
@@ -643,6 +656,38 @@ class KeyManager extends CallablePlugin {
       })
 
     return dng;
+  }
+
+  async initFrostNonce(reqId: string): Promise<FrostCommitment> {
+    const d = TssModule.curve.genKeyPair(), e = TssModule.curve.genKeyPair()
+    await SharedMemory.set(
+      `frost-single-nonce-${reqId}`, 
+      {
+        d: bn2hex(d.getPrivate()),
+        e: bn2hex(e.getPrivate())
+      },
+      5*60e3
+    )
+    return {
+      D: d.getPublic(),
+      E: e.getPublic(),
+    }
+  }
+
+  async getFrostNonce(reqId: string): Promise<FrostNonce> {
+    let {d, e} = await SharedMemory.waitAndGet(`frost-single-nonce-${reqId}`, 5e3)
+    d = TssModule.keyFromPrivate(d);
+    e = TssModule.keyFromPrivate(e);
+    return {
+      d: d.getPrivate(),
+      e: e.getPrivate(),
+      commitments: {
+        [this.currentNodeInfo!.id]: {
+          D: d.getPublic(),
+          E: e.getPublic()
+        }
+      }
+    }
   }
 
   async onNonceBatchGen(appNonceBatchJson: AppNonceBatchJson) {
@@ -710,25 +755,26 @@ class KeyManager extends CallablePlugin {
     return this.appNonceBatches[appId][seed];
   }
 
-  async takeNonceIndex(id: string, timeout: number=5000): Promise<number> {
-    const lock = await this.mutex.lock(id);
-    try {
-      const {partyInfo, index} = await SharedMemory.waitAndGet(id, timeout);
-      await SharedMemory.set(
-        id,
-        {
-          partyInfo,
-          index: index+1
-        },
-        /** clear after 7 days */
-        7*24*60*60*1000
-      );
-      return index;
-    }
-    finally {
-      await lock.release();
-    }
-  }
+  // async takeNonceIndex(seed: string, timeout: number=5000): Promise<number> {
+  //   return NonceStorage.pickIndex(seed, this.currentNodeInfo!.id, timeout);
+  //   // const lock = await this.mutex.lock(id);
+  //   // try {
+  //   //   const {partyInfo, index} = await SharedMemory.waitAndGet(id, timeout);
+  //   //   await SharedMemory.set(
+  //   //     id,
+  //   //     {
+  //   //       partyInfo,
+  //   //       index: index+1
+  //   //     },
+  //   //     /** clear after 7 days */
+  //   //     7*24*60*60*1000
+  //   //   );
+  //   //   return index;
+  //   // }
+  //   // finally {
+  //   //   await lock.release();
+  //   // }
+  // }
 
   /**
    * Ask all the key partners who has the key share.
@@ -812,7 +858,12 @@ class KeyManager extends CallablePlugin {
         nonces.map(({d, e}, i) => ({d, e, commitments: {}})))
     ).toJson();
     
-    CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
+    // CoreIpc.fireEvent({type: "nonce-batch:gen", data: appNonceBatchJson})
+    await NonceStorage.put({
+      seed, 
+      owner: callerInfo.id, 
+      appNonceBatch: appNonceBatchJson
+    });
     return commitments.map(({D, E}) => ({
       D: D.encode("hex", true),
       E: E.encode("hex", true),
