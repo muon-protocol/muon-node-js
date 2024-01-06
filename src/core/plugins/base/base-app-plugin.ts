@@ -36,6 +36,7 @@ import { DEPLOYMENT_APP_ID } from '../../../common/contantes.js'
 import { AppNonceBatchJson } from '../../../utils/tss/app-nonce-batch.js'
 import { FrostCommitmentJson, FrostNonce, FrostNonceJson } from '../../../common/mpc/dist-nonce.js';
 import * as NonceStorage from '../../../common/nonce-storage/index.js'
+import * as PromiseLib from "../../../common/promise-libs.js"
 import {toBN} from "../../../utils/helpers.js";
 
 const { omit } = lodash;
@@ -327,6 +328,8 @@ class BaseAppPlugin extends CallablePlugin {
         if(this.useFrost){
           commitments = await this.initReqNonce(newRequest);
           availablePartners = Object.keys(commitments);
+          if(availablePartners.length < appParty.t)
+            throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
         }
         else
           availablePartners = await this.findAvailablePartners(newRequest, appParty);
@@ -429,9 +432,11 @@ class BaseAppPlugin extends CallablePlugin {
     let {deploymentSeed: seed, reqId} = request;
     const party = this.getParty(seed)!;
 
-    const nodes:MuonNodeInfo[] = this.nodeManager.filterNodes({list: party.partners});
+    const partners = lodash.shuffle(party.partners).slice(0, Math.ceil(party.t * 1.2));
+    const nodes:MuonNodeInfo[] = this.nodeManager.filterNodes({list: partners});
 
-    let responses:(FrostCommitmentJson|null)[] = await Promise.all(
+    let responses:(FrostCommitmentJson|null)[] = await PromiseLib.resolveN(
+      party.t,
       nodes.map(n => (
         n.id === this.currentNodeInfo?.id
         ?
@@ -443,8 +448,9 @@ class BaseAppPlugin extends CallablePlugin {
           {seed, reqId},
           {timeout: 5000}
         )
-      ).catch(e => null))
-    )
+      )),
+      true,
+    );
 
     return responses.reduce((obj, r, i) => {
       if(r)
