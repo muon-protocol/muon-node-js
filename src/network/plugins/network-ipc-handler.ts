@@ -425,18 +425,19 @@ class NetworkIpcHandler extends CallablePlugin {
         return await enqueueAppRequest(requestData)
       }
       else {
-        /** Forward request to the appropriate node. */
-        const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(partners.length/2));
-        /** find an online node that has the app's tss key */
-        const availables: string[] = await CoreIpc.findNAvailablePartners({
-          nodes: candidatePartners,
-          count: 1,
-          partyInfo: {appId:context.appId, seed: context.seed},
-          resolveAnyway: true,
-        });
-        if(availables.length <= 0)
-          throw "The request cannot be forwarded because there is no available partner";
-        return this.forwardGatewayCallToOtherNode(availables[0], requestData, options.timeout);
+        // /** Forward request to the appropriate node. */
+        // const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(partners.length/2));
+        // /** find an online node that has the app's tss key */
+        // const availables: string[] = await CoreIpc.findNAvailablePartners({
+        //   nodes: candidatePartners,
+        //   count: 1,
+        //   partyInfo: {appId:context.appId, seed: context.seed},
+        //   resolveAnyway: true,
+        // });
+        // if(availables.length <= 0)
+        //   throw "The request cannot be forwarded because there is no available partner";
+        // return this.forwardGatewayCallToOtherNode(availables[0], requestData, options.timeout);
+        return this.forwardGatewayCallToOtherNode(_.shuffle(partners)[0], requestData, options.timeout);
       }
     }
     else {
