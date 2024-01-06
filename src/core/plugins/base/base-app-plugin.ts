@@ -432,7 +432,7 @@ class BaseAppPlugin extends CallablePlugin {
     let {deploymentSeed: seed, reqId} = request;
     const party = this.getParty(seed)!;
 
-    const partners = lodash.shuffle(party.partners).slice(0, Math.ceil(party.t * 1.2));
+    const partners = lodash.shuffle(party.partners).slice(0, Math.ceil(party.t * 1.5));
     const nodes:MuonNodeInfo[] = this.nodeManager.filterNodes({list: partners});
 
     let responses:(FrostCommitmentJson|null)[] = await PromiseLib.resolveN(
@@ -1277,6 +1277,9 @@ class BaseAppPlugin extends CallablePlugin {
     const ctx = this.appManager.getSeedContext(seed);
     if(!ctx)
       throw `App's constext not found`;
+    if(!this.appManager.appHasTssKey(this.APP_ID, seed))
+      throw `Missing app's long term key.`
+
     const {D, E} = await this.keyManager.initFrostNonce(reqId);
     return {
       D: D.encode("hex", true),
