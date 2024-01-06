@@ -432,23 +432,21 @@ class BaseAppPlugin extends CallablePlugin {
     let {deploymentSeed: seed, reqId} = request;
     const party = this.getParty(seed)!;
 
-    const partners = lodash.shuffle(party.partners).slice(0, Math.ceil(party.t * 1.5));
+    /** exclude current node */
+    let partners = party.partners.filter(id => id != this.currentNodeInfo!.id);
+    partners = lodash.shuffle(partners).slice(0, Math.ceil(party.t * 1.5));
     const nodes:MuonNodeInfo[] = this.nodeManager.filterNodes({list: partners});
 
     let responses:(FrostCommitmentJson|null)[] = await PromiseLib.resolveN(
-      party.t,
-      nodes.map(n => (
-        n.id === this.currentNodeInfo?.id
-        ?
-        this.__initNonce({seed, reqId}, this.currentNodeInfo)
-        :
-        this.remoteCall(
+      /** exclude current node */
+      party.t-1,
+      nodes.map(n => this.remoteCall(
           n.peerId,
           RemoteMethods.InitNonce,
           {seed, reqId},
           {timeout: 5000}
         )
-      )),
+      ),
       true,
     );
 
@@ -456,7 +454,10 @@ class BaseAppPlugin extends CallablePlugin {
       if(r)
         obj[nodes[i].id] = r;
       return obj
-    }, {});
+    }, {
+      /** add current node */
+      [this.currentNodeInfo!.id]: await this.__initNonce({seed, reqId}, this.currentNodeInfo),
+    });
   }
 
   private async initFrostNonce(seed: string, reqId): Promise<any> {
