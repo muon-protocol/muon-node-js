@@ -1277,6 +1277,9 @@ class BaseAppPlugin extends CallablePlugin {
     const ctx = this.appManager.getSeedContext(seed);
     if(!ctx)
       throw `App's constext not found`;
+    if(!this.appManager.appHasTssKey(this.APP_ID, seed))
+      throw `Missing app's long term key.`
+    
     const {D, E} = await this.keyManager.initFrostNonce(reqId);
     return {
       D: D.encode("hex", true),
