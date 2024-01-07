@@ -5,19 +5,21 @@ import { createClient, RedisClient } from 'redis'
 import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
 import Web3 from 'web3'
+import { remoteMethod } from '../../network/plugins/base/app-decorators.js'
+import { MuonNodeInfo } from '../../common/types.js'
+import NodeManagerPlugin from "./node-manager.js";
+import * as PromiseLib from "../../common/promise-libs.js"
+import _ from 'lodash'
 
-export type MemWriteType = 'local'
+export type MemWriteType = 'local' | "global"
 
 export type MemWrite = {
   type: MemWriteType,
-  key: string,
   owner: string,
   timestamp: number,
   ttl: number,
-  nSign: number,
-  data: any,
-  hash: string,
-  signatures: string[]
+  key: string,
+  value: any,
 }
 
 export type MemWriteOptions = {
@@ -27,6 +29,11 @@ export type MemWriteOptions = {
 export type MemReadOption = {
   distinct?: boolean,
   multi?: boolean
+}
+
+const RemoteMethods = {
+  WriteGlobal: "write-global",
+  ReadGlobal: "read-global",
 }
 
 @remoteApp
@@ -57,25 +64,47 @@ class MemoryPlugin extends CallablePlugin {
     this.redisClient = redisClient
   }
 
-  async writeLocalMem(key: string, data: any, ttl: number=0, options:MemWriteOptions={}) {
+  private get nodeManager(): NodeManagerPlugin{
+    return this.muon.getPlugin('node-manager');
+  }
+
+  async writeLocalMem(key: string, value: string, ttl: number=0, options:MemWriteOptions={}) {
     let memWrite: MemWrite = {
       type: "local",
-      key,
       owner: process.env.SIGN_WALLET_ADDRESS!,
       timestamp: getTimestamp(),
       ttl,
-      nSign: 0,
-      data,
-      hash: '',
-      signatures: []
+      key,
+      value,
     }
     return await this.storeMemWrite(memWrite, options);
   }
 
+  async readMem(key: string, type:MemWriteType): Promise<string|null> {
+    return this.redisGet(`${this.keyPrefix}-${key}`)
+      .then(strData => {
+        try {
+          const data:MemWrite = JSON.parse(strData)
+          if(data.type !== type)
+            return null
+          return data.value;
+        }
+        catch(e) {
+          return null;
+        }
+      })
+  }
+
+  async readLocalMem(key: string): Promise<string|null> {
+    return this.readMem(key, "local")
+  }
+
   private async storeMemWrite(memWrite: MemWrite, options:MemWriteOptions={}){
-    let {timestamp, key, ttl} = memWrite;
+    let {timestamp, key, value, ttl} = memWrite;
     if(!key)
       throw `MemoryPlugin.storeMemWrite ERROR: key not defined in MemWrite.`
+    if(typeof value !== "string")
+      throw `Only string data can be saved.`
     if(ttl && ttl>0) {
       let expireAt = (timestamp + ttl) * 1000;
       ttl -= (getTimestamp() - timestamp)
@@ -99,8 +128,74 @@ class MemoryPlugin extends CallablePlugin {
     }
   }
 
-  async readLocalMem(key) {
-    return await this.redisGet(`${this.keyPrefix}-${key}`);
+  async writeGlobalMem(key: string, value: string, ttl: number=0, options:MemWriteOptions={}) {
+    if(typeof value !== "string")
+      throw `Only string data can be saved.`
+
+    let memWrite: MemWrite = {
+      type: "global",
+      owner: process.env.SIGN_WALLET_ADDRESS!,
+      timestamp: getTimestamp(),
+      ttl,
+      key,
+      value,
+    }
+    return PromiseLib.resolveN(
+      this.netConfigs.tss.threshold,
+      this.nodeManager.filterNodes({isDeployer: true}).map(({peerId, id}) => {
+        return (
+          id === this.currentNodeInfo?.id
+          ?
+          this.__writeGlobal(memWrite, this.currentNodeInfo)
+          :
+          this.remoteCall(
+            peerId,
+            RemoteMethods.WriteGlobal,
+            memWrite,
+            {timeout: 5000},
+          )
+        )
+      })
+    )
+  }
+
+  async readGlobalMem(key: string): Promise<string|null> {
+    let results:string[] = await PromiseLib.resolveN(
+      this.netConfigs.tss.threshold,
+      this.nodeManager.filterNodes({isDeployer: true}).map(({peerId, id}) => {
+        return (
+          id === this.currentNodeInfo!.id
+          ?
+          this.__readGlobal(key, this.currentNodeInfo!)
+          :
+          this.remoteCall(
+            peerId,
+            RemoteMethods.ReadGlobal,
+            key,
+            {timeout: 5000},
+          )
+        )
+      }),
+      true
+    )
+    let uniqueResults = _.uniq(results.filter(r => !!r));
+    if(uniqueResults.length !== 1)
+      return null;
+    return uniqueResults[0];
+  }
+
+  @remoteMethod(RemoteMethods.WriteGlobal)
+  async __writeGlobal(memWrite: MemWrite, callerInfo: MuonNodeInfo) {
+    if(memWrite.owner !== callerInfo.wallet)
+      throw `Memory write owner missmatched.`
+    if(memWrite.type !== 'global')
+      throw `Memory write type missmatched.`
+    return this.storeMemWrite(memWrite);
+  }
+
+  @remoteMethod(RemoteMethods.ReadGlobal)
+  async __readGlobal(key: string, callerInfo: MuonNodeInfo): Promise<string|null> {
+    return this.readMem(key, "global");
   }
 }
 

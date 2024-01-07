@@ -155,6 +155,10 @@ class BaseAppPlugin extends CallablePlugin {
     return this.muon.getPlugin('app-manager');
   }
 
+  get memoryPlugin(): MemoryPlugin {
+    return this.muon.getPlugin('memory');
+  }
+
   async invoke(appName, method, params) {
     this.log(`invoking app ${appName}.${method} params: %o`, params)
     const app = this.muon.getAppByName(appName)
@@ -731,14 +735,20 @@ class BaseAppPlugin extends CallablePlugin {
     }
   }
 
-  async writeLocalMem(key, data, ttl=0, options:MemWriteOptions) {
-    const memory: MemoryPlugin = this.muon.getPlugin('memory')
-    return await memory.writeLocalMem(`${this.APP_ID}-${key}`, data, ttl, options)
+  async writeLocalMem(key: string, value: string, ttl=0, options:MemWriteOptions) {
+    return this.memoryPlugin.writeLocalMem(`${this.APP_ID}-${key}`, value, ttl, options)
   }
 
-  async readLocalMem(key) {
-    const memory: MemoryPlugin = this.muon.getPlugin('memory')
-    return await memory.readLocalMem(`${this.APP_ID}-${key}`);
+  async readLocalMem(key: string): Promise<string|null> {
+    return this.memoryPlugin.readLocalMem(`${this.APP_ID}-${key}`);
+  }
+
+  async writeGlobalMem(key: string, value: string, ttl:number=0) {
+    return this.memoryPlugin.writeGlobalMem(key, value, ttl);
+  }
+
+  async readGlobalMem(key: string): Promise<string|null> {
+    return this.memoryPlugin.readGlobalMem(key);
   }
 
   async isOtherNodesConfirmed(newRequest: AppRequest) {
