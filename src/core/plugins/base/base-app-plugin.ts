@@ -736,19 +736,19 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async writeLocalMem(key: string, value: string, ttl=0, options:MemWriteOptions) {
-    return this.memoryPlugin.writeLocalMem(`${this.APP_ID}-${key}`, value, ttl, options)
+    return this.memoryPlugin.writeLocalMem(this.APP_ID, key, value, ttl, options)
   }
 
   async readLocalMem(key: string): Promise<string|null> {
-    return this.memoryPlugin.readLocalMem(`${this.APP_ID}-${key}`);
+    return this.memoryPlugin.readLocalMem(this.APP_ID, key);
   }
 
   async writeGlobalMem(key: string, value: string, ttl:number=0) {
-    return this.memoryPlugin.writeGlobalMem(key, value, ttl);
+    return this.memoryPlugin.writeGlobalMem(this.APP_ID, key, value, ttl);
   }
 
-  async readGlobalMem(key: string): Promise<string|null> {
-    return this.memoryPlugin.readGlobalMem(key);
+  async readGlobalMem(key: string): Promise<{owner: string, value: string}|null> {
+    return this.memoryPlugin.readGlobalMem(this.APP_ID, key);
   }
 
   async isOtherNodesConfirmed(newRequest: AppRequest) {

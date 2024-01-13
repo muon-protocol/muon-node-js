@@ -184,7 +184,7 @@ class System extends CallablePlugin {
     return _.pick(key.toJson(), ["publicKey", "polynomial", "partners"]);
   }
 
-  private async getAvailableNodes(): Promise<MuonNodeInfo[]> {
+  async getAvailableNodes(): Promise<MuonNodeInfo[]> {
     const externalOnlineList = this.muon.configs.net.nodes?.onlineList;
     let availableIds: string[] = [];
 
