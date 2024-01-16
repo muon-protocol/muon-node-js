@@ -3,7 +3,7 @@
  * Writing Data is distributed and will write on the all nodes local database. Reading data is locally
  * at the moment.
  *
- * There is Two type of Data can be store in shared memory.
+ * There is three type of Data can be store in shared memory.
  *
  * 1) node: The owner of this type of MemoryWrite is the `calling node`. The collateral wallet of
  *          the Node will store in memory.  any other nodes can query for this data. This type of
@@ -16,22 +16,29 @@
  *          needed for this MemoryWrite. Because of the threshold signature, this MemoryWrite only can
  *          be stored when the request is processed successfully.
  *
- * Any node on the network can query for any type of data.
+ * 3) local: The owner of this memory is current node. This type of memory only stored on current node
+ *          and does not broadcast to other nodes.
+ *
+ * Any node on the network can query for app|node types of data.
  */
 
-import CallablePlugin from './base/callable-plugin'
-const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
-const uint8ArrayToString = require('uint8arrays/to-string').toString;
-const crypto = require('../../utils/crypto')
-const {getTimestamp} = require('../../utils/helpers')
-const Memory = require('../../gateway/models/Memory')
-import { remoteApp, broadcastHandler } from './base/app-decorators'
-import CollateralInfoPlugin from "./collateral-info";
+import CallablePlugin from './base/callable-plugin.js'
+import * as crypto from '../../utils/crypto.js'
+import {getTimestamp} from '../../utils/helpers.js'
+import Memory, {types as MemoryTypes} from '../../common/db-models/Memory.js'
+import { remoteApp, broadcastHandler } from './base/app-decorators.js'
+import NodeManagerPlugin from "./node-manager.js";
+import { createClient, RedisClient } from 'redis'
+import redisConfig from '../../common/redis-config.js'
+import { promisify } from "util"
+import Web3 from 'web3'
+import {muonSha3} from '../../utils/sha3.js'
 
-export type MemWriteType = 'app' | 'node'
+export type MemWriteType = 'app' | 'node' | 'local'
 
 export type MemWrite = {
   type: MemWriteType,
+  key: string,
   owner: string,
   timestamp: number,
   ttl: number,
@@ -41,6 +48,10 @@ export type MemWrite = {
   signatures: string[]
 }
 
+export type MemWriteOptions = {
+  getset?:boolean,
+}
+
 export type MemReadOption = {
   distinct?: boolean,
   multi?: boolean
@@ -48,6 +59,31 @@ export type MemReadOption = {
 
 @remoteApp
 class MemoryPlugin extends CallablePlugin {
+  /** Fix the conflict bug, when more than one node is running on the server. */
+  private readonly keyPrefix = Web3.utils.sha3(`memory-plugin-${process.env.SIGN_WALLET_ADDRESS!}`)
+
+  private redisClient: RedisClient;
+  private redisSet: (...args)=>Promise<any>;
+  private redisGet: (key: string)=>Promise<any>;
+  private redisGetset: (...args)=>Promise<any>;
+  private redisExpire: (...args)=>Promise<any>;
+
+  constructor(muon, configs) {
+    super(muon, configs);
+
+    const redisClient = createClient(redisConfig);
+
+    redisClient.on("error", (error) => {
+      console.error(`MemoryPlugin redis client error`, error);
+    });
+
+    this.redisSet = promisify(redisClient.set).bind(redisClient)
+    this.redisGet = promisify(redisClient.get).bind(redisClient)
+    this.redisGetset = promisify(redisClient.getset).bind(redisClient)
+    this.redisExpire = promisify(redisClient.expire).bind(redisClient)
+
+    this.redisClient = redisClient
+  }
 
   broadcastWrite(memWrite: MemWrite) {
     this.broadcast({
@@ -63,7 +99,7 @@ class MemoryPlugin extends CallablePlugin {
     try {
       if (data && data.type === 'mem_write' && !!data.memWrite) {
         if(this.checkSignature(data.memWrite)){
-          this.storeMemWrite(data.memWrite);
+          await this.storeMemWrite(data.memWrite);
         }
         else{
           console.log('memWrite signature mismatch', data.memWrite)
@@ -75,7 +111,7 @@ class MemoryPlugin extends CallablePlugin {
   }
 
   checkSignature(memWrite: MemWrite){
-    let collateralPlugin: CollateralInfoPlugin = this.muon.getPlugin('collateral');
+    let nodeManager: NodeManagerPlugin = this.muon.getPlugin('node-manager');
 
     let {signatures} = memWrite;
 
@@ -85,24 +121,20 @@ class MemoryPlugin extends CallablePlugin {
       return false
     }
 
-    let allowedList = collateralPlugin.getWallets().map(addr => addr.toLowerCase());
-
     switch (memWrite.type) {
       case "app": {
-        if(signatures.length < collateralPlugin.TssThreshold)
+        if(signatures.length < this.netConfigs.tss.threshold)
           throw "Insufficient MemWrite signature";
         let sigOwners: string[] = signatures.map(sig => crypto.recover(hash, sig).toLowerCase())
-        console.log({sigOwners})
-        let ownerIsValid: number[] = sigOwners.map(owner => (allowedList.indexOf(owner) >= 0 ? 1 : 0))
-        let validCount: number = ownerIsValid.reduce((sum, curr) => (sum + curr), 0)
-        return validCount >= collateralPlugin.TssThreshold;
+        let validOwners: string[] = nodeManager.filterNodes({list: sigOwners}).map(n => n.id)
+        return validOwners.length >= this.netConfigs.tss.threshold;
       }
       case "node": {
         if(signatures.length !== 1){
           throw `Node MemWrite must have one signature. currently has ${signatures.length}.`;
         }
         const owner = crypto.recover(hash, signatures[0]).toLowerCase()
-        return allowedList.indexOf(owner) >= 0;
+        return !!nodeManager.getNodeInfo(owner);
       }
       default:
         throw `Unknown MemWrite type: ${memWrite.type}`
@@ -111,41 +143,15 @@ class MemoryPlugin extends CallablePlugin {
 
   hashMemWrite(memWrite: MemWrite) {
     let {type, owner, timestamp, ttl, nSign, data} = memWrite;
-    let ownerIsWallet = type === Memory.types.Node;
-    return crypto.soliditySha3([
+    let ownerIsWallet = type === MemoryTypes.Node;
+    return muonSha3(
       {type: 'string', value: type},
       {type: ownerIsWallet ? 'address' : 'string', value: owner},
       {type: 'uint256', value: timestamp},
       {type: 'uint256', value: ttl},
       {type: 'uint256', value: nSign},
-      ... data.map(({type, value}) => ({type, value})),
-    ])
-  }
-
-  /**
-   * Method for saving APPs data in memory. This method can be called after all nodes
-   * process the request. all nodes signature is needed to this data be saved.
-   * @param request
-   * @returns {Promise<void>}
-   */
-  async writeAppMem(request) {
-    if(!request.data.memWrite)
-      return;
-
-    let {timestamp, ttl, nSign, data, hash} = request.data.memWrite;
-    let signatures = request.signatures.map(sign => sign.memWriteSignature)
-    let memWrite: MemWrite = {
-      type: Memory.types.App,
-      owner: request.app,
-      timestamp,
-      ttl,
-      nSign,
-      data,
-      hash,
-      signatures,
-    }
-    this.storeMemWrite(memWrite);
-    this.broadcastWrite(memWrite);
+      ... data.map(({type, value}) => ({type, value}))
+    )
   }
 
   /**
@@ -154,12 +160,12 @@ class MemoryPlugin extends CallablePlugin {
    * @param memory
    * @returns {Promise<void>}
    */
-  async writeNodeMem(memory) {
-    let {ttl, data} = memory;
+  async writeNodeMem(key: string, data: any, ttl: number=0) {
     let nSign=1,
       timestamp=getTimestamp();
     let memWrite: MemWrite = {
-      type: Memory.types.Node,
+      type: MemoryTypes.Node,
+      key,
       owner: process.env.SIGN_WALLET_ADDRESS!,
       timestamp,
       ttl,
@@ -168,81 +174,57 @@ class MemoryPlugin extends CallablePlugin {
       hash: '',
       signatures: []
     }
-    memWrite.hash = this.hashMemWrite(memWrite)
+    memWrite.hash = this.hashMemWrite(memWrite)!;
     memWrite.signatures = [crypto.sign(memWrite.hash)]
 
-    this.storeMemWrite(memWrite);
+    await this.storeMemWrite(memWrite);
     this.broadcastWrite(memWrite);
   }
 
-  storeMemWrite(memWrite: MemWrite){
-    let {timestamp, ttl} = memWrite;
-    let expireAt: null | number = null;
-    if(!!timestamp && !!ttl){
-      expireAt = (timestamp + ttl) * 1000;
+  async writeLocalMem(key: string, data: any, ttl: number=0, options:MemWriteOptions={}) {
+    let memWrite: MemWrite = {
+      type: MemoryTypes.Local,
+      key,
+      owner: process.env.SIGN_WALLET_ADDRESS!,
+      timestamp: getTimestamp(),
+      ttl,
+      nSign: 0,
+      data,
+      hash: '',
+      signatures: []
     }
-    let mem = new Memory({
-      ...memWrite,
-      expireAt,
-    })
-    mem.save();
+    return await this.storeMemWrite(memWrite, options);
   }
 
-  async readAppMem(app, query, options: MemReadOption={}) {
-    let {multi=false, distinct=null,} = options;
-
-    if(!!distinct){
-      return Memory.distinct(distinct, {...query, type: Memory.types.App, owner: app})
-    }
-    else{
-      if(multi){
-        return Memory.find({...query, type: Memory.types.App, owner: app})
-      }
-      else{
-        return Memory.findOne({...query, type: Memory.types.App, owner: app})
-      }
-    }
-  }
-
-  async readNodeMem(query, options: MemReadOption={}) {
-    let {multi=false, distinct=null,} = options
-
-    if(!!distinct) {
-      return Memory.distinct(distinct, query)
-    }
-    else{
-      let expirationCheck = {
-        $or: [
-          {expireAt: {$eq: null}},
-          {expireAt: {$gt: Date.now()}}
-        ]
-      }
-
-      let {$or: orPart, $and: andPart=[], ...otherParts} = query;
-
-      // query may have "or" element itself.
-      let mixedOr = !!orPart ? {
-        // query may have "and" element itself.
-        $and: [
-          ...andPart,
-          {$or: orPart},
-          expirationCheck
-        ]
-      } : expirationCheck;
-
-      let finalQuery = {
-        ...otherParts,
-        type: Memory.types.Node,
-        ...mixedOr
-      }
-
-      if(multi) {
-        return Memory.find(finalQuery)
+  private async storeMemWrite(memWrite: MemWrite, options:MemWriteOptions={}){
+    let {timestamp, key, ttl} = memWrite;
+    if(!key)
+      throw `MemoryPlugin.storeMemWrite ERROR: key not defined in MemWrite.`
+    if(ttl && ttl>0) {
+      let expireAt = (timestamp + ttl) * 1000;
+      ttl -= (getTimestamp() - timestamp)
+      const dataToSave = {...memWrite, expireAt};
+      if(options.getset){
+        const result = await this.redisGetset(`${this.keyPrefix}-${key}`, JSON.stringify(dataToSave))
+        await this.redisExpire(`${this.keyPrefix}-${key}`, ttl)
+        return result;
       }
       else {
-        return Memory.findOne(finalQuery)
+        await this.redisSet(`${this.keyPrefix}-${key}`, JSON.stringify(dataToSave), 'EX', ttl)
       }
     }
+    else {
+      if(options.getset) {
+        return await this.redisGetset(`${this.keyPrefix}-${key}`, JSON.stringify(memWrite));
+      }
+      else {
+        await this.redisSet(`${this.keyPrefix}-${key}`, JSON.stringify(memWrite));
+      }
+    }
+  }
+
+  async readLocalMem(key) {
+    return await this.redisGet(`${this.keyPrefix}-${key}`);
   }
 }
 

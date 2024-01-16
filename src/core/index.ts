@@ -1,126 +1,248 @@
-import Muon from './muon'
-let mongoose = require('mongoose')
-const path = require('path');
-const fs = require('fs');
-const {dynamicExtend} = require('./utils')
-import BaseApp from './plugins/base/base-app-plugin'
-require('./global')
-const loadConfigs = require('../networking/configurations')
-const {utils: {sha3}} = require('web3')
+import Muon, { MuonPlugin, MuonPluginConfigs } from "./muon.js";
+import mongoose from "mongoose"
+import path from "path"
+import fs from "fs"
+import { dynamicExtend } from "./utils.js"
+import { fileCID } from "../utils/cid.js"
+import BaseApp from "./plugins/base/base-app-plugin.js";
+import "./global.js"
+import loadConfigs from "../network/configurations.js"
+import Web3 from 'web3'
+import chalk from "chalk"
+import { Constructor } from "../common/types";
+import BasePlugin from "./plugins/base/base-plugin.js";
+import {logger} from '@libp2p/logger'
+import { createRequire } from "module";
+import {filePathInfo} from "../utils/helpers.js";
 
-async function getEnvPlugins() {
-  let pluginsStr = process.env['MUON_PLUGINS']
-  if (!pluginsStr)
-    return {}
-  let result: {[index: string]: any} = {};
-  for (let key of pluginsStr.split('|')) {
-    result[`__${key}__`] = [(await import(`./plugins/${key}`)).default, {}]
+const {__dirname} = filePathInfo(import.meta)
+const {utils: { sha3 }} = Web3
+const log = logger("muon:core");
+
+const muonAppRequire = createRequire(import.meta.url);
+// override .js loader
+muonAppRequire.extensions[".js"] = function(module, filename) {
+  const content = fs.readFileSync(filename, "utf8");
+  // @ts-ignore
+  module._compile(content, filename);
+};
+
+async function getEnvPlugins(): Promise<MuonPlugin[]> {
+  let pluginsStr = process.env["MUON_PLUGINS"];
+  if (!pluginsStr) return [];
+  let result: MuonPlugin[] = [];
+  for (let key of pluginsStr.split("|")) {
+    result.push({
+      name: `__${key}__`,
+      module: (await import(`./plugins/${key}`)).default,
+      config: {},
+    });
   }
-  return result
+  return result;
 }
 
-function prepareApp(app, fileName) {
-  if(!app.APP_ID) {
-    app.APP_ID = '0x' + sha3(fileName).slice(-8);
+function prepareApp(app, fileName, isBuiltInApp = false, filePath = "")
+  : [Constructor<BasePlugin>, MuonPluginConfigs] {
+  if (!app.APP_ID) {
+    app.APP_ID = sha3(fileName);
   }
-  return [dynamicExtend(BaseApp, app), {}]
+
+  app.APP_ID = BigInt(app.APP_ID).toString(10);
+  app.isBuiltInApp = isBuiltInApp;
+  if (filePath) {
+    app.APP_CID = fileCID(filePath);
+  }
+  return [dynamicExtend(BaseApp, app), {}];
 }
 
-function getCustomApps() {
-  let pluginsStr = process.env['MUON_CUSTOM_APPS']
-  if (!pluginsStr)
-    return {}
-  return pluginsStr.split('|').reduce((res, key) => {
-    // check if app exist.
-    try {
-      require.resolve(`../../apps/custom/${key}`);
-    } catch (e) {
-      console.error(e);
-      return res;
+function loadApp(path) {
+  try {
+    muonAppRequire.resolve(path);
+    return muonAppRequire(path);
+  } catch (e) {
+    console.error(chalk.red(`Error when loading app from path [${path}]`));
+    console.error(e);
+    return undefined;
+  }
+}
+
+function getCustomApps(): MuonPlugin[] {
+  let pluginsStr = process.env["MUON_CUSTOM_APPS"];
+  if (!pluginsStr) return [];
+  let result: MuonPlugin[] = [];
+  pluginsStr.split("|").forEach((name) => {
+    let appPath = `../../apps/custom/${name}`;
+    let app = loadApp(appPath);
+    if (app && !!app.APP_NAME) {
+      const [module, config] = prepareApp(
+        app,
+        `${name}.js`,
+        false,
+        path.join(__dirname, `${appPath}.js`)
+      );
+      result.push({ name, module, config });
     }
-    // load app
-    let app = require(`../../apps/custom/${key}`)
-    if (!!app.APP_NAME) {
-      return {
-        ...res,
-        [key]: prepareApp(app, `${key}.js`)
+  });
+  return result;
+}
+
+function getBuiltInApps(): MuonPlugin[] {
+  const appDir = path.join(__dirname, "../built-in-apps");
+  let result: MuonPlugin[] = [];
+  let files = fs.readdirSync(appDir);
+  for(let i=0 ; i<files.length ; i++) {
+    const file = files[i]
+    let ext = file.split(".").pop();
+    if (ext && ext.toLowerCase() === "js") {
+      let app = loadApp(`../built-in-apps/${file}`);
+      if (app && !!app.APP_NAME) {
+        const [module, config] = prepareApp(app, file, true);
+        result.push({ name: app.APP_NAME, module, config });
       }
-    } else {
-      return res;
     }
-  }, {})
+  };
+  return result;
 }
 
-function getGeneralApps() {
-  const appDir = path.join(__dirname, '../../apps/general');
-  let result = {};
+function getGeneralApps(): MuonPlugin[] {
+  const appDir = path.join(__dirname, "../../apps/general");
+  let result: MuonPlugin[] = [];
   let files = fs.readdirSync(appDir);
   files.forEach((file) => {
-    let ext = file.split('.').pop();
-    if (ext.toLowerCase() === 'js') {
-      let app = require(`../../apps/general/${file}`)
-      if (!!app.APP_NAME) {
-        result[app.APP_NAME] = prepareApp(app, file)
+    let ext = file.split(".").pop();
+    if (ext && ext.toLowerCase() === "js") {
+      let appPath = `../../apps/general/${file}`;
+      let app = loadApp(appPath);
+      if (app && !!app.APP_NAME) {
+        const [module, config] = prepareApp(app, file,
+          false, path.join(__dirname, `${appPath}`));
+        result.push({ name: app.APP_NAME, module, config });
       }
     }
   });
-  return result
+  return result;
 }
 
-var muon;
+var muon: Muon;
 
 async function start() {
-  await mongoose.connect(process.env.MONGODB_CS, {
+  log("starting ...");
+  await mongoose.connect(process.env.MONGODB_CS!, {
     useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
+    useUnifiedTopology: true,
+  });
+
+  if (!mongoose.connection) throw "Error connecting to MongoDB";
+
+  log(`MongoDB successfully connected.`);
 
   let config = await loadConfigs();
-  let {
-    net,
-    peerId,
-    account,
-    tss,
-    ... otherConfigs
-  } = config
+  let { net, tss } = config;
   try {
     // const nodeVersion = process.versions.node.split('.');
     // if(nodeVersion[0] < '16')
     //   throw {message: `Node version most be >="16.0.0". current version is "${process.versions.node}"`}
     muon = new Muon({
-      plugins: {
-        'collateral': [(await import('./plugins/collateral-info')).default, {}],
-        'remote-call': [(await import('./plugins/remote-call')).default, {}],
-        'gateway-interface': [(await import('./plugins/gateway-Interface')).default, {}],
-        'ipc': [(await import('./plugins/core-ipc-plugin')).default, {}],
-        'ipc-handlers': [(await import('./plugins/core-ipc-handlers')).default, {}],
-        'broadcast': [(await import('./plugins/broadcast')).default, {}],
-        'content-verify': [(await import('./plugins/content-verify-plugin')).default, {}],
-        'content': [(await import('./plugins/content-app')).default, {}],
-        'memory': [(await import('./plugins/memory-plugin')).default, {}],
-        'tss-plugin': [(await import('./plugins/tss-plugin')).default, {}],
-        'health-check': [(await import('./plugins/health-check')).default, {}],
-        ...await getEnvPlugins(),
+      plugins: [
+        {
+          name: "node-manager",
+          module: (await import("./plugins/node-manager.js")).default,
+          config: {},
+        },
+        {
+          name: "app-manager",
+          module: (await import("./plugins/app-manager.js")).default,
+          config: {},
+        },
+        {
+          name: "remote-call",
+          module: (await import("./plugins/remote-call.js")).default,
+          config: {},
+        },
+        {
+          name: "gateway-interface",
+          module: (await import("./plugins/gateway-Interface.js")).default,
+          config: {},
+        },
+        {
+          name: "ipc",
+          module: (await import("./plugins/core-ipc-plugin.js")).default,
+          config: {},
+        },
+        {
+          name: "ipc-handlers",
+          module: (await import("./plugins/core-ipc-handlers.js")).default,
+          config: {},
+        },
+        {
+          name: "broadcast",
+          module: (await import("./plugins/broadcast.js")).default,
+          config: {},
+        },
+        {
+          name: "memory",
+          module: (await import("./plugins/memory-plugin.js")).default,
+          config: {},
+        },
+        {
+          name: "key-manager",
+          module: (await import("./plugins/key-manager.js")).default,
+          config: {},
+        },
+        {
+          name: "health-check",
+          module: (await import("./plugins/health-check.js")).default,
+          config: {},
+        },
+        {
+          name: "explorer",
+          module: (await import("./plugins/explorer.js")).default,
+          config: {},
+        },
+        // {
+        //   name: "dht",
+        //   module: (await import("./plugins/dht.js")).default,
+        //   config: {},
+        // },
+        {
+          name: "system",
+          module: (await import("./plugins/system.js")).default,
+          config: {},
+        },
+        {
+          name: "mpcnet",
+          module: (await import("./plugins/mpc-network.js")).default,
+          config: {},
+        },
+        {
+          name: "db-synchronizer",
+          module: (await import("./plugins/db-synchronizer.js")).default,
+          config: {},
+        },
+        {
+          name: "reshare-cj",
+          module: (await import("./plugins/cron-jobs/reshare-cron-job.js")).default,
+          config: {},
+        },
+        ...(await getEnvPlugins()),
         ...getCustomApps(),
         ...getGeneralApps(),
-      },
+        ...getBuiltInApps(),
+      ],
       net,
-      account,
-      // TODO: pass it into the tss-plugin
+      // TODO: pass it into the key-manager
       tss,
-      ...otherConfigs,
-    })
+    });
 
     await muon.initialize();
 
-    muon.start();
+    await muon.start();
   } catch (e) {
     console.error(e);
-    throw e
+    throw e;
   }
 }
 
-module.exports = {
-  start
-}
-
+export {
+  start,
+};

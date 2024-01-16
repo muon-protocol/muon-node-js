@@ -1,3 +1,6 @@
+import CoreBroadcastPlugin from "../../../core/plugins/broadcast.js";
+import {CoreRemoteCallMiddleware} from "../../remotecall-middleware";
+
 function classNames(target): string[] {
   let names: string[] = []
   let tmp = target
@@ -8,11 +11,11 @@ function classNames(target): string[] {
   return names;
 }
 
-export function remoteMethod (title, options={}) {
+export function remoteMethod (title, ...middlewares: CoreRemoteCallMiddleware[]) {
   return function (target, property, descriptor) {
     if(!target.__remoteMethods)
       target.__remoteMethods = []
-    target.__remoteMethods.push({title, property, options})
+    target.__remoteMethods.push({title, property, middlewares})
     return descriptor
   }
 }
@@ -52,6 +55,33 @@ export function broadcastHandler (target, property, descriptor) {
   return descriptor
 }
 
+/**
+ * Exported methods can be call by apps.
+ *
+ * public: any app (built-in & client) can call this method
+ * built-in: only built-in app can call this method. Client apps are not permitted to call these methods.
+ *
+ * Example
+ * ======= app.js ========
+ * ...
+ * this.callPlugin(<plugin-name>, <method>, <arguments>)
+ * ...
+ */
+export type ApiExportType = "public" | "built-in"
+
+export type ApiExportOptions = {
+  type?: ApiExportType
+}
+
+export function appApiMethod (options: ApiExportOptions={}) {
+  return function (target, property, descriptor) {
+    if(!target.__appApiExports)
+      target.__appApiExports = {}
+    target.__appApiExports[property] = {property, options}
+    return descriptor
+  }
+}
+
 export function remoteApp (constructor): any {
   if(!classNames(constructor).includes('CallablePlugin')) {
     const error = {message: 'RemoteApp should be CallablePlugin.'}
@@ -66,7 +96,24 @@ export function remoteApp (constructor): any {
         for (let i = 0; i < constructor.prototype.__remoteMethods.length; i++) {
           let item = constructor.prototype.__remoteMethods[i];
           // console.log('########## registering remote method', item, this.remoteMethodEndpoint(item.title))
-          this.registerRemoteMethod(item.title, this[item.property].bind(this))
+          this.registerRemoteMethod(item.title, this[item.property].bind(this), {
+            /** override options */
+            middlewares: item.middlewares,
+            /** other props */
+            method: item.title,
+            appName: this.APP_NAME,
+            appId: this.APP_ID,
+          })
+        }
+      }
+
+      if(constructor.prototype.__globalBroadcastHandlers) {
+        const broadcastPlugin: CoreBroadcastPlugin = this.muon.getPlugin('broadcast')
+        for (let i = 0; i < constructor.prototype.__globalBroadcastHandlers.length; i++) {
+          let item = constructor.prototype.__globalBroadcastHandlers[i];
+          await broadcastPlugin.subscribe(item.title)
+          // @ts-ignore
+          broadcastPlugin.on(item.title, this[item.property].bind(this))
         }
       }
 

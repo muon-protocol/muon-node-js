@@ -1,4 +1,8 @@
 #!/bin/bash
+. ~/.bashrc
+GIT_MERGE_AUTOEDIT=no
+export PATH=/usr/local/bin:$PATH
+
 . "`dirname "$0"`/pre-run.sh"
 
 project_dir=`pwd`
@@ -29,17 +33,47 @@ setup (){
 
 check_for_update (){
     current_branch=`git rev-parse --abbrev-ref HEAD`
+    `git checkout package-lock.json package.json`
 
-    if git pull --recurse-submodules origin "$current_branch" | grep -q 'Already up to date'; then
-#        log "Node: [`which node`]    PM2: [`which pm2`]";
-        ``;
+    git reset --hard origin/testnet
+
+    # restart services
+    if [[ -z $_NODE ]]
+    then
+        _NODE=`which node`;
+    fi
+
+    if [[ -z $_NODE ]]
+    then
+        _NODE=/usr/local/bin/node # node Docker
+        _PM2=/usr/local/bin/pm2
+        _NPM=/usr/local/bin/npm
+    fi
+
+    git checkout package.json package-lock.json
+    update_check=`git pull --recurse-submodules origin "$current_branch" 2>&1`
+    
+    #log `$_NODE  $_NPM install 2>&1`
+
+    if [ $? -ne 0 ]; then
+        log "Git pull error.";
+        log "$update_check;"
+        exit;
+    fi
+
+    if echo $update_check | grep -q 'Already up to date'; then
+        echo "No new updates";
     else
-        # restart services
         log "========== updating detected ===========";
-         log "Installing dependencies ...";
-         log `$_NPM install`
-        log "Restarting PM2 ...";
-        log `$_PM2 restart "$_PM2_APP"`
+        log "============ update reason =============";
+        log "$update_check"
+        log "========================================";
+        log "Installing dependencies: $_NODE  $_NPM install";
+        log `pwd`;
+        log `$_NODE  $_NPM install 2>&1`
+        #log `$_NPM install 2>&1`
+        log "Restarting PM2: $_NODE $_PM2 restart $_PM2_APP";
+        log `$_NODE $_PM2 restart "$_PM2_APP"`
         log "============ updating done =============";
     fi
 }
@@ -60,5 +94,5 @@ elif [[ "$action" == "update" ]]
 then
     check_for_update;
 else
-    log "no action defined";
+    log "No action defined.";
 fi

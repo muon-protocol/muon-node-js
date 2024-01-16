@@ -1,32 +1,37 @@
 'use strict'
 /* eslint-disable no-console */
-import {CoreGlobalEvent} from "./ipc";
-
-const Events = require('events')
-const chalk = require('chalk')
-const emoji = require('node-emoji')
-const fs = require('fs')
-const { MessagePublisher, MessageSubscriber } = require('../common/message-bus')
-const { GLOBAL_EVENT_CHANNEL, fireEvent } = require('./ipc')
-import * as NetworkIpc from '../networking/ipc'
-import MuonBasePlugin from './plugins/base/base-plugin';
-
-export interface MuonPlugin {
-  constructor(network: MuonBasePlugin, configs: MuonPluginConfigs);
-  onInit();
-  onStart();
-}
+import {CoreGlobalEvent} from "./ipc.js";
+import Events from 'events'
+import chalk from 'chalk'
+import fs from 'fs'
+import { MessagePublisher, MessageSubscriber } from '../common/message-bus/index.js'
+import { GLOBAL_EVENT_CHANNEL, fireEvent } from './ipc.js'
+import * as NetworkIpc from '../network/ipc.js'
+import MuonBasePlugin from './plugins/base/base-plugin.js';
+import BaseAppPlugin from "./plugins/base/base-app-plugin.js";
+import BasePlugin from "./plugins/base/base-plugin.js";
+import {Constructor, DeploymentTssConfigs, NetConfigs, PolynomialInfoJson} from "../common/types";
 
 export type MuonPluginConfigs = any
 
+export type MuonPlugin = {
+  name: string ,
+  module: Constructor<BasePlugin>,
+  config: MuonPluginConfigs
+}
+
 export type MuonConfigs = {
-  plugins: {[index: string]: [MuonPlugin, MuonPluginConfigs]}
+  plugins: MuonPlugin[],
+  tss: DeploymentTssConfigs,
+  net: NetConfigs,
 }
 
 export default class Muon extends Events {
   configs: MuonConfigs
   _plugins = {}
-  _apps = {}
+  private _apps = {}
+  private appIdToNameMap = {}
+  private appNameToIdMap = {}
   globalEventBus = new MessageSubscriber(GLOBAL_EVENT_CHANNEL)
 
   constructor(configs: MuonConfigs) {
@@ -38,58 +43,74 @@ export default class Muon extends Events {
     await this._initializePlugin(this.configs.plugins)
   }
 
-  _initializePlugin(plugins) {
-    for (let pluginName in plugins) {
-      let [plugin, configs] = plugins[pluginName]
-      this._plugins[pluginName] = new plugin(this, configs)
-      this._plugins[pluginName].onInit();
+  async _initializePlugin(plugins: MuonPlugin[]) {
+    for (let plugin of plugins) {
+
+      const pluginInstance = new plugin.module(this, plugin.config)
+      this._plugins[plugin.name] = pluginInstance
+      await pluginInstance.onInit();
+
+      if(pluginInstance instanceof BaseAppPlugin) {
+        if(pluginInstance.APP_NAME) {
+          if(this.appNameToIdMap[pluginInstance.APP_NAME])
+            throw `There is two app with same APP_NAME: ${pluginInstance.APP_NAME}`
+          this._apps[pluginInstance.APP_ID] = pluginInstance;
+          this.appIdToNameMap[pluginInstance.APP_ID] = pluginInstance.APP_NAME
+          this.appNameToIdMap[pluginInstance.APP_NAME] = pluginInstance.APP_ID
+        }
+      }
     }
     // console.log('plugins initialized.')
+  }
+
+  getAppNameById(appId): string {
+    return this.appIdToNameMap[appId]
+  }
+
+  getAppIdByName(appName): string {
+    return this.appNameToIdMap[appName] || "0";
+  }
+
+  getAppByName(appName) {
+    const appId = this.getAppIdByName(appName)
+    return this.getAppById(appId);
+  }
+
+  getAppById(appId) {
+    return this._apps[appId] || null;
   }
 
   getPlugin(pluginName) {
     return this._plugins[pluginName]
   }
 
-  getAppByName(appName) {
-    if (!appName) return null
-    let keys = Object.keys(this._plugins)
-    for (let i = 0; i < keys.length; i++) {
-      if (this._plugins[keys[i]].APP_NAME === appName)
-        return this._plugins[keys[i]]
-    }
-    return null
-  }
+  // getAppByName(appName) {
+  //   if (!appName) return null
+  //   let keys = Object.keys(this._plugins)
+  //   for (let i = 0; i < keys.length; i++) {
+  //     if (this._plugins[keys[i]].APP_NAME === appName)
+  //       return this._plugins[keys[i]]
+  //   }
+  //   return null
+  // }
 
   async start() {
+    // @ts-ignore
     this.globalEventBus.on("message", this.onGlobalEventReceived.bind(this));
-    this._onceStarted();
-
-    setTimeout(async () => {
-      const peerIds = await NetworkIpc.getOnlinePeers()
-      if(peerIds.length > 0) {
-        peerIds.forEach(peerId => {
-          fireEvent({type: "peer:discovery", data: peerId})
-        })
-      }
-    }, 1000);
+    await this._onceStarted();
   }
 
   async _onceStarted() {
     for (let pluginName in this._plugins) {
-      this._plugins[pluginName].onStart()
+      await this._plugins[pluginName].onStart()
     }
   }
 
-  async onGlobalEventReceived(event: CoreGlobalEvent) {
+  async onGlobalEventReceived(event: CoreGlobalEvent, info) {
     // console.log(`[${process.pid}] core.Muon.onGlobalEventReceived`, event)
-    this.emit(event.type, event.data);
-  }
-
-  getSharedWalletPubKey() {
-    // return this.sharedWalletPubKey
-    let tssPlugin = this.getPlugin('tss-plugin')
-    return tssPlugin.tssKey.publicKey
+    try {
+      await this.emit(event.type, event.data, info);
+    }catch (e) {}
   }
 
   get configDir(){

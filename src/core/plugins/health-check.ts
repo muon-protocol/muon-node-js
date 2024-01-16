@@ -1,12 +1,15 @@
-import CallablePlugin from './base/callable-plugin'
-import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators'
-import {OnlinePeerInfo} from "../../networking/types";
-import TssPlugin from "./tss-plugin";
-const {timeout} = require('../../utils/helpers')
-const OS = require('os')
-const util = require('util');
-const shellExec = util.promisify(require('child_process').exec);
+import CallablePlugin from './base/callable-plugin.js'
+import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
+import KeyManager from "./key-manager.js";
+import * as NetworkIpc from '../../network/ipc.js'
+import {MuonNodeInfo} from "../../common/types";
+import {timeout} from '../../utils/helpers.js'
+import OS from 'os'
+import util from 'util'
+import ChildProcess from 'child_process'
+import {peerId2Str} from "../../network/utils.js";
 
+const shellExec = util.promisify(ChildProcess.exec);
 
 const RemoteMethods = {
   CheckHealth: 'check-health',
@@ -23,39 +26,41 @@ class HealthCheck extends CallablePlugin {
     // this.muon.getPlugin('remote-call').on('error', this.onRemoteCallFailed.bind(this))
   }
 
-  async onRemoteCallFailed({peerId, method, onRemoteSide=false}) {
-    // TODO: need more check
-    if(method === this.healthCheckEndpoint || onRemoteSide)
-      return;
-    let peerIdStr = peerId.toB58String()
-    if(this.checkingTime[peerIdStr] && Date.now() - this.checkingTime[peerIdStr] < 30000) {
-      return;
-    }
+  // async onRemoteCallFailed({peerId, method, onRemoteSide=false}) {
+  //   // TODO: need more check
+  //   if(method === this.healthCheckEndpoint || onRemoteSide)
+  //     return;
+  //   let peerIdStr = peerId2Str(peerId)
+  //   if(this.checkingTime[peerIdStr] && Date.now() - this.checkingTime[peerIdStr] < 30000) {
+  //     return;
+  //   }
+  //
+  //   console.log(`checking peer ${peerId2Str(peerId)} health ...`, {peer: peerIdStr, method, onRemoteSide})
+  //
+  //   this.checkingTime[peerIdStr] = Date.now();
+  //
+  //   // @ts-ignore
+  //   let peer = await this.findPeer(peerId);
+  //   if (!peer) {
+  //     // TODO: what to do ?
+  //     return;
+  //   }
+  //   for (let i = 0; i < 3; i++) {
+  //     try {
+  //       let response = await this.remoteCall(peer, RemoteMethods.CheckHealth, null, {silent: true})
+  //       if (response?.status === 'OK') {
+  //         console.log(`peer responded OK.`)
+  //         return;
+  //       }
+  //     }catch (e) {}
+  //     await timeout(5000)
+  //   }
+  //   console.log(`peer not responding. trigger muon onDisconnect`)
+  //   // @ts-ignore;
+  //   await this.muon.onPeerDisconnect({remotePeer: peerId})
+  // }
 
-    console.log(`checking peer ${peerId.toB58String()} health ...`, {peer: peerIdStr, method, onRemoteSide})
-
-    this.checkingTime[peerIdStr] = Date.now();
-
-    let peer = await this.findPeer(peerId);
-    if (!peer) {
-      // TODO: what to do ?
-      return;
-    }
-    for (let i = 0; i < 3; i++) {
-      try {
-        let response = await this.remoteCall(peer, RemoteMethods.CheckHealth, null, {silent: true})
-        if (response?.status === 'OK') {
-          console.log(`peer responded OK.`)
-          return;
-        }
-      }catch (e) {}
-      await timeout(5000)
-    }
-    console.log(`peer not responding. trigger muon onDisconnect`);
-    await this.muon.onPeerDisconnect({remotePeer: peerId})
-  }
-
-  async getNodeStatus(){
+  private async collectNodeStatus(){
     const {stdout: uptimeStdOut, stderr: uptimeStdErr} = await shellExec('uptime');
     const {stdout: freeStdOut, stderr: freeStdErr} = await shellExec('free');
 
@@ -63,45 +68,23 @@ class HealthCheck extends CallablePlugin {
     return {
       numCpus: OS.cpus().length,
       loadAvg: uptimeStdOut.split('load average')[1].substr(2).trim(),
-      memory: `${freeCols[6]}/${freeCols[1]}`
+      memory: `${freeCols[6]}/${freeCols[1]}`,
+      uptime: await NetworkIpc.getUptime(),
+      networkingPort: process.env.PEER_PORT,
+      gatewayPort: process.env.GATEWAY_PORT
     }
   }
 
-  @gatewayMethod("list-nodes")
-  async _onListNodes(data){
-    let tssPlugin: TssPlugin = this.muon.getPlugin('tss-plugin')
+  async getNodeStatus(node?: MuonNodeInfo) {
+    if(!node)
+      return await this.collectNodeStatus()
 
-    if(tssPlugin.tssParty === null)
-      throw `TSS module not loaded yet`
-
-    if(!process.env.SIGN_WALLET_ADDRESS)
-      throw `process.env.SIGN_WALLET_ADDRESS is not defined`
-
-    let partners: OnlinePeerInfo[] = Object.values(tssPlugin.tssParty.partners)
-      .filter((op: OnlinePeerInfo) => {
-        return !!op.peer && op.wallet !== process.env.SIGN_WALLET_ADDRESS
-      })
-
-    let result = {
-      [process.env.SIGN_WALLET_ADDRESS]: {
-        status: "CURRENT",
-        ... await this.getNodeStatus()
-      }
-    }
-
-    const peerList = partners.map(({peer}) => peer)
-
-    let calls = peerList.map(peer => {
-      return this.remoteCall(peer, RemoteMethods.CheckHealth, {log: true})
-        .catch(e => null)
-    });
-    let responses = await Promise.all(calls)
-
-    for(let i=0 ; i<responses.length ; i++){
-      result[partners[i].wallet] = responses[i];
-    }
-
-    return result;
+    return await this.remoteCall(
+      node.peerId,
+      RemoteMethods.CheckHealth,
+      {log: true},
+      {timeout: 5000}
+    )
   }
 
   @remoteMethod(RemoteMethods.CheckHealth)
@@ -110,7 +93,7 @@ class HealthCheck extends CallablePlugin {
       console.log(`===== HealthCheck._onHealthCheck =====`, new Date());
     return {
       status: "OK",
-      ... await this.getNodeStatus()
+      ... await this.collectNodeStatus()
     }
   }
 }

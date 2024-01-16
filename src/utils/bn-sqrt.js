@@ -1,7 +1,6 @@
-const Web3 = require('web3')
+import BN from "bn.js";
 
-const BNSqrt = (num) => {
-  const BN = Web3.utils.BN
+export const BNSqrt = (num) => {
   if(num.lt(new BN(0))) {
     throw { message: "Sqrt only works on non-negtiave inputs" }
   }
@@ -18,5 +17,3 @@ const BNSqrt = (num) => {
     return largeCand
   }
 }
-
-module.exports = { BNSqrt }

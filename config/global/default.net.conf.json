@@ -1,0 +1,63 @@
+{
+  "tss": {
+    "threshold": 7,
+    "max": 20,
+    "defaultTTL": 43200,
+    "pendingPeriod": 43200
+  },
+  "nodeManager": {
+    "network": "bsctest",
+    "address": "0x2efB53c11FC935f6114B3fC37AaFa6a76B263a4E",
+    "pagination": "0x35fccb153e862b0af8f66192c43a4b0dea132691"
+  },
+  "routing": {
+    "delegate": [
+      "http://104.131.177.195:8080/delegate",
+      "http://3.130.24.220:8080/delegate",
+      "http://194.195.211.27:8080/delegate",
+      "http://209.250.252.247:8080/delegate",
+      "http://188.166.73.132:8000/delegate"
+    ],
+    "ifconfig":[
+      "http://104.131.177.195:8080/ifconfig",
+      "http://3.130.24.220:8080/ifconfig",
+      "http://194.195.211.27:8080/ifconfig",
+      "http://209.250.252.247:8080/ifconfig",
+      "http://188.166.73.132:8000/ifconfig",
+      "https://ifconfig.muon.net/",
+      "https://ifconfig.me/all.json"
+    ],
+    "discoveryValidPeriod": 30000,
+    "findPeerValidPeriod": 30000,
+    "delegateRoutingTTL": 1200000,
+    "peerStoreTTL": 1200000
+  },
+  "nodes": {
+    "onlineList": "https://monitor1.muon.net/nodes",
+    "aggregators": ["4", "22408"]
+  },
+  "bootstrap": [
+    "/ip4/104.131.177.195/tcp/5000/p2p/Qma3GsJmB47xYuyahPZPSadh1avvxfyYQwk8R3UnFrQ6aP",
+    "/ip4/3.130.24.220/tcp/5000/p2p/Qmcrx17xt1vENkbedPjgeQdZWhRRKCLbtqJr9z8E76nztz",
+    "/ip4/194.195.211.27/tcp/5000/p2p/QmTLpbUrFJap7FNQhUo8RqRCXSDhdKjXmXAyCpNCd8YtMm",
+    "/ip4/209.250.252.247/tcp/5000/p2p/QmbAGW4ddya254cAXKz2FnarpFv1odaJuisgCdPZrYfVxE"
+  ],
+  "fee": {
+    "endpoint": "https://fees.muon.net/sign",
+    "signers": [
+      "0x968cB8308E052E9fDce45D1F8a384a9881e829A0"
+    ]
+  },
+  "synchronizer": {
+    "monitor": {
+      "providers": [
+        "http://104.131.177.195:8080/network",
+        "http://3.130.24.220:8080/network",
+        "http://194.195.211.27:8080/network",
+        "http://209.250.252.247:8080/network"
+      ],
+      "startDelay": 120e3,
+      "interval": 3600e3
+    }
+  }
+}

@@ -1,16 +1,21 @@
-const Events = require('events-async')
-const PeerId = require('peer-id')
-const uint8ArrayFromString = require('uint8arrays/from-string').fromString;
-const uint8ArrayToString = require('uint8arrays/to-string').toString;
-const SharedMem = require('../../../common/shared-memory')
+import Muon from "../../muon";
+import {MuonNodeInfo, NetConfigs} from "../../../common/types";
+import NodeManagerPlugin from "../node-manager.js";
+import {logger} from '@libp2p/logger'
+import Events from 'events-async'
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
+import * as SharedMem from '../../../common/shared-memory/index.js'
+
+const log = logger('muon:core:plugins:base')
 
 export default class BasePlugin extends Events{
-  muon;
+  private readonly _muon;
   configs = {}
 
   constructor(muon, configs){
     super()
-    this.muon = muon
+    this._muon = muon
     this.configs = {...configs}
   }
 
@@ -22,15 +27,23 @@ export default class BasePlugin extends Events{
   }
 
   /**
-   * This method will call immediately after Muon start.
+   * This method will be called immediately after Muon starts.
    * @returns {Promise<void>}
    */
   async onStart(){
-    this.registerBroadcastHandler()
+    await this.registerBroadcastHandler()
+  }
+
+  get muon(): Muon {
+    return this._muon;
+  }
+
+  get netConfigs():NetConfigs {
+    return this.muon.configs.net;
   }
 
   get peerId(){
-    throw "peerId moved to networking module"
+    throw "peerId moved to network module"
     // return this.muon.peerId;
   }
 
@@ -40,9 +53,11 @@ export default class BasePlugin extends Events{
   }
 
   protected get BROADCAST_CHANNEL(){
+    // @ts-ignore
     if(this.__broadcastHandlerMethod === undefined)
       return null;
-    return `${this.ConstructorName}.${this.__broadcastHandlerMethod}`
+    // @ts-ignore
+    return `muon.core.${this.ConstructorName}.${this.__broadcastHandlerMethod}`
   }
 
   async registerBroadcastHandler(){
@@ -50,22 +65,31 @@ export default class BasePlugin extends Events{
     /*eslint no-undef: "error"*/
     if (broadcastChannel) {
       if(process.env.VERBOSE) {
-        console.log('Subscribing to broadcast channel', this.BROADCAST_CHANNEL)
+        log('Subscribing to broadcast channel %s', this.BROADCAST_CHANNEL)
       }
+      this.muon.getPlugin('broadcast').subscribe(this.BROADCAST_CHANNEL);
+      // @ts-ignore
       this.muon.getPlugin('broadcast').on(broadcastChannel, this[this.__broadcastHandlerMethod].bind(this))
     }
   }
 
   broadcast(data){
+    // @ts-ignore
     if(this.__broadcastHandlerMethod === undefined) {
-      console.log(this);
-      let superClass = Object.getPrototypeOf(this);
-      throw `${superClass.constructor.name} is not declared broadcast handler`;
+      throw `core.${this.ConstructorName} plugin is not declared broadcast handler`;
     }
     this.muon.getPlugin('broadcast')
         .broadcastToChannel(this.BROADCAST_CHANNEL, data)
         .catch(e => {
-          console.log(`${this.ConstructorName}.broadcast`, e)
+          log(`${this.ConstructorName}.broadcast %O`, e)
+        })
+  }
+
+  broadcastToChannel(channel, data){
+    this.muon.getPlugin('broadcast')
+        .broadcastToChannel(channel, data)
+        .catch(e => {
+          log(`${this.ConstructorName}.broadcastToChannel %O`, e)
         })
   }
 
@@ -85,4 +109,8 @@ export default class BasePlugin extends Events{
     return await SharedMem.clear(this.sharedMemKey(key))
   }
 
+  get currentNodeInfo(): MuonNodeInfo | undefined {
+    const nodeManager: NodeManagerPlugin = this.muon.getPlugin('node-manager')
+    return nodeManager.getNodeInfo(process.env.SIGN_WALLET_ADDRESS!)
+  }
 }

@@ -1,0 +1,25 @@
+{
+  "host": "0.0.0.0",
+  "port": 8000,
+  "routes": {
+    "enable": {
+      "api": true,
+      "network": true,
+      "status": true,
+      "delegate": true,
+      "mine": true,
+      "crashReport": true,
+      "ifconfig": true
+    }
+  },
+  "delegates": {
+    "rateLimit": {
+      "findPeerEnabled": false,
+      "discoveryEnabled": false,
+      "findPeerLimit": 100,
+      "findPeerDuration": 600000,
+      "discoveryLimit": 20,
+      "discoveryDuration": 600000
+    }
+  }
+}

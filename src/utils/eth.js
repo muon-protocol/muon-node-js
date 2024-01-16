@@ -1,36 +1,22 @@
-const Web3 = require('web3')
-const EventEmbitter = require('events')
+import Web3 from 'web3'
+import EventEmbitter from 'events'
+import { sortObject, getTimestamp, timeout } from './helpers.js'
+import * as crypto from './crypto.js'
+import { createRequire } from "module";
+import EthRpcList from './eth-rpc-list.js';
+const require = createRequire(import.meta.url);
+const ERC20_ABI =require('../data/ERC20-ABI.json')
+const ERC721_ABI = require('../data/ERC721-ABI.json')
+import {muonSha3} from './sha3.js'
+
+
 const HttpProvider = Web3.providers.HttpProvider
 const WebsocketProvider = Web3.providers.WebsocketProvider
-const { sortObject, getTimestamp } = require('./helpers')
-const crypto = require('./crypto')
-const ERC20_ABI = require('../data/ERC20-ABI')
-const ERC721_ABI = require('../data/ERC721-ABI')
 
-const _generalWeb3Instance = new Web3()
-const soliditySha3 = _generalWeb3Instance.utils.soliditySha3
 
-const _networksWeb3 = {
-  ganache: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_GANACHE)),
-  // ethereum mani net
-  1: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ETH)),
-  3: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ROPSTEN)),
-  4: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_RINKEBY)),
-  56: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSC)),
-  97: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_BSCTEST)),
-  250: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTM)),
-  4002: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_FTMTEST)),
-  100: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_XDAI_MAINNET || 'https://rpc.xdaichain.com/')),
-  77: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_XDAI_SOKOL_TESTNET || 'https://sokol.poa.network')),
-  137: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_POLYGON)),
-  80001: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_MUMBAI)),
-  43113: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_AVALANCHE_FUJI_TESTNET || 'https://api.avax-test.network/ext/bc/C/rpc')),
-  43114: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_AVALANCHE_MAINNET || 'https://api.avax.network/ext/bc/C/rpc')),
-  421611: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ARBITRUM_TESTNET || 'https://rinkeby.arbitrum.io/rpc')),
-  42161: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_ARBITRUM_MAINNET || 'https://arb1.arbitrum.io/rpc')),
-  1088: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_METIS || 'https://andromeda.metis.io/?owner=1088')),
-  10: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_OPTIMISM || 'https://rpc.ankr.com/optimism')),
-  420: new Web3(new HttpProvider(process.env.WEB3_PROVIDER_OPTIMISM_TESTNET || 'https://rpc.ankr.com/optimism_testnet')),
+const lastUsedRpcIndex = {
+};
+const web3Instances = {
 }
 
 const nameToChainIdMap = {
@@ -55,18 +41,38 @@ const nameToChainIdMap = {
   optimismTestnet: 420, // Optimism Testnet
 }
 
+function getNetworkId(network) {
+  if(!!EthRpcList[network])
+    return network
+  return nameToChainIdMap[network]
+}
+
 function getWeb3(network) {
-  if (_networksWeb3[network]) return Promise.resolve(_networksWeb3[network])
-  else if (_networksWeb3[nameToChainIdMap[network]])
-    return Promise.resolve(_networksWeb3[nameToChainIdMap[network]])
-  else return Promise.reject({ message: `invalid network "${network}"` })
+  let chainId = getNetworkId(network);
+  if(chainId === undefined)
+    return Promise.reject({ message: `invalid network "${network}"` })
+
+  if (!web3Instances[chainId]) {
+    const nextRpc = ((lastUsedRpcIndex[chainId] ?? -1) + 1) % EthRpcList[chainId].length;
+    lastUsedRpcIndex[chainId] = nextRpc;
+    web3Instances[chainId] = new Web3(new HttpProvider(EthRpcList[chainId][nextRpc]))
+  }
+
+  return Promise.resolve(web3Instances[chainId])
 }
 
 function getWeb3Sync(network) {
-  if (_networksWeb3[network]) return _networksWeb3[network]
-  else if (_networksWeb3[nameToChainIdMap[network]])
-    return _networksWeb3[nameToChainIdMap[network]]
-  else throw { message: `invalid network "${network}"` }
+  let chainId = getNetworkId(network);
+  if(chainId === undefined)
+    throw { message: `invalid network "${network}"` }
+
+  if (!web3Instances[chainId]) {
+    const nextRpc = ((lastUsedRpcIndex[chainId] ?? -1) + 1) % EthRpcList[chainId].length;
+    lastUsedRpcIndex[chainId] = nextRpc;
+    web3Instances[chainId] = new Web3(new HttpProvider(EthRpcList[chainId][nextRpc]))
+  }
+
+  return web3Instances[chainId]
 }
 
 function hashCallOutput(
@@ -95,17 +101,50 @@ function hashCallOutput(
     value: !name || typeof result === 'string' ? result : result[name]
   }))
   params = [{ type: 'address', value: address }, ...params, ...extraParams]
-  let hash = _generalWeb3Instance.utils.soliditySha3(...params)
+  let hash = muonSha3(...params)
   return hash
+}
+
+const web3ProvidersSpecificErrors = [
+  'CONNECTION ERROR',
+  "Invalid JSON RPC response",
+  "invalid json response body",
+  "not authorized",
+  "we can't execute this request",
+  "Returned error:",
+  "Returned values aren't valid",
+].map(msg => msg.toLowerCase());
+
+function errorNeedRpcRotate(msg) {
+  msg = msg.toLowerCase();
+  for(const specificMsg of web3ProvidersSpecificErrors) {
+    if(specificMsg.includes(msg))
+      return true;
+  }
+  return false
+}
+
+async function wrappedCall(network, web3ApiCall, args=[]) {
+  try {
+    return await web3ApiCall(...args)
+  }
+  catch (e) {
+    if(errorNeedRpcRotate(e.message) ) {
+      const chainId = getNetworkId(network);
+      console.log(`error on web3 call`, {chainId}, e.message)
+      delete web3Instances[chainId];
+    }
+    throw e
+  }
 }
 
 function getTokenInfo(address, network) {
   return getWeb3(network).then(async (web3) => {
     let contract = new web3.eth.Contract(ERC20_ABI, address)
     return {
-      symbol: await contract.methods.symbol().call(),
-      name: await contract.methods.name().call(),
-      decimals: await contract.methods.decimals().call()
+      symbol: await wrappedCall(network, contract.methods.symbol().call),
+      name: await wrappedCall(network, contract.methods.name().call),
+      decimals: await wrappedCall(contract.methods.decimals().call)
     }
   })
 }
@@ -113,50 +152,43 @@ function getNftInfo(address, network) {
   return getWeb3(network).then(async (web3) => {
     let contract = new web3.eth.Contract(ERC721_ABI, address)
     return {
-      symbol: await contract.methods.symbol().call(),
-      name: await contract.methods.name().call()
+      symbol: await wrappedCall(network, contract.methods.symbol().call),
+      name: await wrappedCall(network, contract.methods.name().call)
     }
   })
 }
 
 function getTransaction(txHash, network) {
-  return getWeb3(network).then((web3) => web3.eth.getTransaction(txHash))
+  return getWeb3(network).then((web3) => wrappedCall(network, web3.eth.getTransaction.bind(web3), [txHash]))
 }
 
 function getTransactionReceipt(txHash, network) {
-  return getWeb3(network).then((web3) => web3.eth.getTransactionReceipt(txHash))
+  return getWeb3(network).then((web3) => wrappedCall(network, web3.eth.getTransactionReceipt.bind(web3), [txHash]))
 }
 
 function call(contractAddress, methodName, params, abi, network) {
   return getWeb3(network).then((web3) => {
     let contract = new web3.eth.Contract(abi, contractAddress)
-    return contract.methods[methodName](...params).call()
-  })
-}
-
-function read(contractAddress, property, params, abi, network) {
-  return getWeb3(network).then((web3) => {
-    let contract = new web3.eth.Contract(abi, contractAddress)
-    return contract.methods[property].call(...params)
+    return wrappedCall(network, contract.methods[methodName](...params).call)
   })
 }
 
 function getBlock(network, blockHashOrBlockNumber) {
   return getWeb3(network).then((web3) => {
-    return web3.eth.getBlock(blockHashOrBlockNumber)
+    return wrappedCall(network, web3.eth.getBlock.bind(web3), [blockHashOrBlockNumber])
   })
 }
 
 function getBlockNumber(network) {
   return getWeb3(network).then((web3) => {
-    return web3.eth.getBlockNumber()
+    return wrappedCall(network, web3.eth.getBlockNumber.bind(web3))
   })
 }
 
 function getPastEvents(network, contractAddress, abi, event, options) {
   return getWeb3(network).then((web3) => {
     let contract = new web3.eth.Contract(abi, contractAddress)
-    return contract.getPastEvents(event, options)
+    return wrappedCall(network, contract.getPastEvents.bind(contract), [event, options])
   })
 }
 
@@ -237,18 +269,17 @@ class Subscribe extends EventEmbitter {
   }
 }
 
-module.exports = {
+export {
   getWeb3,
+  getNetworkId,
   getBlock,
   getBlockNumber,
   getPastEvents,
   getWeb3Sync,
   hashCallOutput,
-  soliditySha3,
   getTransaction,
   getTransactionReceipt,
   call,
-  read,
   subscribeLogEvent,
   getTokenInfo,
   getNftInfo

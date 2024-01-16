@@ -1,6 +1,6 @@
-import BasePlugin from './base/base-plugin'
-import * as NetworkingIpc from '../../networking/ipc'
-import QueueConsumer from '../../common/message-bus/queue-consumer'
+import BasePlugin from './base/base-plugin.js'
+import * as NetworkIpc from '../../network/ipc.js'
+import QueueConsumer from '../../common/message-bus/queue-consumer.js'
 
 export const BROADCAST_CHANNEL = 'core-broadcast';
 
@@ -15,7 +15,7 @@ export type CoreBroadcastMessage = {
   }
 }
 
-export default class BroadcastPlugin extends BasePlugin {
+export default class CoreBroadcastPlugin extends BasePlugin {
   /**
    * @type {QueueConsumer}
    */
@@ -33,18 +33,23 @@ export default class BroadcastPlugin extends BasePlugin {
     if(!channel)
       throw "broadcast channel not defined";
 
-    if(this.listenerCount(`${channel}`) > 0){
+    // if(this.listenerCount(`${channel}`) > 0){
+      // @ts-ignore
       return await this.emit(channel, message, callerInfo);
-    }
-    else {
-      throw {message: `broadcast channel "${channel}" is not handled`}
-    }
+    // }
+    // else {
+    //   console.error({message: `core.Broadcast.onBroadcastReceived: broadcast channel "${channel}" is not handled`})
+    // }
+  }
+
+  async subscribe(channel) {
+    await NetworkIpc.subscribeToBroadcastChannel(channel);
   }
 
   async broadcastToChannel(channel, message) {
     if(channel===undefined || message===undefined)
       throw {message: "Broadcast channel/message must be defined"}
-    let response = await NetworkingIpc.broadcastToChannel(channel, message);
+    let response = await NetworkIpc.broadcastToChannel(channel, message);
     // TODO: is need to check response is 'Ok' or not?
   }
 }

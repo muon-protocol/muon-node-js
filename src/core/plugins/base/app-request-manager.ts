@@ -6,8 +6,9 @@
  *
  */
 
-import TimeoutPromise from '../../../common/timeout-promise'
-const NodeCache = require('node-cache');
+import TimeoutPromise from '../../../common/timeout-promise.js'
+import NodeCache from 'node-cache'
+import {MapOf} from "../../../common/mpc/types";
 
 const requestCache = new NodeCache({
   /**
@@ -24,12 +25,21 @@ const requestCache = new NodeCache({
   useClones: false,
 });
 
+type CacheItem = {
+  partnerCount: number,
+  requestTimeout: number,
+  request: object,
+  signatures: MapOf<string>,
+  errors: object,
+  promise: TimeoutPromise,
+}
+
 export default class AppRequestManager{
 
   constructor(){
   }
 
-  getItem(reqId){
+  getItem(reqId): CacheItem | undefined{
     return requestCache.get(reqId.toString());
   }
 
@@ -39,8 +49,8 @@ export default class AppRequestManager{
    * @param options.requestTimeout
    */
   addRequest(req, options={}){
-    if(!requestCache.has(req.hash)){
-      requestCache.set(req.hash, {
+    if(!requestCache.has(req.reqId)){
+      requestCache.set(req.reqId, {
         /** options can override items above "...options" */
         partnerCount: Infinity,
         requestTimeout: 40000,
@@ -55,62 +65,74 @@ export default class AppRequestManager{
     }
   }
 
-  hasRequest(reqHash){
-    return requestCache.has(reqHash);
+  hasRequest(reqId): boolean{
+    return requestCache.has(reqId);
   }
 
-  setPartnerCount(reqHash, partnerCount) {
-    let item = this.getItem(reqHash);
-    item.partnerCount = partnerCount
+  setPartnerCount(reqId, partnerCount) {
+    let item:CacheItem|undefined = this.getItem(reqId);
+    if(item) {
+      item.partnerCount = partnerCount
+    }
   }
 
-  getRequest(reqHash){
-    return requestCache.get(reqHash).request
+  getRequest(reqId): object | undefined{
+    const item: CacheItem | undefined = requestCache.get(reqId)
+    return !!item ? item.request : undefined
   }
 
-  addSignature(reqHash, owner, sign){
-    let item = this.getItem(reqHash);
-    if(item.signatures[owner] === undefined){
+  addSignature(reqId: string, owner: string, sign: string){
+    let item: CacheItem | undefined = this.getItem(reqId);
+    if(item && item.signatures[owner] === undefined){
       item.signatures[owner] = sign
-      if(this.isRequestFullFilled(reqHash)){
+      if(this.isRequestFullFilled(reqId)){
         if(item.promise)
           item.promise.resolve(item.signatures)
       }
     }
   }
 
-  addError(reqHash, owner, error) {
-    // console.log('AppRequestManager.addError: request error', reqHash, owner, error);
-    let item = this.getItem(reqHash);
-    if(item.errors[owner] === undefined){
+  addError(reqId, owner, error) {
+    // console.log('AppRequestManager.addError: request error', reqId, owner, error);
+    let item: CacheItem | undefined = this.getItem(reqId);
+    if(item && item.errors[owner] === undefined){
       item.errors[owner] = error
-      if(this.isRequestFailed(reqHash)){
-        const req = this.getRequest(reqHash);
+      if(this.isRequestFailed(reqId)){
+        const req = this.getRequest(reqId)!;
         if(item.promise)
           item.promise.reject({
             message: "Request failed to confirm.",
             data: {
               app: {
+                // @ts-ignore
                 name: req.app,
+                // @ts-ignore
                 method: req.method,
+                // @ts-ignore
                 params: req.data.params,
               },
-              responses: item.signatures,
-              errors: item.errors
+              responses: Object.values(item.signatures),
+              errors: Object.values(item.errors)
             }
           })
       }
     }
   }
 
-  isRequestFullFilled(reqHash){
-    let item = this.getItem(reqHash);
+  isRequestFullFilled(reqId){
+    let item: CacheItem|undefined = this.getItem(reqId);
+    if(!item)
+      return false
+    // @ts-ignore
     let {request: {nSign}, signatures: sigs} = item
     return !!sigs && Object.keys(sigs).length >= nSign;
   }
 
-  isRequestFailed(reqHash){
-    let item = this.getItem(reqHash);
+  isRequestFailed(reqId){
+    let item: CacheItem | undefined = this.getItem(reqId);
+    if(!item)
+      return false
+    // @ts-ignore
     let {request: {nSign}, errors, signatures} = item
     const signCount = Object.keys(signatures).length
     const needMoreSignature = nSign - signCount;
@@ -120,12 +142,13 @@ export default class AppRequestManager{
     return remainingPartners < needMoreSignature || failedCount >= 2;
   }
 
-  onRequestSignFullFilled(reqHash){
-    let item = this.getItem(reqHash);
+  onRequestSignFullFilled(reqId): Promise<MapOf<string>>{
+    let item = this.getItem(reqId);
     if(!item)
       return Promise.reject({message: "RequestManager: request not added to RequestManager"})
 
     let {request, signatures} = item;
+    // @ts-ignore
     if(signatures && Object.keys(signatures).length >= request.nSign){
       return Promise.resolve(signatures)
     }

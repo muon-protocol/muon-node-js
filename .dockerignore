@@ -1,8 +1,7 @@
 node_modules
-dev-chain
+devnet
 npm-debug.log
 .idea
-**/.env
 
 config/*
 !config/global/

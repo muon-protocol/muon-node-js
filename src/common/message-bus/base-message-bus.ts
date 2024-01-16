@@ -1,9 +1,11 @@
 import { createClient, RedisClient } from 'redis'
-import redisConfig from './redis-config'
-const Events = require('events-async')
-const {newCallId} = require('../../utils/helpers')
+import redisConfig from '../redis-config.js'
+import Events from 'events-async'
+import {uuid} from '../../utils/helpers.js'
+import {MessageBusConfigs} from "./types";
 
 export default class BaseMessageBus extends Events{
+  readonly configs: MessageBusConfigs;
   /**
    * @type {String} - Bus name for transferring message between processes
    */
@@ -17,12 +19,28 @@ export default class BaseMessageBus extends Events{
    */
   receiveRedis: RedisClient;
 
-  constructor(busName: string) {
+  constructor(busName: string, configs:MessageBusConfigs={}) {
     super();
     this.busName = busName
 
-    this.sendRedis = this.createRedisClient();
-    this.receiveRedis = this.createRedisClient();
+    this.configs = {
+      ...redisConfig,
+      ...configs
+    }
+
+    const sendRedis = this.createRedisClient();
+    const receiveRedis = this.createRedisClient();
+
+    sendRedis.on("error", function(error) {
+      console.error(`BaseMessageBus.sendRedis[${busName}] error`, error);
+    });
+
+    receiveRedis.on("error", function(error) {
+      console.error(`BaseMessageBus.receiveRedis[${busName}] error`, error);
+    });
+
+    this.sendRedis = sendRedis
+    this.receiveRedis = receiveRedis
   }
 
   get channelPrefix() {
@@ -38,7 +56,7 @@ export default class BaseMessageBus extends Events{
   }
 
   wrapData(data: any, mix?: object) {
-    return {pid: process.pid, uid: newCallId(), data, ...mix};
+    return {pid: process.pid, uid: uuid(), data, ...mix};
   }
 
   createRedisClient() {
