@@ -56,7 +56,7 @@ export const MuonSignatureSchema = {
   type: "object",
   properties: {
     owner: {customType: "ethAddress"},
-    ownerPublicKey: {
+    ownerPubKey: {
       x: {customType: "uint256"},
       yParity: {
         enum: ['0', '1']
@@ -67,7 +67,7 @@ export const MuonSignatureSchema = {
       items: {customType: "uint256"}
     },
   },
-  required: ["owner", "ownerPublicKey", "signatures"]
+  required: ["owner", "ownerPubKey", "signatures"]
 }
 
 export const AppRequestSchema = {
