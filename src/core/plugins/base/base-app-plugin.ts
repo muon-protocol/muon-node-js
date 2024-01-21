@@ -13,7 +13,7 @@ import AppTssKey from "../../../utils/tss/app-tss-key.js";
 import KeyManager from "../key-manager.js";
 import AppManager from "../app-manager.js";
 import NodeManagerPlugin from "../node-manager.js";
-import {AppContext, AppRequest, MuonNodeInfo, Party} from "../../../common/types";
+import {AppContext, AppRequest, MuonNodeInfo, MuonSignature, Party, TypedValue} from "../../../common/types";
 import {useOneTime} from "../../../utils/tss/use-one-time.js";
 import chalk from 'chalk'
 import {logger} from '@libp2p/logger'
@@ -315,8 +315,7 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`calling signParams ...`)
       const appSignParams = this.signParams(newRequest, result)
       this.log(`calling signParams done successfully.`)
-      const resultHashWithoutSecurityParams = this.hashAppSignParams(newRequest, appSignParams, false);
-      newRequest.reqId = this.calculateRequestId(newRequest, resultHashWithoutSecurityParams)
+      newRequest.reqId = this.calculateRequestId(newRequest, result)
       newRequest.data.signParams = this.appendSecurityParams(newRequest, appSignParams)
       resultHash = this.hashAppSignParams(newRequest, appSignParams)
       newRequest.data.resultHash = resultHash;
@@ -653,7 +652,21 @@ class BaseAppPlugin extends CallablePlugin {
       throw `Error when informing request confirmation.`
   }
 
-  calculateRequestId(request, resultHash) {
+  calculateRequestId(request, appResult: any) {
+    let signParams:TypedValue[]=[], resultHash:string;
+    try {
+      signParams = this.signParams(request, appResult);
+      resultHash =  muonSha3(...signParams)
+    }
+    catch (e) {
+      const {message, ...otherProps} = e;
+      throw {
+        message: `Failed to hash signParams: ${e.message}`,
+        ...otherProps,
+        appResult,
+        signParams,
+      }
+    }
     return muonSha3(
       {type: "address", value: request.gwAddress},
       {type: "uint256", value: muonSha3(request.data.uid)},
@@ -743,12 +756,26 @@ class BaseAppPlugin extends CallablePlugin {
     return this.memoryPlugin.readLocalMem(this.APP_ID, key);
   }
 
+  async deleteLocalMem(key: string) {
+    return this.memoryPlugin.deleteLocalMemory(this.APP_ID, key);
+  }
+
   async writeGlobalMem(key: string, value: string, ttl:number=0) {
     return this.memoryPlugin.writeGlobalMem(this.APP_ID, key, value, ttl);
   }
 
   async readGlobalMem(key: string): Promise<{owner: string, value: string}|null> {
     return this.memoryPlugin.readGlobalMem(this.APP_ID, key);
+  }
+
+  async deleteGlobalMem(key: string, request: AppRequest) {
+    const verified = await this.verifyCompletedRequest(request);
+    if(verified) {
+      return this.memoryPlugin.deleteGlobalMemory(this.APP_ID, request);
+    }
+    else {
+      throw `Global memory delete is not confirmed.`
+    }
   }
 
   async isOtherNodesConfirmed(newRequest: AppRequest) {
@@ -1148,8 +1175,7 @@ class BaseAppPlugin extends CallablePlugin {
     this.resultChecking(result)
 
     const appSignParams = this.signParams(request, result)
-    const resultHashWithoutSecurityParams = this.hashAppSignParams(request, appSignParams, false)
-    let reqId = this.calculateRequestId(request, resultHashWithoutSecurityParams);
+    let reqId = this.calculateRequestId(request, result);
 
     let hash1 = this.hashAppSignParams(request, request.data.signParams, false)
     let hash2 = this.hashAppSignParams(request, appSignParams)

@@ -6,7 +6,7 @@ import redisConfig from '../../common/redis-config.js'
 import { promisify } from "util"
 import Web3 from 'web3'
 import { remoteMethod } from '../../network/plugins/base/app-decorators.js'
-import { MuonNodeInfo, PartyInfo } from '../../common/types.js'
+import { AppRequest, MuonNodeInfo, PartyInfo } from '../../common/types.js'
 import NodeManagerPlugin from "./node-manager.js";
 import AppManager from './app-manager.js'
 import {Mutex} from "../../common/mutex.js";
@@ -45,6 +45,7 @@ const RemoteMethods = {
   PrepareGlobalWrite: "prepare-global-write",
   FinalizeGlobalWrite: "finalize-global-write",
   GlobalRead: "global-read",
+  DeleteGlobal: "delete-global",
 }
 
 @remoteApp
@@ -55,6 +56,7 @@ class MemoryPlugin extends CallablePlugin {
   private redisClient: RedisClient;
   private redisSet: (...args)=>Promise<any>;
   private redisGet: (key: string)=>Promise<any>;
+  private redisDel: (key: string)=>Promise<any>;
   private redisGetset: (...args)=>Promise<any>;
   private redisExpire: (...args)=>Promise<any>;
   private mutex:Mutex;
@@ -70,6 +72,7 @@ class MemoryPlugin extends CallablePlugin {
 
     this.redisSet = promisify(redisClient.set).bind(redisClient)
     this.redisGet = promisify(redisClient.get).bind(redisClient)
+    this.redisDel = promisify(redisClient.del).bind(redisClient)
     this.redisGetset = promisify(redisClient.getset).bind(redisClient)
     this.redisExpire = promisify(redisClient.expire).bind(redisClient)
 
@@ -119,7 +122,7 @@ class MemoryPlugin extends CallablePlugin {
   }
 
   async readMem(appId: string, key: string, type:MemWriteType): Promise<MemWrite|null> {
-    return this.redisGet(this.getCacheKey(appId, key))
+    return this.redisGet(this.getCacheKey(appId, key, type))
       .then(strData => {
         try {
           const data:MemWrite = JSON.parse(strData)
@@ -133,8 +136,12 @@ class MemoryPlugin extends CallablePlugin {
       })
   }
 
-  getCacheKey(appId: string, key: string): string {
-    return `${this.keyPrefix}-${appId}-${key}`
+  async deleteMem(appId: string, key: string, type:MemWriteType): Promise<MemWrite|null> {
+    return this.redisDel(this.getCacheKey(appId, key, type))
+  }
+
+  getCacheKey(appId: string, key: string, type:MemWriteType): string {
+    return `${this.keyPrefix}-${appId}-${type}-${key}`
   }
 
   async readLocalMem(appId: string, key: string): Promise<string|null> {
@@ -142,8 +149,12 @@ class MemoryPlugin extends CallablePlugin {
     return memWrire ? memWrire.value : null;
   }
 
+  async deleteLocalMemory(appId: string, key:string) {
+    return this.deleteMem(appId, key, "local");
+  }
+
   private async storeMemWrite(appId: string, memWrite: MemWrite, options:MemWriteOptions={}){
-    let {timestamp, key, value, ttl} = memWrite;
+    let {timestamp, key, value, type, ttl} = memWrite;
     if(!key)
       throw `MemoryPlugin.storeMemWrite ERROR: key not defined in MemWrite.`
     if(typeof value !== "string")
@@ -153,20 +164,20 @@ class MemoryPlugin extends CallablePlugin {
       ttl -= (getTimestamp() - timestamp)
       const dataToSave = {...memWrite, expireAt};
       if(options.getset){
-        const result = await this.redisGetset(this.getCacheKey(appId, key), JSON.stringify(dataToSave))
-        await this.redisExpire(this.getCacheKey(appId, key), ttl)
+        const result = await this.redisGetset(this.getCacheKey(appId, key, type), JSON.stringify(dataToSave))
+        await this.redisExpire(this.getCacheKey(appId, key, type), ttl)
         return result;
       }
       else {
-        await this.redisSet(this.getCacheKey(appId, key), JSON.stringify(dataToSave), 'EX', ttl)
+        await this.redisSet(this.getCacheKey(appId, key, type), JSON.stringify(dataToSave), 'EX', ttl)
       }
     }
     else {
       if(options.getset) {
-        return await this.redisGetset(this.getCacheKey(appId, key), JSON.stringify(memWrite));
+        return await this.redisGetset(this.getCacheKey(appId, key, type), JSON.stringify(memWrite));
       }
       else {
-        await this.redisSet(this.getCacheKey(appId, key), JSON.stringify(memWrite));
+        await this.redisSet(this.getCacheKey(appId, key, type), JSON.stringify(memWrite));
       }
     }
   }
@@ -279,6 +290,30 @@ class MemoryPlugin extends CallablePlugin {
     return {owner, value};
   }
 
+  async deleteGlobalMemory(appId: string, appRequest:AppRequest) {
+    const deployers:MuonNodeInfo[] = this.nodeManager.filterNodes({isDeployer: true})
+    let responses:string[] = await Promise.all(
+      deployers.map(({peerId, id}) => {
+        return (
+          id === this.currentNodeInfo?.id
+          ?
+          this.__deleteGlobal({appId, appRequest}, this.currentNodeInfo)
+          :
+          this.remoteCall(
+            peerId,
+            RemoteMethods.DeleteGlobal,
+            {appId, appRequest},
+            {timeout: 5000},
+          )
+        )
+        .catch(e => {
+          return e.onRemoteSide ? "error" : "offline";
+        })
+      })
+    )
+    return responses;
+  }
+
   @remoteMethod(RemoteMethods.PrepareGlobalWrite)
   async __prepareGlobalWrite(data: {appId: string, memWrite: MemWrite}, callerInfo: MuonNodeInfo) {
     const {appId, memWrite} = data
@@ -296,7 +331,7 @@ class MemoryPlugin extends CallablePlugin {
     if(!this.currentNodeInfo!.isDeployer)
       throw `Only deployers can store the memory data.`
 
-    const lock = await this.mutex.lock(`mem-write:${this.getCacheKey(appId, memWrite.key)}`);
+    const lock = await this.mutex.lock(`mem-write:${this.getCacheKey(appId, memWrite.key, memWrite.type)}`);
     try {
       let local:MemWrite|null = await this.readMem(appId, memWrite.key, "global");
       if(local) {
@@ -338,7 +373,7 @@ class MemoryPlugin extends CallablePlugin {
         throw `No enough signature to confirm global memory write`;
     }
 
-    const lock = await this.mutex.lock(`mem-write:${this.getCacheKey(appId, memWrite.key)}`);
+    const lock = await this.mutex.lock(`mem-write:${this.getCacheKey(appId, memWrite.key, memWrite.type)}`);
     try {
       let local:MemWrite|null = await this.readMem(appId, memWrite.key, "global");
       if(!local)
@@ -354,6 +389,25 @@ class MemoryPlugin extends CallablePlugin {
     finally {
       await lock.release()
     }
+  }
+
+  @remoteMethod(RemoteMethods.DeleteGlobal)
+  async __deleteGlobal(data: {appId: string, appRequest: AppRequest}, callerInfo: MuonNodeInfo) {
+    let { appId, appRequest } = data;
+    
+    if(appRequest.method !== "delete-global-memory")
+      throw `Invalid deleteing request. method name must be 'delete-global-memory'`;
+
+    let app = this.muon.getAppById(appId)
+    let verified = await app.verifyCompletedRequest(appRequest);
+    if(!verified)
+      throw `Deleting request is not verified.`
+    
+      let {key, message} = appRequest.data.result
+    if(message !== `delete global memory ${key}`)
+      throw `Invalid deleting request result.`
+    
+    return this.deleteMem(appId, key, "global");
   }
 
   @remoteMethod(RemoteMethods.GlobalRead)

@@ -92,7 +92,7 @@ export type TypedValue =
 
 export type MuonSignature = {
     owner: string,
-    ownerPublicKey: {
+    ownerPubKey: {
         x: string,
         yParity: '0' | '1',
     },
