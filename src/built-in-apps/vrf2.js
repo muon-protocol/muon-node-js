@@ -59,7 +59,15 @@ const VRFApp = {
 
         const result = this.randomNumberResult(request)
         const reqId = this.calculateRequestId(request, result);
-        await this.writeGlobalMem(`vrf-lock-${paramsHash}`, JSON.stringify({seed: deploymentSeed, reqId}), LOCK_DURATION);
+        await this.writeGlobalMem(
+          `vrf-lock-${paramsHash}`, 
+          JSON.stringify({
+            seed: deploymentSeed, 
+            reqId,
+            timestamp: Date.now(),
+          }), 
+          LOCK_DURATION
+        );
       }
     }
   },
@@ -113,6 +121,7 @@ const VRFApp = {
           throw `Lock is successfully done for the request ${memData.reqId}`;
         return {
           key: lockKey,
+          value: memory.value,
           message: `delete global memory ${lockKey}`
         }
       }
@@ -144,8 +153,8 @@ const VRFApp = {
         ];
       }
       case "delete-global-memory": {
-        const { key, message } = result;
-        return [key, " ", message]
+        const { key, value, message } = result;
+        return [key, " ", value, " ", message]
       }
 
       default:

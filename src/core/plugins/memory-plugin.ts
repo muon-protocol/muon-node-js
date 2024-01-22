@@ -403,9 +403,13 @@ class MemoryPlugin extends CallablePlugin {
     if(!verified)
       throw `Deleting request is not verified.`
     
-      let {key, message} = appRequest.data.result
+    let {key, value, message} = appRequest.data.result
     if(message !== `delete global memory ${key}`)
       throw `Invalid deleting request result.`
+
+    let memory = await this.readMem(appId, key, "global");
+    if(memory?.value != value) 
+      throw `Global memory value mismatched while deleting.`
     
     return this.deleteMem(appId, key, "global");
   }
