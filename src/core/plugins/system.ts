@@ -387,7 +387,7 @@ class System extends CallablePlugin {
   async validateShareProofs(polynomial: string[], shareProofs: MapOf<string>): Promise<boolean> {
     const netConfigs:NetConfigs = this.netConfigs;
     const threshold = polynomial.length
-    if(Object.keys(shareProofs).length < netConfigs.tss.minShareProof * threshold) {
+    if(Object.keys(shareProofs).length < netConfigs.tss.minShareProof * threshold && threshold > 2) {
       throw `Share proof count is lower than the minimum required count.`
     }
     /** nodes must sign hash of publicKey */
