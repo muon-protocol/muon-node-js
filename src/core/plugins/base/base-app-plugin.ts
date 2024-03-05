@@ -1,7 +1,8 @@
 import CallablePlugin from './callable-plugin.js'
-import {getTimestamp, pub2json} from '../../../utils/helpers.js'
+import {getTimestamp, pub2json, timeout} from '../../../utils/helpers.js'
 import * as crypto from '../../../utils/crypto.js'
 import {muonSha3} from '../../../utils/sha3.js'
+import BN from "bn.js";
 import * as TssModule from '../../../utils/tss/index.js'
 import lodash from 'lodash'
 import AppRequestManager from './app-request-manager.js'
@@ -12,7 +13,7 @@ import AppTssKey from "../../../utils/tss/app-tss-key.js";
 import KeyManager from "../key-manager.js";
 import AppManager from "../app-manager.js";
 import NodeManagerPlugin from "../node-manager.js";
-import {AppContext, AppRequest, MuonNodeInfo, Party} from "../../../common/types";
+import {AppContext, AppRequest, MuonNodeInfo, MuonSignature, Party, TypedValue} from "../../../common/types";
 import {useOneTime} from "../../../utils/tss/use-one-time.js";
 import chalk from 'chalk'
 import {logger} from '@libp2p/logger'
@@ -20,6 +21,7 @@ import {bn2hex} from "../../../utils/tss/utils.js";
 import * as NetworkIpc from "../../../network/ipc.js";
 import {PublicKey} from "../../../utils/tss/types";
 import {RedisCache} from "../../../common/redis-cache.js";
+import Redis from "ioredis";
 import axios from "axios";
 import {GatewayCallParams} from "../../../gateway/types";
 import {splitSignature, stringifySignature} from "../../../utils/tss/index.js";
@@ -31,6 +33,11 @@ import {AppRequestSchema} from "../../../common/ajv-schemas.js";
 import Web3 from 'web3'
 import { MapOf } from '../../../common/mpc/types.js'
 import { DEPLOYMENT_APP_ID } from '../../../common/contantes.js'
+import { AppNonceBatchJson } from '../../../utils/tss/app-nonce-batch.js'
+import { FrostCommitmentJson, FrostNonce, FrostNonceJson } from '../../../common/mpc/dist-nonce.js';
+import * as NonceStorage from '../../../common/nonce-storage/index.js'
+import * as PromiseLib from "../../../common/promise-libs.js"
+import {toBN} from "../../../utils/helpers.js";
 
 const { omit } = lodash;
 
@@ -41,6 +48,7 @@ const requestConfirmationCache: RedisCache = new RedisCache('req-confirm', 3600)
 const RemoteMethods = {
   AskSignature: 'AskSign',
   InformRequestConfirmation: 'InformReqConfirmation',
+  InitNonce: "init-nonce",
   PartialSignInfo: "partial-sing-info"
 }
 
@@ -74,6 +82,7 @@ class BaseAppPlugin extends CallablePlugin {
   /** initialize when loading */
   isBuiltInApp: boolean
   private log;
+  useFrost: boolean = false;
 
   constructor(muon, configs) {
     super(muon, configs);
@@ -121,6 +130,17 @@ class BaseAppPlugin extends CallablePlugin {
     /** load app party on start */
     await this.appManager.waitToLoad();
     await this.nodeManager.waitToLoad();
+
+    if(this.useFrost) {
+      timeout(20e3 + Math.floor(Math.random()*10e3))
+      .then(() => this.initializeFROST())
+      .catch(e => {})
+
+    }
+  }
+
+  async initializeFROST() {
+    // this.keyManager.nonceGen()
   }
 
   get keyManager(): KeyManager{
@@ -133,6 +153,10 @@ class BaseAppPlugin extends CallablePlugin {
 
   get appManager(): AppManager {
     return this.muon.getPlugin('app-manager');
+  }
+
+  get memoryPlugin(): MemoryPlugin {
+    return this.muon.getPlugin('memory');
   }
 
   async invoke(appName, method, params) {
@@ -291,8 +315,7 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`calling signParams ...`)
       const appSignParams = this.signParams(newRequest, result)
       this.log(`calling signParams done successfully.`)
-      const resultHashWithoutSecurityParams = this.hashAppSignParams(newRequest, appSignParams, false);
-      newRequest.reqId = this.calculateRequestId(newRequest, resultHashWithoutSecurityParams)
+      newRequest.reqId = this.calculateRequestId(newRequest, result)
       newRequest.data.signParams = this.appendSecurityParams(newRequest, appSignParams)
       resultHash = this.hashAppSignParams(newRequest, appSignParams)
       newRequest.data.resultHash = resultHash;
@@ -303,37 +326,32 @@ class BaseAppPlugin extends CallablePlugin {
         newRequest = this.requestManager.getRequest(newRequest.reqId)!;
       }
       else {
-        this.requestManager.addRequest(newRequest, {requestTimeout: this.requestTimeout});
-
-        /** find available partners to sign the request */
-        const availableCount = Math.min(
-          Math.ceil(appParty.t*1.5),
-          appParty.partners.length,
-        );
-        const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
-          this.APP_ID,
-          deploymentSeed,
-          availableCount,
-        );
-
         t1 = Date.now();
-        this.log(`partners:[%o] are available to sign the request`, availablePartners)
-        if(availablePartners.length < appParty.t) {
-          /** send analytic data to server */
-          reportInsufficientPartners({graph, minGraph, count: availableCount})
-            .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
-          throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+        let availablePartners: string[], commitments;
+        if(this.useFrost){
+          commitments = await this.initReqNonce(newRequest);
+          availablePartners = Object.keys(commitments);
+          if(availablePartners.length < appParty.t)
+            throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
         }
+        else
+          availablePartners = await this.findAvailablePartners(newRequest, appParty);
+
+        this.requestManager.addRequest(newRequest, {
+          requestTimeout: this.requestTimeout, 
+          isFrost: this.useFrost,
+          partnerCount: availablePartners.length,
+        });
 
         t2 = Date.now()
         newRequest.data.init = {
           ... newRequest.data.init,
-          ... await this.onFirstNodeRequestSucceed(clone(newRequest), availablePartners)
+          ... await this.onFirstNodeRequestSucceed(clone(newRequest), availablePartners, commitments)
         };
         t3 = Date.now();
 
         let sign: string = await this.makeSignature(newRequest, result, resultHash)
-        this.requestManager.addSignature(newRequest.reqId, process.env.SIGN_WALLET_ADDRESS!, sign);
+        this.requestManager.addSignature(newRequest.reqId, this.currentNodeInfo!.id, sign);
         // new Signature(sign).save()
 
         if(feeParams){
@@ -357,8 +375,13 @@ class BaseAppPlugin extends CallablePlugin {
       this.log(`confirmation done with %s`, confirmed)
       t5 = Date.now()
 
-      let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${newRequest.reqId}`, 15000, {type: "nonce", message: resultHash})
-      this.log(`request signed with %o`, nonce.partners);
+      if(this.useFrost) {
+        this.log(`request signed with %o`, newRequest.data.init.noncePartners);
+      }
+      else {
+        let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${newRequest.reqId}`, 15000, {type: "nonce", message: resultHash})
+        this.log(`request signed with %o`, nonce.partners);
+      }
       this.log('request time parts %o',{
         "req exec time": t1-t0,
         "find online nodes": t2-t1,
@@ -406,6 +429,89 @@ class BaseAppPlugin extends CallablePlugin {
 
       return requestData
     }
+  }
+
+  private async initReqNonce(request: AppRequest): Promise<MapOf<FrostCommitmentJson>> {
+    let {deploymentSeed: seed, reqId} = request;
+    const party = this.getParty(seed)!;
+
+    /** exclude current node */
+    let partners = party.partners.filter(id => id != this.currentNodeInfo!.id);
+    partners = lodash.shuffle(partners).slice(0, Math.ceil(party.t * 1.5));
+    const nodes:MuonNodeInfo[] = this.nodeManager.filterNodes({list: partners});
+
+    let responses:(FrostCommitmentJson|null)[] = await PromiseLib.resolveN(
+      /** exclude current node */
+      party.t-1,
+      nodes.map(n => this.remoteCall(
+          n.peerId,
+          RemoteMethods.InitNonce,
+          {seed, reqId},
+          {timeout: 5000}
+        )
+      ),
+      true,
+    );
+
+    return responses.reduce((obj, r, i) => {
+      if(r)
+        obj[nodes[i].id] = r;
+      return obj
+    }, {
+      /** add current node */
+      [this.currentNodeInfo!.id]: await this.__initNonce({seed, reqId}, this.currentNodeInfo),
+    });
+  }
+
+  private async initFrostNonce(seed: string, reqId): Promise<any> {
+    const redis = new Redis();
+    const lockKey = `frost-nonce-${seed}-start`;
+    let lockVal = await redis.getset(lockKey, "locked")
+    if(lockVal === null) {
+      await redis.expire(lockKey, 60000);
+      this.log(`generating nonce batch for this party ...`);
+      const nonceBatchJson: AppNonceBatchJson = await this.keyManager.nonceGen(
+        {appId: this.APP_ID, seed}, 
+        this.getParty(seed)!.t, 
+        {
+          n: 50, 
+          timeout: 60000
+        }
+      )
+      this.log(`nonce generation done for this party.`);
+      // nonceBatch = AppNonceBatch.fromJson(nonceBatchJson);;
+      
+      redis.del(lockKey).catch(e => {});
+    }
+    else {
+      const t0 = Date.now();
+      while(await redis.get(lockKey)){
+        await timeout(50);
+      }
+    }
+  }
+
+  async findAvailablePartners(newRequest, appParty: Party) {
+    /** find available partners to sign the request */
+    let availableCount = Math.min(
+      Math.ceil(appParty.t*1.5),
+      appParty.partners.length,
+    );
+
+    const {availables: availablePartners, minGraph, graph} = await this.appManager.findOptimalAvailablePartners(
+      appParty.appId,
+      appParty.seed,
+      availableCount,
+    );
+
+    this.log(`partners:[%o] are available to sign the request`, availablePartners)
+    if(availablePartners.length < appParty.t) {
+      /** send analytic data to server */
+      reportInsufficientPartners({graph, minGraph, count: availableCount})
+        .catch(e => this.log.error(`error reporting insufficient partners %o`, e))
+      throw `Insufficient partner to sign the request, needs ${appParty.t} but only ${availablePartners.length} are available`
+    }
+    return availablePartners;
   }
 
   async spendRequestFee(request: AppRequest) {
@@ -546,7 +652,21 @@ class BaseAppPlugin extends CallablePlugin {
       throw `Error when informing request confirmation.`
   }
 
-  calculateRequestId(request, resultHash) {
+  calculateRequestId(request, appResult: any) {
+    let signParams:TypedValue[]=[], resultHash:string;
+    try {
+      signParams = this.signParams(request, appResult);
+      resultHash =  muonSha3(...signParams)
+    }
+    catch (e) {
+      const {message, ...otherProps} = e;
+      throw {
+        message: `Failed to hash signParams: ${e.message}`,
+        ...otherProps,
+        appResult,
+        signParams,
+      }
+    }
     return muonSha3(
       {type: "address", value: request.gwAddress},
       {type: "uint256", value: muonSha3(request.data.uid)},
@@ -557,8 +677,21 @@ class BaseAppPlugin extends CallablePlugin {
     );
   }
 
-  async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[]) {
-    const seed = request.deploymentSeed;
+  private async getNextNonce(seed: string, reqId: string): Promise<string> {
+    while (true) {
+      let nonceIndex = await NonceStorage.pickIndex({
+        seed, 
+        owner: this.currentNodeInfo!.id
+      });
+      if (nonceIndex != null) {
+        return nonceIndex;
+      }
+      await this.initFrostNonce(seed, reqId);
+    }
+  }
+
+  async onFirstNodeRequestSucceed(request: AppRequest, availablePartners: string[], commitmentsJson:MapOf<FrostCommitmentJson>) {
+    const {appId, deploymentSeed: seed, data: {resultHash}} = request;
 
     if(!this.getTss(seed)){
       throw {message: 'App tss is not initialized', seed};
@@ -569,50 +702,113 @@ class BaseAppPlugin extends CallablePlugin {
       throw {message: 'App party is not generated'}
 
     let nonceParticipantsCount = Math.ceil(party.t * 1.2)
-    this.log(`generating nonce with ${Math.min(nonceParticipantsCount, availablePartners.length)} partners.`)
-    let nonce = await this.keyManager.keyGen({appId: this.APP_ID, seed}, {
-      id: `nonce-${request.reqId}`,
-      partners: availablePartners,
-      maxPartners: nonceParticipantsCount,
-      usage: {type: "nonce", message: request.data.resultHash},
-    })
-    this.log(`nonce generation has ben completed with address %s.`, TssModule.pub2addr(nonce.publicKey))
+    if(this.useFrost) {
+      // const commitmentsJson = await NonceStorage.getCommitment({
+      //   seed, 
+      //   owner: this.currentNodeInfo!.id, 
+      //   index: nonceIndex!
+      // });
 
-    // let sign = this.keyManager.sign(null, party);
-    return {
-      nonceAddress: TssModule.pub2addr(nonce.publicKey),
+      const key: AppTssKey = this.getTss(seed)!;
+
+      const {R} = TssModule.frostSignInit(
+        resultHash, 
+        key.publicKey,
+        availablePartners, 
+        Object.entries(commitmentsJson).reduce((obj, [id, {D, E}]) => {
+          obj[id] = {
+            D: TssModule.keyFromPublic(D),
+            E: TssModule.keyFromPublic(E),
+          }
+          return obj;
+        }, {}),
+      )
+
+      return {
+        // nonceBatchId: nonceBatch.id,
+        // nonceIndex: nonceIndex,
+        noncePartners: availablePartners,
+        commitments: commitmentsJson,
+        nonceAddress: TssModule.pub2addr(R),
+      }
+    }
+    else {
+      this.log(`generating nonce with ${Math.min(nonceParticipantsCount, availablePartners.length)} partners.`)
+      let nonce = await this.keyManager.keyGen({appId: this.APP_ID, seed}, {
+        id: `nonce-${request.reqId}`,
+        partners: availablePartners,
+        maxPartners: nonceParticipantsCount,
+        usage: {type: "nonce", message: request.data.resultHash},
+      })
+      this.log(`nonce generation has ben completed with address %s.`, TssModule.pub2addr(nonce.publicKey))
+
+      return {
+        nonceAddress: TssModule.pub2addr(nonce.publicKey),
+      }
     }
   }
 
-  async writeLocalMem(key, data, ttl=0, options:MemWriteOptions) {
-    const memory: MemoryPlugin = this.muon.getPlugin('memory')
-    return await memory.writeLocalMem(`${this.APP_ID}-${key}`, data, ttl, options)
+  async writeLocalMem(key: string, value: string, ttl=0, options:MemWriteOptions) {
+    return this.memoryPlugin.writeLocalMem(this.APP_ID, key, value, ttl, options)
   }
 
-  async readLocalMem(key) {
-    const memory: MemoryPlugin = this.muon.getPlugin('memory')
-    return await memory.readLocalMem(`${this.APP_ID}-${key}`);
+  async readLocalMem(key: string): Promise<string|null> {
+    return this.memoryPlugin.readLocalMem(this.APP_ID, key);
+  }
+
+  async deleteLocalMem(key: string) {
+    return this.memoryPlugin.deleteLocalMemory(this.APP_ID, key);
+  }
+
+  async writeGlobalMem(key: string, value: string, ttl:number=0) {
+    return this.memoryPlugin.writeGlobalMem(this.APP_ID, key, value, ttl);
+  }
+
+  async readGlobalMem(key: string): Promise<{owner: string, value: string}|null> {
+    return this.memoryPlugin.readGlobalMem(this.APP_ID, key);
+  }
+
+  async deleteGlobalMem(key: string, request: AppRequest) {
+    const verified = await this.verifyCompletedRequest(request);
+    if(verified) {
+      return this.memoryPlugin.deleteGlobalMemory(this.APP_ID, request);
+    }
+    else {
+      throw `Global memory delete is not confirmed.`
+    }
   }
 
   async isOtherNodesConfirmed(newRequest: AppRequest) {
-    let signers = {}
-
+    let {
+      appId, 
+      deploymentSeed: seed, 
+      data:{init}
+    } = newRequest;
     let party = this.getParty(newRequest.deploymentSeed)
     let verifyingPubKey = this.getTss(newRequest.deploymentSeed)?.publicKey!
 
-    signers = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
-
-    let owners = Object.keys(signers)
-    let allSignatures = owners.map(w => signers[w]);
-
-    let schnorrSigns = allSignatures.map(signature => splitSignature(signature))
-
-    const ownersIndex = owners.map(wallet => this.nodeManager.getNodeInfo(wallet)!.id);
-    let aggregatedSign = TssModule.schnorrAggregateSigs(party!.t, schnorrSigns, ownersIndex)
+    const signatures: MapOf<string> = await this.requestManager.onRequestSignFullFilled(newRequest.reqId)
     let resultHash = this.hashAppSignParams(newRequest, newRequest.data.signParams, false)
 
-    // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
-    let confirmed = TssModule.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
+    let aggregatedSign, confirmed;
+    if(this.useFrost) {
+      let allSignatures = init.noncePartners.map(id => signatures[id]);
+
+      let frostSigns = allSignatures.map(signature => {
+        return splitSignature(signature) as {R: PublicKey, s: BN};
+      })
+      aggregatedSign = TssModule.frostAggregateSigs(frostSigns);
+      confirmed = TssModule.frostVerify(aggregatedSign, verifyingPubKey, resultHash)
+    } 
+    else{
+      let owners = Object.keys(signatures);
+      let allSignatures = owners.map(w => signatures[w]);
+      let schnorrSigns = allSignatures.map(signature => splitSignature(signature))
+      aggregatedSign = TssModule.schnorrAggregateSigs(party!.t, schnorrSigns, owners)
+      // TODO: check more combination of signatures. some time one combination not verified bot other combination does.
+      confirmed = TssModule.schnorrVerify(verifyingPubKey, resultHash, aggregatedSign)
+    } 
+
     // TODO: check and detect nodes misbehavior if request not confirmed
 
     return [
@@ -620,25 +816,16 @@ class BaseAppPlugin extends CallablePlugin {
       confirmed ? [{
         owner: TssModule.pub2addr(verifyingPubKey),
         ownerPubKey: pub2json(verifyingPubKey, true),
-        // signers: signersIndices,
-        signature: bn2hex(aggregatedSign.s),
-        // sign: {
-        //   s: `0x${aggregatedSign.s.toString(16)}`,
-        //   e: `0x${aggregatedSign.e.toString(16)}`
-        // },
+        signature: bn2hex(aggregatedSign.s)
       }] : []
     ]
   }
 
   async recoverSignature(request: AppRequest, owner: string, signature: string) {
     let tt0 = Date.now();
-    const appTssKey = this.getTss(request.deploymentSeed)!
-    // TODO: need to recheck
-    // if(owner !== TssModule.pub2addr(pubKey)) {
-    //   console.log({owner, pubKeyStr,})
-    //   throw {message: 'Sign recovery error: invalid pubKey address'}
-    // }
+    const appTssKey = this.getTss(request.deploymentSeed)!;
 
+    // @ts-ignore
     let {s, e} = splitSignature(signature)
     //
     let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})
@@ -658,17 +845,41 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async verifyPartialSignature(request: AppRequest, owner:MuonNodeInfo, signature: string): Promise<boolean> {
-    const appTssKey = this.getTss(request.deploymentSeed)!
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})
+    const {appId, deploymentSeed: seed, data: {resultHash, init}} = request;
+    const {useFrost} = this;
 
-    return TssModule.schnorrVerifyPartial(
-      appTssKey.getPubKey(owner.id),
-      appTssKey.publicKey,
-      nonce.getPubKey(owner.id),
-      nonce.publicKey,
-      request.data.resultHash,
-      signature,
-    );
+    const appTssKey = this.getTss(seed)!
+
+    if(useFrost) {
+      const {nonceIndex, noncePartners, } = init;
+      return TssModule.frostVerifyPartial(
+        TssModule.splitSignature(signature) as TssModule.FrostSign,
+        appTssKey.publicKey,
+        appTssKey.getPubKey(owner.id),
+        noncePartners,
+        noncePartners.findIndex(id => id === owner.id),
+        Object.entries(init.commitments as MapOf<FrostCommitmentJson>).reduce((obj, [id, {D, E}]) => {
+          obj[id] = {
+            D: TssModule.keyFromPublic(D),
+            E: TssModule.keyFromPublic(E),
+          }
+          return obj;
+        }, {}),
+        resultHash,
+      );
+    }
+    else {
+      let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, undefined, {type: "nonce", message: request.data.resultHash})
+
+      return TssModule.schnorrVerifyPartial(
+        appTssKey.getPubKey(owner.id),
+        appTssKey.publicKey,
+        nonce.getPubKey(owner.id),
+        nonce.publicKey,
+        request.data.resultHash,
+        signature,
+      );
+    }
   }
 
   async verify(deploymentSeed: string, hash: string, signature: string, nonceAddress: string): Promise<boolean> {
@@ -685,26 +896,32 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async broadcastNewRequest(request: AppRequest) {
-    let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, 15000, {type: "nonce", message: request.data.resultHash})
-    let party = this.getParty(request.deploymentSeed);
+    const {appId, deploymentSeed: seed, data: {init}} = request;
+    let party = this.getParty(seed);
     if(!party)
       throw {message: `${this.ConstructorName}.broadcastNewRequest: app party has not value.`}
-    let partners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: party.partners})
-      .filter((op: MuonNodeInfo) => {
-        return op.wallet !== process.env.SIGN_WALLET_ADDRESS && nonce.partners.includes(op.id)
-      })
 
-    this.requestManager.setPartnerCount(request.reqId, partners.length + 1);
+    let sidePartners: MuonNodeInfo[] = this.nodeManager.filterNodes({list: party.partners, excludeSelf: true});
+    let taskId: string;
+    if(this.useFrost) {
+      sidePartners = sidePartners.filter((op: MuonNodeInfo) => init.noncePartners.includes(op.id))
+    }
+    else {
+      let nonce: AppTssKey = await this.keyManager.getSharedKey(`nonce-${request.reqId}`, 15000, {type: "nonce", message: request.data.resultHash})
+      sidePartners = sidePartners.filter((op: MuonNodeInfo) => nonce.partners.includes(op.id))
+      taskId = `keygen-${nonce.id}`
+    }
 
+    this.requestManager.setPartnerCount(request.reqId, sidePartners.length + 1);
     // TODO: remove async
-    partners.map(async node => {
+    sidePartners.map(async node => {
       return this.remoteCall(
           node.peerId,
           RemoteMethods.AskSignature,
           request,
           {
             timeout: this.REMOTE_CALL_TIMEOUT,
-            taskId: `keygen-${nonce.id}`
+            taskId,
           }
         )
         .then((signResponse: AppSignatureResponse) => this.__onRemoteSignTheRequest({reqId: request.reqId, ...signResponse}, null, node))
@@ -744,6 +961,13 @@ class BaseAppPlugin extends CallablePlugin {
   }
 
   async makeSignature(request: AppRequest, result: any, resultHash): Promise<string> {
+    if(this.useFrost)
+      return this.makeFrostSignature(request, result, resultHash);
+    else
+      return this.makeOldSignature(request, result, resultHash);
+  }
+
+  async makeOldSignature(request: AppRequest, result: any, resultHash): Promise<string> {
     let {reqId} = request;
     let nonce: AppTssKey = await this.keyManager.getSharedKey(
       `nonce-${reqId}`,
@@ -770,6 +994,60 @@ class BaseAppPlugin extends CallablePlugin {
     await useOneTime("key", K.encode('hex', true), `app-${this.APP_ID}-nonce-${resultHash}`, 3600)
     // TODO: remove nonce after sign
     let signature = TssModule.schnorrSign(tssKey.share!, tssKey.publicKey, k_i!, K, resultHash)
+
+    if(!process.env.SIGN_WALLET_ADDRESS){
+      throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
+    }
+
+    return stringifySignature(signature);
+  }
+
+  async makeFrostSignature(request: AppRequest, result: any, resultHash): Promise<string> {
+    let {
+      reqId,
+      appId, 
+      deploymentSeed: seed,
+      gwAddress,
+      data:{
+        init: {nonceIndex, noncePartners, commitments}
+      }
+    } = request;
+    // let tssKey = this.isBuiltInApp ? this.keyManager.tssKey : this.keyManager.getAppTssKey(this.APP_ID);
+    let tssKey: AppTssKey = this.getTss(request.deploymentSeed)!;
+    if(!tssKey)
+      throw `App TSS key not found`;
+    /** Storing the TSS key usage for ever. */
+    await useOneTime("key", tssKey.publicKey!.encode('hex', true), `app-${this.APP_ID}-tss`)
+
+    const owner = this.nodeManager.getNodeInfo(gwAddress)!.id
+
+    // let nonceJson: FrostNonceJson|undefined = await NonceStorage.getNonce({seed, owner, index: nonceIndex});
+    let nonce: FrostNonce = await this.keyManager.getFrostNonce(reqId);
+    /**
+     Storing the nonce usage for an hour.
+     Each nonce will remain in the memory for 30 minutes. Therefore one hour is reasonable for keeping usage history.
+     */
+    // await useOneTime("key", K.encode('hex', true), `app-${this.APP_ID}-nonce-${resultHash}`, 3600)
+    // TODO: remove nonce after sign
+    commitments = Object.entries(commitments as MapOf<FrostCommitmentJson>).reduce((obj, [id, {D, E}]) => {
+      obj[id] = {
+        D: TssModule.keyFromPublic(D),
+        E: TssModule.keyFromPublic(E),
+      };
+      return obj;
+    }, {})
+    let signature = TssModule.frostSign(
+      resultHash,
+      {share: tssKey.share, pubKey: tssKey.publicKey},
+      // {
+      //   d: toBN(nonceJson.d),
+      //   e: toBN(nonceJson.e),
+      // },
+      nonce,
+      noncePartners,
+      noncePartners.findIndex(id => this.currentNodeInfo?.id===id),
+      commitments,
+    )
 
     if(!process.env.SIGN_WALLET_ADDRESS){
       throw {message: "process.env.SIGN_WALLET_ADDRESS is not defined"}
@@ -818,7 +1096,7 @@ class BaseAppPlugin extends CallablePlugin {
       let {request: reqId, ...otherParts} = error;
       let request = this.requestManager.getRequest(reqId);
       if(request) {
-        this.requestManager.addError(reqId, remoteNode.wallet, otherParts);
+        this.requestManager.addError(reqId, remoteNode.id, otherParts);
       }
       return;
     }
@@ -834,23 +1112,23 @@ class BaseAppPlugin extends CallablePlugin {
         // let signatureVerified = request.appId === "1" || (await this.verifyPartialSignature(request, remoteNode, sign))
         let signatureVerified = await this.verifyPartialSignature(request, remoteNode, signature)
         if (signatureVerified) {
-          this.requestManager.addSignature(request.reqId, remoteNode.wallet, signature)
+          this.requestManager.addSignature(request.reqId, remoteNode.id, signature)
         }
         else {
           this.log.error('partial signature mismatch %o', {reqId: request.reqId, signature, signer: remoteNode.id})
-          this.requestManager.addError(reqId, remoteNode.wallet, {message: "partial signature mismatch"});
+          this.requestManager.addError(reqId, remoteNode.id, {message: "partial signature mismatch"});
           this.reportPartialMismatch(request, remoteNode, data!)
             .catch(e => this.log(`partial signature mismatch resport error: %s`, e.message));
         }
       }
       else{
         this.log(`Request not found id:${reqId}`);
-        this.requestManager.addError(reqId, remoteNode.wallet, {message: "request not found"});
+        this.requestManager.addError(reqId, remoteNode.id, {message: "request not found"});
       }
     }
     catch (e) {
       this.log.error('onRemoteSignTheRequest', e);
-      this.requestManager.addError(data?.reqId, remoteNode.wallet, {message: e.message});
+      this.requestManager.addError(data?.reqId, remoteNode.id, {message: e.message});
     }
   }
 
@@ -897,8 +1175,7 @@ class BaseAppPlugin extends CallablePlugin {
     this.resultChecking(result)
 
     const appSignParams = this.signParams(request, result)
-    const resultHashWithoutSecurityParams = this.hashAppSignParams(request, appSignParams, false)
-    let reqId = this.calculateRequestId(request, resultHashWithoutSecurityParams);
+    let reqId = this.calculateRequestId(request, result);
 
     let hash1 = this.hashAppSignParams(request, request.data.signParams, false)
     let hash2 = this.hashAppSignParams(request, appSignParams)
@@ -1029,6 +1306,22 @@ class BaseAppPlugin extends CallablePlugin {
     await requestConfirmationCache.set(request.reqId, '1');
 
     return `OK`;
+  }
+
+  @remoteMethod(RemoteMethods.InitNonce)
+  async __initNonce(data: {seed: string, reqId: string}, callerInfo): Promise<FrostCommitmentJson> {
+    let {seed, reqId} = data;
+    const ctx = this.appManager.getSeedContext(seed);
+    if(!ctx)
+      throw `App's constext not found`;
+    if(!this.appManager.appHasTssKey(this.APP_ID, seed))
+      throw `Missing app's long term key.`
+
+    const {D, E} = await this.keyManager.initFrostNonce(reqId);
+    return {
+      D: D.encode("hex", true),
+      E: E.encode("hex", true),
+    }
   }
 
   @remoteMethod(RemoteMethods.PartialSignInfo)

@@ -73,7 +73,7 @@ export default class QueueProducer<MessageType> extends BaseMessageQueue {
           content.message,
           rawResponse
         );
-        content.promise.reject({...error, onRemoteSide: true})
+        content.promise.reject({...error})
       }
     }
     else{

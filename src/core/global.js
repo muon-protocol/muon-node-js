@@ -10,6 +10,8 @@ import { toBaseUnit } from '../utils/crypto.js'
 import { timeout, floatToBN } from '../utils/helpers.js'
 import ethSigUtil from '@metamask/eth-sig-util'
 import {
+  getWeb3 as ethGetWeb3,
+  getTransactionReceipt as ethGetTransactionReceipt,
   getBlock as ethGetBlock,
   getBlockNumber as ethGetBlockNumber,
   getPastEvents as ethGetPastEvents,
@@ -51,6 +53,10 @@ global.MuonAppUtils = {
   ethGetTokenInfo,
   ethGetNftInfo,
   ethHashCallOutput,
+
+  ethGetWeb3,
+  ethGetTransactionReceipt,
+
   toBaseUnit,
   ecRecover,
   recoverTypedSignature: ethSigUtil.recoverTypedSignature,

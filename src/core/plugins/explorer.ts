@@ -1,7 +1,7 @@
 import CallablePlugin from './base/callable-plugin.js'
 import {remoteApp, remoteMethod, gatewayMethod} from './base/app-decorators.js'
-import KeyManager from "./key-manager.js";
-import {AppContext, AppDeploymentStatus, AppRequest, MuonNodeInfo, Override} from "../../common/types";
+import KeyManager, { NonceGenOptions } from "./key-manager.js";
+import {AppContext, AppDeploymentStatus, AppRequest, MuonNodeInfo, Override, Party} from "../../common/types";
 import HealthCheck from "./health-check.js";
 import {GatewayCallParams} from "../../gateway/types";
 import AppManager from "./app-manager.js";
@@ -13,6 +13,7 @@ import {MapOf} from "../../common/mpc/types";
 import {APP_STATUS_DEPLOYED, APP_STATUS_EXPIRED, APP_STATUS_ONBOARDING, APP_STATUS_PENDING} from "../constants.js";
 import {GENESIS_SEED} from "../../common/contantes.js";
 import { getTimestamp } from '../../utils/helpers.js';
+import AppNonceBatch, { AppNonceBatchJson } from '../../utils/tss/app-nonce-batch.js';
 
 const requestConfirmCache: RedisCache = new RedisCache('req-confirm')
 

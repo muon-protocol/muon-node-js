@@ -184,7 +184,7 @@ class System extends CallablePlugin {
     return _.pick(key.toJson(), ["publicKey", "polynomial", "partners"]);
   }
 
-  private async getAvailableNodes(): Promise<MuonNodeInfo[]> {
+  async getAvailableNodes(): Promise<MuonNodeInfo[]> {
     const externalOnlineList = this.muon.configs.net.nodes?.onlineList;
     let availableIds: string[] = [];
 
@@ -194,7 +194,7 @@ class System extends CallablePlugin {
       .reduce((obj, current) => (obj[current]=true, obj), {});
 
     if(externalOnlineList){
-      let response = await axios.get(externalOnlineList).then(({data}) => data);
+      let response = await axios.get(externalOnlineList+`?r=${uuid()}`).then(({data}) => data);
       let availables = response.result.filter(item => {
         /** active nodes that has uptime more than 1 hour */
         // return item.isDeployer || (item.active && item.status_is_ok && parseInt(item.uptime) > 60*60)
@@ -349,15 +349,23 @@ class System extends CallablePlugin {
       throw `App's old context not found.`
 
     const dealers: string[] = newContext.party.partners.filter(id => oldContext.party.partners.includes(id));
-    const readyDealers = await this.appManager.findNAvailablePartners(
-      dealers,
-      dealers.length,
-      {appId, seed: oldContext.seed, return: "id"},
-    );
+    const readyDealers = await this.appManager.findNAvailablePartners({
+      nodes: dealers,
+      count: dealers.length,
+      partyInfo: {appId, seed: oldContext.seed}, 
+      return: "id",
+      resolveAnyway: true,
+    });
     // const generatorId = dealers.filter(id => readyDealers.includes(id))[0];
     const generatorId = _.shuffle(dealers.filter(id => readyDealers.includes(id)))[0];
+    console.log({dealers, readyDealers, generatorId})
     if(!generatorId)
-      throw `key-gen starter node not online`
+      throw {
+        message: `key-gen starter node not online`,
+        dealers, 
+        readyDealers, 
+        generatorId
+      }
 
     const generatorInfo: MuonNodeInfo = this.nodeManager.getNodeInfo(generatorId)!;
 
@@ -379,7 +387,7 @@ class System extends CallablePlugin {
   async validateShareProofs(polynomial: string[], shareProofs: MapOf<string>): Promise<boolean> {
     const netConfigs:NetConfigs = this.netConfigs;
     const threshold = polynomial.length
-    if(Object.keys(shareProofs).length < netConfigs.tss.minShareProof * threshold) {
+    if(Object.keys(shareProofs).length < netConfigs.tss.minShareProof * threshold && threshold > 2) {
       throw `Share proof count is lower than the minimum required count.`
     }
     /** nodes must sign hash of publicKey */

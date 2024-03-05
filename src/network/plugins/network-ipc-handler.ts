@@ -54,14 +54,6 @@ const tasksCache = new NodeCache({
   useClones: false,
 });
 
-const appTimeouts = {}
-async function getAppTimeout(app) {
-  if(appTimeouts[app] === undefined) {
-    appTimeouts[app] = await CoreIpc.getAppTimeout(app);
-  }
-  return appTimeouts[app];
-}
-
 export const IpcMethods = {
   FilterNodes: "filter-nodes",
   GetNetworkConfig: "get-net-conf",
@@ -239,8 +231,7 @@ class NetworkIpcHandler extends CallablePlugin {
 
   @ipcMethod(IpcMethods.ForwardGatewayRequest)
   async __ipcForwardGateWayRequest(data: {requestData: GatewayCallParams, appTimeout: number}) {
-    const timeout = await getAppTimeout(data.requestData.app);
-    return this.__rcForwardGatewayRequest(data.requestData, this.nodeManager.currentNodeInfo, {timeout})
+    return this.__rcForwardGatewayRequest(data.requestData, this.nodeManager.currentNodeInfo, {timeout: 30000})
   }
 
   private async forwardGatewayRequestToOnlinePartner(partners: string[], requestData: GatewayCallParams, timeout?:number) {
@@ -434,13 +425,19 @@ class NetworkIpcHandler extends CallablePlugin {
         return await enqueueAppRequest(requestData)
       }
       else {
-        /** Forward request to the appropriate node. */
-        const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(partners.length/2));
-        /** find an online node that has the app's tss key */
-        const availables: string[] = await CoreIpc.findNAvailablePartners(context.appId, context.seed, candidatePartners, 1);
-        if(availables.length <= 0)
-          throw "The request cannot be forwarded because there is no available partner";
-        return this.forwardGatewayCallToOtherNode(availables[0], requestData, options.timeout);
+        // /** Forward request to the appropriate node. */
+        // const candidatePartners = _.shuffle(partners).slice(0, Math.ceil(partners.length/2));
+        // /** find an online node that has the app's tss key */
+        // const availables: string[] = await CoreIpc.findNAvailablePartners({
+        //   nodes: candidatePartners,
+        //   count: 1,
+        //   partyInfo: {appId:context.appId, seed: context.seed},
+        //   resolveAnyway: true,
+        // });
+        // if(availables.length <= 0)
+        //   throw "The request cannot be forwarded because there is no available partner";
+        // return this.forwardGatewayCallToOtherNode(availables[0], requestData, options.timeout);
+        return this.forwardGatewayCallToOtherNode(_.shuffle(partners)[0], requestData, options.timeout);
       }
     }
     else {

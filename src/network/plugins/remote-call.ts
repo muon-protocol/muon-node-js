@@ -10,6 +10,7 @@ import NodeCache from 'node-cache'
 import {peerId2Str} from "../utils.js";
 import {logger} from '@libp2p/logger'
 import NetworkIpcHandler from "./network-ipc-handler";
+import { MapOf } from '../../common/mpc/types.js';
 
 const log = logger("muon:network:plugins:remote-call")
 
@@ -26,6 +27,8 @@ export type RemoteCallOptions = {
   timeout?: number,
   timeoutMessage?: string,
 }
+
+const lastCallTimes: MapOf<number> = {}
 
 class RemoteCall extends BaseNetworkPlugin {
 
@@ -77,6 +80,7 @@ class RemoteCall extends BaseNetworkPlugin {
       if(!nodeInfo){
         throw {message: `Unrecognized sender`}
       }
+      lastCallTimes[nodeInfo.peerId] = Date.now();
 
       let data = JSON.parse(message)
 
@@ -186,12 +190,14 @@ class RemoteCall extends BaseNetworkPlugin {
 
   call(peer, method: string, params: any, options: RemoteCallOptions={}){
     let exactMethod = this.getCallExactMethod(method, params);
-    log(`Calling peer %s : %s`, peerId2Str(peer.id), exactMethod)
+    const peerIdStr = peerId2Str(peer.id)
+    log(`Calling peer %s : %s`, peerIdStr, exactMethod)
     // TODO: need more check
     if(!peer){
       log.error(`Invalid peerId %s : %s`, peerId2Str(peer.id), exactMethod)
       return Promise.reject({message: `RemoteCall.call: Invalid peerId. method: ${method}`})
     }
+    lastCallTimes[peerIdStr] = Date.now();
     return this.getPeerStream(peer)
       .then(stream => {
         if(!stream) {
@@ -246,6 +252,10 @@ class RemoteCall extends BaseNetworkPlugin {
       }
       return handler(...args)
     })
+  }
+
+  getLastCallTimes():MapOf<number> {
+    return lastCallTimes;
   }
 }
 

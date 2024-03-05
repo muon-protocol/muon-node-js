@@ -1,11 +1,12 @@
 {
+  "networkId": 2,
   "defaultLeader": "1",
   "tss": {
     "threshold": 7,
     "max": 20,
     "defaultTTL": 604800,
     "pendingPeriod": 86400,
-    "minShareProof": 1.2
+    "minShareProof": 1.5
   },
   "nodeManager": {
     "network": "bsc",
@@ -13,7 +14,8 @@
   },
   "connectionManager":{
     "maxConnections": 900,
-    "pruneInterval": 300000
+    "pruneInterval": 300000,
+    "pruneBatchSize": 30
   },
   "routing": {
     "delegate": [
@@ -36,9 +38,9 @@
     "/ip4/3.136.59.242/tcp/9012/p2p/QmeZ5zHPfhrUeYY4D1kzHTS3BPKFrcTxbRrmC3gXsYNVmi"
   ],
   "fee": {
-    "endpoint": "https://fees.muon.net/sign",
+    "endpoint": "https://pion-fees-api.muon.net/sign",
     "signers": [
-      "0x968cB8308E052E9fDce45D1F8a384a9881e829A0"
+      "0x7a99C6c6d401185aa5316D2B38C5e8298319F1fa"
     ]
   },
   "synchronizer": {

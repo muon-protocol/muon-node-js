@@ -30,6 +30,12 @@ export class Mutex {
     this.redlock = redlock;
   }
 
+  /**
+   * 
+   * @param resource {string} - The resource to be locked
+   * @param ttl {number} - Amount of time the resource be locked (in ms)
+   * @returns {Lock} - The resource release handler
+   */
   async lock(resource:string[]|string, ttl:number=1000):Promise<Lock> {
     if(typeof resource === 'string')
       resource = [resource];

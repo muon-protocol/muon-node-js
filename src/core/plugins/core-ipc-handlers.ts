@@ -1,7 +1,7 @@
 import CallablePlugin from "./base/callable-plugin.js"
 import {remoteApp, ipcMethod} from "./base/app-decorators.js"
 import System from "./system.js";
-import AppManager from "./app-manager.js";
+import AppManager, { FindAvailableNodesOptions } from "./app-manager.js";
 import GatewayInterface from "./gateway-Interface.js";
 import BaseAppPlugin from "./base/base-app-plugin.js";
 import {AppContext, AppDeploymentInfo, AppRequest, JsonPublicKey, MuonNodeInfo} from "../../common/types";
@@ -15,7 +15,6 @@ export const IpcMethods = {
   GetAppContext: "get-app-context",
   GetAppOldestContext: "get-app-oldest-context",
   GetAppDeploymentInfo: "get-app-deployment-info",
-  GetAppTimeout: "get-app-timeout",
   QueryAppAllContext: "query-app-all-context",
   IsDeploymentExcerpt: "is-deployment-excerpt",
   EnsureAppTssKeyExist: "ensure-app-tss-key-exist",
@@ -90,18 +89,6 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   /**
-   * Return local app context
-   * @param appName
-   */
-  @ipcMethod(IpcMethods.GetAppTimeout)
-  async __getAppTimeout(appName: string): Promise<number> {
-    const app:BaseAppPlugin = await this.muon.getAppByName(appName)
-    if(!app)
-      return 0;
-    return app.requestTimeout || 0
-  }
-
-  /**
    * If app context not found locally, it's need to query muon network to find it.
    * @param appName
    */
@@ -130,15 +117,8 @@ class CoreIpcHandlers extends CallablePlugin {
   }
 
   @ipcMethod(IpcMethods.FindNAvailablePartners)
-  async __findNAvailablePartners(data: {appId: string, seed: string, searchList: string[], count: number}): Promise<string[]> {
-    return await this.appManager.findNAvailablePartners(
-      data.searchList,
-      data.count,
-      {
-        appId: data.appId,
-        seed: data.seed
-      }
-    )
+  async __findNAvailablePartners(options: FindAvailableNodesOptions): Promise<string[]> {
+    return await this.appManager.findNAvailablePartners(options)
   }
 
   @ipcMethod(IpcMethods.VerifyRequestSignature)
