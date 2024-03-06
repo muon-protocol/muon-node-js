@@ -19,6 +19,7 @@ const oldEnvKeys = {
   1088: "WEB3_PROVIDER_METIS",
   10: "WEB3_PROVIDER_OPTIMISM",
   420: "WEB3_PROVIDER_OPTIMISM_TESTNET",
+  59144: "WEB3_PROVIDER_LINEA"
 }
 
 /**
@@ -185,6 +186,10 @@ const DefaultRpcList = {
   588: [
     "https://stardust.metis.io/?owner=588",
   ],
+
+  59144: [
+    "https://rpc.linea.build"
+  ]
 }
 
 const finalRpcList = Object.entries(DefaultRpcList)
