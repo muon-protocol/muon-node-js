@@ -19,6 +19,10 @@ const oldEnvKeys = {
   1088: "WEB3_PROVIDER_METIS",
   10: "WEB3_PROVIDER_OPTIMISM",
   420: "WEB3_PROVIDER_OPTIMISM_TESTNET",
+
+  11155111: "WEB3_PROVIDER_SEPOLIA",
+  8453: "WEB3_PROVIDER_BASE",
+  81457: "WEB3_PROVIDER_BLAST"
 }
 
 /**
@@ -185,6 +189,22 @@ const DefaultRpcList = {
   588: [
     "https://stardust.metis.io/?owner=588",
   ],
+
+  11155111: [
+    "https://rpc.ankr.com/eth_sepolia",
+    "https://ethereum-sepolia-rpc.publicnode.com"
+  ],
+
+  8453: [
+    "https://rpc.ankr.com/base",
+    "https://base.llamarpc.com"
+  ],
+
+  81457: [
+    "https://rpc.blast.io",
+    "https://blastl2-mainnet.public.blastapi.io",
+    "https://rpc.ankr.com/blast"
+  ]
 }
 
 const finalRpcList = Object.entries(DefaultRpcList)
