@@ -41,6 +41,10 @@ const nameToChainIdMap = {
   metis: 1088, // Metis
   optimism: 10, // Optimism
   optimismTestnet: 420, // Optimism Testnet
+
+  sepolia: 11155111,
+  base: 8453,
+  blast: 81457,
 }
 
 function getNetworkId(network) {
