@@ -19,7 +19,10 @@ const oldEnvKeys = {
   1088: "WEB3_PROVIDER_METIS",
   10: "WEB3_PROVIDER_OPTIMISM",
   420: "WEB3_PROVIDER_OPTIMISM_TESTNET",
-  59144: "WEB3_PROVIDER_LINEA"
+  59144: "WEB3_PROVIDER_LINEA",
+
+  8453: "WEB3_PROVIDER_BASE",
+  81457: "WEB3_PROVIDER_BLAST"
 }
 
 /**
@@ -189,6 +192,19 @@ const DefaultRpcList = {
 
   59144: [
     "https://rpc.linea.build"
+  ],
+
+  8453: [
+    "https://rpc.ankr.com/base",
+    "https://base-rpc.publicnode.com",
+    "https://base.drpc.org"
+  ],
+
+  81457: [
+    "https://blast.gasswap.org",
+    "https://rpc.ankr.com/blast",
+    "https://rpc.blast.io",
+    "https://blastl2-mainnet.public.blastapi.io"    
   ]
 }
 
