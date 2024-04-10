@@ -15,6 +15,7 @@
   "author": "",
   "license": "GPL-3.0",
   "dependencies": {
+    "@btq-js/falcon-js": "^0.0.38",
     "@chainsafe/libp2p-noise": "^13.0.1",
     "@chainsafe/libp2p-yamux": "^5.0.0",
     "@ipld/dag-pb": "^2.1.16",
