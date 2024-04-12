@@ -141,8 +141,8 @@ const DefaultRpcList = {
     "https://rpc.ankr.com/polygon",
     "https://polygon-rpc.com",
     "https://polygon-mainnet.public.blastapi.io",
-    "https://polygon.llamarpc.com",
-    "https://polygon-bor.publicnode.com",
+    //"https://polygon.llamarpc.com",
+    "https://polygon-bor-rpc.publicnode.com",
   ],
 
   /** Polygon MUMBAI testnet */
