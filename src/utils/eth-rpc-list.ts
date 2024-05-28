@@ -22,7 +22,8 @@ const oldEnvKeys = {
   59144: "WEB3_PROVIDER_LINEA",
 
   8453: "WEB3_PROVIDER_BASE",
-  81457: "WEB3_PROVIDER_BLAST"
+  81457: "WEB3_PROVIDER_BLAST",
+  11155111: "WEB3_PROVIDER_SEPOLIA"
 }
 
 /**
@@ -205,6 +206,10 @@ const DefaultRpcList = {
     "https://rpc.ankr.com/blast",
     "https://rpc.blast.io",
     "https://blastl2-mainnet.public.blastapi.io"    
+  ],
+
+  11155111: [
+    "https://rpc.ankr.com/eth_sepolia"
   ]
 }
 
