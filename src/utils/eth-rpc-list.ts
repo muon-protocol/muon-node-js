@@ -196,7 +196,7 @@ const DefaultRpcList = {
   ],
 
   8453: [
-    "https://rpc.ankr.com/base",
+    //"https://rpc.ankr.com/base",
     "https://base-rpc.publicnode.com",
     "https://base.drpc.org"
   ],
