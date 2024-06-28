@@ -127,6 +127,7 @@ const web3ProvidersSpecificErrors = [
   "we can't execute this request",
   "Returned error:",
   "Returned values aren't valid",
+  "EAI_AGAIN"
 ].map(msg => msg.toLowerCase());
 
 function errorNeedRpcRotate(msg) {
