@@ -23,7 +23,10 @@ const oldEnvKeys = {
 
   8453: "WEB3_PROVIDER_BASE",
   81457: "WEB3_PROVIDER_BLAST",
-  11155111: "WEB3_PROVIDER_SEPOLIA"
+  11155111: "WEB3_PROVIDER_SEPOLIA",
+
+  7001: "WEB3_PROVIDER_ZETACHAIN_TESTNET",
+  7000: "WEB3_PROVIDER_ZETACHAIN"
 }
 
 /**
@@ -210,6 +213,14 @@ const DefaultRpcList = {
 
   11155111: [
     "https://rpc.ankr.com/eth_sepolia"
+  ],
+
+  7000: [
+    "https://zetachain-evm.blockpi.network/v1/rpc/public"
+  ],
+
+  7001: [
+    "https://zetachain-athens-evm.blockpi.network/v1/rpc/public"
   ]
 }
 
