@@ -15,13 +15,16 @@ const oldEnvKeys = {
   43113: "WEB3_PROVIDER_AVALANCHE_FUJI_TESTNET",
   43114: "WEB3_PROVIDER_AVALANCHE_MAINNET",
   421611: "WEB3_PROVIDER_ARBITRUM_TESTNET",
+  421614: "WEB3_PROVIDER_ARBITRUM_SEPOLIA",
   42161: "WEB3_PROVIDER_ARBITRUM_MAINNET",
   1088: "WEB3_PROVIDER_METIS",
   10: "WEB3_PROVIDER_OPTIMISM",
   420: "WEB3_PROVIDER_OPTIMISM_TESTNET",
+  11155420: "WEB3_PROVIDER_OPTIMISM_SEPOLIA",
   59144: "WEB3_PROVIDER_LINEA",
 
   8453: "WEB3_PROVIDER_BASE",
+  84532: "WEB3_PROVIDER_BASE_SEPOLIA",
   81457: "WEB3_PROVIDER_BLAST",
   11155111: "WEB3_PROVIDER_SEPOLIA",
 
@@ -99,6 +102,11 @@ const DefaultRpcList = {
     "https://goerli.optimism.io",
     "https://rpc.ankr.com/optimism_testnet",
     "https://optimism-goerli.public.blastapi.io",
+  ],
+
+  11155420: [
+    "https://rpc.ankr.com/optimism_sepolia",
+    "https://sepolia.optimism.io"
   ],
 
   /** BSC testnet */
@@ -184,6 +192,12 @@ const DefaultRpcList = {
     "https://rinkeby.arbitrum.io/rpc",
   ],
 
+  /** Arbitrum sepolia */
+  421614: [
+    "https://rpc.ankr.com/arbitrum_sepolia",
+    "https://sepolia-rollup.arbitrum.io/rpc"
+  ],
+
   /** Metis Andromeda mainnet */
   1088: [
     "https://andromeda.metis.io/?owner=1088",
@@ -202,6 +216,11 @@ const DefaultRpcList = {
     "https://rpc.ankr.com/base",
     //"https://base-rpc.publicnode.com",
     //"https://base.drpc.org"
+  ],
+
+  84532: [
+    "https://rpc.ankr.com/base_sepolia",
+    "https://sepolia.base.org"
   ],
 
   81457: [

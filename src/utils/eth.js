@@ -37,12 +37,15 @@ const nameToChainIdMap = {
   fuji: 43113, // Avalanche Fuji Testnet
   avax: 43114, // Avalanche Mainnet
   arbitrumTestnet: 421611, //Arbitrum Testnet
+  arbitrumSepolia: 421614, //Arbitrum Sepolia
   arbitrum: 42161, // Arbitrum
   metis: 1088, // Metis
   optimism: 10, // Optimism
   optimismTestnet: 420, // Optimism Testnet
+  optimismSepolia: 11155420, // Optimism Sepolia
 
   base: 8453,
+  baseSepolia: 84532,
   blast: 81457,
   linea: 59144,
 
