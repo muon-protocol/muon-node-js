@@ -2,6 +2,7 @@ const {
     lodash,
     muonSha3,
     ecRecover,
+    loadGlobalConfigs
 } = MuonAppUtils
 
 const Methods = {
@@ -10,6 +11,8 @@ const Methods = {
     Deploy: "deploy",
     Reshare: "reshare"
 }
+
+const VALID_DEPLOYERS = loadGlobalConfigs("default.apps.conf.json", "default.apps.conf.json").validDeployers
 
 const NODES_SELECTION_TOLERANCE = 0.07;
 const ROTATION_COEFFICIENT = 1.5;
@@ -163,8 +166,24 @@ module.exports = {
 
     undeploy: async function (params) {
         const {
-            params: {app}
+            params: {app, sign, expireTime}
         } = params
+
+        let hash = muonSha3(
+            {type: 'string', value: app},
+            {type: 'uint64', value: expireTime},
+            {type: 'string', value: "undeploy"}
+        );
+
+        const signer = ecRecover(hash, sign);
+
+        if(!VALID_DEPLOYERS.includes(signer)) {
+            throw `Signature mismatched`;
+        }
+        const now = Math.floor(Date.now() / 1000);
+        if(now > expireTime) {
+            throw `Expired signature`;
+        }
 
         await this.callPlugin("system", "undeployApp", app);
 
@@ -311,6 +330,24 @@ module.exports = {
                     appId,
                     seed: {value: seed, nonce, reqId},
                 } = params
+
+                let hash = muonSha3(
+                    {type: 'uint256', value: appId},
+                    {type: 'uint64', value: params.expireTime},
+                    {type: 'string', value: Methods.Deploy}
+                );
+        
+                const signer = ecRecover(hash, params.sign);
+        
+                if(!VALID_DEPLOYERS.includes(signer)) {
+                    throw `Signature mismatched`;
+                }
+                const now = Math.floor(Date.now() / 1000);
+                console.log(now);
+                if(now > params.expireTime) {
+                    throw `Expired signature`;
+                }
+
                 const context = await this.callPlugin('system', "getAppContext", appId, seed)
                 /** ignore onboarding contexts */
                 if(!!context && !!context.deploymentRequest) {

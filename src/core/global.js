@@ -25,6 +25,7 @@ import { BNSqrt } from'../utils/bn-sqrt.js'
 import BN from "bn.js";
 import {toBN} from "../utils/tss/utils.js";
 import {muonSha3} from "../utils/sha3.js";
+import {loadGlobalConfigs} from "../common/configurations.js";
 
 const { flatten, groupBy } = lodash;
 const web3Instance = new Web3('http://localhost:8545');
@@ -60,5 +61,6 @@ global.MuonAppUtils = {
   toBaseUnit,
   ecRecover,
   recoverTypedSignature: ethSigUtil.recoverTypedSignature,
-  BNSqrt: BNSqrt
+  BNSqrt: BNSqrt,
+  loadGlobalConfigs
 }
