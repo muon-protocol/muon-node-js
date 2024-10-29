@@ -100,13 +100,13 @@ async function deployApp(argv, configs) {
     console.log('deploying ...')
     deploymentSeed = randomSeedResponse.result.signatures[0].signature
 
-    const expireTime = Math.floor(Date.now() / 1000) + 300
-    let hash = muonSha3(
-      {type: 'uint256', value: appId},
-      {type: 'uint64', value: expireTime},
-      {type: 'string', value: "deploy"}
-    )
-    const sign = crypto.signWithPrivateKey(hash, configs.sign_wallet_pk);
+    // const expireTime = Math.floor(Date.now() / 1000) + 300
+    // let hash = muonSha3(
+    //   {type: 'uint256', value: appId},
+    //   {type: 'uint64', value: expireTime},
+    //   {type: 'string', value: "deploy"}
+    // )
+    // const sign = crypto.signWithPrivateKey(hash, configs.sign_wallet_pk);
 
     const deployResponse = await muonCall(configs.url, {
       app: 'deployment',
@@ -123,8 +123,8 @@ async function deployApp(argv, configs) {
         n,
         ttl,
         pendingPeriod: pending,
-        sign,
-        expireTime
+        // sign,
+        // expireTime
       }
     })
     expectConfirmed(deployResponse)

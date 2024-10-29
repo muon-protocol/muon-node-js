@@ -331,22 +331,21 @@ module.exports = {
                     seed: {value: seed, nonce, reqId},
                 } = params
 
-                let hash = muonSha3(
-                    {type: 'uint256', value: appId},
-                    {type: 'uint64', value: params.expireTime},
-                    {type: 'string', value: Methods.Deploy}
-                );
+                // let hash = muonSha3(
+                //     {type: 'uint256', value: appId},
+                //     {type: 'uint64', value: params.expireTime},
+                //     {type: 'string', value: Methods.Deploy}
+                // );
         
-                const signer = ecRecover(hash, params.sign);
+                // const signer = ecRecover(hash, params.sign);
         
-                if(!VALID_DEPLOYERS.includes(signer)) {
-                    throw `Signature mismatched`;
-                }
-                const now = Math.floor(Date.now() / 1000);
-                console.log(now);
-                if(now > params.expireTime) {
-                    throw `Expired signature`;
-                }
+                // if(!VALID_DEPLOYERS.includes(signer)) {
+                //     throw `Signature mismatched`;
+                // }
+                // const now = Math.floor(Date.now() / 1000);
+                // if(now > params.expireTime) {
+                //     throw `Expired signature`;
+                // }
 
                 const context = await this.callPlugin('system', "getAppContext", appId, seed)
                 /** ignore onboarding contexts */
