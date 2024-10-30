@@ -3,6 +3,8 @@ import {muonCall, waitToRequestBeAnnounced} from '../utils.js'
 import {getConfigs} from "./cmd-conf-mod.js";
 import {AppDeploymentStatus} from "../../common/types";
 import {APP_STATUS_EXPIRED, APP_STATUS_PENDING, APP_STATUS_ONBOARDING} from "../../core/constants.js";
+import { muonSha3 } from "../../utils/sha3.js";
+import * as crypto from "../../utils/crypto.js";
 
 function expectConfirmed(response) {
   try {
@@ -97,6 +99,15 @@ async function deployApp(argv, configs) {
 
     console.log('deploying ...')
     deploymentSeed = randomSeedResponse.result.signatures[0].signature
+
+    // const expireTime = Math.floor(Date.now() / 1000) + 300
+    // let hash = muonSha3(
+    //   {type: 'uint256', value: appId},
+    //   {type: 'uint64', value: expireTime},
+    //   {type: 'string', value: "deploy"}
+    // )
+    // const sign = crypto.signWithPrivateKey(hash, configs.sign_wallet_pk);
+
     const deployResponse = await muonCall(configs.url, {
       app: 'deployment',
       method: `deploy`,
@@ -112,6 +123,8 @@ async function deployApp(argv, configs) {
         n,
         ttl,
         pendingPeriod: pending,
+        // sign,
+        // expireTime
       }
     })
     expectConfirmed(deployResponse)
@@ -149,12 +162,22 @@ async function undeployApp(argv, configs) {
   if (!deployers || deployers.length == 0)
     throw `deployers not defined for this network in cmd.conf.json`;
 
+  const expireTime = Math.floor(Date.now() / 1000) + 300
+  let hash = muonSha3(
+    {type: 'string', value: app},
+    {type: 'uint64', value: expireTime},
+    {type: 'string', value: "undeploy"}
+  )
+  const sign = crypto.signWithPrivateKey(hash, configs.sign_wallet_pk);
+
   await Promise.all(deployers.map(url => {
     return muonCall(url, {
       app: 'deployment',
       method: `undeploy`,
       params: {
         app: app,
+        sign,
+        expireTime
       }
     })
     .then(statusResult => {
