@@ -42,6 +42,7 @@ Then node modules can be installed as follows:
     $ npm install
 
 
+
 ## Running a Local Network
 
 A network of local nodes (devnet) can be run and used to develope and test Muon apps or the node.
