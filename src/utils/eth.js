@@ -49,7 +49,8 @@ const nameToChainIdMap = {
   blast: 81457,
   linea: 59144,
 
-  sepolia: 11155111
+  sepolia: 11155111,
+  sonic: 146
 }
 
 function getNetworkId(network) {

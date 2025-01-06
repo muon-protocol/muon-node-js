@@ -29,7 +29,8 @@ const oldEnvKeys = {
   11155111: "WEB3_PROVIDER_SEPOLIA",
 
   7001: "WEB3_PROVIDER_ZETACHAIN_TESTNET",
-  7000: "WEB3_PROVIDER_ZETACHAIN"
+  7000: "WEB3_PROVIDER_ZETACHAIN",
+  146: "WEB3_PROVIDER_SONIC"
 }
 
 /**
@@ -240,6 +241,12 @@ const DefaultRpcList = {
 
   7001: [
     "https://zetachain-athens-evm.blockpi.network/v1/rpc/public"
+  ],
+
+  146: [
+    "https://rpc.soniclabs.com",
+    "https://rpc.ankr.com/sonic_mainnet",
+    "https://sonic.drpc.org"
   ]
 }
 
