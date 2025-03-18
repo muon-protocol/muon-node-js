@@ -138,7 +138,7 @@ const web3ProvidersSpecificErrors = [
 function errorNeedRpcRotate(msg) {
   msg = msg.toLowerCase();
   for(const specificMsg of web3ProvidersSpecificErrors) {
-    if(specificMsg.includes(msg))
+    if(specificMsg.includes(msg) || msg.includes(specificMsg))
       return true;
   }
   return false
