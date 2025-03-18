@@ -88,7 +88,8 @@ const DefaultRpcList = {
     "https://bsc-dataseed2.binance.org",
     "https://bsc-dataseed3.binance.org",
     "https://bsc-dataseed4.binance.org",
-    "https://rpc.ankr.com/bsc",
+    // "https://rpc.ankr.com/bsc",
+    "https://evm-rpcs.jungoai.xyz/56"
   ],
 
   /** Optimism mainnet */
