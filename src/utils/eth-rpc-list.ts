@@ -30,7 +30,9 @@ const oldEnvKeys = {
 
   7001: "WEB3_PROVIDER_ZETACHAIN_TESTNET",
   7000: "WEB3_PROVIDER_ZETACHAIN",
-  146: "WEB3_PROVIDER_SONIC"
+  146: "WEB3_PROVIDER_SONIC",
+
+  6342: "WEB3_PROVIDER_MEGAETH"
 }
 
 /**
@@ -249,6 +251,12 @@ const DefaultRpcList = {
     "https://rpc.soniclabs.com",
     "https://rpc.ankr.com/sonic_mainnet",
     "https://sonic.drpc.org"
+  ],
+
+  // MegaETH testnet
+  6342: [
+    "https://carrot.megaeth.com/rpc",
+    "https://evm-rpcs.jungoai.xyz/6342"
   ]
 }
 
