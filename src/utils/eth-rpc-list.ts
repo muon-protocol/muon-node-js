@@ -216,9 +216,9 @@ const DefaultRpcList = {
   ],
 
   8453: [
-    "https://rpc.ankr.com/base",
-    //"https://base-rpc.publicnode.com",
-    //"https://base.drpc.org"
+    "https://base.llamarpc.com",
+    "https://base.drpc.org",
+    "https://evm-rpcs.jungoai.xyz/8453"
   ],
 
   84532: [
