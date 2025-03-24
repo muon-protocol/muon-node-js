@@ -50,7 +50,8 @@ const nameToChainIdMap = {
   linea: 59144,
 
   sepolia: 11155111,
-  sonic: 146
+  sonic: 146,
+  megaeth: 6342
 }
 
 function getNetworkId(network) {
