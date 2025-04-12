@@ -129,7 +129,8 @@ const DefaultRpcList = {
 
   /**  */
   250: [
-    "https://rpc.ankr.com/fantom",
+    //"https://rpc.ankr.com/fantom",
+    "https://evm-rpcs.jungoai.xyz/250",
     "https://rpcapi.fantom.network",
     "https://fantom-mainnet.public.blastapi.io",
     "https://rpc.fantom.network",
