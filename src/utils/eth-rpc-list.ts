@@ -173,10 +173,14 @@ const DefaultRpcList = {
 
   /** Avalanche mainnet */
   43114: [
-    "https://rpc.ankr.com/avalanche",
+    // "https://rpc.ankr.com/avalanche",
     "https://1rpc.io/avax/c",
+    "https://avalanche.drpc.org",
     "https://avalanche-c-chain.publicnode.com",
-    "https://api.avax.network/ext/bc/C/rpc",
+    // "https://api.avax.network/ext/bc/C/rpc",
+    "https://evm-rpcs.jungoai.xyz/43114",
+
+
   ],
 
   /** Avalanche FUJI testnet */
