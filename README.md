@@ -75,7 +75,6 @@ A Muon app refers to an oracle app that is deployed and runs on the Muon network
 
 To learn more about how to build a Muon app, please refer to the [Muon Development Documentation](https://dev.muon.net/).
 
-
 ## Support
 Muon has an active and continuously expanding community. Our [Discord server](https://discord.com/invite/rcK4p8g7Ce) serves as the primary communication channel for day-to-day interactions and addressing development-related inquiries. 
 You can ask your development related questions in #dev-help channel.
