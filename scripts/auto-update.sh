@@ -63,6 +63,8 @@ check_for_update (){
     fi
 
     if echo $update_check | grep -q 'Already up to date'; then
+        log "Resatrt if stopped"
+        pm2 ls| grep muon-node-js-pion| grep online || pm2 start muon-node-js-pion
         log "No new updates";
     else
         log "========== updating detected ===========";
