@@ -85,6 +85,7 @@ export default class BaseCronJob extends BasePlugin {
    * @return {string} - nodeId of the leader
    */
   getLeader(): string {
+    return "1";
     let timestamp: number = Date.now();
 
     /** There is no leader in the leading gap. */
