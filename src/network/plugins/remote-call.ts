@@ -190,13 +190,15 @@ class RemoteCall extends BaseNetworkPlugin {
 
   call(peer, method: string, params: any, options: RemoteCallOptions={}){
     let exactMethod = this.getCallExactMethod(method, params);
+
+    if(!peer){
+      log.error(`Invalid peerId %s : %s`, peer, exactMethod)
+      return Promise.reject({message: `RemoteCall.call: Invalid peerId. method: ${method}`})
+    }
+
     const peerIdStr = peerId2Str(peer.id)
     log(`Calling peer %s : %s`, peerIdStr, exactMethod)
     // TODO: need more check
-    if(!peer){
-      log.error(`Invalid peerId %s : %s`, peerId2Str(peer.id), exactMethod)
-      return Promise.reject({message: `RemoteCall.call: Invalid peerId. method: ${method}`})
-    }
     lastCallTimes[peerIdStr] = Date.now();
     return this.getPeerStream(peer)
       .then(stream => {
