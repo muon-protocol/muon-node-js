@@ -226,7 +226,7 @@ const DefaultRpcList = {
     "https://base.llamarpc.com",
     "https://base.drpc.org",
     "https://base.rpc.subquery.network/public",
-    "https://evm-rpcs.jungoai.xyz/8453"
+    //"https://evm-rpcs.jungoai.xyz/8453"
   ],
 
   84532: [
