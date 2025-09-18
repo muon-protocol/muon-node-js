@@ -263,7 +263,7 @@ const DefaultRpcList = {
   6342: [
     "https://carrot.megaeth.com/rpc",
     "https://evm-rpcs.jungoai.xyz/6342"
-  ]
+  ],
 
   // Neurochain
   828: [
