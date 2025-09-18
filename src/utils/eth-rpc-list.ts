@@ -264,6 +264,11 @@ const DefaultRpcList = {
     "https://carrot.megaeth.com/rpc",
     "https://evm-rpcs.jungoai.xyz/6342"
   ]
+
+  // Neurochain
+  828: [
+    "https://evm-rpcs.jungoai.xyz/828"
+  ]
 }
 
 const finalRpcList = Object.entries(DefaultRpcList)

@@ -51,7 +51,8 @@ const nameToChainIdMap = {
 
   sepolia: 11155111,
   sonic: 146,
-  megaeth: 6342
+  megaeth: 6342,
+  neurochainTestnet: 828 
 }
 
 function getNetworkId(network) {
