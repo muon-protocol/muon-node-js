@@ -193,7 +193,8 @@ const DefaultRpcList = {
   /** Arbitrum mainnet */
   42161: [
     "https://arb1.arbitrum.io/rpc",
-    "https://rpc.ankr.com/arbitrum",
+    //"https://rpc.ankr.com/arbitrum",
+    "https://evm-rpcs.jungoai.xyz/42161",
     "https://arbitrum-one.public.blastapi.io",
   ],
 
@@ -255,8 +256,9 @@ const DefaultRpcList = {
 
   146: [
     "https://rpc.soniclabs.com",
-    "https://rpc.ankr.com/sonic_mainnet",
-    "https://sonic.drpc.org"
+    //"https://rpc.ankr.com/sonic_mainnet",
+    "https://sonic.drpc.org",
+    "https://evm-rpcs.jungoai.xyz/146"
   ],
 
   // MegaETH testnet
