@@ -863,7 +863,7 @@ export default class AppManager extends CallablePlugin {
   getNodeAllContexts(node: MuonNodeInfo): AppContext[] {
     return Object.values(this.appContexts)
       .filter((ctx:AppContext) => {
-        return ctx.party.partners.includes(node.id)
+        return node.isDeployer || ctx.party.partners.includes(node.id)
       })
   }
 
