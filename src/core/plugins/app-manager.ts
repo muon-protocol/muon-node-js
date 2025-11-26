@@ -684,7 +684,7 @@ export default class AppManager extends CallablePlugin {
 
   hasContext(ctx: AppContext): boolean {
     let existingCtx: AppContext = this.appContexts[ctx.seed];
-    return !existingCtx
+    return !!existingCtx
   }
 
   appHasTssKey(appId: string, seed: string): boolean {
