@@ -1,6 +1,6 @@
 {
   "networkId": 2,
-  "defaultLeader": "2",
+  "defaultLeader": "1",
   "tss": {
     "threshold": 2,
     "max": 20,
