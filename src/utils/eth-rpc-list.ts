@@ -179,8 +179,6 @@ const DefaultRpcList = {
     "https://avalanche-c-chain.publicnode.com",
     // "https://api.avax.network/ext/bc/C/rpc",
     "https://evm-rpcs.jungoai.xyz/43114",
-
-
   ],
 
   /** Avalanche FUJI testnet */
