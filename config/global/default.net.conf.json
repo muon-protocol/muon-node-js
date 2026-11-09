@@ -20,8 +20,8 @@
   "routing": {
     "delegate": [
       "http://3.136.59.242:8012/delegate",
-      "http://18.217.244.255:8012/delegate",
-      "http://52.14.167.242:8012/delegate"
+      "http://18.191.92.65:8012/delegate",
+      "http://77.113.241.167:8012/delegate"
     ],
     "ifconfig":[
       "http://3.136.59.242:8012/ifconfig"
